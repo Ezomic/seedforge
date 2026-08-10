@@ -72,33 +72,46 @@ def build_floor(slab, marble):
 
 
 def build_walls(block, terracotta):
-    """Two runs meeting at a corner. 'Cornered' is a death cause; it needs a corner."""
+    """Two runs meeting at a corner. 'Cornered' is a death cause; it needs a corner.
+
+    Each block is 400 long in X and 60 thick in Y, so a run along Y has to be yawed 90 and
+    a run along X must not be. The first version had these the wrong way round, which laid
+    the blocks across the wall line like a comb rather than along it."""
     half = COURT * CELL / 2.0
     n = 0
-    # Run along -X, facing in
     for i in range(COURT):
         y = (i - (COURT - 1) / 2.0) * CELL
-        if place(block, (-half, y, 100.0), material=terracotta, label="Wall_X_{}".format(i)):
+        if place(block, (-half, y, 100.0), 90.0, terracotta, "Wall_X_{}".format(i)):
             n += 1
-    # Run along -Y, rotated to meet it
     for i in range(COURT):
         x = (i - (COURT - 1) / 2.0) * CELL
-        if place(block, (x, -half, 100.0), (0.0, 90.0, 0.0), terracotta, "Wall_Y_{}".format(i)):
+        if place(block, (x, -half, 100.0), 0.0, terracotta, "Wall_Y_{}".format(i)):
             n += 1
     log("walls: {} blocks forming one corner".format(n))
 
 
 def build_colonnade(column, marble):
-    """A defile on the +X side: 3m clear, narrower than the 2.5m band plus two bodies."""
+    """One row, on the court. Cover to be lost behind - that is all this is for.
+
+    It used to be two rows eight metres apart, described in the comment as a defile, which
+    it was not; and the second row stood three metres past the floor edge on nothing. A
+    defile wants solid walls you cannot slip between, so it is built separately below."""
     n = 0
-    gap = 150.0
     for i in range(4):
-        y = -600.0 + i * 400.0
-        if place(column, (900.0, y - gap, 0.0), material=marble, label="Col_A_{}".format(i)):
+        y = -600.0 + i * CELL
+        if place(column, (900.0, y, 0.0), 0.0, marble, "Col_{}".format(i)):
             n += 1
-        if place(column, (1700.0, y + gap, 0.0), material=marble, label="Col_B_{}".format(i)):
+    log("colonnade: {} columns in one row, all on the floor".format(n))
+
+
+def build_defile(block, terracotta):
+    """A 3m gap in a wall that spans the court - narrower than the 2.5m engagement band
+    plus two bodies, so spacing has to break down to pass through it."""
+    n = 0
+    for x in (-1150.0, -750.0, -350.0, 350.0, 750.0, 1150.0):
+        if place(block, (x, 800.0, 100.0), 0.0, terracotta, "Defile_{:.0f}".format(x)):
             n += 1
-    log("colonnade: {} columns, two staggered rows".format(n))
+    log("defile: {} blocks leaving a {:.1f}m gap".format(n, 300.0 / 100.0))
 
 
 def build_lighting():
@@ -157,8 +170,25 @@ def build_fighters():
 
 
 def main():
-    les.new_level(LEVEL)
-    log("created level " + LEVEL)
+    # Rebuild in place rather than delete-and-recreate. The level is the editor startup
+    # map, so a commandlet has it loaded and cannot delete the world it is standing in -
+    # delete_asset silently did nothing and new_level then refused the occupied path.
+    if lib.does_asset_exist(LEVEL):
+        les.load_level(LEVEL)
+        existing = eas.get_all_level_actors()
+        cleared = 0
+        for a in existing:
+            try:
+                eas.destroy_actor(a)
+                cleared += 1
+            except Exception:
+                pass
+        log("reusing {}, cleared {} of {} actors".format(LEVEL, cleared, len(existing)))
+    else:
+        if not les.new_level(LEVEL):
+            log("ABORT: could not create " + LEVEL)
+            return
+        log("created level " + LEVEL)
 
     slab, block, column = mesh("SM_FloorSlab"), mesh("SM_WallBlock"), mesh("SM_Column_Doric")
     marble, terracotta = mat("M_Ichor_Marble"), mat("M_Ichor_Terracotta")
@@ -173,14 +203,19 @@ def main():
     build_floor(slab, sand or marble)
     build_walls(block, terracotta)
     build_colonnade(column, marble)
+    build_defile(block, terracotta)
     build_lighting()
     build_fighters()
 
-    les.save_current_level()
-    log("saved")
+    if not les.save_current_level():
+        log("SAVE FAILED - nothing was written to disk")
+        return
 
     actors = eas.get_all_level_actors()
-    log("VERIFIED: {} actors in {}".format(len(actors), LEVEL))
+    if not lib.does_asset_exist(LEVEL):
+        log("VERIFY FAIL: {} does not exist after saving".format(LEVEL))
+        return
+    log("VERIFIED: {} actors saved to {}".format(len(actors), LEVEL))
 
 
 main()
