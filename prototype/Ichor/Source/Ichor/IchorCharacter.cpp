@@ -2,6 +2,7 @@
 
 #include "IchorCharacter.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/Engine.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -10,13 +11,16 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "IchorCombatComponent.h"
 #include "Ichor.h"
 
 AIchorCharacter::AIchorCharacter()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
+
 	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -26,8 +30,6 @@ AIchorCharacter::AIchorCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
 
-	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
-	// instead of recompiling to adjust them
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.35f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
@@ -46,15 +48,40 @@ AIchorCharacter::AIchorCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	Combat = CreateDefaultSubobject<UIchorCombatComponent>(TEXT("Combat"));
+}
+
+void AIchorCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!Combat) { return; }
+
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+
+	// Commitment is rotational as well as temporal. The clamp is what stops a committed
+	// attack from quietly tracking its target, which is the commonest reason this kind of
+	// combat reads as cheap.
+	Move->RotationRate.Yaw = Combat->GetAllowedTurnRate();
+
+	// ...and positional. You cannot stroll through your own swing.
+	float Scale = 1.f;
+	if (Combat->IsCommitted())                        { Scale = CommittedMoveScale; }
+	else if (Combat->IsBlocking())                    { Scale = BlockingMoveScale; }
+	if (Combat->GetState() == EIchorCombatState::Staggered) { Scale = 0.f; }
+	Move->MaxWalkSpeed = BaseWalkSpeed * Scale;
+
+	if (bShowCombatDebug && GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(1001, 0.f, FColor::Green,
+			FString::Printf(TEXT("PLAYER  %s"), *Combat->GetDebugLine()));
+	}
 }
 
 void AIchorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
@@ -65,11 +92,34 @@ void AIchorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AIchorCharacter::Look);
+
+		// Combat. Started rather than Triggered - attacks fire once on press and commit.
+		if (LightAttackAction) { EnhancedInputComponent->BindAction(LightAttackAction, ETriggerEvent::Started, this, &AIchorCharacter::OnLightAttack); }
+		if (HeavyAttackAction) { EnhancedInputComponent->BindAction(HeavyAttackAction, ETriggerEvent::Started, this, &AIchorCharacter::OnHeavyAttack); }
+		if (DodgeAction)       { EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &AIchorCharacter::OnDodge); }
+		if (BlockAction)
+		{
+			EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Started, this, &AIchorCharacter::OnBlockStart);
+			EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Completed, this, &AIchorCharacter::OnBlockEnd);
+		}
 	}
 	else
 	{
-		UE_LOG(LogIchor, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogIchor, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
 	}
+}
+
+void AIchorCharacter::OnLightAttack() { if (Combat) { Combat->TryAttack(EIchorAttack::Light); } }
+void AIchorCharacter::OnHeavyAttack() { if (Combat) { Combat->TryAttack(EIchorAttack::Heavy); } }
+void AIchorCharacter::OnBlockStart()  { if (Combat) { Combat->SetBlocking(true); } }
+void AIchorCharacter::OnBlockEnd()    { if (Combat) { Combat->SetBlocking(false); } }
+
+void AIchorCharacter::OnDodge()
+{
+	if (!Combat) { return; }
+	// Dodge in the direction of travel, or backwards when standing still.
+	FVector Dir = LastMoveDirection.IsNearlyZero() ? -GetActorForwardVector() : LastMoveDirection;
+	Combat->TryDodge(Dir);
 }
 
 void AIchorCharacter::Move(const FInputActionValue& Value)
@@ -101,10 +151,13 @@ void AIchorCharacter::DoMove(float Right, float Forward)
 		// get forward vector
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 
-		// get right vector 
+		// get right vector
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// add movement 
+		// remember intent so a dodge has a direction to use
+		LastMoveDirection = (ForwardDirection * Forward + RightDirection * Right).GetSafeNormal();
+
+		// add movement
 		AddMovementInput(ForwardDirection, Forward);
 		AddMovementInput(RightDirection, Right);
 	}

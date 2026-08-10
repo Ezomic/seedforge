@@ -10,13 +10,16 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UIchorCombatComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 /**
- *  A simple player-controllable third person character
- *  Implements a controllable orbiting camera
+ *  Third person player character for the Stage 0 grey-box prototype.
+ *
+ *  Combat lives in UIchorCombatComponent, shared with the skirmisher. This class only
+ *  translates input into intent and enforces the movement side of commitment.
  */
 UCLASS(abstract)
 class AIchorCharacter : public ACharacter
@@ -30,7 +33,11 @@ class AIchorCharacter : public ACharacter
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
-	
+
+	/** Health, stamina, poise and the committed attack cycle */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	UIchorCombatComponent* Combat;
+
 protected:
 
 	/** Jump Input Action */
@@ -49,10 +56,41 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
+	/** Light attack */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* LightAttackAction;
+
+	/** Heavy attack */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* HeavyAttackAction;
+
+	/** Hold to block */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* BlockAction;
+
+	/** Directional dodge-step. No invincibility frames - see the combat component. */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* DodgeAction;
+
+	/** Movement speed multiplier while committed to an attack. Commitment is not only rotational. */
+	UPROPERTY(EditAnywhere, Category="Tuning|Movement")
+	float CommittedMoveScale = 0.25f;
+
+	UPROPERTY(EditAnywhere, Category="Tuning|Movement")
+	float BlockingMoveScale = 0.45f;
+
+	/** Always-on state readout. You will read this more than the code. */
+	UPROPERTY(EditAnywhere, Category="Debug")
+	bool bShowCombatDebug = true;
+
 public:
 
 	/** Constructor */
-	AIchorCharacter();	
+	AIchorCharacter();
+
+	virtual void Tick(float DeltaSeconds) override;
+
+	UIchorCombatComponent* GetCombat() const { return Combat; }
 
 protected:
 
@@ -66,6 +104,12 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+
+	void OnLightAttack();
+	void OnHeavyAttack();
+	void OnBlockStart();
+	void OnBlockEnd();
+	void OnDodge();
 
 public:
 
@@ -92,5 +136,11 @@ public:
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-};
 
+private:
+
+	/** Last world-space movement intent, used to pick a dodge direction. */
+	FVector LastMoveDirection = FVector::ZeroVector;
+
+	float BaseWalkSpeed = 500.f;
+};
