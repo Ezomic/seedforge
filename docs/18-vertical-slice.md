@@ -24,11 +24,16 @@ Scope around the **riskiest** assumptions, not the most enjoyable ones to build.
 
 # Stage 0 — the grey-box prototype
 
-**Two to three weeks. One empty box, one enemy, no art, no map, no loot.**
+**About four weeks. One empty box, one enemy, no art, no map, no loot.**
 
 Stage 0 answers the highest-risk question at roughly **10% of the slice's cost**. If a single
 fight is not tense in a grey box, it will not become tense because a forest was added around
 it.
+
+> The ticketed estimate is 164 h across 14 tickets. An earlier draft said "two to three
+> weeks", which was wishful — building a controller, a combat kit, an AI, instrumentation
+> *and* running 200 tuning fights does not fit in three weeks for one person. The four-week
+> figure is the honest one; the scope is unchanged.
 
 ## Write the hypothesis first
 
@@ -61,9 +66,8 @@ instantly measures nothing.
 sword, and it fits the setting). Light attack, heavy attack. Block. Directional dodge-step.
 Stamina. Health.
 
-**One skirmisher.** A state machine of ~200 lines, not a behaviour tree: approach → circle at
-spacing → commit → recover → punish whiffs → back off at low stamina. Resist making it
-clever. If a dumb enemy at correct spacing is tense, that is a real result.
+**One skirmisher.** Specified in full below — it *is* the experiment. Resist making it
+clever; if a dumb enemy at correct spacing is tense, that is a real result.
 
 Nothing else. No magic, no second enemy, no combos, no parry, no second weapon.
 
@@ -94,12 +98,150 @@ which is the point and what makes terrain matter later. It is also the call most
 wrong: if the prototype reads as unfair while the telegraphs are demonstrably clean, this is
 suspect number one.
 
+---
+
+## The skirmisher state machine
+
+The player's controls only need to stay out of the way. **The enemy is what creates the
+fight**, so this is the most load-bearing single piece of Stage 0.
+
+### It is a rhythm generator, not an opponent
+
+Its job is not to be smart or to win. It is to produce **readable pressure with legible
+gaps** — the player continuously choosing under threat, able to see openings and take or
+decline them.
+
+The governing variable is the **window**: the beat after a commit where the player decides to
+punish, reposition, drink, or wait. Too short and the fight is reaction-only; too long and it
+is trivial; unreadable and it is frustrating at any length.
+
+### States
+
+| State | Purpose |
+|---|---|
+| `Unaware` | Pre-aggro. Minimal now; matters once the bow exists |
+| `Approach` | Close to the engagement band |
+| `Neutral` | Strafe, hold spacing, accumulate desire. **The most important state** |
+| `Tell` | ~0.15 s weight-shift before wind-up |
+| `Commit` | Wind-up → active → recovery |
+| `Punish` | Fast reactive attack on a player whiff |
+| `Rest` | Deliberate back-off |
+| `Stagger` / `Dead` | Poise broken; terminal |
+
+`Neutral` is routinely under-built. Tension lives there — an enemy that is always attacking
+has no neutral, and a fight with no neutral contains no decisions.
+
+### Committing: a desire accumulator, not a timer
+
+A timer is predictable and dull; pure reaction feels arbitrary. Instead, desire builds while
+in the engagement band — faster when the player is close, faster still when the player is in
+their own recovery. Commit when `desire > threshold`, then reset with jitter.
+
+Pressure becomes something the player can feel building without being able to count it.
+
+### The rest cadence is designed content
+
+After three commits or ~6 seconds of pressure, the skirmisher **must** disengage for 1–2
+seconds.
+
+> The pause is a feature, not an absence of behaviour. It is where the player heals,
+> repositions and thinks, and it is what makes a fight read as an exchange rather than an
+> onslaught. **Continuous pressure removes decision-making and reads as unfair even when it
+> is survivable.**
+
+### Anti-frustration rules
+
+**Clamp rotation during commit — 30°/s during wind-up, zero during active frames.**
+
+> This is the most important rule on the page. Enemies that snap-track through their own
+> attack are the commonest reason commitment-based combat feels cheap: the dodge is correct,
+> the hit lands anyway, and the player correctly concludes the game is lying to them.
+>
+> **With i-frames removed, this clamp is doing all the fairness work i-frames would otherwise
+> do.** Get it wrong and Stage 0 will read as a design failure when it is a tracking bug.
+
+Also:
+
+- **Never attack from off-screen without audio** — see the telegraph contract
+- **No chaining into player stagger** beyond a single follow-up. No true loops
+- **Must return to spacing before re-committing**, guaranteeing a beat between attacks
+
+### Readability from the AI side
+
+- **The `Tell` state.** 0.15 s of weight-shift before the wind-up proper. Enormous
+  readability gain without lengthening the attack — the cheapest fairness upgrade available
+- **Wind-up silhouettes must differ between attacks**, not just durations. If light and heavy
+  look alike for their first 0.3 s the player is guessing, and guessing reads as unfair
+
+### Give the enemy stamina
+
+It should tire visibly: slower strafing, longer rests, heavier breathing. Three things follow —
+defensive play gains a **readable reward**, the rest cadence becomes diegetic rather than
+arbitrary, and the player has a reason to watch the enemy instead of their own cooldowns.
+
+### The knobs are the tuning protocol's variables
+
+Six floats, editable without recompiling. If tuning needs a code change it will happen less
+often and teach less.
+
+```
+desireGainRate        preferredSpacing
+restDuration          punishReactionTime
+windupScale           trackingCapDegPerSec
+```
+
+### It emits the telemetry the gate depends on
+
+The machine knows the answer at the moment of the killing blow, so have it stamp the context
+rather than filling the taxonomy in by hand:
+
+> attacker on screen · player mid-recovery · player stamina at impact · which attack ·
+> time since the player's last input
+
+That is the difference between *"it felt unfair"* and *"41% of deaths were off-screen
+attacks."*
+
+### Implementation
+
+**A C++ enum and a switch statement on the pawn. Not a Behaviour Tree.** BTs earn their keep
+with many agents and designer-authored logic; for one enemy in disposable code a switch is
+faster to write, faster to change and trivially debuggable. Blackboards and task nodes are
+ceremony for something being thrown away.
+
+**Always-on debug draw**: state, desire, spacing, active timers, tracking angle. You will read
+that overlay more than the code.
+
+Perception is `distance + dot(forward, toPlayer)` — no perception system, no stimuli config.
+
+### Starting values
+
+| | |
+|---|---|
+| Preferred spacing | 2.5 m (just outside spear reach) |
+| Desire threshold | 1.0; +0.35/s in band, +0.6/s if player recovering |
+| Rest trigger | 3 commits or 6 s |
+| Rest duration | 1.5 s |
+| Tell | 0.15 s |
+| Tracking cap | 30°/s wind-up, 0°/s active |
+| Punish reaction | 0.25 s after whiff detection |
+| Enemy stamina | 100; 30 per attack; regen 15/s |
+
+### Not in the skirmisher
+
+Group coordination · flanking · pathfinding beyond `MoveTo` · a perception system · difficulty
+scaling · more than two attacks · **feints** (tempting, and only meaningful once the player can
+reliably read the honest attacks).
+
+---
+
 ## Instrumentation
 
 "Tense or frustrating?" cannot be answered by recollection after 200 fights.
 
 Log every fight: duration, HP remaining, damage taken, hits landed, whiffs, blocks, dodges.
-Then the part that does the real work — **classify every death by cause:**
+Then the part that does the real work — **classify every death by cause**, which the
+[state machine stamps automatically](#it-emits-the-telemetry-the-gate-depends-on) rather than
+being recorded by hand:
 
 - ran out of stamina
 - whiff-punished
@@ -295,7 +437,7 @@ context; **step 3 is the actual experiment.**
 
 ## Estimate
 
-Stage 0: two to three weeks. Slice: a further three to four months.
+Stage 0: about four weeks (164 h ticketed). Slice: a further three to four months.
 
 Vertical slices routinely take twice their estimate, mostly from step 9 onward where "just one
 more system" accumulates. **The gate at step 4 is what protects against spending that before
