@@ -12,15 +12,25 @@
 
 import unreal
 
-OUT_DIR = "/Game/Ichor/Anims/Unarmed"
 ANIMS = "/Game/Characters/Mannequins/Anims"
 
-# (montage, source clip, what the combat component drives it with)
+# (folder, montage, source clip, what the combat component drives it with)
+#
+# Armed deliberately draws different clips from unarmed. There is no spear animation
+# anywhere in the project and none is being authored yet, so the armed moveset is the
+# same mannequin motion with a spear in hand - but picking MM_Attack_02 and
+# MM_ChargedAttack rather than 01 and 03 at least makes the two loadouts read as
+# different fighters instead of the same one holding a stick.
 WANTED = [
-    ("AM_Light_Unarmed",   ANIMS + "/Unarmed/Attack/MM_Attack_01",          "Light: 1.000s -> 0.85s"),
-    ("AM_Heavy_Unarmed",   ANIMS + "/Unarmed/Attack/MM_Attack_03",          "Heavy: 1.667s -> 1.64s"),
-    ("AM_Stagger_Unarmed", ANIMS + "/Rifle/HitReact/MM_HitReact_Front_Med_01", "Stagger: 0.767s -> 0.70s"),
-    ("AM_Death_Unarmed",   ANIMS + "/Death/MM_Death_Front_01",              "Death: 1.100s, unscaled"),
+    ("Unarmed", "AM_Light_Unarmed",   ANIMS + "/Unarmed/Attack/MM_Attack_01",             "Light: 1.000s -> 0.85s"),
+    ("Unarmed", "AM_Heavy_Unarmed",   ANIMS + "/Unarmed/Attack/MM_Attack_03",             "Heavy: 1.667s -> 1.64s"),
+    ("Unarmed", "AM_Stagger_Unarmed", ANIMS + "/Rifle/HitReact/MM_HitReact_Front_Med_01", "Stagger: 0.767s -> 0.70s"),
+    ("Unarmed", "AM_Death_Unarmed",   ANIMS + "/Death/MM_Death_Front_01",                 "Death: 1.100s, unscaled"),
+
+    ("Spear",   "AM_Light_Spear",     ANIMS + "/Unarmed/Attack/MM_Attack_02",             "Light: 1.000s -> 0.85s"),
+    ("Spear",   "AM_Heavy_Spear",     ANIMS + "/Unarmed/Attack/MM_ChargedAttack",         "Heavy: 1.833s -> 1.64s"),
+    ("Spear",   "AM_Stagger_Spear",   ANIMS + "/Rifle/HitReact/MM_HitReact_Front_Hvy_01", "Stagger: 0.800s -> 0.70s"),
+    ("Spear",   "AM_Death_Spear",     ANIMS + "/Death/MM_Death_Front_02",                 "Death: unscaled"),
 ]
 
 lib = unreal.EditorAssetLibrary
@@ -43,8 +53,9 @@ def play_length(asset):
         return -1.0
 
 
-def build(name, source_path, note):
-    out = "{}/{}".format(OUT_DIR, name)
+def build(folder, name, source_path, note):
+    out_dir = "/Game/Ichor/Anims/" + folder
+    out = "{}/{}".format(out_dir, name)
     if lib.does_asset_exist(out):
         log("exists, left alone: " + name)
         return True
@@ -72,7 +83,10 @@ def build(name, source_path, note):
             e, [p for p in dir(factory) if not p.startswith("_")]))
         return False
 
-    montage = tools.create_asset(name, OUT_DIR, unreal.AnimMontage, factory)
+    if not lib.does_directory_exist(out_dir):
+        lib.make_directory(out_dir)
+
+    montage = tools.create_asset(name, out_dir, unreal.AnimMontage, factory)
     if montage is None:
         log("create_asset returned None for " + name)
         return False
@@ -85,8 +99,8 @@ def build(name, source_path, note):
 def verify():
     """Reload from disk and confirm the montage actually contains the clip."""
     ok = True
-    for name, source_path, _ in WANTED:
-        out = "{}/{}".format(OUT_DIR, name)
+    for folder, name, source_path, _ in WANTED:
+        out = "/Game/Ichor/Anims/{}/{}".format(folder, name)
         m = lib.load_asset(out)
         if m is None:
             log("VERIFY FAIL: {} does not exist".format(name))
@@ -112,12 +126,8 @@ def verify():
 
 
 def main():
-    if not lib.does_directory_exist(OUT_DIR):
-        lib.make_directory(OUT_DIR)
-        log("created " + OUT_DIR)
-
-    for name, source_path, note in WANTED:
-        build(name, source_path, note)
+    for folder, name, source_path, note in WANTED:
+        build(folder, name, source_path, note)
 
     log("VERIFIED: all montages contain their clip" if verify()
         else "FAILED: see the verify lines above - do not wire C++ to these yet")

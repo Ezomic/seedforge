@@ -9,6 +9,9 @@
 #include "Engine/OverlapResult.h"
 #include "DrawDebugHelpers.h"
 #include "Animation/AnimMontage.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Ichor.h"
 
@@ -28,6 +31,69 @@ UIchorCombatComponent::UIchorCombatComponent()
 	if (HeavyAsset.Succeeded())   { HeavyMontage = HeavyAsset.Object; }
 	if (StaggerAsset.Succeeded()) { StaggerMontage = StaggerAsset.Object; }
 	if (DeathAsset.Succeeded())   { DeathMontage = DeathAsset.Object; }
+
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearLightAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Light_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearHeavyAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Heavy_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearStaggerAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Stagger_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearDeathAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Death_Spear"));
+
+	if (SpearLightAsset.Succeeded())   { SpearLightMontage = SpearLightAsset.Object; }
+	if (SpearHeavyAsset.Succeeded())   { SpearHeavyMontage = SpearHeavyAsset.Object; }
+	if (SpearStaggerAsset.Succeeded()) { SpearStaggerMontage = SpearStaggerAsset.Object; }
+	if (SpearDeathAsset.Succeeded())   { SpearDeathMontage = SpearDeathAsset.Object; }
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderAsset(TEXT("/Engine/BasicShapes/Cylinder"));
+	if (CylinderAsset.Succeeded()) { CylinderMesh = CylinderAsset.Object; }
+}
+
+UAnimMontage* UIchorCombatComponent::PickMontage(UAnimMontage* Unarmed, UAnimMontage* Armed) const
+{
+	if (Loadout == EIchorLoadout::SpearAndShield && Armed) { return Armed; }
+	return Unarmed;
+}
+
+void UIchorCombatComponent::BuildWeaponVisuals()
+{
+	if (Loadout != EIchorLoadout::SpearAndShield) { return; }
+
+	ACharacter* Ch = Cast<ACharacter>(GetOwner());
+	USkeletalMeshComponent* Body = Ch ? Ch->GetMesh() : nullptr;
+	if (!Body || !CylinderMesh)
+	{
+		UE_LOG(LogIchor, Warning, TEXT("[loadout] %s armed but no %s - going without"),
+			*GetNameSafe(GetOwner()), Body ? TEXT("primitive mesh") : TEXT("skeletal mesh"));
+		return;
+	}
+
+	// Both are the same cylinder at different scales. A spear is a long thin one and a
+	// shield is a short fat one, which is as much as a grey box needs to say.
+	struct FLocal
+	{
+		static UStaticMeshComponent* Make(ACharacter* Owner, USkeletalMeshComponent* Parent,
+			UStaticMesh* Mesh, FName Bone, const FVector& Loc, const FRotator& Rot, const FVector& Scale)
+		{
+			UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
+			C->SetStaticMesh(Mesh);
+
+			// Never let a prop participate in the attack sweep - it traces on ECC_Pawn and
+			// a weapon that blocks it would have the character hitting its own spear.
+			C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			C->SetGenerateOverlapEvents(false);
+
+			C->RegisterComponent();
+			C->AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetIncludingScale, Bone);
+			C->SetRelativeLocation(Loc);
+			C->SetRelativeRotation(Rot);
+			C->SetRelativeScale3D(Scale);
+			return C;
+		}
+	};
+
+	SpearMesh = FLocal::Make(Ch, Body, CylinderMesh, SpearAttachBone, SpearOffset, SpearRotation, SpearScale);
+	ShieldMesh = FLocal::Make(Ch, Body, CylinderMesh, ShieldAttachBone, ShieldOffset, ShieldRotation, ShieldScale);
+
+	UE_LOG(LogIchor, Log, TEXT("[loadout] %s armed: spear on %s, shield on %s"),
+		*GetNameSafe(GetOwner()), *SpearAttachBone.ToString(), *ShieldAttachBone.ToString());
 }
 
 void UIchorCombatComponent::PlayMontageScaled(UAnimMontage* Montage, float TargetDuration) const
@@ -52,11 +118,19 @@ void UIchorCombatComponent::BeginPlay()
 	Stamina = MaxStamina;
 	Poise = MaxPoise;
 
+	BuildWeaponVisuals();
+
 	// A null montage plays nothing and says nothing, which is indistinguishable from an
-	// animation that simply looks wrong. Say it out loud once, at BeginPlay.
-	UE_LOG(LogIchor, Log, TEXT("[anim]   %s  light=%s heavy=%s stagger=%s death=%s"),
-		*GetNameSafe(GetOwner()), *GetNameSafe(LightMontage), *GetNameSafe(HeavyMontage),
-		*GetNameSafe(StaggerMontage), *GetNameSafe(DeathMontage));
+	// animation that simply looks wrong. Say it out loud once, at BeginPlay - and report
+	// what will actually play, not what is merely assigned.
+	static const UEnum* LoadoutEnum = StaticEnum<EIchorLoadout>();
+	UE_LOG(LogIchor, Log, TEXT("[anim]   %s  [%s]  light=%s heavy=%s stagger=%s death=%s"),
+		*GetNameSafe(GetOwner()),
+		LoadoutEnum ? *LoadoutEnum->GetNameStringByValue((int64)Loadout) : TEXT("?"),
+		*GetNameSafe(PickMontage(LightMontage, SpearLightMontage)),
+		*GetNameSafe(PickMontage(HeavyMontage, SpearHeavyMontage)),
+		*GetNameSafe(PickMontage(StaggerMontage, SpearStaggerMontage)),
+		*GetNameSafe(PickMontage(DeathMontage, SpearDeathMontage)));
 }
 
 float UIchorCombatComponent::GetAllowedTurnRate() const
@@ -223,15 +297,17 @@ void UIchorCombatComponent::EnterState(EIchorCombatState NewState)
 		const float Total = bHeavy
 			? HeavyWindup + HeavyActive + HeavyRecovery
 			: LightWindup + LightActive + LightRecovery;
-		PlayMontageScaled(bHeavy ? HeavyMontage : LightMontage, Total);
+		PlayMontageScaled(bHeavy
+			? PickMontage(HeavyMontage, SpearHeavyMontage)
+			: PickMontage(LightMontage, SpearLightMontage), Total);
 		break;
 	}
 	case EIchorCombatState::Staggered:
-		PlayMontageScaled(StaggerMontage, StaggerDuration);
+		PlayMontageScaled(PickMontage(StaggerMontage, SpearStaggerMontage), StaggerDuration);
 		break;
 
 	case EIchorCombatState::Dead:
-		PlayMontageScaled(DeathMontage, 0.f);
+		PlayMontageScaled(PickMontage(DeathMontage, SpearDeathMontage), 0.f);
 		break;
 
 	default:

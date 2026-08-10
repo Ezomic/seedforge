@@ -8,6 +8,8 @@
 
 class UIchorCombatComponent;
 class UAnimMontage;
+class UStaticMesh;
+class UStaticMeshComponent;
 
 /** Attacks commit. Once Windup begins there is no cancel - that is the design under test. */
 UENUM(BlueprintType)
@@ -27,6 +29,18 @@ enum class EIchorAttack : uint8
 {
 	Light,
 	Heavy
+};
+
+/**
+ *  One weapon class, not one weapon - doc 05 puts movesets on the class. Stage 0 has
+ *  exactly one armed loadout because doc 18's slice is spear and shield, and a second
+ *  weapon is on its explicit not-in-scope list.
+ */
+UENUM(BlueprintType)
+enum class EIchorLoadout : uint8
+{
+	Unarmed,
+	SpearAndShield
 };
 
 /**
@@ -164,6 +178,42 @@ public:
 	/** Plays unscaled - a death has no frame data to honour. */
 	UPROPERTY(EditAnywhere, Category = "Animation") UAnimMontage* DeathMontage;
 
+	/**
+	 *  The armed set. Different source clips from unarmed so the two loadouts read as
+	 *  different fighters rather than the same one holding a stick - but it is the same
+	 *  mannequin motion underneath. No spear animation exists in the project and none has
+	 *  been authored yet, so these are honest placeholders with correct frame data, which
+	 *  is the half doc 18 says cannot be faked.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearLightMontage;
+	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearHeavyMontage;
+	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearStaggerMontage;
+	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearDeathMontage;
+
+	// ---- loadout ------------------------------------------------------------
+	/** AttackRange is already 220 - spear reach - so armed needs no separate tuning. */
+	UPROPERTY(EditAnywhere, Category = "Loadout") EIchorLoadout Loadout = EIchorLoadout::SpearAndShield;
+
+	/**
+	 *  Grey-box weapons built from engine primitives at BeginPlay. Doc 18 says make
+	 *  nothing custom for the grey box, and a spear that is a scaled cylinder is on-spec.
+	 *
+	 *  These transforms are the one thing here I cannot get right without looking at it -
+	 *  hand bone axes are not something to reason about from a bone list. They are
+	 *  EditAnywhere so they can be dragged into place without a recompile.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FName SpearAttachBone = TEXT("hand_r");
+	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FVector SpearOffset = FVector(0.f, 0.f, 0.f);
+	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FRotator SpearRotation = FRotator(0.f, 0.f, 90.f);
+
+	/** 4cm across, 220cm long - the engine cylinder is 100cm in every axis. */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FVector SpearScale = FVector(0.04f, 0.04f, 1.1f);
+
+	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FName ShieldAttachBone = TEXT("hand_l");
+	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FVector ShieldOffset = FVector(0.f, 0.f, 0.f);
+	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FRotator ShieldRotation = FRotator(90.f, 0.f, 0.f);
+	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FVector ShieldScale = FVector(0.55f, 0.55f, 0.05f);
+
 	// ---- queries ------------------------------------------------------------
 	UFUNCTION(BlueprintPure, Category = "Ichor|Combat") EIchorCombatState GetState() const { return State; }
 	UFUNCTION(BlueprintPure, Category = "Ichor|Combat") float GetHealth() const { return Health; }
@@ -216,6 +266,18 @@ private:
 
 	/** Stretches Montage to last exactly TargetDuration. Pass 0 to play it unscaled. */
 	void PlayMontageScaled(UAnimMontage* Montage, float TargetDuration) const;
+
+	/** Armed choice when one exists, falling back to unarmed rather than playing nothing. */
+	UAnimMontage* PickMontage(UAnimMontage* Unarmed, UAnimMontage* Armed) const;
+
+	/** Spawns and attaches the grey-box spear and shield. No-op when unarmed. */
+	void BuildWeaponVisuals();
+
+	UPROPERTY() UStaticMeshComponent* SpearMesh = nullptr;
+	UPROPERTY() UStaticMeshComponent* ShieldMesh = nullptr;
+
+	/** Primitive sources, resolved in the constructor. */
+	UPROPERTY() UStaticMesh* CylinderMesh = nullptr;
 
 	EIchorCombatState State = EIchorCombatState::Idle;
 	EIchorAttack PendingAttack = EIchorAttack::Light;
