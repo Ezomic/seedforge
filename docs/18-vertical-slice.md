@@ -35,6 +35,9 @@ it.
 > *and* running 200 tuning fights does not fit in three weeks for one person. The four-week
 > figure is the honest one; the scope is unchanged.
 
+> The live record — hypothesis, parameters, tuning sessions, death-cause data and the
+> final verdict — is kept in **[stage0-log.md](stage0-log.md)**.
+
 ## Write the hypothesis first
 
 Stage 0 fails most often by quietly becoming a *combat system* instead of an *experiment*.
