@@ -15,6 +15,6 @@
     { "title": "Four-state schedules with no offline simulation", "description": "Home, work, social, sleep by time of day. NPCs are simply where they should be when the player looks.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["npcs"] },
     { "title": "Author and cast the 10-15 Principals", "description": "Hand-authored voice and arcs, cast into roles by the seed. Includes synergy-specific characters.", "type": "feature", "priority": "high", "estimate": "8w", "labels": ["npcs", "content", "narrative"] },
     { "title": "Principal VO recording and integration", "description": "Principals only. Everyone else gets vocalisations and text.", "type": "feature", "priority": "medium", "estimate": "4w", "labels": ["npcs", "audio"] },
-    { "title": "NPC appearance: base set, variation, per-region tinting", "description": "Isolated Sundering valleys should look isolated. Measure MetaHuman cost at this population count before committing.", "type": "feature", "priority": "medium", "estimate": "3w", "labels": ["npcs", "art"] }
+    { "title": "NPC appearance: base set, variation, per-region tinting", "description": "Valleys cut off by the Unbinding should look isolated. Measure MetaHuman cost at this population count before committing.", "type": "feature", "priority": "medium", "estimate": "3w", "labels": ["npcs", "art"] }
   ]
 }
