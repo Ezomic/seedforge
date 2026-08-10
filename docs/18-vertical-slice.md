@@ -422,26 +422,43 @@ outside.**
 | 4 | Two outside testers; **write the verdict down** | **GATE** |
 | **Slice** | | |
 | 5 | The four architecture items | First permanent code |
-| 6 | Bow and the preparation loop | |
-| 7 | Anchor and Artillery, validated across all five terrain conditions | |
-| 8 | The 500 m map | |
-| 9 | Loot, consumables, encumbrance, merchant, repair | Scope creep starts here |
-| 10 | The dungeon | |
-| 11 | Discovery XP, trainer, capability unlocks | |
-| 12 | Navigation, landmarks, the no-waypoint test | |
-| 13 | The Law swap test | |
-| 14 | Full outside playtest, five fresh players | |
+| 6 | **Rebuild the Stage 0 loop on it** | Stage 0 was disposable; this is where it becomes real |
+| 7 | Bow and the preparation loop | |
+| 8 | Anchor and Artillery, validated across all five terrain conditions | |
+| 9 | The 500 m map | |
+| 10 | Loot, consumables, encumbrance, merchant, repair | Scope creep starts here |
+| 11 | The dungeon | |
+| 12 | Discovery XP, trainer, capability unlocks | |
+| 13 | Navigation, landmarks, the no-waypoint test | |
+| 14 | The Law swap test | |
+| 15 | Full outside playtest, five fresh players | |
 
-Steps 1–4 are roughly **40% of the total value**. Everything after step 6 is confirmation and
-context; **step 3 is the actual experiment.**
+Steps 1–4 are **a fifth of the hours and the majority of the risk**. Everything after step 7
+is confirmation and context; **step 3 is the actual experiment.**
+
+Step 6 exists because Stage 0 is thrown away on purpose. It was previously implied by the
+text and had no ticket, which is exactly how a week of work goes missing from a plan.
 
 ## Estimate
 
-Stage 0: about four weeks (164 h ticketed). Slice: a further three to four months.
+| | Ticketed | |
+|---|---|---|
+| Stage 0 | 162 h | ~4 weeks |
+| Slice proper | 642 h | ~16 weeks (3.7 months) |
+| **Milestone 1 total** | **804 h** | **~20 weeks (4.6 months)** |
 
-Vertical slices routinely take twice their estimate, mostly from step 9 onward where "just one
-more system" accumulates. **The gate at step 4 is what protects against spending that before
-knowing whether the premise holds.**
+Both figures were recalibrated after the first coarse pass, which had inflated Stage 0 to
+388 h and priced slice tickets as though each were built from scratch. They are not: **Stage 0
+leaves reusable pieces behind.** Enemy roles reuse the skirmisher machine, the bow reuses the
+weapon class, and merchant and trainer share one interaction pattern — so the second enemy
+costs a fraction of the first.
+
+Working assumptions: 40 h weeks, one person, reasonable UE C++ fluency, and no
+already-solved-it advantage on any of it.
+
+> Vertical slices routinely take twice their estimate, mostly from step 9 onward where "just
+> one more system" accumulates. **The gate at step 4 is what protects against spending that
+> before knowing whether the premise holds** — it is 162 h in, or a fifth of the milestone.
 
 ## Next
 
