@@ -103,7 +103,15 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 	}
 
 	Health = FMath::Max(0.f, Health - Applied);
-	Poise = FMath::Max(0.f, Poise - PoiseDamage);
+
+	// A blocked heavy would otherwise guarantee a stagger, which makes blocking a heavy
+	// strictly worse than doing nothing.
+	const float AppliedPoise = bBlocked ? PoiseDamage * BlockedPoiseRatio : PoiseDamage;
+	if (AppliedPoise > 0.f)
+	{
+		Poise = FMath::Max(0.f, Poise - AppliedPoise);
+		TimeSincePoiseDamage = 0.f;
+	}
 
 	OnDamaged.Broadcast(Applied, FromActor, bBlocked);
 
@@ -252,6 +260,7 @@ void UIchorCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	StateTimer += DeltaTime;
 	TimeSinceStaminaSpend += DeltaTime;
+	TimeSincePoiseDamage += DeltaTime;
 
 	// Stamina only recovers once the owner stops spending it.
 	if (TimeSinceStaminaSpend >= StaminaRegenDelay && !IsBlocking())
@@ -259,7 +268,8 @@ void UIchorCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		Stamina = FMath::Min(MaxStamina, Stamina + StaminaRegenPerSec * DeltaTime);
 	}
 
-	if (State == EIchorCombatState::Idle)
+	// Same shape as stamina: recovery starts only once the pressure stops.
+	if (State == EIchorCombatState::Idle && TimeSincePoiseDamage >= PoiseRegenDelay)
 	{
 		Poise = FMath::Min(MaxPoise, Poise + PoiseRegenPerSec * DeltaTime);
 	}
@@ -298,7 +308,12 @@ void UIchorCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	case EIchorCombatState::Staggered:
 		if (StateTimer >= StaggerDuration)
 		{
-			Poise = MaxPoise * 0.5f;
+			// Full, not half. At half, the next light would re-stagger immediately and the
+			// regen delay would hold it there - a stunlock, not a fight. Full poise also
+			// means nobody is staggered twice in a fight that ends in three hits, so the
+			// opening a stagger buys has to actually be converted.
+			Poise = MaxPoise;
+			TimeSincePoiseDamage = 999.f;
 			EnterState(EIchorCombatState::Idle);
 		}
 		break;

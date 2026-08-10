@@ -74,8 +74,26 @@ public:
 
 	/** Stagger is the currency of melee: winning is about who gets interrupted. */
 	UPROPERTY(EditAnywhere, Category = "Tuning|Vitals") float MaxPoise = 100.f;
-	UPROPERTY(EditAnywhere, Category = "Tuning|Vitals") float PoiseRegenPerSec = 20.f;
+	UPROPERTY(EditAnywhere, Category = "Tuning|Vitals") float PoiseRegenPerSec = 35.f;
+
+	/**
+	 *  Poise used to refill the moment the victim returned to Idle, which meant nothing
+	 *  ever accumulated across a combo and stagger was unreachable inside a fight that ends
+	 *  in three hits. The delay is what makes consecutive hits mean something, exactly as
+	 *  StaminaRegenDelay does for attacking.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Tuning|Vitals") float PoiseRegenDelay = 1.5f;
+
+	/**
+	 *  0.7s: long enough that an immediate follow-up connects, short enough that it is not
+	 *  guaranteed. A light lands 0.75s after the previous one (0.40 recovery + 0.35
+	 *  wind-up), so the victim recovers a hair before it arrives unless the attacker
+	 *  committed instantly. The opening is real but it must be taken.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Tuning|Vitals") float StaggerDuration = 0.7f;
+
+	/** Blocking absorbs impact as well as damage, or heavies would make blocking pointless. */
+	UPROPERTY(EditAnywhere, Category = "Tuning|Defence") float BlockedPoiseRatio = 0.5f;
 
 	// ---- tuning: attacks ----------------------------------------------------
 	/** 100 health, so three lights or two heavies. Doc 18 asks for a 2-3 hit fight. */
@@ -84,14 +102,20 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightActive = 0.10f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightRecovery = 0.40f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightStaminaCost = 20.f;
-	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightPoiseDamage = 25.f;
+	/** Two consecutive lights stagger. One does not - the poke is safe, not decisive. */
+	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightPoiseDamage = 55.f;
 
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyDamage = 55.f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyWindup = 0.70f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyActive = 0.14f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyRecovery = 0.80f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyStaminaCost = 35.f;
-	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyPoiseDamage = 45.f;
+	/**
+	 *  Equal to MaxPoise, so an unblocked heavy always staggers. This is what gives the two
+	 *  attacks distinct jobs: light is the poke, heavy is the interrupt. It is also the
+	 *  only way to break a committed wind-up, and it costs a 0.70s tell to do it.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyPoiseDamage = 100.f;
 
 	/** Spear reach. Spacing reads more legibly with reach than with a sword. */
 	UPROPERTY(EditAnywhere, Category = "Tuning|Reach") float AttackRange = 220.f;
@@ -179,6 +203,7 @@ private:
 
 	float StateTimer = 0.f;
 	float TimeSinceStaminaSpend = 999.f;
+	float TimeSincePoiseDamage = 999.f;
 
 	bool bBlocking = false;
 	bool bTraceDoneThisSwing = false;
