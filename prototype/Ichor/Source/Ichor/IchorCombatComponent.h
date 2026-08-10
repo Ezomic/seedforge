@@ -10,6 +10,7 @@ class UIchorCombatComponent;
 class UAnimMontage;
 class UStaticMesh;
 class UStaticMeshComponent;
+class UMaterialInterface;
 
 /** Attacks commit. Once Windup begins there is no cancel - that is the design under test. */
 UENUM(BlueprintType)
@@ -209,6 +210,20 @@ public:
 	/** The generated meshes are already real-world size, so this is a correction, not a fit. */
 	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FVector SpearScale = FVector(1.f, 1.f, 1.f);
 
+	/**
+	 *  Doc 16 puts covered faces on day one - it deletes facial rigging, animation and
+	 *  lipsync from the project in one decision, and a Corinthian helm happens to be
+	 *  exactly the right answer for hoplites. It also solves a grey-box problem: two
+	 *  identical mannequins are hard to tell apart mid-fight, and a crest colour is
+	 *  readable from any angle at any distance.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FName HelmetAttachBone = TEXT("head");
+	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FVector HelmetOffset = FVector(0.f, 0.f, 0.f);
+	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FRotator HelmetRotation = FRotator(0.f, 0.f, 0.f);
+
+	/** Material slot 1 on the helmet. Set this differently per Blueprint to tell sides apart. */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") UMaterialInterface* CrestMaterial;
+
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FName ShieldAttachBone = TEXT("hand_l");
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FVector ShieldOffset = FVector(0.f, 0.f, 0.f);
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FRotator ShieldRotation = FRotator(90.f, 0.f, 0.f);
@@ -284,6 +299,12 @@ private:
 	 */
 	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") UStaticMesh* SpearMeshAsset;
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") UStaticMesh* ShieldMeshAsset;
+	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") UStaticMesh* HelmetMeshAsset;
+
+	/** Bronze, shared by all three pieces of kit. */
+	UPROPERTY(EditAnywhere, Category = "Loadout") UMaterialInterface* KitMaterial;
+
+	UPROPERTY() UStaticMeshComponent* HelmetMesh = nullptr;
 
 	EIchorCombatState State = EIchorCombatState::Idle;
 	EIchorAttack PendingAttack = EIchorAttack::Light;

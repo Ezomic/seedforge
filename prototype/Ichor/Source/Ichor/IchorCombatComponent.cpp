@@ -12,6 +12,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Ichor.h"
 
@@ -44,9 +45,17 @@ UIchorCombatComponent::UIchorCombatComponent()
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DoryAsset(TEXT("/Game/Ichor/Weapons/SM_Dory"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> AspisAsset(TEXT("/Game/Ichor/Weapons/SM_Aspis"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HelmAsset(TEXT("/Game/Ichor/Props/SM_Helmet_Corinthian"));
 
 	if (DoryAsset.Succeeded())  { SpearMeshAsset = DoryAsset.Object; }
 	if (AspisAsset.Succeeded()) { ShieldMeshAsset = AspisAsset.Object; }
+	if (HelmAsset.Succeeded())  { HelmetMeshAsset = HelmAsset.Object; }
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BronzeAsset(TEXT("/Game/Ichor/Materials/M_Ichor_Bronze"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CrestAsset(TEXT("/Game/Ichor/Materials/M_Ichor_CrestRed"));
+
+	if (BronzeAsset.Succeeded()) { KitMaterial = BronzeAsset.Object; }
+	if (CrestAsset.Succeeded())  { CrestMaterial = CrestAsset.Object; }
 }
 
 UAnimMontage* UIchorCombatComponent::PickMontage(UAnimMontage* Unarmed, UAnimMontage* Armed) const
@@ -94,11 +103,22 @@ void UIchorCombatComponent::BuildWeaponVisuals()
 
 	SpearMesh = FLocal::Make(Ch, Body, SpearMeshAsset, SpearAttachBone, SpearOffset, SpearRotation, SpearScale);
 	ShieldMesh = FLocal::Make(Ch, Body, ShieldMeshAsset, ShieldAttachBone, ShieldOffset, ShieldRotation, ShieldScale);
+	HelmetMesh = FLocal::Make(Ch, Body, HelmetMeshAsset, HelmetAttachBone, HelmetOffset, HelmetRotation, FVector(1.f));
 
-	UE_LOG(LogIchor, Log, TEXT("[loadout] %s armed: spear=%s on %s, shield=%s on %s"),
-		*GetNameSafe(GetOwner()),
-		*GetNameSafe(SpearMeshAsset), *SpearAttachBone.ToString(),
-		*GetNameSafe(ShieldMeshAsset), *ShieldAttachBone.ToString());
+	if (KitMaterial)
+	{
+		if (SpearMesh)  { SpearMesh->SetMaterial(0, KitMaterial); }
+		if (ShieldMesh) { ShieldMesh->SetMaterial(0, KitMaterial); }
+		if (HelmetMesh) { HelmetMesh->SetMaterial(0, KitMaterial); }
+	}
+
+	// Slot 1 is the crest, and it is the only thing distinguishing two identical
+	// mannequins once they are both in bronze.
+	if (HelmetMesh && CrestMaterial) { HelmetMesh->SetMaterial(1, CrestMaterial); }
+
+	UE_LOG(LogIchor, Log, TEXT("[loadout] %s armed: spear=%s shield=%s helm=%s crest=%s"),
+		*GetNameSafe(GetOwner()), *GetNameSafe(SpearMeshAsset), *GetNameSafe(ShieldMeshAsset),
+		*GetNameSafe(HelmetMeshAsset), *GetNameSafe(CrestMaterial));
 }
 
 void UIchorCombatComponent::PlayMontageScaled(UAnimMontage* Montage, float TargetDuration) const
@@ -222,6 +242,12 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 	// A blocked heavy would otherwise guarantee a stagger, which makes blocking a heavy
 	// strictly worse than doing nothing.
 	const float AppliedPoise = bBlocked ? PoiseDamage * BlockedPoiseRatio : PoiseDamage;
+
+	// Captured before the reset below, or the log would report zero every time and answer
+	// nothing. This is the gap the regen delay is measured against.
+	const float GapSincePoise = TimeSincePoiseDamage;
+	const float PoiseBefore = Poise;
+
 	if (AppliedPoise > 0.f)
 	{
 		Poise = FMath::Max(0.f, Poise - AppliedPoise);
@@ -230,9 +256,13 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 
 	OnDamaged.Broadcast(Applied, FromActor, bBlocked);
 
-	UE_LOG(LogIchor, Log, TEXT("[hit]    %s took %.0f from %s%s  (HP %.0f, ST %.0f)"),
+	// Poise is here because a stagger fired whose arithmetic did not add up, and the line
+	// printed everything except the number that would have explained it. PO- is the poise
+	// this blow removed; PO is what is left.
+	UE_LOG(LogIchor, Log, TEXT("[hit]    %s took %.0f from %s%s  (HP %.0f, ST %.0f | poise %.0f -%.0f -> %.0f after %.2fs idle)"),
 		*GetNameSafe(GetOwner()), Applied, *GetNameSafe(FromActor),
-		bBlocked ? TEXT(" [blocked]") : TEXT(""), Health, Stamina);
+		bBlocked ? TEXT(" [blocked]") : TEXT(""), Health, Stamina,
+		PoiseBefore, AppliedPoise, Poise, GapSincePoise);
 
 #if ENABLE_DRAW_DEBUG
 	// Connection needs to be felt before it can be tuned, and there is no hit reaction

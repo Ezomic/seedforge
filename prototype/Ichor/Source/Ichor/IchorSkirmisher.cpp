@@ -9,6 +9,8 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
+#include "Materials/MaterialInterface.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Ichor.h"
 
 AIchorSkirmisher::AIchorSkirmisher()
@@ -28,6 +30,11 @@ AIchorSkirmisher::AIchorSkirmisher()
 	AIControllerClass = AAIController::StaticClass();
 
 	Combat = CreateDefaultSubobject<UIchorCombatComponent>(TEXT("Combat"));
+
+	// The opponent wears the dark crest. Set here rather than in BeginPlay because the
+	// combat component builds its kit during its own BeginPlay, which runs first.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DarkCrest(TEXT("/Game/Ichor/Materials/M_Ichor_CrestDark"));
+	if (DarkCrest.Succeeded() && Combat) { Combat->CrestMaterial = DarkCrest.Object; }
 }
 
 void AIchorSkirmisher::BeginPlay()
