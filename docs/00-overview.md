@@ -104,3 +104,7 @@ procedural content, and answer:
 > **Is a single fight against one ordinary enemy tense?**
 
 If not, nothing downstream rescues it.
+
+Full scope, success criteria, and kill criteria: **[18 — Vertical Slice](18-vertical-slice.md)**.
+Note that the question above is answerable in a grey box in two to three weeks, well before
+the full slice exists.

@@ -36,6 +36,7 @@ different economies, different traversal verbs, and a different definition of wh
 | 15 | [Multiplayer](15-multiplayer.md) | Async social now, co-op architecture decisions now |
 | 16 | [Art Direction](16-art-direction.md) | Atmosphere over fidelity, the unification stack |
 | 17 | [Tech Stack](17-tech-stack.md) | `libworldforge`, repo layout, tooling, order of work |
+| 18 | [Vertical Slice](18-vertical-slice.md) | Milestone 1 — scope, success criteria, kill criteria |
 
 ---
 
@@ -53,5 +54,8 @@ system needs designing.
 
 ## Status
 
-Design complete, implementation not started. The first milestone is a hand-built 500 m
-vertical slice with no procedural content — see [17-tech-stack.md](17-tech-stack.md#order-of-work).
+Design complete, implementation not started.
+
+The first milestone is a hand-built 500 m vertical slice with no procedural content, gated
+on *"is one ordinary fight tense?"* — see **[18-vertical-slice.md](18-vertical-slice.md)**,
+which starts with a two-to-three-week grey-box combat prototype before any of the rest.
