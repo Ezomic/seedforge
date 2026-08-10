@@ -78,14 +78,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tuning|Vitals") float StaggerDuration = 0.7f;
 
 	// ---- tuning: attacks ----------------------------------------------------
-	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightDamage = 30.f;
+	/** 100 health, so three lights or two heavies. Doc 18 asks for a 2-3 hit fight. */
+	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightDamage = 40.f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightWindup = 0.35f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightActive = 0.10f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightRecovery = 0.40f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightStaminaCost = 20.f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Light") float LightPoiseDamage = 25.f;
 
-	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyDamage = 50.f;
+	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyDamage = 55.f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyWindup = 0.70f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyActive = 0.14f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Heavy") float HeavyRecovery = 0.80f;
