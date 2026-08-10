@@ -86,3 +86,6 @@ $RECYCLE.BIN/
 .DS_Store
 *~
 *.swp
+
+# Blender preview renders are regenerated on every run of the art scripts.
+art/renders/
