@@ -42,8 +42,11 @@ UIchorCombatComponent::UIchorCombatComponent()
 	if (SpearStaggerAsset.Succeeded()) { SpearStaggerMontage = SpearStaggerAsset.Object; }
 	if (SpearDeathAsset.Succeeded())   { SpearDeathMontage = SpearDeathAsset.Object; }
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderAsset(TEXT("/Engine/BasicShapes/Cylinder"));
-	if (CylinderAsset.Succeeded()) { CylinderMesh = CylinderAsset.Object; }
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> DoryAsset(TEXT("/Game/Ichor/Weapons/SM_Dory"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> AspisAsset(TEXT("/Game/Ichor/Weapons/SM_Aspis"));
+
+	if (DoryAsset.Succeeded())  { SpearMeshAsset = DoryAsset.Object; }
+	if (AspisAsset.Succeeded()) { ShieldMeshAsset = AspisAsset.Object; }
 }
 
 UAnimMontage* UIchorCombatComponent::PickMontage(UAnimMontage* Unarmed, UAnimMontage* Armed) const
@@ -58,20 +61,20 @@ void UIchorCombatComponent::BuildWeaponVisuals()
 
 	ACharacter* Ch = Cast<ACharacter>(GetOwner());
 	USkeletalMeshComponent* Body = Ch ? Ch->GetMesh() : nullptr;
-	if (!Body || !CylinderMesh)
+	if (!Body || (!SpearMeshAsset && !ShieldMeshAsset))
 	{
 		UE_LOG(LogIchor, Warning, TEXT("[loadout] %s armed but no %s - going without"),
-			*GetNameSafe(GetOwner()), Body ? TEXT("primitive mesh") : TEXT("skeletal mesh"));
+			*GetNameSafe(GetOwner()), Body ? TEXT("weapon meshes") : TEXT("skeletal mesh"));
 		return;
 	}
 
-	// Both are the same cylinder at different scales. A spear is a long thin one and a
-	// shield is a short fat one, which is as much as a grey box needs to say.
 	struct FLocal
 	{
 		static UStaticMeshComponent* Make(ACharacter* Owner, USkeletalMeshComponent* Parent,
 			UStaticMesh* Mesh, FName Bone, const FVector& Loc, const FRotator& Rot, const FVector& Scale)
 		{
+			if (!Mesh) { return nullptr; }
+
 			UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
 			C->SetStaticMesh(Mesh);
 
@@ -89,11 +92,13 @@ void UIchorCombatComponent::BuildWeaponVisuals()
 		}
 	};
 
-	SpearMesh = FLocal::Make(Ch, Body, CylinderMesh, SpearAttachBone, SpearOffset, SpearRotation, SpearScale);
-	ShieldMesh = FLocal::Make(Ch, Body, CylinderMesh, ShieldAttachBone, ShieldOffset, ShieldRotation, ShieldScale);
+	SpearMesh = FLocal::Make(Ch, Body, SpearMeshAsset, SpearAttachBone, SpearOffset, SpearRotation, SpearScale);
+	ShieldMesh = FLocal::Make(Ch, Body, ShieldMeshAsset, ShieldAttachBone, ShieldOffset, ShieldRotation, ShieldScale);
 
-	UE_LOG(LogIchor, Log, TEXT("[loadout] %s armed: spear on %s, shield on %s"),
-		*GetNameSafe(GetOwner()), *SpearAttachBone.ToString(), *ShieldAttachBone.ToString());
+	UE_LOG(LogIchor, Log, TEXT("[loadout] %s armed: spear=%s on %s, shield=%s on %s"),
+		*GetNameSafe(GetOwner()),
+		*GetNameSafe(SpearMeshAsset), *SpearAttachBone.ToString(),
+		*GetNameSafe(ShieldMeshAsset), *ShieldAttachBone.ToString());
 }
 
 void UIchorCombatComponent::PlayMontageScaled(UAnimMontage* Montage, float TargetDuration) const
