@@ -7,6 +7,7 @@
 #include "IchorCombatComponent.generated.h"
 
 class UIchorCombatComponent;
+class UAnimMontage;
 
 /** Attacks commit. Once Windup begins there is no cancel - that is the design under test. */
 UENUM(BlueprintType)
@@ -144,6 +145,25 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tuning|Fairness") float TrackingCapWindupDegPerSec = 30.f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|Fairness") float TrackingCapActiveDegPerSec = 0.f;
 
+	// ---- animation ----------------------------------------------------------
+	/**
+	 *  One montage per attack, not one per phase: wind-up, active and recovery are parts
+	 *  of a single swing and splitting them across assets would only add seams.
+	 *
+	 *  The frame data above stays authoritative and the clip is play-rate scaled to fit
+	 *  it, so every timing remains tunable from a slider. That trade is deliberate - doc
+	 *  18's protocol changes one number per session, and it cannot wait on re-authored
+	 *  animation. Revisit once the timings settle and fidelity starts to matter more.
+	 *
+	 *  Swapping these four is how an armed moveset replaces the unarmed one.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Animation") UAnimMontage* LightMontage;
+	UPROPERTY(EditAnywhere, Category = "Animation") UAnimMontage* HeavyMontage;
+	UPROPERTY(EditAnywhere, Category = "Animation") UAnimMontage* StaggerMontage;
+
+	/** Plays unscaled - a death has no frame data to honour. */
+	UPROPERTY(EditAnywhere, Category = "Animation") UAnimMontage* DeathMontage;
+
 	// ---- queries ------------------------------------------------------------
 	UFUNCTION(BlueprintPure, Category = "Ichor|Combat") EIchorCombatState GetState() const { return State; }
 	UFUNCTION(BlueprintPure, Category = "Ichor|Combat") float GetHealth() const { return Health; }
@@ -193,6 +213,9 @@ private:
 	 *  drawn shape flatters the tell in a way a real animation will not.
 	 */
 	void DrawTelegraph() const;
+
+	/** Stretches Montage to last exactly TargetDuration. Pass 0 to play it unscaled. */
+	void PlayMontageScaled(UAnimMontage* Montage, float TargetDuration) const;
 
 	EIchorCombatState State = EIchorCombatState::Idle;
 	EIchorAttack PendingAttack = EIchorAttack::Light;

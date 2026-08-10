@@ -8,11 +8,41 @@
 #include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
 #include "DrawDebugHelpers.h"
+#include "Animation/AnimMontage.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Ichor.h"
 
 UIchorCombatComponent::UIchorCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+
+	// Defaults, so the player and the skirmisher both animate without per-Blueprint
+	// wiring - and so a montage cannot go missing because an asset edit silently failed.
+	// Every one is EditAnywhere, so an armed moveset still overrides them per Blueprint.
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> LightAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Light_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> HeavyAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Heavy_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> StaggerAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Stagger_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> DeathAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Death_Unarmed"));
+
+	if (LightAsset.Succeeded())   { LightMontage = LightAsset.Object; }
+	if (HeavyAsset.Succeeded())   { HeavyMontage = HeavyAsset.Object; }
+	if (StaggerAsset.Succeeded()) { StaggerMontage = StaggerAsset.Object; }
+	if (DeathAsset.Succeeded())   { DeathMontage = DeathAsset.Object; }
+}
+
+void UIchorCombatComponent::PlayMontageScaled(UAnimMontage* Montage, float TargetDuration) const
+{
+	ACharacter* Ch = Cast<ACharacter>(GetOwner());
+	if (!Montage || !Ch) { return; }
+
+	const float Length = Montage->GetPlayLength();
+
+	// TargetDuration of 0 means "play it as authored".
+	const float Rate = (TargetDuration > KINDA_SMALL_NUMBER && Length > KINDA_SMALL_NUMBER)
+		? Length / TargetDuration
+		: 1.f;
+
+	Ch->PlayAnimMontage(Montage, Rate);
 }
 
 void UIchorCombatComponent::BeginPlay()
@@ -21,6 +51,12 @@ void UIchorCombatComponent::BeginPlay()
 	Health = MaxHealth;
 	Stamina = MaxStamina;
 	Poise = MaxPoise;
+
+	// A null montage plays nothing and says nothing, which is indistinguishable from an
+	// animation that simply looks wrong. Say it out loud once, at BeginPlay.
+	UE_LOG(LogIchor, Log, TEXT("[anim]   %s  light=%s heavy=%s stagger=%s death=%s"),
+		*GetNameSafe(GetOwner()), *GetNameSafe(LightMontage), *GetNameSafe(HeavyMontage),
+		*GetNameSafe(StaggerMontage), *GetNameSafe(DeathMontage));
 }
 
 float UIchorCombatComponent::GetAllowedTurnRate() const
@@ -175,6 +211,31 @@ void UIchorCombatComponent::EnterState(EIchorCombatState NewState)
 	if (NewState == EIchorCombatState::Staggered)
 	{
 		Poise = 0.f;
+	}
+
+	// Montages share DefaultSlot, so starting one interrupts whatever was playing. That
+	// is what makes a stagger visibly cut an attack short rather than overlap it.
+	switch (NewState)
+	{
+	case EIchorCombatState::Windup:
+	{
+		const bool bHeavy = (PendingAttack == EIchorAttack::Heavy);
+		const float Total = bHeavy
+			? HeavyWindup + HeavyActive + HeavyRecovery
+			: LightWindup + LightActive + LightRecovery;
+		PlayMontageScaled(bHeavy ? HeavyMontage : LightMontage, Total);
+		break;
+	}
+	case EIchorCombatState::Staggered:
+		PlayMontageScaled(StaggerMontage, StaggerDuration);
+		break;
+
+	case EIchorCombatState::Dead:
+		PlayMontageScaled(DeathMontage, 0.f);
+		break;
+
+	default:
+		break;
 	}
 }
 
