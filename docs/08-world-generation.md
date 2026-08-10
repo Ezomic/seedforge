@@ -73,7 +73,7 @@ elevation, then axiom injection and suppression.
 
 **6 — Resources.** Ore from tectonic data; ley nodes if the Law calls for them; arable
 score from slope and moisture.
-> This is where Ore-bound stops being flavour: the ore sits on the convergent boundaries
+> This is where Orichalcum stops being flavour: the ore sits on the convergent boundaries
 > Phase 1 produced, so the wars in Phase 9 happen where the geology put them.
 
 **7 — Settlements.** Suitability = fresh water + arable + defensibility + resource

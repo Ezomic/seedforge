@@ -1,0 +1,20 @@
+{
+  "epic": "14 — Save System",
+  "doc": "docs/14-save-system.md",
+  "tickets": [
+    { "title": "Campaign/slot storage split", "description": "A campaign owns the immutable forged world; slots are ledger snapshots inside it. Without this, every quicksave writes 300MB.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["save", "architecture"] },
+    { "title": "Deterministic entity ID scheme", "description": "hash(worldSeed, poiId, roomIndex, slotIndex) — never spawn order. Prevents the class of bug where loot reappears and dead NPCs return.", "type": "feature", "priority": "high", "estimate": "4d", "labels": ["save", "determinism", "architecture"] },
+    { "title": "Delta storage with default-elision", "description": "Only what differs from the forged baseline. Keeps a sixty-hour save under a few megabytes.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["save"] },
+    { "title": "Snapshot-plus-tail persistence", "description": "Append-only log in memory; last snapshot plus tail on disk; restore and replay on load.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["save"] },
+    { "title": "The chronicle: human-readable notable events", "description": "Separate from the state ledger. Feeds the journal history view and chronicle export.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["save", "ui"] },
+    { "title": "Custom compressed binary ledger serialiser", "description": "UE reflection-based serialisation is the wrong tool for a few hundred thousand small facts.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["save", "performance"] },
+    { "title": "Autosave policy: after consequential moments, not before", "description": "Reloading should cost real progress. Do not telegraph reload points with popups.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["save"] },
+    { "title": "Ironman mode", "description": "One rolling save, no manual slots. A flag on the save policy, and the mode where the ledger and Pressure clock finally sing. Offer prominently, never force.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["save"] },
+    { "title": "Stable string IDs audit across all content", "description": "Never array indices. Adding a catalogue entry must not change what item_47 means.", "type": "chore", "priority": "high", "estimate": "1w", "labels": ["save", "data"] },
+    { "title": "Save format versioning and migration path", "description": "Written before it is needed, not after.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["save"] },
+    { "title": "Corruption safety: temp write, fsync, atomic rename, rotating backups", "description": "Twenty minutes of work that becomes the only thing anyone remembers if skipped.", "type": "chore", "priority": "high", "estimate": "1d", "labels": ["save"] },
+    { "title": "Save/load round-trip automated test", "description": "Serialise, reload, compare state. The one game-side test worth insisting on.", "type": "chore", "priority": "high", "estimate": "3d", "labels": ["save", "testing"] },
+    { "title": "Audit: no serialised actor pointers to generated actors", "description": "Serialise IDs and re-resolve on load; generated actors do not exist when the save is read.", "type": "chore", "priority": "high", "estimate": "2d", "labels": ["save", "architecture"] },
+    { "title": "Chronicle export as readable text", "description": "'Here's what happened in my Age of Salt run' — shareable content for the cost of a text serialiser.", "type": "feature", "priority": "low", "estimate": "2d", "labels": ["save", "social"] }
+  ]
+}

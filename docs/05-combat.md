@@ -58,14 +58,14 @@ animations — different economics.
 
 | Law | Power source | Effect on fights |
 |---|---|---|
-| **Ore-bound** | Physical charges: weighty, lootable | Magic is ammunition. Encumbrance vs. firepower; corpses are resupply |
-| **Blood-price** | Your own HP — *no mana bar exists* | Healing and casting draw one pool. Deeper trouble makes escape cost more |
-| **Written** | Spellbooks as items with fixed uses | Loadout picked in town and lived with. Preparation-forward by construction |
-| **Ley-bound** | Location strength | Magic becomes positional. Holding the node is winning |
-| **Dying** | Finite charges that never refill | Every cast is permanent expenditure. Players hoard for 30 hours then spend once, memorably |
-| **Borrowed** | Debt meter with escalating consequences | Power now, collectors later |
+| **Orichalcum** | Physical charges: weighty, lootable | Power is ammunition. Encumbrance vs. firepower; corpses are resupply |
+| **Hecatomb** | Your own HP — *no mana bar exists* | Healing and offering draw one pool. Deeper trouble makes escape cost more |
+| **The Mysteries** | Rites with fixed uses, held as items | Loadout picked before leaving and lived with. Preparation-forward by construction |
+| **Temenos** | Consecrated ground | Power becomes positional. Holding the sanctuary is winning |
+| **The Last Favour** | Finite charges that never refill | Every use is permanent expenditure. Players hoard for 30 hours then spend once, memorably |
+| **The Oath** | Debt meter with escalating consequence | Power now, reckoning later |
 
-**Prototype Blood-price and Ley-bound first.** They change how a fight *plays* the most,
+**Prototype Hecatomb and Temenos first.** They change how a fight *plays* the most,
 and they will stress-test whether the abstraction is real or whether six combat systems
 have been accidentally designed.
 

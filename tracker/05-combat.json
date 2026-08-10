@@ -1,0 +1,20 @@
+{
+  "epic": "05 — Combat",
+  "doc": "docs/05-combat.md",
+  "note": "Core combat work lives in the vertical slice epic (18). These are the items beyond the slice.",
+  "tickets": [
+    { "title": "Remaining weapon classes (up to five total)", "description": "Movesets per weapon class, not per weapon. Individual weapons differ by stats, reach and effects.", "type": "feature", "priority": "medium", "estimate": "4w", "labels": ["combat"] },
+    { "title": "Parry as a rare weapon property", "description": "Not a universal verb. Only on specific catalogue weapons.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["combat"] },
+    { "title": "Controller enemy role", "description": "Debuffs, snares, summons. The priority target that teaches target prioritisation. Needs a status effect system.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["combat", "ai"] },
+    { "title": "Swarm enemy role", "description": "Individually trivial, dangerous in numbers. The reason area effects exist. Needs crowd handling.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["combat", "ai"] },
+    { "title": "Ambusher enemy role", "description": "The reason you look at terrain. Needs perception and concealment tuning.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["combat", "ai"] },
+    { "title": "Status effect system", "description": "Prerequisite for the Controller role and several Law axioms.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["combat"] },
+    { "title": "Encounter budget composer", "description": "Pick roles to fill a budget, then dress them in the region's faction and biome. One AI, dozens of faces.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "worldgen"] },
+    { "title": "Encounter placement clear-radius validation", "description": "Generator pass refusing to spawn fights inside geometry that makes them unreadable.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["combat", "worldgen", "validation"] },
+    { "title": "Enemy reskinning by faction and biome", "description": "Material parameters, scale, gear and speed over shared skeletons.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["combat", "art"] },
+    { "title": "Remaining Law power sources: Written, Ley-bound, Borrowed", "description": "Ore-bound, Blood-price and Dying land earlier. Ley-bound needs a spatial strength field.", "type": "feature", "priority": "medium", "estimate": "3w", "labels": ["combat", "axioms"] },
+    { "title": "Ley strength spatial field and positional casting", "description": "Magic becomes positional; holding the node is winning. The most mechanically distinct Law.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["combat", "axioms", "worldgen"] },
+    { "title": "Enemy audio identity per role", "description": "Distinct wind-up sounds per role, plus footstep material detection.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["combat", "audio"] },
+    { "title": "Silhouette validation against dense foliage", "description": "Test every enemy shape against the most common thing the PCG pass produces.", "type": "chore", "priority": "medium", "estimate": "3d", "labels": ["combat", "art", "validation"] }
+  ]
+}

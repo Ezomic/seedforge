@@ -1,0 +1,21 @@
+{
+  "epic": "12 — Audio & Atmosphere",
+  "doc": "docs/12-audio-atmosphere.md",
+  "tickets": [
+    { "title": "Set the loudness budget and ducking rules", "description": "Day one. Mixing is where amateur projects audibly lose it, and retrofitting a mix is miserable.", "type": "chore", "priority": "high", "estimate": "2d", "labels": ["audio", "week1"] },
+    { "title": "Six-layer ambience mixer", "description": "Biome bed, time of day, weather, proximity, one-shots, territory. Mixed live.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["audio"] },
+    { "title": "Author biome ambience beds (6)", "description": "Long slow loops. One of the five things that makes a biome a biome rather than a texture swap.", "type": "feature", "priority": "high", "estimate": "3w", "labels": ["audio", "content"] },
+    { "title": "Time-of-day ambience layer", "description": "Dawn chorus, night insects, the specific quiet of pre-dawn.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["audio", "content"] },
+    { "title": "Weather audio driven from the climate fields", "description": "Per-region from phase 4 output, not a global roll.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["audio", "weather"] },
+    { "title": "Proximity and spatialised one-shot layers", "description": "Water, cliffs, settlements, ruins; distant cracks, rockfalls, wingbeats.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["audio"] },
+    { "title": "Territory audio layer", "description": "Work-bells, patrol horns, or nothing. Crossing a border becomes audible before it becomes visible.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["audio", "factions"] },
+    { "title": "Silence-axiom ambience suppression", "description": "Remove the entire biological layer. Costs nothing to implement and will be the most talked-about thing in the game.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["audio", "axioms"] },
+    { "title": "Event-driven music system", "description": "Music arrives at vistas, discovery, combat and death, then stops. Not a continuous bed.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["audio", "music"] },
+    { "title": "Compose modular stems with per-axiom instrumentation", "description": "The seed picks the palette, not the melody. Same composition budget, six sensory identities.", "type": "feature", "priority": "medium", "estimate": "8w", "labels": ["audio", "music", "content"] },
+    { "title": "Audible settlement signatures for navigation", "description": "Bells, mills, surf, mine machinery with long falloff. When visibility fails, sound still navigates.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["audio", "navigation"] },
+    { "title": "Pressure-driven ambience degradation", "description": "As the front approaches, birds thin then vanish, a low drone rises, the one-shot pool loses its living entries.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["audio", "pressure"] },
+    { "title": "Outdoor reverb approximation from terrain", "description": "Occasional raycasts; cliff walls and canyons return sound. Most of the map in a Sundering world.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["audio"] },
+    { "title": "Mechanical weather effects", "description": "Rain masks sound both ways, fog defeats landmark navigation, night is dangerous, cold gates regions.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["audio", "weather", "traversal"] },
+    { "title": "Per-axiom global colour grade and per-biome post volumes", "description": "The cheapest way to make mixed-source assets read as one world. Doc 16.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["art", "atmosphere"] }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "project": {
+    "key": "SEED",
+    "name": "Seedforge",
+    "description": "Seeded open-world RPG in Unreal Engine 5.8. Design docs in docs/."
+  },
+  "note": "Generated from docs/. One file per design document. Epics map 1:1 to docs. Import order matters only in that 18-vertical-slice is the active milestone; everything else is backlog.",
+  "epics": [
+    { "file": "01-axioms.json",           "epic": "01 — World Axioms",       "doc": "docs/01-axioms.md" },
+    { "file": "02-synergies.json",        "epic": "02 — Synergies",          "doc": "docs/02-synergies.md" },
+    { "file": "03-factions.json",         "epic": "03 — Factions",           "doc": "docs/03-factions.md" },
+    { "file": "04-quests.json",           "epic": "04 — Quests",             "doc": "docs/04-quests.md" },
+    { "file": "05-combat.json",           "epic": "05 — Combat",             "doc": "docs/05-combat.md" },
+    { "file": "06-loot-economy.json",     "epic": "06 — Loot & Economy",     "doc": "docs/06-loot-economy.md" },
+    { "file": "07-progression.json",      "epic": "07 — Progression",        "doc": "docs/07-progression.md" },
+    { "file": "08-world-generation.json", "epic": "08 — World Generation",   "doc": "docs/08-world-generation.md" },
+    { "file": "09-dungeons.json",         "epic": "09 — Dungeons",           "doc": "docs/09-dungeons.md" },
+    { "file": "10-npcs.json",             "epic": "10 — NPCs",               "doc": "docs/10-npcs.md" },
+    { "file": "11-traversal-map.json",    "epic": "11 — Traversal & Map",    "doc": "docs/11-traversal-map.md" },
+    { "file": "12-audio-atmosphere.json", "epic": "12 — Audio & Atmosphere", "doc": "docs/12-audio-atmosphere.md" },
+    { "file": "13-ui-hud.json",           "epic": "13 — UI & HUD",           "doc": "docs/13-ui-hud.md" },
+    { "file": "14-save-system.json",      "epic": "14 — Save System",        "doc": "docs/14-save-system.md" },
+    { "file": "15-multiplayer.json",      "epic": "15 — Multiplayer",        "doc": "docs/15-multiplayer.md" },
+    { "file": "16-art-direction.json",    "epic": "16 — Art Direction",      "doc": "docs/16-art-direction.md" },
+    { "file": "17-tech-stack.json",       "epic": "17 — Tech Stack",         "doc": "docs/17-tech-stack.md" },
+    { "file": "18-vertical-slice.json",   "epic": "18 — Vertical Slice",     "doc": "docs/18-vertical-slice.md", "milestone": "active" }
+  ],
+  "ticketSchema": {
+    "title": "string, imperative",
+    "description": "string, 1-2 sentences, references the doc section",
+    "type": "feature | fix | chore | spike",
+    "priority": "low | medium | high",
+    "estimate": "e.g. 2h, 1d, 3d, 1w",
+    "labels": "array of strings"
+  }
+}

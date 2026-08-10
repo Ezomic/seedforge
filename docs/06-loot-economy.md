@@ -20,7 +20,7 @@ holds them*.
 - A fully generic mundane tier below that
 
 The seed distributes them by axiom: the Written world stocks its catalogue in libraries,
-the Ore-bound world buries it in mines.
+the Orichalcum world buries it in mines.
 
 Payoff: *"I found the Ledger Knife in the drowned cathedral this run; it was in a mountain
 fort last time"* is a meaningful sentence. Nobody has ever said anything meaningful about
@@ -62,12 +62,12 @@ currency, and it is the same resource combat spends.
 
 | Law | Hard currency | Economic character |
 |---|---|---|
-| Ore-bound | Refined ore charges | Heavy — wealth is physically burdensome and stealable |
-| Blood-price | Bottled vitality | Gold is human life, and everyone knows it |
-| Written | Spellbooks, pages | Wealth is legible, burnable, forgeable |
-| Ley-bound | Node deeds and claims | Wealth is *real estate* — not portable at all |
-| Dying | Remaining charges | Deflationary; everything costs more every month |
-| Borrowed | Transferable debt | You can pay in obligations that are not yours |
+| Orichalcum | Refined ore charges | Heavy — wealth is physically burdensome and stealable |
+| Hecatomb | Bottled vitality | Coin is human life, and everyone knows it |
+| The Mysteries | Tokens of initiation | Wealth is a status that can be witnessed — and revoked |
+| Temenos | Sanctuary claims and deeds | Wealth is *consecrated ground* — not portable at all |
+| The Last Favour | Remaining charges | Deflationary; everything costs more every month |
+| The Oath | Transferable debt | You can pay in obligations that are not yours |
 
 One data-driven currency swap changes how looting, trading, hoarding, and fighting feel,
 without a second economy implementation.
@@ -83,7 +83,7 @@ Two rules keep it from being miserable:
 2. **Never make the answer be walking back.** Carts, caches, stash points at settlements.
    The interesting question is *what do I leave behind*, not *how many trips*.
 
-Ore-bound is the standout: when currency is heavy, being rich is a tactical liability.
+Orichalcum is the standout: when currency is heavy, being rich is a tactical liability.
 
 ## Sinks — plan the drains before the faucets
 
@@ -97,7 +97,8 @@ drains.
 - **Rebuilding** — funding a settlement, a bridge, a route. The best sink in the genre,
   because it changes the map visibly
 - **Information** — the Surveyors sell knowledge at real prices
-- **Casting itself** — under Dying or Blood-price, power *is* the wallet
+- **Offering itself** — under The Last Favour or Hecatomb, power *is* the wallet
+- **Votives** — dedications at sanctuaries, which is what Greeks actually did with surplus
 
 Target: the player feels **briefly rich two or three times per campaign**, never continuously.
 
@@ -107,7 +108,7 @@ The axiom schema already emits `economy: { scarce, abundant }` per region. Feed 
 directly:
 
 - Stock and price derive from local scarcity, faction control, and route status
-- The Drowning coast pays absurdly for grain and gives away salvage
+- The flooded coast pays absurdly for grain and gives away salvage
 - **When the player cuts a trade route, prices move** — so the quest layer and the economy
   layer are the same system. A Compact hull sunk three weeks ago shows up as a price paid.
 

@@ -67,12 +67,12 @@ Where the axiom system becomes *visible* in the first three seconds of a new wor
 
 | Cataclysm | Palette |
 |---|---|
-| **The Drowning** | Desaturated blue-green, salt white, verdigris. Waterlines on every vertical surface at a consistent height, everywhere |
-| **The Long Winter** | Bone white, pale blue shadows, low thin sun, hard edges |
-| **Gods Died** | Gold gone grey. Dust, empty niches, vertical architecture with nothing at the top |
-| **The Sundering** | Exposed strata as dominant texture, raw rock colour, dust plumes, deliberate vertigo |
-| **The Silence** | A completely normal palette in which **nothing moves.** No birds crossing the sky, no swaying wildlife, no distant motion. Horror entirely in the absence — and it costs nothing |
-| **Nothing Broke** | Warm, saturated, full, conventional. Deliberately ordinary, so every other world feels wrong by comparison |
+| **Deukalion's Flood** | Desaturated blue-green, salt white, verdigris on bronze. Waterlines on every column at a consistent height, everywhere |
+| **Demeter's Grief** | Bone white, pale blue shadows, low thin sun, hard edges. Marble that reads as cold rather than noble |
+| **Silence of the Oracles** | Gold gone grey. Dust, empty plinths, colonnades with nothing at the end of them |
+| **The Unbinding** | Exposed strata as dominant texture, raw rock colour, dust plumes, deliberate vertigo |
+| **Artemis Withdrew** | A completely normal palette in which **nothing moves.** No birds crossing the sky, no swaying wildlife, no distant motion. Horror entirely in the absence — and it costs nothing |
+| **The Age of Kronos** | Warm, saturated, full. Painted marble as it actually was, not the bleached version — deliberately unfamiliar, so every other world feels wrong by comparison |
 
 ## Buy versus make
 
@@ -105,8 +105,10 @@ lose.
 > **Cover the faces.** Helmets, hoods, masks, wraps, respirators, heavy weather gear, faction
 > uniforms.
 
-The setting justifies it completely: the Long Winter demands it, the Drowning demands it, the
-Silence makes it eerie, and occupying garrisons wear helmets anyway.
+The setting justifies it completely, and Greek helmets are the strongest case available:
+the Corinthian type covers the entire face by design. Demeter's Grief demands cover, the
+Flood demands it, Artemis Withdrew makes it eerie, and a satrap's garrison wears helmets
+anyway.
 
 This single decision removes **facial rigging, facial animation, lipsync, and uncanny valley**
 from the critical path. It is the biggest character-art saving available and the fiction pays
@@ -121,12 +123,12 @@ Cheap identity, since VFX is parameterisable.
 
 | Law | Look |
 |---|---|
-| Ore-bound | Hot metal, sparks, forge glow |
-| Blood-price | Red, wet, visceral, uncomfortably physical |
-| Written | Paper, ink, burning script, ash |
-| Ley-bound | Light anchored to the ground rather than the caster |
-| Dying | Guttering, failing, flickering out |
-| Borrowed | Shadow, tally marks, things briefly visible |
+| Orichalcum | Hot metal, sparks, forge glow |
+| Hecatomb | Red, wet, visceral, uncomfortably physical. Ichor as gold at the divine tier |
+| The Mysteries | Torchlight, smoke, things glimpsed by initiates only |
+| Temenos | Light anchored to the ground rather than the caster |
+| The Last Favour | Guttering, failing, flickering out |
+| The Oath | Shadow, tally marks, things briefly visible |
 
 ## The style guide — week one
 

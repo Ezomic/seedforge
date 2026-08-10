@@ -115,7 +115,7 @@ pool is fundamentally incompatible with recorded lines anyway, which is a design
 for text as much as a budget one.
 
 **Faces:** a modest base set with procedural variation, plus per-region tinting so isolated
-Sundering valleys look isolated. MetaHuman is tempting and expensive at this population
+valleys cut off by the Unbinding look isolated. MetaHuman is tempting and expensive at this population
 count — measure before committing.
 
 > Most faces are **covered** — helmets, hoods, masks, weather gear — which the fiction fully

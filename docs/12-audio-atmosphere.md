@@ -33,7 +33,7 @@ Most games are wall-to-wall sound, which deafens the player to dynamics. If the 
 is genuinely quiet, **a sound means something** — and that is the contract that makes
 [rare, lethal combat](05-combat.md) work. You hear the approach. You get to decide.
 
-> **The Silence axiom cashes out here.** A world with no animals loses its entire biological
+> **Artemis Withdrew cashes out here.** A world with no animals loses its entire biological
 > ambience layer: no birds, no insects, no distant movement. Just wind, water, footsteps, and
 > whatever else is out there. It costs nothing to implement — content is *removed* — and it
 > will be the most talked-about thing in the game.
@@ -49,12 +49,16 @@ instrumentation.
 
 | Cataclysm | Palette |
 |---|---|
-| The Drowning | Low strings, water-adjacent percussion, things heard through depth |
-| The Long Winter | Sparse, high, brittle; long decays |
-| Gods Died | Liturgical forms with the choir removed — a ruined shape of sacred music |
-| The Sundering | Low frequency, tectonic, unstable |
-| The Silence | Almost none. What exists is unaccompanied |
-| Nothing Broke | Warm, full, complete — which feels *wrong* to anyone who has played the others |
+| Deukalion's Flood | Low strings, water-adjacent percussion, things heard through depth |
+| Demeter's Grief | Sparse, high, brittle; long decays. Lyre without accompaniment |
+| Silence of the Oracles | Processional forms with the chorus removed — a ruined shape of sacred music |
+| The Unbinding | Low frequency, tectonic, unstable |
+| Artemis Withdrew | Almost none. What exists is a single unaccompanied voice |
+| The Age of Kronos | Warm, full, complete — which feels *wrong* to anyone who has played the others |
+
+Base palette is aulos, lyre and kithara over frame drums, in the Greek modes. The point is
+that a mode carries an ethos — Dorian steadies, Phrygian excites, Mixolydian mourns — which
+is a period-accurate way of doing exactly what an adaptive score needs to do anyway.
 
 Same composition budget, six sensory identities. The cheapest way to make a new seed feel
 new before the player has learned anything about it.
@@ -82,7 +86,7 @@ timber mine; the layout pass knows the volume. A lookup, not a simulation, and i
 of the perceptual work.
 
 Outdoors, approximate with occasional raycasts — cliff walls and canyons should return
-sound. In a Sundering world, that is most of the map.
+sound. In an Unbinding world, that is most of the map.
 
 ## Audio landmarks solve the fog problem
 
@@ -114,7 +118,7 @@ Make weather **mechanical, not cosmetic**:
 - Rain masks sound, both ways
 - Fog defeats landmark navigation
 - Night is dangerous
-- Cold gates regions under the Long Winter
+- Cold gates regions under Demeter's Grief
 
 Visually, the highest-leverage tool is a **strong per-axiom global colour grade** plus
 per-biome post-process volumes. A committed grade is what makes assets from mixed sources

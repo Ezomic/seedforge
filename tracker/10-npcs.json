@@ -1,0 +1,20 @@
+{
+  "epic": "10 — NPCs",
+  "doc": "docs/10-npcs.md",
+  "tickets": [
+    { "title": "Four-tier NPC framework", "description": "Principals (10-15), Regulars (60-100), Residents (~300), Crowd. Few and deep beats many and shallow.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["npcs"] },
+    { "title": "Regular generation from settlement economy", "description": "Economic role drawn from the region's actual economy layer — the salt-panner exists because the axioms made salt abundant.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["npcs", "worldgen", "phase11"] },
+    { "title": "Relationship web generation", "description": "Three to five relationships per Regular: family, rival, creditor, lover, grudge. Load-bearing — this is what makes one death ripple.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["npcs", "worldgen"] },
+    { "title": "Trait pool (~20) and assignment", "description": "Two or three per Regular, used as a dialogue selection axis.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["npcs", "content"] },
+    { "title": "Wants and fears tied to live world state", "description": "'Wants her brother off the dive crews', not 'seeks adventure'.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["npcs", "content"] },
+    { "title": "Systemic dialogue selection engine", "description": "Select authored lines by trait x topic x relationship x world-state. Never generate dialogue text at runtime.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["npcs", "dialogue"] },
+    { "title": "Author the dialogue line pool", "description": "Large tagged pool. Every line hand-written; the combination is what's unique.", "type": "feature", "priority": "high", "estimate": "12w", "labels": ["npcs", "dialogue", "content"] },
+    { "title": "LLM-assisted line variation at authoring time", "description": "Development-time accelerator producing variations on authored lines in a character's voice. Read them, keep the good ones, bake the output. Never at runtime.", "type": "chore", "priority": "low", "estimate": "2w", "labels": ["npcs", "dialogue", "tooling"] },
+    { "title": "NPC memory bound to the consequence ledger", "description": "Helped or harmed them, their faction, their relations; witnessed events; standing and debts. Keep it small and legible.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["npcs", "ledger"] },
+    { "title": "Role succession on death", "description": "Roles are durable, people are instances. The successor remembers how the vacancy happened. Quest binder rebinds automatically.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["npcs", "quests"] },
+    { "title": "Four-state schedules with no offline simulation", "description": "Home, work, social, sleep by time of day. NPCs are simply where they should be when the player looks.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["npcs"] },
+    { "title": "Author and cast the 10-15 Principals", "description": "Hand-authored voice and arcs, cast into roles by the seed. Includes synergy-specific characters.", "type": "feature", "priority": "high", "estimate": "8w", "labels": ["npcs", "content", "narrative"] },
+    { "title": "Principal VO recording and integration", "description": "Principals only. Everyone else gets vocalisations and text.", "type": "feature", "priority": "medium", "estimate": "4w", "labels": ["npcs", "audio"] },
+    { "title": "NPC appearance: base set, variation, per-region tinting", "description": "Isolated Sundering valleys should look isolated. Measure MetaHuman cost at this population count before committing.", "type": "feature", "priority": "medium", "estimate": "3w", "labels": ["npcs", "art"] }
+  ]
+}

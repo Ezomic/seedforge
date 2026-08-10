@@ -1,16 +1,23 @@
-# Seedforge — Design Document
+# Ichor — Design Document
 
-> **Working title.** Placeholder only; rename freely.
-
-A first/third-person open-world RPG in Unreal Engine 5.8 where each seed generates a
-complete continent — its geography, its history, its politics, and the rules its magic
-obeys. Worlds are **forged once** at new-game and baked to disk, not streamed from an
-infinite generator.
+A first/third-person open-world RPG in Unreal Engine 5.8, set in an **ancient Greece that
+never quite happened**, where each seed generates a complete world — its geography, its
+history, its politics, and the terms on which divine power reaches it. Worlds are **forged
+once** at new-game and baked to disk, not streamed from an infinite generator.
 
 The central idea: **the seed rolls the world's premises first, and the geography is a
-consequence.** Two seeds don't just look different — they have different factions,
-different economies, different traversal verbs, and a different definition of what
-"getting stronger" means.
+consequence.** Two seeds don't just look different — they have different poleis, different
+economies, different traversal verbs, and a different definition of what "getting stronger"
+means.
+
+The setting earns its place rather than decorating: a pantheon whose current status is
+genuinely in question is a sharper premise than an anonymous absence; power that only works
+on consecrated ground is how Greek religion actually behaved; and a Pressure that is
+**foretold** rather than merely counting down is the engine of the tragedies.
+
+> The repository directory is still `seedforge` and the tracker key is still `SEED` — both
+> predate the name and neither can be renamed cheaply. `SEED-*` ticket identifiers are
+> permanent by design.
 
 ---
 

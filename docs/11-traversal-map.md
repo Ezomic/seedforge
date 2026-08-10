@@ -26,13 +26,13 @@ The Cataclysm decides traversal identity, via the axiom schema's `traversal.unlo
 
 | Cataclysm | Primary verbs |
 |---|---|
-| **The Drowning** | Boats and diving. Water is the map; depth is progression |
-| **The Sundering** | Climbing and controlled descent. The world is vertical |
-| **The Long Winter** | Environmental protection, sledges. Cold gates regions, not walls |
-| **The Silence** | **No mounts** — there are no animals. Everything on foot |
-| **Gods Died / Nothing Broke** | Conventional: roads, mounts, coaches |
+| **Deukalion's Flood** | Boats and diving. Water is the map; depth is progression |
+| **The Unbinding** | Climbing and controlled descent. The world is vertical |
+| **Demeter's Grief** | Environmental protection, sledges. Cold gates regions, not walls |
+| **Artemis Withdrew** | **No mounts** — there are no animals. Everything on foot |
+| **Silence of the Oracles / Age of Kronos** | Conventional: roads, mounts, coaches |
 
-> **World size is a function of the traversal set.** A Silence world has no horses, so it
+> **World size is a function of the traversal set.** An Artemis Withdrew world has no horses, so it
 > must generate smaller and denser or it becomes a walking simulator. Feed the traversal
 > block back into [Phase 7](08-world-generation.md#the-phases) settlement spacing and into
 > the world bounds themselves.
@@ -56,7 +56,7 @@ Either is defensible. Drifting between them is not.
 The decision that most determines whether the world stays worth having built.
 
 - **Discovered settlements only** — never into the wilderness
-- **Along secured roads only** — if the Levellers cut the route, that link is gone until
+- **Along secured roads only** — if the Isonomoi cut the route, that link is gone until
   someone reopens it
 - **Costs coin** — passage, guides, caravan fare. A good [economy sink](06-loot-economy.md#sinks--plan-the-drains-before-the-faucets)
 - **Costs world-clock time** — the load-bearing part, because the Pressure advances on a

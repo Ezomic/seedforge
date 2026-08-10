@@ -2,14 +2,21 @@
 
 ## Pitch
 
-A classic open-world RPG, first/third person, where a seed generates an entire continent
-and the rules that govern it. The player picks or is given a seed, the game **forges** a
-world in a one-time loading step, and that world is theirs for the campaign.
+A classic open-world RPG, first/third person, set in an ancient Greece that never quite
+happened. A seed generates an entire world and the rules that govern it: the player picks
+or is given a seed, the game **forges** a world in a one-time loading step, and that world
+is theirs for the campaign.
 
-What distinguishes it from other procedurally generated RPGs is that the seed does not
-just arrange terrain. It rolls the world's **axioms** — what broke, how magic works, who
-rules, what is getting worse — and the geography, politics, economy, loot, and combat
+What distinguishes it from other procedurally generated RPGs is that the seed does not just
+arrange terrain. It rolls the world's **axioms** — what broke, how divine power reaches the
+world, who rules, what is foretold — and the geography, politics, economy, loot, and combat
 economics all follow from those.
+
+The Greek frame is load-bearing, not set dressing. A pantheon that demonstrably existed and
+demonstrably stopped is a sharper premise than a generic divine absence; place-bound power
+is how Greek religion actually worked; sacrifice gives a blood-cost system cultural weight
+instead of shock value; and prophecy turns the endgame clock into something characters can
+argue with, subvert, or race — which is the actual machinery of Greek tragedy.
 
 ## Design pillars
 

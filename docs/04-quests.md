@@ -67,24 +67,24 @@ quest is expensive.
 
 ## Worked example
 
-Seed: **The Age of Salt** — Drowning + Merchant compacts + Written, Pressure = Blight.
-The *Written + Blight* synergy fired: the blight eats paper, so magic is being permanently
-erased.
+Seed: **The Salt Years** — Deukalion's Flood + The League + The Mysteries, Pressure = The
+Miasma. The *Mysteries + Miasma* synergy fired: pollution spreads through the initiated, so
+rites are being permanently lost.
 
 The generator pulls three facts off world state, none authored:
 
-- Kessen Reach imports all grain via Compact shipping *(economy layer — nothing grows)*
-- The Levellers have been sinking Compact hulls in the strait *(hostility, contested cells)*
-- The blight front reaches the Ordmoor library in ~11 days *(Pressure advance)*
+- Kessene imports all grain via League shipping *(economy layer — nothing grows)*
+- The Isonomoi have been sinking League hulls in the strait *(hostility, contested cells)*
+- The miasma front reaches the sanctuary at Ordmoor in ~11 days *(Pressure advance)*
 
 It produces:
 
-> The Stationers will pay extravagantly to evacuate Ordmoor's library before the blight
-> takes it. The only hulls fast enough are Compact grain ships, and the Compact will release
-> one — for the right pressure, applied by you. But the ship on the schedule is Kessen
-> Reach's.
+> The Telestai will pay extravagantly to evacuate Ordmoor's sanctuary and its initiates
+> before the miasma reaches it. The only hulls fast enough are League grain ships, and the
+> League will release one — for the right pressure, applied by you. But the ship on the
+> schedule is Kessene's.
 >
-> **Books that nothing can rewrite, or a town that eats next month.**
+> **Rites that no one else can confer, or a polis that eats next month.**
 
 Two claimants with genuine cases, an irreversible cost on both sides, and a deadline the
 world imposed rather than a timer the UI invented.

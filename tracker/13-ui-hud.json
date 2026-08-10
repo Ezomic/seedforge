@@ -1,0 +1,21 @@
+{
+  "epic": "13 — UI & HUD",
+  "doc": "docs/13-ui-hud.md",
+  "tickets": [
+    { "title": "Data-driven HUD framework", "description": "One implementation, six Law configurations. The Law swap must be configuration, not six HUDs.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["ui"] },
+    { "title": "Combat HUD: the five elements", "description": "Health, stamina, Law resource, damage direction indicator, target stagger tick. No enemy health bars, no damage numbers.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["ui", "combat"] },
+    { "title": "Per-Law HUD configurations", "description": "Blood-price shows nothing extra; Dying a decreasing count; Ore-bound charges beside weight; Written loadout slots; Ley-bound an ambient screen effect; Borrowed a debt gauge.", "type": "feature", "priority": "medium", "estimate": "2w", "labels": ["ui", "axioms"] },
+    { "title": "Hand-drawn map screen", "description": "Paper, ink, staining; blank paper for the unknown. Over-invest deliberately — this is what people screenshot when sharing a seed.", "type": "feature", "priority": "high", "estimate": "3w", "labels": ["ui", "art"] },
+    { "title": "Map overlays: region, territory, ley", "description": "Toggleable. The ley overlay is the payoff moment for Ley-bound borders.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["ui"] },
+    { "title": "Journal: prose entries and the consequence view", "description": "Who asked, what they said, where, what you decided — plus a readable 'what I've done and what happened' view backed by the chronicle.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["ui", "quests", "ledger"] },
+    { "title": "Inventory with effortless weight reading", "description": "List with weight column, sorting, filtering, unmistakable over-capacity state. No Tetris grid.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["ui", "loot"] },
+    { "title": "Single-page character screen", "description": "Four stats, capability unlocks, traversal verbs, faction standing. No tree to render because there isn't one.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["ui", "progression"] },
+    { "title": "Faction standing display with explicit tier unlocks", "description": "Standing gates trainers, stock and passage, so what each tier unlocks must be plainly stated.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["ui", "factions"] },
+    { "title": "World screen: axioms, synergies, Pressure, territory", "description": "Where the seed's identity lives and the surface for the cross-seed codex.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["ui", "axioms"] },
+    { "title": "ACCESSIBILITY: visual fallback for every audio telegraph", "description": "A requirement, not a stretch goal — audio was deliberately made to carry combat fairness. Directional indicators for off-screen wind-ups.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["ui", "accessibility", "combat"] },
+    { "title": "Optional precise waypoints, off by default", "description": "Some players need them; the ones who don't will never turn them on.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["ui", "accessibility"] },
+    { "title": "Colourblind-safe faction colours", "description": "Territory is colour-coded on the map.", "type": "chore", "priority": "medium", "estimate": "2d", "labels": ["ui", "accessibility"] },
+    { "title": "Full subtitles for Principal VO", "description": "", "type": "chore", "priority": "medium", "estimate": "3d", "labels": ["ui", "accessibility"] },
+    { "title": "UMG tick audit", "description": "Bind to events, invalidate deliberately. Check early rather than at the end.", "type": "chore", "priority": "medium", "estimate": "3d", "labels": ["ui", "performance"] }
+  ]
+}

@@ -112,12 +112,12 @@ tuning respectively, and none tests anything the first three do not.
 ## The Law axiom, and the architecture test
 
 Build the ability system with a **swappable power source**. Ship the slice on
-**Blood-price**: health *is* mana, one bar, no extra HUD, and it directly stress-tests
-scarcity because casting spends survivability.
+**Hecatomb**: health *is* the offering, one bar, no extra HUD, and it directly stress-tests
+scarcity because using power spends survivability.
 
-Near the end, implement **Dying** (finite charges) as a second configuration.
+Near the end, implement **The Last Favour** (finite charges) as a second configuration.
 
-> **If swapping Blood-price → Dying takes more than a day, the abstraction is wrong** and
+> **If swapping Hecatomb → The Last Favour takes more than a day, the abstraction is wrong** and
 > two combat systems have been designed by accident. A decisive architectural test that
 > costs a day now and months at content stage.
 
@@ -150,7 +150,7 @@ Otherwise whatever gets built will be rationalised into a pass.
 1. One skirmisher, no consumables, full health — **is the fight tense?**
 2. Can a fresh player reach the dungeon from a spoken direction, with no waypoint?
 3. After clearing the dungeon, does the player feel they **spent** something?
-4. Does the Blood-price → Dying swap take under a day?
+4. Does the Hecatomb → The Last Favour swap take under a day?
 5. **Does a fresh player die at least once and immediately want to try again?**
 
 Number five is the real test, and it is the one that cannot be answered from inside the

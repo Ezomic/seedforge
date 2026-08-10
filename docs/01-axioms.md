@@ -3,6 +3,9 @@
 The seed's first and most consequential roll. Axioms are the world's premises; geography,
 politics, economy, and combat economics are all downstream of them.
 
+Setting: **ancient Greece** — poleis, sanctuaries, mystery cults, and a pantheon whose
+current status is the central question of every world.
+
 ## Slot architecture
 
 Axioms are drawn from **five independent slots**, not one pool. Slots answer different
@@ -12,17 +15,16 @@ handling.
 | Slot | Question | Drives |
 |---|---|---|
 | **A. Cataclysm** | What broke? | Ruin types, dungeon kits, terrain scars, tone, traversal verbs |
-| **B. Law** | How does power work? | Loot, economy, combat resource, progression meaning, HUD |
+| **B. Law** | How does divine power reach the world? | Loot, economy, combat resource, progression meaning, HUD |
 | **C. Powers** | Who rules? | Factions, settlement density, road quality, quest structures |
-| **D. Pressure** | What is getting worse? | Endgame clock, enemy escalation, world-state change |
+| **D. Pressure** | What is foretold? | Endgame clock, enemy escalation, world-state change |
 | **E. Anomaly** | The weird thing (~33% of seeds) | High-variance identity |
 
-Six options per slot yields **7,776 configurations from 30 authored axioms**. That ratio
-is the entire argument for the system.
+Six options per slot yields **7,776 configurations from 30 authored axioms**.
 
-**Ship with three per slot** (243 combinations), not six. Each axiom needs real content
-support and every added axiom multiplies against everything already authored — making
-axioms the most natural content-update unit in the project.
+**Ship with three per slot** (243 combinations), not six. Axioms are the most natural
+content-update unit in the project — each new one multiplies against everything already
+authored.
 
 ---
 
@@ -30,59 +32,63 @@ axioms the most natural content-update unit in the project.
 
 | Axiom | Premise | Key consequences |
 |---|---|---|
-| **The Gods Died** | ~200 years ago; divine magic simply stopped | Temples are tombs, priesthoods are relic-scavengers, healing is alchemical so herbalism is an economy, crypt kit everywhere |
-| **The Drowning** | The sea rose 200 m | Settlements only above waterline (hard generator constraint), drowned cities as dungeons, salt-blight biome, diving and boats |
-| **The Long Winter** | A decade of winter, ended 30 years ago | Thin regrowth over frozen ruin, famine-shaped politics, things nobody discusses |
-| **The Sundering** | The land physically broke | Chasms and shear cliffs, **vertical traversal**, isolated regions |
-| **The Silence** | Every animal stopped, a century ago | No fauna, no leather, no mounts, no birdsong. Implemented by *removing* content |
-| **Nothing Broke** | A genuine golden age | Intrigue rather than survival. Rare. Exists to make the others land harder |
+| **The Silence of the Oracles** | ~200 years ago the oracles stopped answering. Nobody knows whether the gods died, left, or lost interest | Sanctuaries are tombs, priesthoods are archivists of a dead correspondence, healing is pharmakon rather than prayer. Plutarch wrote an essay on precisely this anxiety — it is attested, not invented |
+| **Deukalion's Flood** | The flood receded everywhere except here | Settlements only above the waterline (hard generator constraint), drowned cities as dungeons, salt-blight, diving and boats |
+| **Artemis Withdrew** | The mistress of wild things left, and the wild things went with her | No fauna, no hunting, no hides, **no mounts**. Implemented by *removing* content |
+| **Demeter's Grief** | Persephone was never returned. The year stopped turning | Perpetual winter over thin regrowth. Famine-shaped politics. Things nobody discusses |
+| **The Unbinding** | What was chained beneath the earth is working loose | Chasms and shear cliffs, **vertical traversal**, regions isolated by geology |
+| **The Age of Kronos** | The golden age never ended — which is itself the problem | Intrigue rather than survival. Rare. Exists to make the others land harder |
 
-## Slot B — Law of Magic
+## Slot B — The Law
 
-Most mechanical reach of any slot. Invest here first.
+How divine power reaches the world. Most mechanical reach of any slot; invest here first.
 
 | Axiom | Premise | Key consequences |
 |---|---|---|
-| **Ore-bound** | Magic lives in a metal forming near volcanic ridges | **Tectonics determines the political map.** Mines are dungeons, ridges are borders |
-| **Blood-price** | Magic costs vitality | HP-as-mana. Built-in moral axis. Bottled vitality as currency |
-| **Written** | Spells are physical books | Burnable, stealable, forgeable. Libraries are armories. Loadout chosen in town |
-| **Ley-bound** | Magical strength varies by location | Magic becomes **positional**. Geography is tactics. The map is the build |
-| **Dying** | Magic worked a century ago and is failing | Finite charges that never refill. Deflationary economy. Progression is efficiency |
-| **Borrowed** | All magic is a loan from entities keeping ledgers | Debt meter, escalating collection. Best risk/reward dial available |
+| **Orichalcum** | Power inheres in a metal that forms near volcanic ridges | **Tectonics determines the political map.** Mines are dungeons, ridges are borders |
+| **Hecatomb** | Power is bought with sacrifice | Vitality as the casting cost. Built-in moral axis, culturally load-bearing rather than edgy. **Ichor** is the divine tier of the same substance |
+| **The Mysteries** | Power comes by initiation into rites | A "spell" is a rite you have been admitted to — and admission can be revoked. Sanctuaries are armories. Loadout chosen before leaving |
+| **Temenos** | Power exists only on consecrated ground | Magic becomes **positional**: sanctuaries, groves, springs. Greek religion was intensely place-bound, making this the most historically accurate slot on the page |
+| **The Oath** | Power is borrowed against an oath sworn on the Styx | Oaths bound even gods. Debt meter, escalating consequence, no absolution |
+| **The Last Favour** | Divine attention is finite and nearly spent | Finite charges that never refill. Deflationary. Progression is conservation |
 
 ## Slot C — Powers
 
 | Axiom | Premise | Key consequences |
 |---|---|---|
-| **Petty kingdoms** | Many small holds, constant low-grade war | High settlement count, no capital, borders everywhere. No single Incumbent |
-| **A decaying empire** | One enormous capital, rotting frontier | Infrastructure quality interpolates by distance from centre |
-| **Merchant compacts** | Guild-states; everything by contract | Economy-forward; quests are jobs; violence is subcontracted |
-| **Occupation** | A foreign power arrived 20 years ago | Collaborator/resistance axis in every settlement — the most generative quest structure |
-| **A theocracy** | Church-state, absolute and administrative | — |
-| **No one** | Post-state | Isolated settlements, unmaintained roads, dominant wilderness. **No Incumbent** — different faction ecology |
+| **The Poleis** | Many small city-states, constant low-grade war | High settlement count, no capital. No single Incumbent |
+| **The Hegemony** | One dominant power in visible decline | Infrastructure quality interpolates by distance from the centre |
+| **The League** | A maritime trading compact; everything by contract | Economy-forward, quests are jobs, violence subcontracted |
+| **The Satrapy** | A foreign power arrived twenty years ago | Collaborator/resistance axis in every settlement — the most generative quest structure |
+| **The Amphictyony** | A league of states jointly governing a great sanctuary | A real institution. Religious authority as political machinery |
+| **The Dark Age** | Post-collapse. Writing largely lost | Isolated settlements, unmaintained roads, dominant wilderness. **No Incumbent.** Also attested |
 
 ## Slot D — Pressure
 
-The campaign clock. Hidden at world creation; discovered in play.
+**What is foretold.** Hidden at world creation; discovered in play.
+
+The Greek frame's biggest gain: a clock everyone can see coming and nobody can avert is
+the actual engine of the tragedies. The Pressure stops being a countdown and becomes a
+prophecy.
 
 | Axiom | What advances |
 |---|---|
-| **The Blight spreads** | One biome consumes its neighbours, visibly, over campaign time |
-| **The Wakening** | The dead increasingly don't stay dead, at a climbing rate |
-| **The Rival** | Another human power is simply winning a war |
-| **The Returning** | Something arrives on a cycle nearing completion |
-| **The Hunger** | Resource collapse; settlements fail on a schedule |
-| **The Splitting** | The Sundering never stopped |
+| **The Miasma** | Ritual pollution spreads and must be *purified*, not fought. A real concept with real remedies |
+| **The Unburied** | Funeral rites failed somewhere, and the dead are increasingly not staying down |
+| **The Foretold** | A conqueror whose coming was announced, and who is winning |
+| **The Return** | Something arrives on a cycle nearing completion |
+| **The Famine** | Divine punishment on a schedule; settlements fail in order |
+| **The Opening** | The Unbinding never stopped |
 
 ## Slot E — Anomaly
 
-Rolled on ~33% of seeds. Hidden at creation. Cheap, memorable, disproportionately shared.
+Rolled on ~33% of seeds. Hidden at creation.
 
-- Two moons, and they disagree
-- Night here lasts sixty hours
-- One person is immortal, knows everything, and answers honestly — if found
-- A second inhabited map layer beneath this one
-- The world has an edge, and you can walk to it
+- **The Labyrinth is real**, and it is somewhere on this map
+- **Tiresias lives** — blind, immortal, has seen everything, answers honestly if found
+- The underworld is **physically reachable**
+- One polis where time runs at a different rate
+- The sea has a door in it
 
 ---
 
@@ -92,33 +98,31 @@ Axioms are **data assets that emit generator directives**, not prose.
 
 ```json
 {
-  "id": "cataclysm.drowning",
+  "id": "cataclysm.flood",
   "slot": "cataclysm",
-  "title": "The Drowning",
+  "title": "Deukalion's Flood",
   "tags": ["WATER", "RUIN", "SCARCITY", "VERTICAL_LIMIT"],
-  "conflicts": ["cataclysm.long_winter"],
+  "conflicts": ["cataclysm.demeters_grief"],
 
   "terrain":    { "sea_level_offset_m": 200, "coastal_erosion": 2.4 },
   "settlement": { "min_elevation_m": 210, "prefer_slope": "gentle", "density_mult": 0.7 },
   "biomes":     { "inject": ["salt_blight", "tidal_ruin"], "suppress": ["lowland_farm"] },
-  "poi":        { "weights": { "drowned_city": 3.0, "lighthouse": 2.0, "farmstead": 0.2 } },
+  "poi":        { "weights": { "drowned_polis": 3.0, "pharos": 2.0, "farmstead": 0.2 } },
   "enemies":    { "roster_add": ["drowned", "salt_kin"], "roster_remove": ["bandit_farmer"] },
   "traversal":  { "unlock": ["swim_deep", "boat"] },
   "economy":    { "scarce": ["grain", "timber"], "abundant": ["salvage", "salt"] },
-  "palette":    { "grade": "drowning", "fog_density": 1.4 },
-  "audio":      { "bed_overrides": ["surf_distant"], "music_palette": "drowning" }
+  "palette":    { "grade": "flood", "fog_density": 1.4 },
+  "audio":      { "bed_overrides": ["surf_distant"], "music_palette": "flood" }
 }
 ```
 
 ### Rules
 
 1. **Every axiom must touch at least four directive blocks.** Fewer than four and it is
-   decoration, not an axiom — cut it or deepen it.
+   decoration — cut it or deepen it.
 2. Directives merge; conflicts resolved by slot priority A > B > C > D > E.
-3. `conflicts` is a hard blocklist. Blocking an incoherent pair is cheaper and better
-   than reconciling it.
+3. `conflicts` is a hard blocklist. Blocking an incoherent pair is cheaper than reconciling it.
 4. Axiom JSON lives in `data/axioms/` and is read by **both** the generator and the game.
-   See [17](17-tech-stack.md).
 
 ---
 
@@ -126,15 +130,14 @@ Axioms are **data assets that emit generator directives**, not prose.
 
 Compose a world title and summary from the roll, shown on the new-game screen:
 
-> **The Age of Salt** — *Seed `KRAKEN-77`*
-> The sea took the lowlands two centuries past. The compacts rule what's left of the
-> coast, spells are written in books, and the dead are getting restless.
+> **The Salt Years** — *Seed `KRAKEN-77`*
+> The flood never fully drew back. The League rules what is left of the coast, power comes
+> by initiation, and the dead are not staying buried.
 
-This block is the save-file identity, the marketing, and the thing players screenshot.
+This block is the save identity, the marketing, and the thing players screenshot.
 
-**Slots A–C are shown at world creation** — players want to choose their fantasy.
-**Slots D and E are hidden** and discovered in play; the Pressure and the Anomaly land far
-harder as revelations.
+**Slots A–C are shown at world creation.** **Slots D and E are hidden** — the prophecy and
+the anomaly land far harder as revelations.
 
 ## Related
 

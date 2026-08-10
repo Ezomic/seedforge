@@ -1,0 +1,17 @@
+{
+  "epic": "15 — Multiplayer",
+  "doc": "docs/15-multiplayer.md",
+  "note": "The four week-one architecture items live in the vertical slice epic (18) because they must land immediately.",
+  "tickets": [
+    { "title": "Seed + genVersion world reproduction", "description": "A few hundred bytes reproduces a bit-identical world. Terrain never replicates — the foundation of everything else here.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["multiplayer", "determinism"] },
+    { "title": "In-world player messages", "description": "Exact-position, unlike Souls, because geometry matches across everyone on the seed.", "type": "feature", "priority": "low", "estimate": "2w", "labels": ["multiplayer", "social"] },
+    { "title": "Death markers per seed", "description": "A danger map the community generates for free.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["multiplayer", "social"] },
+    { "title": "Annotated map sharing", "description": "The genuinely novel one — sharing your player-authored map of a seed with someone walking the same continent.", "type": "feature", "priority": "low", "estimate": "2w", "labels": ["multiplayer", "social"] },
+    { "title": "Featured seeds", "description": "'This week's world' as a shared topic. An open-world RPG makes a poor speedrun leaderboard.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["multiplayer", "social"] },
+    { "title": "Host-authoritative co-op session layer", "description": "Post-launch. Guests bring character and inventory only, keep no world progress. Dissolves the 'whose consequences' question.", "type": "feature", "priority": "low", "estimate": "8w", "labels": ["multiplayer", "coop"] },
+    { "title": "Co-op difficulty: add enemies, never inflate health", "description": "Health scaling makes lethal low-TTK combat spongy and destroys the 'one bandit is dangerous' contract.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["multiplayer", "coop", "combat"] },
+    { "title": "Downed-and-revive state with a real cost", "description": "Spent charges, lost cargo, world-clock time. Not a free pickup.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["multiplayer", "coop"] },
+    { "title": "DECISION: co-op handling of catalogue uniques", "description": "OPEN. Instancing breaks the 'sixty unique items exist in this world' premise; contesting causes friction. Current lean: single-instance with host priority or a party roll.", "type": "spike", "priority": "low", "estimate": "2d", "labels": ["multiplayer", "coop", "decision"] },
+    { "title": "Guest first-join local forge with caching", "description": "A guest pays a one-time local forge instead of a 400MB download.", "type": "feature", "priority": "low", "estimate": "1w", "labels": ["multiplayer", "coop"] }
+  ]
+}

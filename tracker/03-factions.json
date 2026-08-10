@@ -1,0 +1,21 @@
+{
+  "epic": "03 — Factions",
+  "doc": "docs/03-factions.md",
+  "tickets": [
+    { "title": "Faction role framework: six roles", "description": "Incumbent, Challenger, Parasite, Custodian, Refusenik, Herald as authored roles the seed casts. 5-7 active per world.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["factions"] },
+    { "title": "Incumbent mapping from the Powers axiom", "description": "Administration, Compact, Garrison, Church, plus the Petty kingdoms and No one special cases.", "type": "feature", "priority": "high", "estimate": "4d", "labels": ["factions", "axioms"] },
+    { "title": "Parasite mapping from the Law axiom", "description": "Extraction cartel, Tithe-houses, Stationers, Claim Office, Hoarders, Debt-brokers. One archetype, six faces.", "type": "feature", "priority": "high", "estimate": "4d", "labels": ["factions", "axioms"] },
+    { "title": "Herald mapping from the Pressure axiom", "description": "People who WANT the disaster, not monsters. A political clock can be joined, infiltrated or argued with.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["factions", "axioms"] },
+    { "title": "Challenger archetypes: Restorationists, Successors, Levellers", "description": "Each with a true diagnosis and a bad prescription.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["factions", "content"] },
+    { "title": "Custodian archetypes: Keepers and Surveyors", "description": "Keepers hold the Cataclysm secret; Surveyors sell map knowledge as their reward currency.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["factions", "content"] },
+    { "title": "Refusenik archetypes: Renouncers and Wanderers", "description": "Renouncers gave up magic and are defenceless; Wanderers hold no territory and can offer services anywhere.", "type": "feature", "priority": "low", "estimate": "4d", "labels": ["factions", "content"] },
+    { "title": "Territory flood-fill with per-faction claim strategies", "description": "Resource-following, contiguous-with-distance-decay, nodes-only, defensive-isolated, routes-not-territory, expanding-over-time.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["factions", "worldgen", "phase9"] },
+    { "title": "Contested cell identification", "description": "Overlapping claims mark the map's content sites — where danger, quests and interesting NPCs go.", "type": "feature", "priority": "high", "estimate": "3d", "labels": ["factions", "worldgen", "phase9"] },
+    { "title": "Computed hostility matrix", "description": "Derive from ideological distance (restore/preserve/replace, control/free/renounce) plus resource overlap. Produces reasoned alliances and exploitable odd bedfellows.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["factions", "worldgen"] },
+    { "title": "Faction name composition", "description": "Role plus a noun the axioms produced (salt, ash, ledger, ore, vigil, tide, ink). Names cohere within a seed automatically.", "type": "feature", "priority": "low", "estimate": "2d", "labels": ["factions", "content"] },
+    { "title": "Faction standing system with gated unlocks", "description": "Standing gates trainers, stock, bases and safe passage. The only progression axis that can go negative.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["factions", "progression"] },
+    { "title": "Enforce: at least two factions want strictly incompatible things", "description": "Validation pass. If everyone can be satisfied, there was never a decision.", "type": "chore", "priority": "medium", "estimate": "2d", "labels": ["factions", "validation"] },
+    { "title": "Faction visual identity via material parameters", "description": "Colour, silhouette motif and material treatment applied to shared meshes. One guard mesh becomes six factions. Doc 16.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["factions", "art"] },
+    { "title": "Audible territory layer", "description": "Work-bells, patrol horns, silence. Crossing a border becomes audible before it becomes visible. Doc 12.", "type": "feature", "priority": "low", "estimate": "4d", "labels": ["factions", "audio"] }
+  ]
+}

@@ -24,7 +24,7 @@ Progress is measured in *where you can go*, the most satisfying unit available i
 generated world.
 
 **Capability** — discrete verbs, never percentages. *"You can pick locks of this class,"
-"you can read pre-Sundering script," "you can cast while moving."* About **30–40 unlocks
+"you can read Linear B," "you can make the offering while moving."* About **30–40 unlocks
 total, with no ranks** — a rank is a delay pretending to be a choice.
 
 **Standing** — faction reputation gates trainers, stock, bases, and safe passage. The only
@@ -63,15 +63,15 @@ repetition in a game whose entire pitch is that generated worlds must avoid repe
 
 | Law | Progression is… |
 |---|---|
-| **Ore-bound** | **Logistics.** Carry capacity, refining efficiency, supply lines. Power is infrastructure |
-| **Blood-price** | **Vitality.** HP pool *is* mana pool — one stat governs what you survive and what you can do |
-| **Written** | **Collection.** Your library is your character sheet; loadout size is the curve |
-| **Ley-bound** | **Cartography.** Attunement to node types plus knowing where they are. Your map is your build |
-| **Dying** | **Conservation.** You do not get stronger, you get *cheaper*. Efficiency as progression |
-| **Borrowed** | **Your debt ceiling.** More power available, more collectors interested |
+| **Orichalcum** | **Logistics.** Carry capacity, refining efficiency, supply lines. Power is infrastructure |
+| **Hecatomb** | **Vitality.** HP pool *is* the offering pool — one stat governs what you survive and what you can do |
+| **The Mysteries** | **Initiation.** Your admissions are your character sheet; how many rites you hold is the curve |
+| **Temenos** | **Cartography.** Attunement to sanctuary types plus knowing where they are. Your map is your build |
+| **The Last Favour** | **Conservation.** You do not get stronger, you get *cheaper*. Efficiency as progression |
+| **The Oath** | **Your debt ceiling.** More power available, more attention on the reckoning |
 
-Blood-price collapsing health and mana into one stat is the most elegant of these.
-Dying-as-efficiency is the one nobody else is doing.
+Hecatomb collapsing health and casting cost into one stat is the most elegant of these.
+The Last Favour as efficiency-progression is the one nobody else is doing.
 
 ## Respec — required here specifically
 

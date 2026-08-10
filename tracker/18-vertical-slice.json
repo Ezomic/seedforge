@@ -1,0 +1,44 @@
+{
+  "epic": "18 — Vertical Slice",
+  "doc": "docs/18-vertical-slice.md",
+  "milestone": "active",
+  "tickets": [
+    { "title": "Write kill criteria for the slice and commit them", "description": "Decide in advance what result would make us change the combat design, so the call is not made by sunk cost. Doc 18, Kill criteria.", "type": "chore", "priority": "high", "estimate": "2h", "labels": ["process", "slice"] },
+
+    { "title": "Character controller and camera rig", "description": "Movement, camera, and traversal basics in a grey box. No enemies, no art. Doc 18, Stage 0.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "slice", "stage0"] },
+    { "title": "Melee weapon class with committed attacks", "description": "One weapon class. Attacks commit with no cancel; long wind-ups, clear recovery. Doc 05, The system.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "slice", "stage0"] },
+    { "title": "Stamina governing attack, sprint and block", "description": "Single stamina pool as the pacing dial for all physical actions. Doc 05.", "type": "feature", "priority": "high", "estimate": "3d", "labels": ["combat", "slice", "stage0"] },
+    { "title": "Block and dodge with real recovery", "description": "Two defensive verbs only; no parry. Directional steps with recovery frames, not invincibility spam. Doc 05.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "slice", "stage0"] },
+    { "title": "Poise and stagger economy", "description": "Stagger is the currency of melee — winning is about who gets interrupted, not who has more HP. Doc 05.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "slice", "stage0"] },
+    { "title": "Audio telegraphs for every attack wind-up", "description": "Distinct identifiable sound per wind-up. Part of the fairness test, not polish — a lethal fight cannot be evaluated without it. Doc 12, combat audio contract.", "type": "feature", "priority": "high", "estimate": "3d", "labels": ["audio", "combat", "slice", "stage0"] },
+    { "title": "Skirmisher enemy role and AI", "description": "Fast, low health, flanks, punishes commitment. Tests the core melee dance. Doc 05, enemy roles.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "ai", "slice", "stage0"] },
+    { "title": "GATE: 200-fight tension evaluation", "description": "Fight one skirmisher two hundred times in the grey box. Is a single ordinary fight tense? Do not proceed past this without an honest answer. Doc 18, Stage 0.", "type": "spike", "priority": "high", "estimate": "3d", "labels": ["gate", "slice", "stage0"] },
+
+    { "title": "Run single-player as a one-player listen server", "description": "The single most important architectural item. Cannot be retrofitted. Doc 15, decisions required now.", "type": "chore", "priority": "high", "estimate": "1w", "labels": ["architecture", "multiplayer", "week1"] },
+    { "title": "Route all state mutation through an event/command layer", "description": "Event-sourced state everywhere, not just narrative facts. Prerequisite for both co-op and the consequence ledger. Doc 15.", "type": "chore", "priority": "high", "estimate": "1w", "labels": ["architecture", "week1"] },
+    { "title": "Eliminate singleton assumptions about 'the player'", "description": "Audio, streaming, encounter spawning and the Pressure must not be written against a single global pawn. Doc 15.", "type": "chore", "priority": "high", "estimate": "3d", "labels": ["architecture", "week1"] },
+    { "title": "Write the one-page style guide and lock the snap grid", "description": "Palette, material value ranges, world scale rules, 2m or 4m snap grid, silhouette requirements, fog and grade defaults. Doc 16.", "type": "chore", "priority": "high", "estimate": "1d", "labels": ["art", "process", "week1"] },
+
+    { "title": "Bow and the ranged-opening preparation loop", "description": "Melee-only tests half the identity. Open at range, finish in melee. Doc 18, scope.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "slice"] },
+    { "title": "Anchor enemy role", "description": "Slow, high poise, controls space. Tests the stagger economy. Doc 05.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["combat", "ai", "slice"] },
+    { "title": "Artillery enemy role", "description": "Ranged pressure, forces movement, dies fast when reached. Tests positioning and terrain use. Doc 05.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["combat", "ai", "slice"] },
+
+    { "title": "Enemy validation harness across five terrain conditions", "description": "Automated or checklist validation of every enemy in open field, dense forest, narrow defile, steep slope, and shallow water. Doc 18, test fixture.", "type": "chore", "priority": "high", "estimate": "3d", "labels": ["ai", "tooling", "slice"] },
+    { "title": "Build the 500m test-fixture map", "description": "Hand-built, containing all five AI-breaking terrain conditions plus a ridge, a river, and 2-3 landmark silhouettes. Doc 18.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["level", "slice"] },
+
+    { "title": "Ability system with swappable power source", "description": "One ability system; the Law axiom swaps only what pays for it. Ship the slice on Blood-price (health is mana, no extra HUD). Doc 05.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["combat", "architecture", "slice"] },
+    { "title": "ARCHITECTURE TEST: implement Dying power source", "description": "Second power source as finite charges. If this takes more than one day, the abstraction is wrong and two combat systems have been designed by accident. Doc 18.", "type": "spike", "priority": "high", "estimate": "1d", "labels": ["gate", "architecture", "slice"] },
+
+    { "title": "Loot, consumables and encumbrance", "description": "Consumables, charges, 4-5 catalogue items, weight on. Encumbrance is not optional — scarcity is a primary question. Doc 06.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["loot", "slice"] },
+    { "title": "Merchant and repair services", "description": "One merchant, one repair. Durability as a repair cost, not breakage. Doc 06.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["economy", "slice"] },
+    { "title": "Discovery XP and the four stats", "description": "XP from reaching places and first-time events. Health, stamina, carry, attunement. No kill-XP, no use-based grinding. Doc 07.", "type": "feature", "priority": "medium", "estimate": "4d", "labels": ["progression", "slice"] },
+    { "title": "Trainer with capability unlocks", "description": "One trainer, 4-5 discrete capability unlocks with no ranks. Doc 07.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["progression", "slice"] },
+
+    { "title": "Hand-build the regional-tier dungeon", "description": "~15 minutes, authored layout, vertical structure and a shortcut back. Doc 09, regional tier.", "type": "feature", "priority": "high", "estimate": "2w", "labels": ["level", "dungeon", "slice"] },
+    { "title": "Landmark navigation: compass, directions, no waypoints", "description": "No minimap, no quest pins. Compass bearing plus verbal directions against landmark silhouettes. Doc 11.", "type": "feature", "priority": "high", "estimate": "1w", "labels": ["navigation", "ui", "slice"] },
+    { "title": "Minimal map screen", "description": "Functional but ugly. The hand-drawn diegetic map is an art investment and is deferred. Doc 13.", "type": "feature", "priority": "low", "estimate": "3d", "labels": ["ui", "slice"] },
+
+    { "title": "Art baseline: material clamp, colour grade, covered faces", "description": "Clamp roughness and specular ranges across all assets, establish one colour grade, use covered-face characters from day one. Doc 16.", "type": "chore", "priority": "medium", "estimate": "1w", "labels": ["art", "slice"] },
+    { "title": "Outside playtest with five fresh players", "description": "Watch without helping. Count quits versus retries. Tension and frustration are indistinguishable from inside the project. Doc 18.", "type": "spike", "priority": "high", "estimate": "1w", "labels": ["gate", "playtest", "slice"] }
+  ]
+}

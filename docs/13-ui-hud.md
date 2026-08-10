@@ -30,14 +30,14 @@ One data-driven HUD, six configurations.
 
 | Law | On screen |
 |---|---|
-| **Blood-price** | **Nothing extra.** Health *is* mana. One bar teaches the entire game |
-| **Dying** | A count that only ever decreases. Watching it fall permanently is the design in one element |
-| **Ore-bound** | Charge count beside carried weight — magic and encumbrance visibly competing |
-| **Written** | Loadout slots with remaining uses. The build is on screen and finite |
-| **Ley-bound** | No bar — an ambient screen effect intensifying with local strength, so the player reads *the world* |
-| **Borrowed** | A debt gauge that fills and does not empty easily |
+| **Hecatomb** | **Nothing extra.** Health *is* the offering. One bar teaches the entire game |
+| **The Last Favour** | A count that only ever decreases. Watching it fall permanently is the design in one element |
+| **Orichalcum** | Charge count beside carried weight — power and encumbrance visibly competing |
+| **The Mysteries** | Rite slots with remaining uses. The build is on screen and finite |
+| **Temenos** | No bar — an ambient screen effect intensifying on consecrated ground, so the player reads *the world* |
+| **The Oath** | A debt gauge that fills and does not empty easily |
 
-Blood-price is the standout: the most powerful HUD in the set is the one with the fewest
+Hecatomb is the standout: the most powerful HUD in the set is the one with the fewest
 elements.
 
 ## The map is the biggest UI investment — and marketing

@@ -105,7 +105,7 @@ Modular kits must snap to a grid with consistent socket heights and door widths.
 The largest art line item in the project.
 
 - **5–6 kits**: crypt, mine, ruin, natural cave, fortification, and one axiom-specific
-  (drowned city under the Drowning; sealed library under the Long Winter)
+  (drowned polis under Deukalion's Flood; sealed telesterion under Demeter's Grief)
 - **30–50 modules each**: room shells, corridors, junctions, stairs, shafts, doors, plus
   damage and clutter variants
 - Which kits appear is decided by the **Cataclysm axiom**
