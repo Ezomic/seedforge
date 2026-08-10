@@ -1,0 +1,87 @@
+# ---------------------------------------------------------------------------
+# Unreal Engine (game/)
+# ---------------------------------------------------------------------------
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+!Build/*/**/*.ini
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+*.suo
+*.sln
+*.xcodeproj/
+*.xcworkspace/
+.vs/
+.vscode/
+.idea/
+
+# UE plugin build output
+game/Plugins/**/Binaries/
+game/Plugins/**/Intermediate/
+
+# ---------------------------------------------------------------------------
+# libworldforge / forge-cli (C++)
+# ---------------------------------------------------------------------------
+build/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.pdb
+*.ilk
+*.exe
+
+# ---------------------------------------------------------------------------
+# Generator output — build artifacts, never committed
+# ---------------------------------------------------------------------------
+forge-out/
+worlds/
+*.r16
+*.raw
+debug/*.png
+tests/**/actual/
+
+# Golden reference images ARE tracked — do not ignore tests/**/golden/
+
+# ---------------------------------------------------------------------------
+# Python prototype (phases 1-6)
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+*.npy
+*.npz
+
+# ---------------------------------------------------------------------------
+# Node (viewer/, tools/)
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.cache/
+
+# ---------------------------------------------------------------------------
+# OS / editor cruft
+# ---------------------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*~
+*.swp
