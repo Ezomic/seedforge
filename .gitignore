@@ -13,6 +13,7 @@ Build/
 *.sdf
 *.suo
 *.sln
+*.slnx
 *.xcodeproj/
 *.xcworkspace/
 .vs/
