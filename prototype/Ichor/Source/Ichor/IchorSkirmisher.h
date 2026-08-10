@@ -77,6 +77,16 @@ public:
 	/** Must return to spacing before committing again, guaranteeing a beat between attacks. */
 	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float ReCommitSpacingTolerance = 90.f;
 
+	/**
+	 *  How close it must be before a swing can actually land, and therefore before it is
+	 *  allowed to start one. Distinct from the spacing band: the band is where it wants to
+	 *  stand, this is where its weapon reaches. Gating commitment on the band instead let it
+	 *  swing from outside its own reach and whiff every time.
+	 *
+	 *  Derived at BeginPlay from the combat component's reach; the editor value is a fallback.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float StrikeRange = 300.f;
+
 	UPROPERTY(EditAnywhere, Category = "Debug") bool bShowDebug = true;
 
 protected:

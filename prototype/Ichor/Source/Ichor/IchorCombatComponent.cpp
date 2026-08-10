@@ -5,6 +5,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
 #include "DrawDebugHelpers.h"
 #include "Ichor.h"
@@ -106,6 +107,21 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 
 	OnDamaged.Broadcast(Applied, FromActor, bBlocked);
 
+	UE_LOG(LogIchor, Log, TEXT("[hit]    %s took %.0f from %s%s  (HP %.0f, ST %.0f)"),
+		*GetNameSafe(GetOwner()), Applied, *GetNameSafe(FromActor),
+		bBlocked ? TEXT(" [blocked]") : TEXT(""), Health, Stamina);
+
+#if ENABLE_DRAW_DEBUG
+	// Connection needs to be felt before it can be tuned, and there is no hit reaction
+	// animation to feel it through yet.
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 1.5f, bBlocked ? FColor::Cyan : FColor::Orange,
+			FString::Printf(TEXT("%s  -%.0f%s"), *GetNameSafe(GetOwner()), Applied,
+				bBlocked ? TEXT("  (blocked)") : TEXT("")));
+	}
+#endif
+
 	if (Health <= 0.f)
 	{
 		// Stamp the cause now, at the moment of the killing blow, rather than
@@ -117,6 +133,13 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 		else                                            { PendingDeathCause = EIchorDeathCause::Unreadable; }
 
 		EnterState(EIchorCombatState::Dead);
+
+		// The cause, not just the fact. Doc 18's gate reads the distribution of these.
+		static const UEnum* CauseEnum = StaticEnum<EIchorDeathCause>();
+		UE_LOG(LogIchor, Log, TEXT("[death]  %s killed by %s - cause: %s"),
+			*GetNameSafe(GetOwner()), *GetNameSafe(FromActor),
+			CauseEnum ? *CauseEnum->GetNameStringByValue((int64)PendingDeathCause) : TEXT("?"));
+
 		OnDied.Broadcast(PendingDeathCause);
 		return Applied;
 	}
@@ -131,6 +154,13 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 
 void UIchorCombatComponent::EnterState(EIchorCombatState NewState)
 {
+	static const UEnum* E = StaticEnum<EIchorCombatState>();
+	UE_LOG(LogIchor, Log, TEXT("[combat] %-20s %s -> %s  (HP %.0f, ST %.0f, PO %.0f)"),
+		*GetNameSafe(GetOwner()),
+		E ? *E->GetNameStringByValue((int64)State) : TEXT("?"),
+		E ? *E->GetNameStringByValue((int64)NewState) : TEXT("?"),
+		Health, Stamina, Poise);
+
 	State = NewState;
 	StateTimer = 0.f;
 
@@ -138,6 +168,37 @@ void UIchorCombatComponent::EnterState(EIchorCombatState NewState)
 	{
 		Poise = 0.f;
 	}
+}
+
+void UIchorCombatComponent::DrawTelegraph() const
+{
+#if ENABLE_DRAW_DEBUG
+	const AActor* Owner = GetOwner();
+	UWorld* World = GetWorld();
+	if (!Owner || !World) { return; }
+
+	const bool bHeavy = (PendingAttack == EIchorAttack::Heavy);
+	const FVector Base = Owner->GetActorLocation();
+	const FVector Fwd = Owner->GetActorForwardVector();
+
+	if (State == EIchorCombatState::Windup)
+	{
+		const float Dur = bHeavy ? HeavyWindup : LightWindup;
+		const float T = FMath::Clamp(StateTimer / FMath::Max(Dur, KINDA_SMALL_NUMBER), 0.f, 1.f);
+
+		// Charge reads as the shape growing out to where the blow will land, so the
+		// distance closing is the tell rather than a colour change alone.
+		const FColor Col = bHeavy ? FColor(255, 90, 0) : FColor(255, 210, 60);
+		DrawDebugSphere(World, Base + Fwd * AttackRange * T, AttackRadius * (0.4f + 0.6f * T),
+			12, Col, false, -1.f, 0, bHeavy ? 3.f : 1.5f);
+		DrawDebugLine(World, Base, Base + Fwd * AttackRange * T, Col, false, -1.f, 0, 2.f);
+	}
+	else if (State == EIchorCombatState::Active)
+	{
+		DrawDebugCapsule(World, Base + Fwd * AttackRange * 0.5f, AttackRange * 0.5f, AttackRadius,
+			FRotationMatrix::MakeFromZ(Fwd).ToQuat(), FColor::Red, false, -1.f, 0, 3.f);
+	}
+#endif
 }
 
 void UIchorCombatComponent::PerformAttackTrace()
@@ -202,6 +263,8 @@ void UIchorCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	{
 		Poise = FMath::Min(MaxPoise, Poise + PoiseRegenPerSec * DeltaTime);
 	}
+
+	DrawTelegraph();
 
 	switch (State)
 	{

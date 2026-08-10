@@ -39,6 +39,11 @@ void AIchorSkirmisher::BeginPlay()
 		Combat->TrackingCapWindupDegPerSec = TrackingCapDegPerSec;
 		Combat->LightWindup *= WindupScale;
 		Combat->HeavyWindup *= WindupScale;
+
+		// Reach decides when a swing can land, so reach decides when one may start. Derived
+		// rather than typed twice: the two drifting apart is exactly how it ended up
+		// committing from outside its own range.
+		StrikeRange = Combat->AttackRange + Combat->AttackRadius + 40.f;
 	}
 
 	Target = UGameplayStatics::GetPlayerPawn(this, 0);
@@ -46,6 +51,14 @@ void AIchorSkirmisher::BeginPlay()
 
 void AIchorSkirmisher::EnterState(EIchorSkirmisherState NewState)
 {
+	// Logged as well as drawn: the on-screen readout is for playing, this is for
+	// verifying the loop headlessly and for the fight records the gate depends on.
+	static const UEnum* E = StaticEnum<EIchorSkirmisherState>();
+	UE_LOG(LogIchor, Log, TEXT("[skirm] %s -> %s  (desire %.2f, commits %d)"),
+		E ? *E->GetNameStringByValue((int64)State) : TEXT("?"),
+		E ? *E->GetNameStringByValue((int64)NewState) : TEXT("?"),
+		Desire, CommitsSinceRest);
+
 	State = NewState;
 	StateTimer = 0.f;
 }
@@ -142,9 +155,13 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 			break;
 		}
 
-		if (Desire >= DesireThreshold && Distance <= PreferredSpacing + ReCommitSpacingTolerance)
+		if (Desire >= DesireThreshold)
 		{
-			EnterState(EIchorSkirmisherState::Tell);
+			// Ready to swing, but only from somewhere the swing can land. Out of reach it
+			// closes instead of committing - a whiff should be something the player earned
+			// by moving, not something the enemy did to itself.
+			if (Distance <= StrikeRange) { EnterState(EIchorSkirmisherState::Tell); }
+			else                         { MoveToward(Forward, 1.f); }
 		}
 		break;
 	}
@@ -160,6 +177,9 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 		break;
 
 	case EIchorSkirmisherState::Punish:
+		// Step into the opening during the reaction beat. A punish that starts out of reach
+		// is not a punish, it is a gift.
+		if (Distance > StrikeRange * 0.8f) { MoveToward(Forward, 1.f); }
 		if (StateTimer >= PunishReactionTime)
 		{
 			Combat->TryAttack(EIchorAttack::Light);
@@ -195,12 +215,16 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 		static const UEnum* E = StaticEnum<EIchorSkirmisherState>();
 		const FString Name = E ? E->GetNameStringByValue((int64)State) : TEXT("?");
 		GEngine->AddOnScreenDebugMessage(1002, 0.f, FColor::Yellow,
-			FString::Printf(TEXT("SKIRM   %-11s desire %4.2f  dist %6.1f  commits %d   | %s"),
-				*Name, Desire, Distance, CommitsSinceRest, *Combat->GetDebugLine()));
+			FString::Printf(TEXT("SKIRM   %-11s desire %4.2f  dist %6.1f (strike %5.1f)  commits %d   | %s"),
+				*Name, Desire, Distance, StrikeRange, CommitsSinceRest, *Combat->GetDebugLine()));
 
 #if ENABLE_DRAW_DEBUG
+		// Two rings, and the difference between them is the whole spacing game: cyan is
+		// where it wants to stand, red is where it can actually hurt you.
 		DrawDebugCircle(GetWorld(), GetActorLocation(), PreferredSpacing, 32, FColor::Cyan,
 			false, -1.f, 0, 2.f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+		DrawDebugCircle(GetWorld(), GetActorLocation(), StrikeRange, 32, FColor(160, 40, 40),
+			false, -1.f, 0, 1.5f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 #endif
 	}
 }

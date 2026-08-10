@@ -159,6 +159,16 @@ private:
 	void EnterState(EIchorCombatState NewState);
 	void PerformAttackTrace();
 
+	/**
+	 *  Stands in for the attack animation that does not exist yet. Without it a swing is
+	 *  three quarters of a second of standing still, and the fight is invisible.
+	 *
+	 *  Scaffolding for judging whether the loop runs - explicitly NOT for judging
+	 *  readability. Doc 18 is clear that wind-up timing cannot be placeholdered, and a
+	 *  drawn shape flatters the tell in a way a real animation will not.
+	 */
+	void DrawTelegraph() const;
+
 	EIchorCombatState State = EIchorCombatState::Idle;
 	EIchorAttack PendingAttack = EIchorAttack::Light;
 
