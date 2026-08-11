@@ -44,6 +44,7 @@ on consecrated ground is how Greek religion actually behaved; and a Pressure tha
 | 16 | [Art Direction](16-art-direction.md) | Atmosphere over fidelity, the unification stack |
 | 17 | [Tech Stack](17-tech-stack.md) | `libworldforge`, repo layout, tooling, order of work |
 | 18 | [Vertical Slice](18-vertical-slice.md) | Milestone 1 — scope, success criteria, kill criteria |
+| 19 | [Patrons & Trials](19-patrons-and-trials.md) | **Proposal.** Divine patrons, trials, heralds, Prometheus as an Anomaly |
 
 ---
 
@@ -52,6 +53,10 @@ on consecrated ground is how Greek religion actually behaved; and a Pressure tha
 Each document states **decisions**, not options. Where a decision is genuinely open it
 is marked `OPEN`. Where something is deliberately excluded it appears in that document's
 cut list — the cut lists are load-bearing and should be treated as commitments.
+
+Documents 00–18 are decided. **19 is the sole exception and is labelled as a proposal** — it
+carries an explicit list of the committed decisions it would overturn. Nothing in it is
+adoptable until those are resolved.
 
 A recurring pattern runs through nearly every system: **author roles, generate
 instances.** Faction roles, enemy roles, NPC roles, dungeon tiers, and quest structures
