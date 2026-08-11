@@ -34,10 +34,10 @@ AIchorSkirmisher::AIchorSkirmisher()
 
 	// The opponent wears the dark crest. Set here rather than in BeginPlay because the
 	// combat component builds its kit during its own BeginPlay, which runs first.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DarkCrest(TEXT("/Game/Ichor/Materials/MI_HelmetCrestDark"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DarkCrest(TEXT("/Game/Ichor/Hoplite/MI_HelmetCrestDark"));
 	if (DarkCrest.Succeeded() && Combat) { Combat->CrestMaterial = DarkCrest.Object; }
 
-	static ConstructorHelpers::FObjectFinder<USoundBase> TellAsset(TEXT("/Game/Ichor/Audio/A_Tell"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> TellAsset(TEXT("/Game/Ichor/Hoplite/A_Tell"));
 	if (TellAsset.Succeeded()) { TellCue = TellAsset.Object; }
 }
 

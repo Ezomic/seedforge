@@ -17,8 +17,8 @@
 
 import unreal
 
-MAT_DIR = "/Game/Ichor/Materials"
-PROP_DIR = "/Game/Ichor/Props"
+MAT_DIR = "/Game/Ichor/Arena"
+PROP_DIR = "/Game/Ichor/Arena"
 
 prims = unreal.GeometryScript_Primitives
 tools = unreal.AssetToolsHelpers.get_asset_tools()

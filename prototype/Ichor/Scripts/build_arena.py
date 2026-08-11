@@ -14,9 +14,9 @@
 
 import unreal
 
-LEVEL = "/Game/Ichor/Maps/Lvl_Arena"
-PROPS = "/Game/Ichor/Props"
-MATS = "/Game/Ichor/Materials"
+LEVEL = "/Game/Ichor/Arena/Lvl_Arena"
+PROPS = "/Game/Ichor/Arena"
+MATS = "/Game/Ichor/Arena"
 SKIRMISHER = "/Game/ThirdPerson/Blueprints/BP_Skirmisher"
 
 CELL = 400.0          # 4m grid

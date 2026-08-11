@@ -54,7 +54,7 @@ def play_length(asset):
 
 
 def build(folder, name, source_path, note):
-    out_dir = "/Game/Ichor/Anims/" + folder
+    out_dir = "/Game/Ichor/Hoplite"
     out = "{}/{}".format(out_dir, name)
     if lib.does_asset_exist(out):
         log("exists, left alone: " + name)
@@ -100,7 +100,7 @@ def verify():
     """Reload from disk and confirm the montage actually contains the clip."""
     ok = True
     for folder, name, source_path, _ in WANTED:
-        out = "/Game/Ichor/Anims/{}/{}".format(folder, name)
+        out = "/Game/Ichor/Hoplite/{}".format(name)
         m = lib.load_asset(out)
         if m is None:
             log("VERIFY FAIL: {} does not exist".format(name))

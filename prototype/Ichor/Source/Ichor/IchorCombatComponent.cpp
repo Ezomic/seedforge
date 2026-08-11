@@ -26,20 +26,20 @@ UIchorCombatComponent::UIchorCombatComponent()
 	// Defaults, so the player and the skirmisher both animate without per-Blueprint
 	// wiring - and so a montage cannot go missing because an asset edit silently failed.
 	// Every one is EditAnywhere, so an armed moveset still overrides them per Blueprint.
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> LightAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Light_Unarmed"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> HeavyAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Heavy_Unarmed"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> StaggerAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Stagger_Unarmed"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> DeathAsset(TEXT("/Game/Ichor/Anims/Unarmed/AM_Death_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> LightAsset(TEXT("/Game/Ichor/Hoplite/AM_Light_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> HeavyAsset(TEXT("/Game/Ichor/Hoplite/AM_Heavy_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> StaggerAsset(TEXT("/Game/Ichor/Hoplite/AM_Stagger_Unarmed"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> DeathAsset(TEXT("/Game/Ichor/Hoplite/AM_Death_Unarmed"));
 
 	if (LightAsset.Succeeded())   { LightMontage = LightAsset.Object; }
 	if (HeavyAsset.Succeeded())   { HeavyMontage = HeavyAsset.Object; }
 	if (StaggerAsset.Succeeded()) { StaggerMontage = StaggerAsset.Object; }
 	if (DeathAsset.Succeeded())   { DeathMontage = DeathAsset.Object; }
 
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearLightAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Light_Spear"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearHeavyAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Heavy_Spear"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearStaggerAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Stagger_Spear"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearDeathAsset(TEXT("/Game/Ichor/Anims/Spear/AM_Death_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearLightAsset(TEXT("/Game/Ichor/Hoplite/AM_Light_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearHeavyAsset(TEXT("/Game/Ichor/Hoplite/AM_Heavy_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearStaggerAsset(TEXT("/Game/Ichor/Hoplite/AM_Stagger_Spear"));
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SpearDeathAsset(TEXT("/Game/Ichor/Hoplite/AM_Death_Spear"));
 
 	if (SpearLightAsset.Succeeded())   { SpearLightMontage = SpearLightAsset.Object; }
 	if (SpearHeavyAsset.Succeeded())   { SpearHeavyMontage = SpearHeavyAsset.Object; }
@@ -49,9 +49,9 @@ UIchorCombatComponent::UIchorCombatComponent()
 	// The Blender kit, imported by Scripts/import_kit.py. The Geometry Script versions in
 	// /Weapons and /Props are the earlier primitives-welded-together pass, kept for
 	// comparison rather than used.
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> DoryAsset(TEXT("/Game/Ichor/Kit/SM_Dory"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> AspisAsset(TEXT("/Game/Ichor/Kit/SM_Aspis"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> HelmAsset(TEXT("/Game/Ichor/Kit/SM_Helmet"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> DoryAsset(TEXT("/Game/Ichor/Hoplite/SM_Dory"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> AspisAsset(TEXT("/Game/Ichor/Hoplite/SM_Aspis"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HelmAsset(TEXT("/Game/Ichor/Hoplite/SM_Helmet"));
 
 	if (DoryAsset.Succeeded())  { SpearMeshAsset = DoryAsset.Object; }
 	if (AspisAsset.Succeeded()) { ShieldMeshAsset = AspisAsset.Object; }
@@ -61,11 +61,11 @@ UIchorCombatComponent::UIchorCombatComponent()
 	// slots now - bronze with its baked occlusion, wood on the shaft - and overriding slot
 	// 0 with a flat colour would throw all of that away. Set it in a Blueprint only to
 	// deliberately override.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CrestAsset(TEXT("/Game/Ichor/Materials/MI_HelmetCrest"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CrestAsset(TEXT("/Game/Ichor/Hoplite/MI_HelmetCrest"));
 	if (CrestAsset.Succeeded()) { CrestMaterial = CrestAsset.Object; }
 
-	static ConstructorHelpers::FObjectFinder<USoundBase> LightCueAsset(TEXT("/Game/Ichor/Audio/A_WindupLight"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> HeavyCueAsset(TEXT("/Game/Ichor/Audio/A_WindupHeavy"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> LightCueAsset(TEXT("/Game/Ichor/Hoplite/A_WindupLight"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> HeavyCueAsset(TEXT("/Game/Ichor/Hoplite/A_WindupHeavy"));
 
 	if (LightCueAsset.Succeeded()) { LightWindupCue = LightCueAsset.Object; }
 	if (HeavyCueAsset.Succeeded()) { HeavyWindupCue = HeavyCueAsset.Object; }

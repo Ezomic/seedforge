@@ -21,10 +21,10 @@ FBX_DIR = os.path.abspath(os.path.join(ART, "export"))
 TEX_DIR = os.path.abspath(os.path.join(ART, "textures"))
 AUDIO_DIR = os.path.abspath(os.path.join(ART, "audio"))
 
-KIT = "/Game/Ichor/Kit"
-TEXTURES = "/Game/Ichor/Textures"
-MATERIALS = "/Game/Ichor/Materials"
-AUDIO = "/Game/Ichor/Audio"
+KIT = "/Game/Ichor/Hoplite"
+TEXTURES = "/Game/Ichor/Hoplite"
+MATERIALS = "/Game/Ichor/Hoplite"
+AUDIO = "/Game/Ichor/Hoplite"
 
 WHITE = "/Engine/EngineResources/WhiteSquareTexture"
 
