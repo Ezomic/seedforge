@@ -13,6 +13,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "Sound/SoundBase.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 #include "IchorFightRecorder.h"
 #include "Ichor.h"
@@ -61,6 +63,12 @@ UIchorCombatComponent::UIchorCombatComponent()
 	// deliberately override.
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CrestAsset(TEXT("/Game/Ichor/Materials/MI_HelmetCrest"));
 	if (CrestAsset.Succeeded()) { CrestMaterial = CrestAsset.Object; }
+
+	static ConstructorHelpers::FObjectFinder<USoundBase> LightCueAsset(TEXT("/Game/Ichor/Audio/A_WindupLight"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> HeavyCueAsset(TEXT("/Game/Ichor/Audio/A_WindupHeavy"));
+
+	if (LightCueAsset.Succeeded()) { LightWindupCue = LightCueAsset.Object; }
+	if (HeavyCueAsset.Succeeded()) { HeavyWindupCue = HeavyCueAsset.Object; }
 }
 
 UAnimMontage* UIchorCombatComponent::PickMontage(UAnimMontage* Unarmed, UAnimMontage* Armed) const
@@ -359,6 +367,18 @@ void UIchorCombatComponent::EnterState(EIchorCombatState NewState)
 	case EIchorCombatState::Windup:
 	{
 		const bool bHeavy = (PendingAttack == EIchorAttack::Heavy);
+		// The cue fires with the wind-up, not with the swing. Announcing the blow as it
+		// lands is decoration; announcing it as it starts is information.
+		if (USoundBase* Cue = bHeavy ? HeavyWindupCue : LightWindupCue)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, Cue, GetOwner()->GetActorLocation());
+		}
+		else
+		{
+			UE_LOG(LogIchor, Warning, TEXT("[telegraph] %s has no %s cue - attacking silently"),
+				*GetNameSafe(GetOwner()), bHeavy ? TEXT("heavy") : TEXT("light"));
+		}
+
 		const float Total = bHeavy
 			? HeavyWindup + HeavyActive + HeavyRecovery
 			: LightWindup + LightActive + LightRecovery;

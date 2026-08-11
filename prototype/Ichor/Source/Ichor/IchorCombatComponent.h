@@ -11,6 +11,7 @@ class UAnimMontage;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UMaterialInterface;
+class USoundBase;
 
 /** Attacks commit. Once Windup begins there is no cancel - that is the design under test. */
 UENUM(BlueprintType)
@@ -190,6 +191,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearHeavyMontage;
 	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearStaggerMontage;
 	UPROPERTY(EditAnywhere, Category = "Animation|Spear") UAnimMontage* SpearDeathMontage;
+
+	// ---- telegraphs ---------------------------------------------------------
+	/**
+	 *  Half the readability variable, and the half that still works when the attacker is
+	 *  behind you - which is why doc 18's anti-frustration rules forbid an attack from off
+	 *  screen without one.
+	 *
+	 *  The two contours are deliberately opposite: light rises, heavy falls. If they
+	 *  differed only in volume the player would have to judge loudness under pressure,
+	 *  which nobody can do.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Telegraph") USoundBase* LightWindupCue;
+	UPROPERTY(EditAnywhere, Category = "Telegraph") USoundBase* HeavyWindupCue;
 
 	// ---- loadout ------------------------------------------------------------
 	/** AttackRange is already 220 - spear reach - so armed needs no separate tuning. */

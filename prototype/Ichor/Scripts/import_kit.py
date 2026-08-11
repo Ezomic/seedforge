@@ -19,10 +19,12 @@ import os
 ART = os.path.join(unreal.Paths.project_dir(), "..", "..", "art")
 FBX_DIR = os.path.abspath(os.path.join(ART, "export"))
 TEX_DIR = os.path.abspath(os.path.join(ART, "textures"))
+AUDIO_DIR = os.path.abspath(os.path.join(ART, "audio"))
 
 KIT = "/Game/Ichor/Kit"
 TEXTURES = "/Game/Ichor/Textures"
 MATERIALS = "/Game/Ichor/Materials"
+AUDIO = "/Game/Ichor/Audio"
 
 WHITE = "/Engine/EngineResources/WhiteSquareTexture"
 
@@ -32,6 +34,7 @@ mel = unreal.MaterialEditingLibrary
 
 MESHES = ["SM_Aspis", "SM_Dory", "SM_Helmet"]
 TEXES = ["T_Bronze", "T_Crest", "T_CrestDark", "T_Wood", "T_Helmet_AO"]
+CUES = ["A_Tell", "A_WindupLight", "A_WindupHeavy"]
 
 
 def log(m):
@@ -39,7 +42,7 @@ def log(m):
 
 
 def ensure_dirs():
-    for d in (KIT, TEXTURES, MATERIALS):
+    for d in (KIT, TEXTURES, MATERIALS, AUDIO):
         if not lib.does_directory_exist(d):
             lib.make_directory(d)
 
@@ -109,6 +112,41 @@ def import_mesh(name):
     asset = lib.load_asset("{}/{}".format(KIT, name))
     if asset is None:
         log("IMPORT FAILED: " + name)
+    return asset
+
+
+def import_sound(name):
+    src = os.path.join(AUDIO_DIR, name + ".wav")
+    if not os.path.exists(src):
+        log("MISSING cue source: " + src)
+        return None
+
+    task = unreal.AssetImportTask()
+    task.filename = src
+    task.destination_path = AUDIO
+    task.destination_name = name
+    task.automated = True
+    task.replace_existing = True
+    task.save = True
+    tools.import_asset_tasks([task])
+
+    asset = lib.load_asset("{}/{}".format(AUDIO, name))
+    if asset is None:
+        log("IMPORT FAILED: " + name)
+        return None
+
+    # Telegraphs must never be ducked or dropped when the mix gets busy - the whole point
+    # is that they are audible at the moment the player has to act.
+    try:
+        asset.set_editor_property("looping", False)
+        lib.save_asset("{}/{}".format(AUDIO, name), only_if_is_dirty=False)
+    except Exception as e:
+        log("cue tweak failed on {}: {}".format(name, e))
+
+    try:
+        log("cue {:<16} {:.2f}s".format(name, asset.get_editor_property("duration")))
+    except Exception:
+        log("cue " + name)
     return asset
 
 
@@ -224,6 +262,9 @@ def main():
             log("WARNING: {} did not import - anything using it falls back".format(t))
     for m in MESHES:
         import_mesh(m)
+    for c in CUES:
+        if import_sound(c) is None:
+            log("WARNING: {} did not import - that attack will telegraph silently".format(c))
 
     master = build_master()
     if master is None:

@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "Materials/MaterialInterface.h"
+#include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Ichor.h"
 
@@ -35,6 +36,9 @@ AIchorSkirmisher::AIchorSkirmisher()
 	// combat component builds its kit during its own BeginPlay, which runs first.
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DarkCrest(TEXT("/Game/Ichor/Materials/MI_HelmetCrestDark"));
 	if (DarkCrest.Succeeded() && Combat) { Combat->CrestMaterial = DarkCrest.Object; }
+
+	static ConstructorHelpers::FObjectFinder<USoundBase> TellAsset(TEXT("/Game/Ichor/Audio/A_Tell"));
+	if (TellAsset.Succeeded()) { TellCue = TellAsset.Object; }
 }
 
 void AIchorSkirmisher::BeginPlay()
@@ -181,7 +185,15 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 			// Ready to swing, but only from somewhere the swing can land. Out of reach it
 			// closes instead of committing - a whiff should be something the player earned
 			// by moving, not something the enemy did to itself.
-			if (Distance <= StrikeRange) { EnterState(EIchorSkirmisherState::Tell); }
+			if (Distance <= StrikeRange)
+				{
+					// Sounded on entry, so it lands a full TellDuration before the wind-up.
+					if (TellCue)
+					{
+						UGameplayStatics::PlaySoundAtLocation(this, TellCue, GetActorLocation());
+					}
+					EnterState(EIchorSkirmisherState::Tell);
+				}
 			else                         { MoveToward(Forward, 1.f); }
 		}
 		break;

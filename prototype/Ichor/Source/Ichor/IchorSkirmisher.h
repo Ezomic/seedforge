@@ -7,6 +7,7 @@
 #include "IchorSkirmisher.generated.h"
 
 class UIchorCombatComponent;
+class USoundBase;
 
 /**
  *  Neutral is the most important state. Tension lives there, and a fight with no neutral
@@ -86,6 +87,10 @@ public:
 	 *  Derived at BeginPlay from the combat component's reach; the editor value is a fallback.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float StrikeRange = 300.f;
+
+	/** The weight shift, 0.15s before the wind-up proper. Quiet and dry on purpose - it
+	 *  must read as the moment before an attack, never as the attack. */
+	UPROPERTY(EditAnywhere, Category = "Telegraph") USoundBase* TellCue;
 
 	UPROPERTY(EditAnywhere, Category = "Debug") bool bShowDebug = true;
 
