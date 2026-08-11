@@ -14,6 +14,7 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
+#include "IchorFightRecorder.h"
 #include "Ichor.h"
 
 UIchorCombatComponent::UIchorCombatComponent()
@@ -188,6 +189,12 @@ bool UIchorCombatComponent::TryAttack(EIchorAttack Attack)
 	PendingAttack = Attack;
 	bTraceDoneThisSwing = false;
 	bBlocking = false;
+
+	if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(GetOwner()))
+	{
+		Rec->NoteAttack(GetOwner(), Attack);
+	}
+
 	EnterState(EIchorCombatState::Windup);
 	return true;
 }
@@ -207,6 +214,11 @@ bool UIchorCombatComponent::TryDodge(FVector Direction)
 		FVector Dir = Direction.GetSafeNormal();
 		if (Dir.IsNearlyZero()) { Dir = -Ch->GetActorForwardVector(); }
 		Ch->LaunchCharacter(Dir * DodgeImpulse, true, false);
+	}
+
+	if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(GetOwner()))
+	{
+		Rec->NoteDodge(GetOwner());
 	}
 
 	EnterState(EIchorCombatState::Dodging);
@@ -260,6 +272,11 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 
 	OnDamaged.Broadcast(Applied, FromActor, bBlocked);
 
+	if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(GetOwner()))
+	{
+		Rec->NoteHit(FromActor, GetOwner(), Applied, bBlocked);
+	}
+
 	// Poise is here because a stagger fired whose arithmetic did not add up, and the line
 	// printed everything except the number that would have explained it. PO- is the poise
 	// this blow removed; PO is what is left.
@@ -297,6 +314,11 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 			*GetNameSafe(GetOwner()), *GetNameSafe(FromActor),
 			CauseEnum ? *CauseEnum->GetNameStringByValue((int64)PendingDeathCause) : TEXT("?"));
 
+		if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(GetOwner()))
+		{
+			Rec->NoteDeath(GetOwner(), PendingDeathCause);
+		}
+
 		OnDied.Broadcast(PendingDeathCause);
 		return Applied;
 	}
@@ -324,6 +346,10 @@ void UIchorCombatComponent::EnterState(EIchorCombatState NewState)
 	if (NewState == EIchorCombatState::Staggered)
 	{
 		Poise = 0.f;
+		if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(GetOwner()))
+		{
+			Rec->NoteStagger(GetOwner());
+		}
 	}
 
 	// Montages share DefaultSlot, so starting one interrupts whatever was playing. That
@@ -419,6 +445,16 @@ void UIchorCombatComponent::PerformAttackTrace()
 			const FVector ToAttacker = (Owner->GetActorLocation() - Other->GetActorLocation()).GetSafeNormal();
 			const bool bOnScreen = FVector::DotProduct(Other->GetActorForwardVector(), ToAttacker) > -0.2f;
 			Target->ReceiveHit(Damage, PoiseDmg, Owner, bOnScreen);
+		}
+	}
+
+	// A swing whose active frames touched nothing. This is the price of committing, and
+	// its rate against the enemy's is the clearest signal of whether spacing is legible.
+	if (Struck.Num() == 0)
+	{
+		if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(Owner))
+		{
+			Rec->NoteWhiff(Owner);
 		}
 	}
 

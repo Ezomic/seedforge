@@ -122,6 +122,20 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 	UIchorCombatComponent* TargetCombat = Target->FindComponentByClass<UIchorCombatComponent>();
 	const bool bTargetRecovering = TargetCombat && TargetCombat->GetState() == EIchorCombatState::Recovery;
 
+	// A dead target is not an opponent. Without this it goes on attacking the body, which
+	// looks broken and, less obviously, opens a new fight record on every connect.
+	if (TargetCombat && !TargetCombat->IsAlive())
+	{
+		if (State != EIchorSkirmisherState::Unaware)
+		{
+			EnterState(EIchorSkirmisherState::Unaware);
+		}
+		Desire = 0.f;
+		CommitsSinceRest = 0;
+		PressureTimer = 0.f;
+		return;
+	}
+
 	FaceTarget(DeltaSeconds);
 	GetCharacterMovement()->MaxWalkSpeed = BaseWalkSpeed * (Combat->IsCommitted() ? 0.15f : 1.f);
 
