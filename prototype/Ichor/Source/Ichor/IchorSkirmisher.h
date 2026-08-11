@@ -75,6 +75,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float AggroRange = 1500.f;
 	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float StrafeSpeedScale = 0.55f;
 
+	/**
+	 *  How many blows it may land into a stagger before it has to let the player up.
+	 *
+	 *  Doc 18 lists this among the anti-frustration rules for a reason: being hit, being
+	 *  unable to act, and being hit again is the commonest way commitment combat reads as
+	 *  cheap. One follow-up is a punish; two is a stunlock, and the player cannot tell the
+	 *  difference between a stunlock and a broken game.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Tuning|AI") int32 MaxFollowUpsIntoStagger = 1;
+
 	/** Must return to spacing before committing again, guaranteeing a beat between attacks. */
 	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float ReCommitSpacingTolerance = 90.f;
 
@@ -115,5 +125,8 @@ private:
 	float PressureTimer = 0.f;
 	int32 CommitsSinceRest = 0;
 	int32 StrafeSign = 1;
+
+	/** Reset when the target stands up, so the allowance is per stagger, not per fight. */
+	int32 FollowUpsThisStagger = 0;
 	float BaseWalkSpeed = 400.f;
 };

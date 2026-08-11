@@ -126,6 +126,18 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 	UIchorCombatComponent* TargetCombat = Target->FindComponentByClass<UIchorCombatComponent>();
 	const bool bTargetRecovering = TargetCombat && TargetCombat->GetState() == EIchorCombatState::Recovery;
 
+	const bool bTargetStaggered = TargetCombat
+		&& TargetCombat->GetState() == EIchorCombatState::Staggered;
+
+	// The allowance refills only when they are back on their feet.
+	if (!bTargetStaggered) { FollowUpsThisStagger = 0; }
+
+	// Hitting someone who cannot act, repeatedly, is the difference between a punish and a
+	// stunlock - and from the far side of the screen a stunlock is indistinguishable from
+	// the game being broken.
+	const bool bMustLetThemUp = bTargetStaggered
+		&& FollowUpsThisStagger >= MaxFollowUpsIntoStagger;
+
 	// A dead target is not an opponent. Without this it goes on attacking the body, which
 	// looks broken and, less obviously, opens a new fight record on every connect.
 	if (TargetCombat && !TargetCombat->IsAlive())
@@ -185,13 +197,14 @@ void AIchorSkirmisher::Tick(float DeltaSeconds)
 			// Ready to swing, but only from somewhere the swing can land. Out of reach it
 			// closes instead of committing - a whiff should be something the player earned
 			// by moving, not something the enemy did to itself.
-			if (Distance <= StrikeRange)
+			if (Distance <= StrikeRange && !bMustLetThemUp)
 				{
 					// Sounded on entry, so it lands a full TellDuration before the wind-up.
 					if (TellCue)
 					{
 						UGameplayStatics::PlaySoundAtLocation(this, TellCue, GetActorLocation());
 					}
+					if (bTargetStaggered) { FollowUpsThisStagger++; }
 					EnterState(EIchorSkirmisherState::Tell);
 				}
 			else                         { MoveToward(Forward, 1.f); }
