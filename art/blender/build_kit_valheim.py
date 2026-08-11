@@ -124,6 +124,17 @@ def tex_crest(rng):
     return np.clip(a, 0, 1)
 
 
+def tex_crest_dark(rng):
+    """The opponent's crest. Same weave, undyed and weathered - so the two sides differ by
+    colour alone and the silhouette stays identical, which is what makes it a fair tell."""
+    a = base(TEX, TEX, (0.115, 0.110, 0.125))
+    strands = np.repeat(rng.random(TEX)[:, None], TEX, axis=1)
+    a[:, :, :3] *= (0.74 + 0.48 * strands)[:, :, None]
+    dark = (blocky(TEX, TEX, 16, rng) > 0.80).astype(np.float32)
+    a = tint(a, dark, (0.05, 0.05, 0.06), 0.5)
+    return np.clip(a, 0, 1)
+
+
 def tex_marble(rng):
     """Weathered marble: warm bone base, grey veining, dirt settling low."""
     a = base(TEX, TEX, (0.80, 0.78, 0.71))
@@ -176,6 +187,7 @@ def build_textures():
         "bronze": write_texture("T_Bronze", tex_bronze(rng)),
         "wood": write_texture("T_Wood", tex_wood(rng)),
         "crest": write_texture("T_Crest", tex_crest(rng)),
+        "crest_dark": write_texture("T_CrestDark", tex_crest_dark(rng)),
         "marble": write_texture("T_Marble", tex_marble(rng)),
         "leather": write_texture("T_Leather", tex_leather(rng)),
     }
@@ -687,6 +699,45 @@ def tonemap():
         pass
 
 
+def export_fbx(parts, name, out_dir):
+    """One FBX per asset. Modifiers are applied on the way out so what Unreal receives is
+    the final mesh, not a base mesh plus instructions it cannot read."""
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts:
+        o.hide_render = False
+        o.hide_viewport = False
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+
+    path = os.path.join(out_dir, name + ".fbx")
+    try:
+        bpy.ops.export_scene.fbx(
+            filepath=path,
+            use_selection=True,
+            object_types={'MESH'},
+            use_mesh_modifiers=True,
+            mesh_smooth_type='EDGE',
+            bake_space_transform=True,
+            add_leaf_bones=False,
+            apply_unit_scale=True,
+            apply_scale_options='FBX_SCALE_NONE',
+            global_scale=1.0,
+            path_mode='STRIP',
+        )
+    except Exception as e:
+        log("EXPORT FAILED {}: {}".format(name, e))
+        return None
+
+    bpy.ops.object.select_all(action='DESELECT')
+    size = os.path.getsize(path) if os.path.exists(path) else 0
+    if size == 0:
+        log("EXPORT FAILED {}: no file written".format(name))
+        return None
+    log("exported {:<12} {:>7} bytes  ({} tris)".format(
+        name, size, sum(len(o.data.polygons) for o in parts)))
+    return path
+
+
 def pick_engine():
     for name in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "CYCLES"):
         try:
@@ -824,6 +875,17 @@ def main():
     helmet = join(helmet_parts, "SM_Helmet")
     add_bake_uvs(helmet)
 
+    # The spear ships as one mesh; three separate objects is an artefact of how it was
+    # modelled, not something Unreal should have to know about.
+    dory_mesh = join(dory, "SM_Dory")
+
+    export_dir = os.path.join(HERE, "..", "export")
+    os.makedirs(export_dir, exist_ok=True)
+    export_fbx([aspis], "SM_Aspis", export_dir)
+    export_fbx([dory_mesh], "SM_Dory", export_dir)
+    export_fbx([helmet], "SM_Helmet", export_dir)
+
+    dory = [dory_mesh]
     subjects = [aspis] + dory + [helmet]
     for o in subjects:
         d = o.dimensions
@@ -842,7 +904,7 @@ def main():
     render("helmet_front", [helmet], everything, keep, "vh_helmet_front.png",
            lens=85, pad=5.0, azim=(1.15, -0.06, 0.12))
     render("aspis", [aspis], everything, keep, "vh_aspis.png", lens=70, pad=2.8)
-    render("dory", [dory[1]], everything, keep, "vh_dory_head.png", lens=90, pad=3.2)
+    render("dory", dory, everything, keep, "vh_dory_head.png", lens=90, pad=2.2)
     # Laid out for the group shot. Everything is modelled at the origin, so without this
     # the shield, helmet and spear render stacked inside one another.
     aspis.location = (0.0, -0.62, 0.0)

@@ -43,19 +43,23 @@ UIchorCombatComponent::UIchorCombatComponent()
 	if (SpearStaggerAsset.Succeeded()) { SpearStaggerMontage = SpearStaggerAsset.Object; }
 	if (SpearDeathAsset.Succeeded())   { SpearDeathMontage = SpearDeathAsset.Object; }
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> DoryAsset(TEXT("/Game/Ichor/Weapons/SM_Dory"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> AspisAsset(TEXT("/Game/Ichor/Weapons/SM_Aspis"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> HelmAsset(TEXT("/Game/Ichor/Props/SM_Helmet_Corinthian"));
+	// The Blender kit, imported by Scripts/import_kit.py. The Geometry Script versions in
+	// /Weapons and /Props are the earlier primitives-welded-together pass, kept for
+	// comparison rather than used.
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> DoryAsset(TEXT("/Game/Ichor/Kit/SM_Dory"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> AspisAsset(TEXT("/Game/Ichor/Kit/SM_Aspis"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HelmAsset(TEXT("/Game/Ichor/Kit/SM_Helmet"));
 
 	if (DoryAsset.Succeeded())  { SpearMeshAsset = DoryAsset.Object; }
 	if (AspisAsset.Succeeded()) { ShieldMeshAsset = AspisAsset.Object; }
 	if (HelmAsset.Succeeded())  { HelmetMeshAsset = HelmAsset.Object; }
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BronzeAsset(TEXT("/Game/Ichor/Materials/M_Ichor_Bronze"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CrestAsset(TEXT("/Game/Ichor/Materials/M_Ichor_CrestRed"));
-
-	if (BronzeAsset.Succeeded()) { KitMaterial = BronzeAsset.Object; }
-	if (CrestAsset.Succeeded())  { CrestMaterial = CrestAsset.Object; }
+	// KitMaterial is deliberately left null. The imported meshes carry their own material
+	// slots now - bronze with its baked occlusion, wood on the shaft - and overriding slot
+	// 0 with a flat colour would throw all of that away. Set it in a Blueprint only to
+	// deliberately override.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CrestAsset(TEXT("/Game/Ichor/Materials/MI_HelmetCrest"));
+	if (CrestAsset.Succeeded()) { CrestMaterial = CrestAsset.Object; }
 }
 
 UAnimMontage* UIchorCombatComponent::PickMontage(UAnimMontage* Unarmed, UAnimMontage* Armed) const
