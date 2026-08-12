@@ -156,6 +156,11 @@ void UIchorCombatComponent::BeginPlay()
 	Stamina = MaxStamina;
 	Poise = MaxPoise;
 
+	if (const AActor* Owner = GetOwner())
+	{
+		SpawnTransform = Owner->GetActorTransform();
+	}
+
 	BuildWeaponVisuals();
 
 	// A null montage plays nothing and says nothing, which is indistinguishable from an
@@ -337,6 +342,30 @@ float UIchorCombatComponent::ReceiveHit(float Damage, float PoiseDamage, AActor*
 	}
 
 	return Applied;
+}
+
+void UIchorCombatComponent::ResetForNewFight()
+{
+	Health = MaxHealth;
+	Stamina = MaxStamina;
+	Poise = MaxPoise;
+	State = EIchorCombatState::Idle;
+	StateTimer = 0.f;
+	TimeSinceStaminaSpend = 999.f;
+	TimeSincePoiseDamage = 999.f;
+	bBlocking = false;
+	bTraceDoneThisSwing = false;
+	PendingDeathCause = EIchorDeathCause::Unknown;
+
+	if (ACharacter* Ch = Cast<ACharacter>(GetOwner()))
+	{
+		Ch->StopAnimMontage();
+		Ch->SetActorTransform(SpawnTransform, false, nullptr, ETeleportType::ResetPhysics);
+		if (UCharacterMovementComponent* Move = Ch->GetCharacterMovement())
+		{
+			Move->StopMovementImmediately();
+		}
+	}
 }
 
 void UIchorCombatComponent::EnterState(EIchorCombatState NewState)

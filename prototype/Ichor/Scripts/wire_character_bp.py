@@ -14,6 +14,7 @@ WIRING = [
     ("IA_HeavyAttack", "heavy_attack_action"),
     ("IA_Block",       "block_action"),
     ("IA_Dodge",       "dodge_action"),
+    ("IA_Restart",     "restart_action"),
 ]
 
 lib = unreal.EditorAssetLibrary

@@ -12,6 +12,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "IchorCombatComponent.h"
+#include "IchorFightRecorder.h"
 #include "Ichor.h"
 
 AIchorCharacter::AIchorCharacter()
@@ -97,6 +98,7 @@ void AIchorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		if (LightAttackAction) { EnhancedInputComponent->BindAction(LightAttackAction, ETriggerEvent::Started, this, &AIchorCharacter::OnLightAttack); }
 		if (HeavyAttackAction) { EnhancedInputComponent->BindAction(HeavyAttackAction, ETriggerEvent::Started, this, &AIchorCharacter::OnHeavyAttack); }
 		if (DodgeAction)       { EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &AIchorCharacter::OnDodge); }
+		if (RestartAction)     { EnhancedInputComponent->BindAction(RestartAction, ETriggerEvent::Started, this, &AIchorCharacter::OnRestart); }
 		if (BlockAction)
 		{
 			EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Started, this, &AIchorCharacter::OnBlockStart);
@@ -113,6 +115,14 @@ void AIchorCharacter::OnLightAttack() { if (Combat) { Combat->TryAttack(EIchorAt
 void AIchorCharacter::OnHeavyAttack() { if (Combat) { Combat->TryAttack(EIchorAttack::Heavy); } }
 void AIchorCharacter::OnBlockStart()  { if (Combat) { Combat->SetBlocking(true); } }
 void AIchorCharacter::OnBlockEnd()    { if (Combat) { Combat->SetBlocking(false); } }
+
+void AIchorCharacter::OnRestart()
+{
+	if (UIchorFightRecorder* Rec = UIchorFightRecorder::For(this))
+	{
+		Rec->ResetFight();
+	}
+}
 
 void AIchorCharacter::OnDodge()
 {

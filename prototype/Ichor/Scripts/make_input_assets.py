@@ -26,6 +26,10 @@ WANTED = [
     ("IA_HeavyAttack", "RightMouseButton"),
     ("IA_Block",       "LeftShift"),
     ("IA_Dodge",       "SpaceBar"),
+    # Retry. Doc 18 measures the gap between dying and trying again, so trying again has
+    # to cost one key rather than a level restart - otherwise the number measures how long
+    # PIE takes to reload.
+    ("IA_Restart",     "R"),
 ]
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()

@@ -47,6 +47,9 @@ public:
 
 	UIchorCombatComponent* GetCombat() const { return Combat; }
 
+	/** Back to Unaware with every accumulator cleared, so a retry is not half a fight in. */
+	void ResetAI();
+
 	// ---- the six knobs the 200-fight protocol turns ---------------------------
 	/** How fast the urge to attack accumulates while in the engagement band. */
 	UPROPERTY(EditAnywhere, Category = "Tuning|AI") float DesireGainRate = 0.35f;

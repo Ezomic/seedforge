@@ -60,6 +60,16 @@ void AIchorSkirmisher::BeginPlay()
 	Target = UGameplayStatics::GetPlayerPawn(this, 0);
 }
 
+void AIchorSkirmisher::ResetAI()
+{
+	State = EIchorSkirmisherState::Unaware;
+	StateTimer = 0.f;
+	Desire = 0.f;
+	PressureTimer = 0.f;
+	CommitsSinceRest = 0;
+	FollowUpsThisStagger = 0;
+}
+
 void AIchorSkirmisher::EnterState(EIchorSkirmisherState NewState)
 {
 	// Logged as well as drawn: the on-screen readout is for playing, this is for

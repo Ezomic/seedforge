@@ -66,6 +66,9 @@ public:
 	void NoteStagger(AActor* Who);
 	void NoteDeath(AActor* Who, EIchorDeathCause Cause);
 
+	/** Puts both fighters back on their marks and opens the way for a fresh record. */
+	void ResetFight();
+
 	/** Fights completed this session. */
 	int32 GetFightNumber() const { return FightNumber; }
 

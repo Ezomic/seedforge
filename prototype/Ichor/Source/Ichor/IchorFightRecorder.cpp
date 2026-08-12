@@ -2,6 +2,7 @@
 
 #include "IchorFightRecorder.h"
 #include "GameFramework/Pawn.h"
+#include "IchorSkirmisher.h"
 #include "Engine/World.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -24,6 +25,56 @@ void UIchorFightRecorder::Initialize(FSubsystemCollectionBase& Collection)
 			"f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken\n");
 		FFileHelper::SaveStringToFile(Header, *CsvPath);
 	}
+	else
+	{
+		// Carry the count across sessions. Every fight was numbered 1 because the subsystem
+		// is rebuilt with the world, so twenty fights produced twenty rows all called the
+		// first one - which is useless for a protocol that reads them in order.
+		FString Existing;
+		if (FFileHelper::LoadFileToString(Existing, *CsvPath))
+		{
+			TArray<FString> Lines;
+			Existing.ParseIntoArrayLines(Lines);
+			FightNumber = FMath::Max(0, Lines.Num() - 1);
+		}
+	}
+
+	UE_LOG(LogIchor, Log, TEXT("[fight]  log has %d fights already; next is #%d"),
+		FightNumber, FightNumber + 1);
+}
+
+void UIchorFightRecorder::ResetFight()
+{
+	// An abandoned fight is not a result. Dropping it rather than writing a row keeps the
+	// dataset to fights that actually ended.
+	if (bFightRunning)
+	{
+		bFightRunning = false;
+		UE_LOG(LogIchor, Log, TEXT("[fight]  #%d abandoned on retry - not recorded"), FightNumber + 1);
+	}
+
+	const UWorld* World = GetWorld();
+	int32 Reset = 0;
+	for (TObjectIterator<UIchorCombatComponent> It; It; ++It)
+	{
+		UIchorCombatComponent* C = *It;
+		if (!C || C->GetWorld() != World) { continue; }
+		C->ResetForNewFight();
+		Reset++;
+	}
+
+	for (TObjectIterator<AIchorSkirmisher> It; It; ++It)
+	{
+		AIchorSkirmisher* S = *It;
+		if (S && S->GetWorld() == World) { S->ResetAI(); }
+	}
+
+	// The clock for the next fight starts now, so the gap measures thinking time rather
+	// than however long the corpse was left lying there.
+	LastFightEndTime = FPlatformTime::Seconds();
+
+	UE_LOG(LogIchor, Log, TEXT("[fight]  reset %d fighters - ready for #%d"),
+		Reset, FightNumber + 1);
 }
 
 UIchorFightRecorder* UIchorFightRecorder::For(const AActor* Actor)
@@ -127,8 +178,12 @@ void UIchorFightRecorder::WriteRow(AActor* Loser, EIchorDeathCause Cause)
 	const float Duration = (float)(Now - FightStartTime);
 
 	// Zero on the first fight of a session rather than a meaningless number measured from
-	// engine start.
-	const float Gap = (FightNumber > 0) ? (float)(FightStartTime - LastFightEndTime) : 0.f;
+	// engine start. Keyed on the timestamp, not on FightNumber: the counter now persists
+	// across sessions, so a fresh run starts at 8 and would subtract a LastFightEndTime of
+	// zero - which produced a gap of sixteen million seconds.
+	const float Gap = (LastFightEndTime > 0.0)
+		? (float)(FightStartTime - LastFightEndTime)
+		: 0.f;
 
 	const FString Row = FString::Printf(
 		TEXT("%d,%.2f,%.2f,%s,%s,")

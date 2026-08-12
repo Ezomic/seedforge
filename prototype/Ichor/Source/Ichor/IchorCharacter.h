@@ -72,6 +72,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input|Combat")
 	UInputAction* DodgeAction;
 
+	/**
+	 *  Retry. Doc 18's gate asks whether a player dies and immediately tries again, and
+	 *  measures the gap - so trying again has to cost one key. Measured against a level
+	 *  reload the number would record how long the editor takes to boot.
+	 */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* RestartAction;
+
 	/** Movement speed multiplier while committed to an attack. Commitment is not only rotational. */
 	UPROPERTY(EditAnywhere, Category="Tuning|Movement")
 	float CommittedMoveScale = 0.25f;
@@ -110,6 +118,7 @@ protected:
 	void OnBlockStart();
 	void OnBlockEnd();
 	void OnDodge();
+	void OnRestart();
 
 public:
 

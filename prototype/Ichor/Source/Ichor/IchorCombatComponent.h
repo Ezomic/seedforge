@@ -263,6 +263,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ichor|Combat") bool TryDodge(FVector Direction);
 	UFUNCTION(BlueprintCallable, Category = "Ichor|Combat") void SetBlocking(bool bWantsToBlock);
 
+	/** Put this fighter back exactly as it started: full vitals, idle, back on its mark. */
+	void ResetForNewFight();
+
 	/** Returns damage actually applied after blocking. */
 	UFUNCTION(BlueprintCallable, Category = "Ichor|Combat")
 	float ReceiveHit(float Damage, float PoiseDamage, AActor* FromActor, bool bAttackerWasOnScreen);
@@ -341,6 +344,10 @@ private:
 	 */
 	float FootingTimer = 0.f;
 	bool bFootingReported = false;
+
+	/** Captured at BeginPlay so a retry returns everyone to their marks, not to wherever
+	 *  the last fight happened to end. */
+	FTransform SpawnTransform;
 
 	bool bBlocking = false;
 	bool bTraceDoneThisSwing = false;
