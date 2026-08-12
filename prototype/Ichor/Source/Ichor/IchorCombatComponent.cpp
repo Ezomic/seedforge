@@ -494,6 +494,34 @@ void UIchorCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	TimeSinceStaminaSpend += DeltaTime;
 	TimeSincePoiseDamage += DeltaTime;
 
+	if (!bFootingReported)
+	{
+		FootingTimer += DeltaTime;
+		if (FootingTimer >= 2.f)
+		{
+			bFootingReported = true;
+			if (const ACharacter* Ch = Cast<ACharacter>(GetOwner()))
+			{
+				const UCharacterMovementComponent* Move = Ch->GetCharacterMovement();
+				const bool bGrounded = Move && Move->IsMovingOnGround();
+				const float Z = Ch->GetActorLocation().Z;
+
+				// Warning rather than Log when airborne, so it surfaces in a filtered log
+				// instead of scrolling past with everything else.
+				if (bGrounded)
+				{
+					UE_LOG(LogIchor, Log, TEXT("[footing] %s on the ground at z=%.0f"),
+						*GetNameSafe(GetOwner()), Z);
+				}
+				else
+				{
+					UE_LOG(LogIchor, Warning, TEXT("[footing] %s IS NOT ON THE GROUND at z=%.0f"),
+						*GetNameSafe(GetOwner()), Z);
+				}
+			}
+		}
+	}
+
 	// Stamina only recovers once the owner stops spending it.
 	if (TimeSinceStaminaSpend >= StaminaRegenDelay && !IsBlocking())
 	{

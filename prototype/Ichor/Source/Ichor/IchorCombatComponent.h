@@ -331,6 +331,17 @@ private:
 	float TimeSinceStaminaSpend = 999.f;
 	float TimeSincePoiseDamage = 999.f;
 
+	/**
+	 *  One-shot footing check.
+	 *
+	 *  Every headless run so far proved the fight loop worked while the arena floor had no
+	 *  collision at all and both fighters were falling - they fall at the same rate, stay
+	 *  in reach, and every log line looks normal. "The fight ran" is not the same claim as
+	 *  "anyone was standing on anything", and only one of them was ever being checked.
+	 */
+	float FootingTimer = 0.f;
+	bool bFootingReported = false;
+
 	bool bBlocking = false;
 	bool bTraceDoneThisSwing = false;
 

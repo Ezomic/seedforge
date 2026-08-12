@@ -155,6 +155,9 @@ def save_mesh(mesh, name, writer):
     o.set_editor_property("enable_recompute_tangents", True)
     o.set_editor_property("enable_collision", True)
     o.set_editor_property("enable_nanite", False)
+    # enable_collision alone produces a mesh that reports QUERY_AND_PHYSICS and has zero
+    # collision primitives - the arena floor was visual only and the player fell through
+    # it. Collision geometry is applied after creation; see fix_prop_collision.py.
 
     try:
         writer(mesh, path, o)
