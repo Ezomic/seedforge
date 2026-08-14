@@ -35,7 +35,13 @@ seedforge/
     Source/             Core, Gameplay, WorldRuntime, UI
     Content/
   tools/                data validation, JSON→DataAsset import
+  art/                  Blender sources, generated textures and audio
+  tracker/              the backlog, as JSON
 ```
+
+`art/` and `tracker/` are not in the original sketch but sit at the root for the same
+reason `data/` does: both are source material read by tooling rather than build output, and
+both are pure text or small binaries that behave under Git.
 
 **`data/` being shared is the important bit.** Axioms are read by *both* the generator and
 the game; two copies will diverge within a month.
