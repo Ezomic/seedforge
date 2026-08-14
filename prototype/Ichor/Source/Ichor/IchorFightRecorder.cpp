@@ -6,6 +6,9 @@
 #include "Engine/World.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/App.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UObject/UObjectIterator.h"
 #include "Ichor.h"
 
@@ -13,7 +16,15 @@ void UIchorFightRecorder::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	CsvPath = FPaths::ProjectSavedDir() / TEXT("Fights") / TEXT("fights.csv");
+	// Automated runs write somewhere else. Every headless verification appends a fight
+	// nobody played, and those rows sit in the same file the 200-fight protocol reads -
+	// with zero attacks and a duration set by whatever the AI did to a motionless dummy.
+	// Deleting them by hand after each check is a step that will eventually be forgotten.
+	const bool bAutomated = FApp::IsUnattended()
+		|| FParse::Param(FCommandLine::Get(), TEXT("nullrhi"));
+
+	CsvPath = FPaths::ProjectSavedDir() / TEXT("Fights")
+		/ (bAutomated ? TEXT("fights_headless.csv") : TEXT("fights.csv"));
 
 	// Header once, on first creation. Appending to a file with no header produces a
 	// spreadsheet nobody can read a month later.
