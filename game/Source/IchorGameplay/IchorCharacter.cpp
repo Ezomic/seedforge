@@ -76,6 +76,24 @@ void AIchorCharacter::Tick(float DeltaSeconds)
 		GEngine->AddOnScreenDebugMessage(1001, 0.f, FColor::Green,
 			FString::Printf(TEXT("PLAYER  %s"), *Combat->GetDebugLine()));
 	}
+
+	if (bShowControls && GEngine)
+	{
+		// Says what each key does, not just which keys exist. "Space - dodge" would leave a
+		// tester assuming invincibility frames, which is the one thing dodge deliberately
+		// does not have; they would then read a correct dodge that still got hit as the
+		// game cheating rather than as their spacing being wrong.
+		GEngine->AddOnScreenDebugMessage(1010, 0.f, FColor::Silver,
+			TEXT("R - retry"));
+		GEngine->AddOnScreenDebugMessage(1011, 0.f, FColor::Silver,
+			TEXT("SPACE - step (moves you; no invulnerability - the enemy cannot turn mid-swing)"));
+		GEngine->AddOnScreenDebugMessage(1012, 0.f, FColor::Silver,
+			TEXT("SHIFT - hold to block (damage becomes stamina; two blocks break your guard)"));
+		GEngine->AddOnScreenDebugMessage(1013, 0.f, FColor::Silver,
+			TEXT("RMB - heavy (slow, always staggers)"));
+		GEngine->AddOnScreenDebugMessage(1014, 0.f, FColor::Silver,
+			TEXT("LMB - light (fast, two in a row stagger)"));
+	}
 }
 
 void AIchorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

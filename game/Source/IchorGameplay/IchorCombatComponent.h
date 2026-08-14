@@ -219,7 +219,15 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FName SpearAttachBone = TEXT("hand_r");
 	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FVector SpearOffset = FVector(0.f, 0.f, 0.f);
-	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FRotator SpearRotation = FRotator(0.f, 0.f, 90.f);
+	/**
+	 *  FRotator is (Pitch, Yaw, Roll), and the old default was a Roll of 90 - which spins
+	 *  the spear about its own long axis and never reorients it, so it stayed pointing
+	 *  wherever the bone pointed. Sideways, through the hand.
+	 *
+	 *  The meshes are modelled along +Z because that is Blender's up. A hand bone's forward
+	 *  is its X axis. Mapping mesh +Z onto bone +X is a pitch of -90.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FRotator SpearRotation = FRotator(-90.f, 0.f, 0.f);
 
 	/** The generated meshes are already real-world size, so this is a correction, not a fit. */
 	UPROPERTY(EditAnywhere, Category = "Loadout|Spear") FVector SpearScale = FVector(1.f, 1.f, 1.f);
@@ -233,14 +241,16 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FName HelmetAttachBone = TEXT("head");
 	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FVector HelmetOffset = FVector(0.f, 0.f, 0.f);
-	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FRotator HelmetRotation = FRotator(0.f, 0.f, 0.f);
+	/** Had no correction at all, so it inherited the head bone's axes directly. */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") FRotator HelmetRotation = FRotator(-90.f, 0.f, 0.f);
 
 	/** Material slot 1 on the helmet. Set this differently per Blueprint to tell sides apart. */
 	UPROPERTY(EditAnywhere, Category = "Loadout|Helmet") UMaterialInterface* CrestMaterial;
 
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FName ShieldAttachBone = TEXT("hand_l");
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FVector ShieldOffset = FVector(0.f, 0.f, 0.f);
-	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FRotator ShieldRotation = FRotator(90.f, 0.f, 0.f);
+	/** Pitch +90 aimed the shield face backwards. Same -90 correction as the spear. */
+	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FRotator ShieldRotation = FRotator(-90.f, 0.f, 0.f);
 	UPROPERTY(EditAnywhere, Category = "Loadout|Shield") FVector ShieldScale = FVector(1.f, 1.f, 1.f);
 
 	// ---- queries ------------------------------------------------------------

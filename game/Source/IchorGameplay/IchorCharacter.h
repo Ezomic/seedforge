@@ -91,6 +91,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Debug")
 	bool bShowCombatDebug = true;
 
+	/**
+	 *  The controls, on screen.
+	 *
+	 *  Doc 18's gate is "thirty minutes each, no help, watched". Two strangers cannot
+	 *  discover that Shift converts damage into stamina, or that Space repositions rather
+	 *  than granting invincibility, by pressing keys at random - and a tester who never
+	 *  finds half the defensive design fails the gate for a reason that has nothing to do
+	 *  with whether the fight is tense.
+	 */
+	UPROPERTY(EditAnywhere, Category="Debug")
+	bool bShowControls = true;
+
 public:
 
 	/** Constructor */
