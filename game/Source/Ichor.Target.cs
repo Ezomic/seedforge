@@ -10,6 +10,11 @@ public class IchorTarget : TargetRules
 		Type = TargetType.Game;
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
-		ExtraModuleNames.Add("Ichor");
+		ExtraModuleNames.AddRange(new string[] {
+			"IchorCore",
+			"IchorGameplay",
+			"IchorWorldRuntime",
+			"IchorUI"
+		});
 	}
 }

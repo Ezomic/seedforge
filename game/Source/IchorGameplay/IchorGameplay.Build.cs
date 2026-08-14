@@ -2,9 +2,9 @@
 
 using UnrealBuildTool;
 
-public class Ichor : ModuleRules
+public class IchorGameplay : ModuleRules
 {
-	public Ichor(ReadOnlyTargetRules Target) : base(Target)
+	public IchorGameplay(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -20,13 +20,10 @@ public class Ichor : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"AIModule",
-			"NavigationSystem"
+			"NavigationSystem",
+			"IchorCore"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
-
-		PublicIncludePaths.AddRange(new string[] {
-			"Ichor"
-		});
+		PublicIncludePaths.AddRange(new string[] { "IchorGameplay" });
 	}
 }

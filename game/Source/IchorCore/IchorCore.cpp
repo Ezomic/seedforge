@@ -3,6 +3,6 @@
 #include "Ichor.h"
 #include "Modules/ModuleManager.h"
 
-IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, Ichor, "Ichor" );
+IMPLEMENT_MODULE(FDefaultModuleImpl, IchorCore);
 
 DEFINE_LOG_CATEGORY(LogIchor)

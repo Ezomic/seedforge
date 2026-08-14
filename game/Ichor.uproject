@@ -5,13 +5,28 @@
 	"Description": "Stage 0 grey-box combat prototype. Disposable by design - see docs/18-vertical-slice.md.",
 	"Modules": [
 		{
-			"Name": "Ichor",
+			"Name": "IchorCore",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "IchorGameplay",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
 				"Engine",
 				"AIModule"
 			]
+		},
+		{
+			"Name": "IchorWorldRuntime",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "IchorUI",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
