@@ -1,5 +1,6 @@
 add_library(ichor_platform_api INTERFACE)
 target_include_directories(ichor_platform_api INTERFACE include)
+target_link_libraries(ichor_platform_api INTERFACE ichor_core)
 
 add_library(ichor_platform_null
     src/null_platform.cpp

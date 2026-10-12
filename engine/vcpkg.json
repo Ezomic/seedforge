@@ -8,7 +8,8 @@
     "glm",
     "cgltf",
     "stb",
-    "meshoptimizer"
+    "meshoptimizer",
+    "entt"
   ],
   "default-features": [
     "runtime"

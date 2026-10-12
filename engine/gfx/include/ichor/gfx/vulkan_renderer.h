@@ -19,6 +19,7 @@ public:
 
     bool init() override;
     bool uploadBundle(const SceneBundle& bundle) override;
+    bool reloadShaders() override;
     void beginFrame() override;
     void submit(const RenderView& view) override;
     void endFrame() override;

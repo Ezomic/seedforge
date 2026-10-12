@@ -15,6 +15,29 @@ Engine::Engine(Platform& platform, Renderer& renderer, const EngineConfig& confi
 {
 }
 
+void Engine::replayInputs(InputStream stream)
+{
+    replay_ = std::move(stream);
+    replayIndex_ = 0;
+    replaying_ = true;
+}
+
+InputFrame Engine::nextInput()
+{
+    InputFrame input;
+    if (replaying_) {
+        if (replayIndex_ < replay_.frames.size()) {
+            input = replay_.frames[replayIndex_++];
+        }
+    } else {
+        input = platform_.input();
+    }
+    if (recording_) {
+        recorded_.frames.push_back(input);
+    }
+    return input;
+}
+
 bool Engine::frame(double frameSeconds)
 {
     platform_.pumpEvents();
@@ -23,8 +46,8 @@ bool Engine::frame(double frameSeconds)
     }
 
     const int steps = step_.advance(frameSeconds);
-    for (int i = 0; i < steps; ++i) {
-        scene_.tick(step_.dt());
+    for (int i = 0; i < steps && !replayFinished(); ++i) {
+        scene_.tick(step_.dt(), nextInput());
     }
 
     renderer_.beginFrame();
@@ -34,8 +57,9 @@ bool Engine::frame(double frameSeconds)
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
     }
-    renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s", frameCount_, scene_.tickCount(), scene_.time()));
-    renderer_.debugText(std::format("seed {}  state {:016x}", scene_.seed(), scene_.stateHash()));
+    renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}", frameCount_, scene_.tickCount(), scene_.time(),
+        replaying_ ? "  [replay]" : recording_ ? "  [rec]" : ""));
+    renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
     renderer_.endFrame();
 
     ++frameCount_;

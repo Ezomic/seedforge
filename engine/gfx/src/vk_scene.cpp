@@ -413,6 +413,18 @@ bool SceneRenderer::createPipelines()
     return ok;
 }
 
+bool SceneRenderer::reloadPipelines()
+{
+    vkDeviceWaitIdle(ctx_.device());
+    for (VkPipeline* pipeline : {&pbrPipeline_, &shadowPipeline_, &debugPipeline_}) {
+        vkDestroyPipeline(ctx_.device(), *pipeline, nullptr);
+        *pipeline = VK_NULL_HANDLE;
+    }
+    const bool ok = createPipelines();
+    log(ok ? LogLevel::Info : LogLevel::Error, ok ? "shaders reloaded" : "shader reload failed; the scene will not draw until they compile");
+    return ok;
+}
+
 bool SceneRenderer::createDefaultTextures()
 {
     auto make = [&](GpuImage& image, std::uint8_t r, std::uint8_t g, std::uint8_t b, TextureFormat format) {
@@ -632,8 +644,10 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         const VkRect2D scissor{{0, 0}, {kShadowSize, kShadowSize}};
         vkCmdSetViewport(cmd, 0, 1, &viewport);
         vkCmdSetScissor(cmd, 0, 1, &scissor);
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline_);
-        drawInstances(true, c);
+        if (shadowPipeline_ != VK_NULL_HANDLE) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline_);
+            drawInstances(true, c);
+        }
         vkCmdEndRendering(cmd);
     }
     transitionImage(cmd, shadowMap_.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
@@ -667,10 +681,12 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     const VkRect2D scissor{{0, 0}, extent};
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     vkCmdSetScissor(cmd, 0, 1, &scissor);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pbrPipeline_);
-    drawInstances(false, 0);
+    if (pbrPipeline_ != VK_NULL_HANDLE) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pbrPipeline_);
+        drawInstances(false, 0);
+    }
 
-    if (lineCount > 0) {
+    if (lineCount > 0 && debugPipeline_ != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, debugPipeline_);
         const VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cmd, 0, 1, &frame.debugVertices.buffer, &offset);

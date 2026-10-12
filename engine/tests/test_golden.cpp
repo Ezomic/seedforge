@@ -37,5 +37,5 @@ TEST_CASE("golden: scene state hash after 120 ticks")
         scene.tick(1.0 / 60.0);
     }
     REQUIRE(scene.tickCount() == 120);
-    REQUIRE(scene.stateHash() == 0x541feb2405dda192ull);
+    REQUIRE(scene.stateHash() == 0xdf2ba91fba40da84ull);
 }

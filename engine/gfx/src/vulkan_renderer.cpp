@@ -240,6 +240,11 @@ bool VulkanRenderer::uploadBundle(const SceneBundle& bundle)
     return impl_->scene->uploadBundle(bundle);
 }
 
+bool VulkanRenderer::reloadShaders()
+{
+    return impl_->scene->reloadPipelines();
+}
+
 void VulkanRenderer::beginFrame()
 {
     ZoneScoped;

@@ -21,6 +21,15 @@ public:
         nextU32();
     }
 
+    // Rebuilds a generator from a snapshot; see scene_io.
+    static Rng fromState(std::uint64_t seed, std::uint64_t state, std::uint64_t increment)
+    {
+        Rng rng(seed);
+        rng.state_ = state;
+        rng.inc_ = increment;
+        return rng;
+    }
+
     // A child generator whose sequence depends on this seed and the name only,
     // so adding a system never reshuffles another system's draws.
     Rng derive(std::string_view name) const
@@ -69,6 +78,8 @@ public:
     }
 
     std::uint64_t state() const { return state_; }
+    std::uint64_t increment() const { return inc_; }
+    std::uint64_t seed() const { return seed_; }
 
 private:
     std::uint64_t state_ = 0;

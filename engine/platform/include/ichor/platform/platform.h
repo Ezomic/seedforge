@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/core/input.h"
+
 #include <string>
 
 namespace ichor {
@@ -24,6 +26,9 @@ public:
     virtual bool quitRequested() const = 0;
     virtual double now() const = 0;
     virtual Extent drawableSize() const = 0;
+
+    // The player's input as of the last pump, in simulation terms.
+    virtual InputFrame input() const = 0;
 };
 
 }
