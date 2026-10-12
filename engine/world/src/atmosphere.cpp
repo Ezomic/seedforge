@@ -86,6 +86,7 @@ void applyAtmosphere(const Atmosphere& atmosphere, RenderView& view)
     view.skyHorizon = atmosphere.horizon;
     view.fogColor = atmosphere.fogColor;
     view.fogDensity = atmosphere.fogDensity;
+    view.rainIntensity = atmosphere.rain;
 }
 
 }

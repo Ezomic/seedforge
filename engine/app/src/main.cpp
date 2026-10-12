@@ -20,6 +20,7 @@
 #include "ichor/world/atmosphere.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
+#include "ichor/world/weather.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
@@ -409,7 +410,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!heightfield.empty()) {
             view.camera.farPlane = 2500.0f;
             // Time of day follows the tick, so it needs no saved state and a replay sees the same sky.
-            ichor::applyAtmosphere(ichor::atmosphereAt(ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour)), view);
+            // Weather follows the hours since the world began, so it needs no saved state either.
+            ichor::Atmosphere atmosphere = ichor::atmosphereAt(ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour));
+            ichor::applyWeather(ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
+            ichor::applyAtmosphere(atmosphere, view);
+            view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
