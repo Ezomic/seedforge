@@ -1,0 +1,33 @@
+{
+  "name": "ichor-engine",
+  "version-string": "0.1.0",
+  "builtin-baseline": "e456309491fd875487bf02b8a0dca76c1b1b00cc",
+  "description": "Ichor's engine. Every dependency here has a one-line why in docs/17-tech-stack.md.",
+  "dependencies": [
+    "catch2"
+  ],
+  "default-features": [
+    "runtime"
+  ],
+  "features": {
+    "runtime": {
+      "description": "The SDL3 window, Vulkan renderer, ImGui overlay and Tracy client. Off for headless builds.",
+      "dependencies": [
+        {
+          "name": "sdl3",
+          "features": ["vulkan"]
+        },
+        "vulkan-headers",
+        "vulkan-loader",
+        "vk-bootstrap",
+        "vulkan-memory-allocator",
+        {
+          "name": "imgui",
+          "features": ["sdl3-binding", "vulkan-binding"]
+        },
+        "tracy",
+        "directx-dxc"
+      ]
+    }
+  }
+}
