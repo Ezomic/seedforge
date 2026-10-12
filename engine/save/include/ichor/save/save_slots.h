@@ -48,6 +48,7 @@ struct LoadResult {
     bool dataChanged = false;    // loaded, but the data layer differs from when it was saved
     SlotInfo info;
     Chronicle chronicle;         // the story up to the moment of the save
+    bool chronicleDamaged = false; // the slot held a chronicle that could not be read, so it came back empty
 };
 
 class SaveSlots {

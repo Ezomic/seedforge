@@ -26,7 +26,14 @@ bool Chronicle::add(std::uint64_t tick, std::string_view category, std::string_v
     ChronicleEntry entry;
     entry.tick = tick;
     entry.category = std::string(category);
-    entry.text = std::string(text.substr(0, kMaxTextBytes));
+    // Cut on a character boundary, so a multi-byte character is never split.
+    std::size_t length = std::min(text.size(), kMaxTextBytes);
+    if (length < text.size()) {
+        while (length > 0 && (static_cast<unsigned char>(text[length]) & 0xC0) == 0x80) {
+            --length;
+        }
+    }
+    entry.text = std::string(text.substr(0, length));
     for (char& c : entry.text) {
         if (c == '\t' || c == '\n' || c == '\r') {
             c = ' ';
@@ -55,7 +62,12 @@ bool Chronicle::parse(std::string_view bytes, Chronicle& out)
 {
     Chronicle parsed;
     std::size_t position = bytes.find('\n');
-    if (position == std::string_view::npos || bytes.substr(0, position) != kHeader) {
+    if (position == std::string_view::npos) {
+        return false;
+    }
+    // A file saved with Windows line endings is read the same.
+    const auto withoutReturn = [](std::string_view line) { return !line.empty() && line.back() == '\r' ? line.substr(0, line.size() - 1) : line; };
+    if (withoutReturn(bytes.substr(0, position)) != kHeader) {
         return false;
     }
     ++position;
@@ -64,7 +76,7 @@ bool Chronicle::parse(std::string_view bytes, Chronicle& out)
         if (end == std::string_view::npos) {
             return false; // a final line without its break is a truncated file
         }
-        const std::string_view line = bytes.substr(position, end - position);
+        const std::string_view line = withoutReturn(bytes.substr(position, end - position));
         position = end + 1;
         const std::size_t first = line.find('\t');
         const std::size_t second = first == std::string_view::npos ? first : line.find('\t', first + 1);
@@ -89,7 +101,9 @@ std::string Chronicle::exportText(double secondsPerTick) const
 {
     std::string out;
     for (const ChronicleEntry& entry : entries_) {
-        const auto seconds = static_cast<std::uint64_t>(static_cast<double>(entry.tick) * secondsPerTick);
+        // NaN, a negative rate and absurd ticks all fall to zero instead of an undefined conversion.
+        const double elapsed = static_cast<double>(entry.tick) * secondsPerTick;
+        const std::uint64_t seconds = elapsed >= 0.0 && elapsed < 1.8e19 ? static_cast<std::uint64_t>(elapsed) : 0;
         out += std::format("[{}:{:02}:{:02}] {}: {}\n", seconds / 3600, seconds / 60 % 60, seconds % 60, entry.category, entry.text);
     }
     return out;

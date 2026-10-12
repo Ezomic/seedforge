@@ -256,7 +256,8 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
             continue;
         }
         // The story is read after the scene is back; a damaged one costs the journal, not the save.
-        Chronicle::parse(std::string_view(reinterpret_cast<const char*>(payload.data()) + header.snapshotSize, payload.size() - header.snapshotSize), result.chronicle);
+        const std::string_view story(reinterpret_cast<const char*>(payload.data()) + header.snapshotSize, payload.size() - header.snapshotSize);
+        result.chronicleDamaged = !story.empty() && !Chronicle::parse(story, result.chronicle);
         result.status = LoadStatus::Loaded;
         result.fromBackup = backup > 0;
         result.dataChanged = header.dataDigest != expected.dataDigest;

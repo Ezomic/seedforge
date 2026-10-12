@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -325,4 +326,45 @@ TEST_CASE("a slot carries the chronicle and a load restores the story")
     // Saving without one gives an empty story, not an error.
     REQUIRE(slots.save("plain", scene, kContext));
     REQUIRE(slots.load("plain", restored, kContext).chronicle.empty());
+}
+
+TEST_CASE("chronicle text is cut on a character boundary and export survives odd inputs")
+{
+    Chronicle story;
+    std::string text(Chronicle::kMaxTextBytes - 1, 'x');
+    text += "\xE2\x82\xAC"; // a three-byte character straddling the limit
+    REQUIRE(story.add(1, "money", text));
+    const std::string& kept = story.entries()[0].text;
+    REQUIRE(kept.size() == Chronicle::kMaxTextBytes - 1);
+    REQUIRE((static_cast<unsigned char>(kept.back()) & 0xC0) != 0x80);
+
+    REQUIRE(story.add(UINT64_MAX, "late", "far future"));
+    REQUIRE_NOTHROW(story.exportText(1.0 / 60.0));
+    REQUIRE_NOTHROW(story.exportText(-1.0));
+    REQUIRE_NOTHROW(story.exportText(std::nan("")));
+}
+
+TEST_CASE("a chronicle with Windows line endings parses")
+{
+    Chronicle back;
+    REQUIRE(Chronicle::parse("ichor-chronicle 1\r\n5\tquest\tdone\r\n", back));
+    REQUIRE(back.entries().size() == 1);
+    REQUIRE(back.entries()[0].text == "done");
+}
+
+TEST_CASE("a slot says when its chronicle was damaged")
+{
+    const Dir dir;
+    Scene scene(5);
+    populate(scene, 2);
+    Chronicle story;
+    REQUIRE(story.add(1, "quest", "something"));
+    SaveSlots slots(dir.path());
+    REQUIRE(slots.save("s", scene, kContext, story));
+    Scene restored(5);
+    const LoadResult clean = slots.load("s", restored, kContext);
+    REQUIRE_FALSE(clean.chronicleDamaged);
+
+    REQUIRE(slots.save("none", scene, kContext));
+    REQUIRE_FALSE(slots.load("none", restored, kContext).chronicleDamaged);
 }
