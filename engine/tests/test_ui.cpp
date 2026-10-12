@@ -7,6 +7,8 @@
 #include <memory>
 
 #include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/Core.h>
+#include <RmlUi/Core/SystemInterface.h>
 
 using namespace ichor;
 
@@ -152,4 +154,20 @@ TEST_CASE("contexts come and go, and the process-wide setup follows them")
     c.loadDocumentFromMemory(kBoxes)->Show();
     frame(c, third, 0.0);
     REQUIRE_FALSE(third.draws().empty());
+}
+
+TEST_CASE("each context reads its own clock, not whichever updated last")
+{
+    RecordingUiRenderer first;
+    RecordingUiRenderer second;
+    UiContext a(first, 100, 100);
+    UiContext b(second, 100, 100);
+    REQUIRE(a.ok());
+    REQUIRE(b.ok());
+    a.update(5.0);
+    b.update(900.0);
+    a.render();
+    REQUIRE(Rml::GetSystemInterface()->GetElapsedTime() == 5.0);
+    b.render();
+    REQUIRE(Rml::GetSystemInterface()->GetElapsedTime() == 900.0);
 }

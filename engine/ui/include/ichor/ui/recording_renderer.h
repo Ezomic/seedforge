@@ -24,7 +24,7 @@ public:
     Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override;
     void RenderGeometry(Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation, Rml::TextureHandle texture) override;
     void ReleaseGeometry(Rml::CompiledGeometryHandle geometry) override;
-    // Textures are counted, not stored. LoadTexture reports a 1 by 1 image for any source.
+    // Textures are not stored. LoadTexture reports a 1 by 1 image for any source.
     Rml::TextureHandle LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source) override;
     Rml::TextureHandle GenerateTexture(Rml::Span<const Rml::byte> source, Rml::Vector2i dimensions) override;
     void ReleaseTexture(Rml::TextureHandle texture) override;
@@ -35,8 +35,6 @@ public:
     const std::vector<Draw>& draws() const { return draws_; }
     void clearDraws() { draws_.clear(); }
     std::size_t liveGeometry() const { return geometry_.size(); }
-    std::uint64_t compiled() const { return compiled_; }
-    std::size_t liveTextures() const { return textures_; }
 
 private:
     struct Geometry {
@@ -46,8 +44,6 @@ private:
     };
     std::map<Rml::CompiledGeometryHandle, Geometry> geometry_;
     Rml::CompiledGeometryHandle next_ = 1;
-    std::uint64_t compiled_ = 0;
-    std::size_t textures_ = 0;
     Rml::TextureHandle nextTexture_ = 1;
     std::vector<Draw> draws_;
     bool scissorOn_ = false;

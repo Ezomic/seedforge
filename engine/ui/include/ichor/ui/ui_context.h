@@ -19,6 +19,8 @@ namespace ichor {
 // one UI surface and draws through whichever render interface it is given, so
 // headless tests record geometry and the Vulkan renderer draws it. Everything
 // RmlUi keeps global is set up once for the process, on the engine's log.
+// Use it from one thread. File paths resolve through RmlUi's default file
+// interface, so a relative path is relative to the working directory.
 class UiContext {
 public:
     UiContext(Rml::RenderInterface& renderer, std::uint32_t width, std::uint32_t height);
@@ -29,8 +31,9 @@ public:
     bool ok() const { return context_ != nullptr; }
 
     // Documents are RML (HTML and CSS). Both return null on a parse error,
-    // which is logged.
-    Rml::ElementDocument* loadDocumentFromMemory(std::string_view rml);
+    // which is logged. RmlUi has no default stylesheet, so a document sets
+    // display itself. sourceUrl is the base for the document's relative links.
+    Rml::ElementDocument* loadDocumentFromMemory(std::string_view rml, std::string_view sourceUrl = "[document from memory]");
     Rml::ElementDocument* loadDocument(const std::filesystem::path& path);
     void unloadDocument(Rml::ElementDocument* document);
 
@@ -50,6 +53,7 @@ public:
 private:
     Rml::Context* context_ = nullptr;
     std::string name_;
+    double clock_ = 0.0;
 };
 
 }

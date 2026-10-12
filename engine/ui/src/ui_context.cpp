@@ -4,20 +4,20 @@
 
 #include <RmlUi/Core.h>
 
-#include <atomic>
 #include <string>
 
 namespace ichor {
 
 namespace {
 
-// The UI clock belongs to whoever drives the context; the system interface
-// reads it, so animations follow simulated time.
-std::atomic<double> g_uiClock{0.0};
+// The system interface reads the clock of the context being updated or
+// rendered, so animations follow simulated time and two contexts on different
+// clocks do not disturb each other. Everything here is single-threaded.
+double g_uiClock = 0.0;
 
 class UiSystem final : public Rml::SystemInterface {
 public:
-    double GetElapsedTime() override { return g_uiClock.load(); }
+    double GetElapsedTime() override { return g_uiClock; }
 
     bool LogMessage(Rml::Log::Type type, const Rml::String& message) override
     {
@@ -63,14 +63,18 @@ UiContext::~UiContext()
     }
 }
 
-Rml::ElementDocument* UiContext::loadDocumentFromMemory(std::string_view rml)
+Rml::ElementDocument* UiContext::loadDocumentFromMemory(std::string_view rml, std::string_view sourceUrl)
 {
-    return context_ == nullptr ? nullptr : context_->LoadDocumentFromMemory(Rml::String(rml));
+    return context_ == nullptr ? nullptr : context_->LoadDocumentFromMemory(Rml::String(rml), Rml::String(sourceUrl));
 }
 
 Rml::ElementDocument* UiContext::loadDocument(const std::filesystem::path& path)
 {
-    return context_ == nullptr ? nullptr : context_->LoadDocument(path.generic_string());
+    if (context_ == nullptr) {
+        return nullptr;
+    }
+    const auto utf8 = path.generic_u8string();
+    return context_->LoadDocument(Rml::String(reinterpret_cast<const char*>(utf8.data()), utf8.size()));
 }
 
 void UiContext::unloadDocument(Rml::ElementDocument* document)
@@ -89,7 +93,8 @@ void UiContext::setSize(std::uint32_t width, std::uint32_t height)
 
 void UiContext::update(double elapsedSeconds)
 {
-    g_uiClock.store(elapsedSeconds);
+    clock_ = elapsedSeconds;
+    g_uiClock = clock_;
     if (context_ != nullptr) {
         context_->Update();
     }
@@ -97,6 +102,7 @@ void UiContext::update(double elapsedSeconds)
 
 void UiContext::render()
 {
+    g_uiClock = clock_;
     if (context_ != nullptr) {
         context_->Render();
     }

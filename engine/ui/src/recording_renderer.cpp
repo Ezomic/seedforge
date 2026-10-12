@@ -12,7 +12,6 @@ Rml::CompiledGeometryHandle RecordingUiRenderer::CompileGeometry(Rml::Span<const
     }
     const Rml::CompiledGeometryHandle handle = next_++;
     geometry_.emplace(handle, geometry);
-    ++compiled_;
     return handle;
 }
 
@@ -40,21 +39,16 @@ void RecordingUiRenderer::ReleaseGeometry(Rml::CompiledGeometryHandle geometry)
 Rml::TextureHandle RecordingUiRenderer::LoadTexture(Rml::Vector2i& dimensions, const Rml::String&)
 {
     dimensions = {1, 1};
-    ++textures_;
     return nextTexture_++;
 }
 
 Rml::TextureHandle RecordingUiRenderer::GenerateTexture(Rml::Span<const Rml::byte>, Rml::Vector2i)
 {
-    ++textures_;
     return nextTexture_++;
 }
 
 void RecordingUiRenderer::ReleaseTexture(Rml::TextureHandle)
 {
-    if (textures_ > 0) {
-        --textures_;
-    }
 }
 
 void RecordingUiRenderer::EnableScissorRegion(bool enable)
