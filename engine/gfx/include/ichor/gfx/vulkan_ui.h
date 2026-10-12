@@ -15,7 +15,12 @@ namespace ichor {
 // the viewport must be upright, since the vertex shader maps top-left pixels.
 //
 // Buffers and textures RmlUi releases may still be read by frames in flight,
-// so they are destroyed a few frames later, not at once.
+// so they are destroyed a few frames later, not at once. The VulkanContext
+// must outlive this object.
+//
+// Not yet supported: CSS transforms and clipping by rounded overflow, which
+// need RmlUi's SetTransform and clip mask calls. Plain boxes, borders, rounded
+// backgrounds, scissor clipping and textures work.
 class VulkanUiRenderer final : public Rml::RenderInterface {
 public:
     VulkanUiRenderer(VulkanContext& context, VkFormat colorFormat, VkFormat depthFormat);

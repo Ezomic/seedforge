@@ -30,7 +30,7 @@ public:
     bool render(const RenderView& view, std::vector<std::uint8_t>& rgba, const Overlay& overlay = {});
 
     VulkanContext& context() { return context_; }
-    VkFormat colorFormat() const { return VK_FORMAT_R8G8B8A8_UNORM; }
+    VkFormat colorFormat() const { return color_.format; }
     VkExtent2D extent() const { return extent_; }
 
     const char* deviceName() const { return context_.deviceName(); }

@@ -234,12 +234,14 @@ constexpr const char* kUiDocument = R"(<rml><head><style>
     .clip { position: absolute; left: 380px; top: 40px; width: 120px; height: 90px; overflow: hidden; background-color: #204020; }
     .big { width: 300px; height: 300px; background-color: #40e040; }
     .round { position: absolute; left: 500px; top: 200px; width: 100px; height: 100px; background-color: #f0f0f0; border-radius: 24px; }
+    .pic { position: absolute; left: 60px; top: 270px; width: 64px; height: 64px; }
 </style></head><body>
     <div class="panel"></div>
     <div class="bar"></div>
     <div class="glass"></div>
     <div class="clip"><div class="big"></div></div>
     <div class="round"></div>
+    <img class="pic" src="ui_texture.png"/>
 </body></rml>)";
 
 }
@@ -254,7 +256,17 @@ TEST_CASE("golden image: the game UI drawn with Vulkan")
     REQUIRE(vkUi.init());
     UiContext ui(vkUi, kWidth, kHeight);
     REQUIRE(ui.ok());
-    Rml::ElementDocument* document = ui.loadDocumentFromMemory(kUiDocument);
+    // A small translucent checker, loaded through the texture path: PNG decode, premultiply, upload.
+    std::filesystem::create_directories(kOutDir);
+    std::vector<std::uint8_t> checker;
+    for (int y = 0; y < 4; ++y) {
+        for (int x = 0; x < 4; ++x) {
+            const bool light = (x + y) % 2 == 0;
+            checker.insert(checker.end(), {static_cast<std::uint8_t>(light ? 240 : 40), static_cast<std::uint8_t>(light ? 200 : 60), static_cast<std::uint8_t>(light ? 40 : 200), static_cast<std::uint8_t>(light ? 255 : 160)});
+        }
+    }
+    REQUIRE(writePng(kOutDir / "ui_texture.png", 4, 4, checker.data()));
+    Rml::ElementDocument* document = ui.loadDocumentFromMemory(kUiDocument, std::filesystem::relative(kOutDir / "ui_document.rml").generic_string()); // RmlUi reads a drive letter as a URL scheme
     REQUIRE(document != nullptr);
     document->Show();
     ui.update(0.0);

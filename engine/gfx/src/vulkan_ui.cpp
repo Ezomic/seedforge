@@ -236,6 +236,7 @@ Rml::CompiledGeometryHandle VulkanUiRenderer::CompileGeometry(Rml::Span<const Rm
         ctx_.destroyBuffer(geometry.indices);
         return 0;
     }
+    static_assert(sizeof(int) == sizeof(std::uint32_t), "RmlUi's int indices are drawn as 32-bit indices");
     std::memcpy(geometry.vertices.mapped, vertices.data(), vertexBytes);
     std::memcpy(geometry.indices.mapped, indices.data(), indexBytes);
     vmaFlushAllocation(ctx_.allocator(), geometry.vertices.allocation, 0, VK_WHOLE_SIZE);
