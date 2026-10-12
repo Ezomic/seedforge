@@ -72,6 +72,12 @@ Atmosphere atmosphereAt(float hour)
     a.ambient = glm::mix(glm::vec3(0.025f, 0.03f, 0.06f), glm::vec3(0.18f, 0.2f, 0.26f), day);
     a.fogColor = a.horizon;
     a.fogDensity = glm::mix(0.0006f, 0.0009f, 1.0f - day);
+    a.fogHeightFalloff = 0.006f;
+
+    // The wind veers slowly through the day.
+    const float heading = 0.5f + 0.35f * std::sin(hour * 0.26f);
+    a.windDirection = {std::cos(heading), std::sin(heading)};
+    a.windStrength = 0.25f;
     return a;
 }
 
@@ -87,6 +93,9 @@ void applyAtmosphere(const Atmosphere& atmosphere, RenderView& view)
     view.fogColor = atmosphere.fogColor;
     view.fogDensity = atmosphere.fogDensity;
     view.rainIntensity = atmosphere.rain;
+    view.windDirection = atmosphere.windDirection;
+    view.windStrength = atmosphere.windStrength;
+    view.fogHeightFalloff = atmosphere.fogHeightFalloff;
 }
 
 }

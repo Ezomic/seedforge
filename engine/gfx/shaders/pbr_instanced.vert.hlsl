@@ -28,7 +28,8 @@ VSOut main(VSIn i)
     const float c = i.rotation.x;
     const float s = i.rotation.y;
     const float3 cellOrigin = mul(push.model, float4(0.0, 0.0, 0.0, 1.0)).xyz;
-    const float3 world = yaw(i.position * i.positionScale.w, c, s) + i.positionScale.xyz + cellOrigin;
+    float3 world = yaw(i.position * i.positionScale.w, c, s) + i.positionScale.xyz + cellOrigin;
+    world.xz += windOffset(i.position.y, i.positionScale.xyz, i.positionScale.w);
 
     VSOut o;
     o.clip = mul(frame.viewProj, float4(world, 1.0));

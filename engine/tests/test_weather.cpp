@@ -77,4 +77,8 @@ TEST_CASE("cloud dims the sun, greys the sky, thickens the fog and carries the r
     const float stormSpread = storm.zenith.b - storm.zenith.r;
     REQUIRE(stormSpread < clearSpread * 0.4f);
     REQUIRE(storm.fogColor == storm.horizon);
+    // Storms blow harder than calm days, and never past a gale.
+    REQUIRE(storm.windStrength > clear.windStrength * 2.0f);
+    REQUIRE(storm.windStrength <= 1.0f);
+    REQUIRE(none.windStrength == Approx(clear.windStrength));
 }

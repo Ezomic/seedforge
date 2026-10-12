@@ -3,6 +3,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
 #include <cstdint>
@@ -75,6 +76,9 @@ struct RenderView {
     float fogDensity = 0.0f; // per metre; zero is no fog
     float rainIntensity = 0.0f; // 0 dry to 1 downpour; streaks are drawn over the picture
     float time = 0.0f;          // seconds, for effects that move; the caller keeps it small
+    glm::vec2 windDirection{1.0f, 0.0f}; // ground-plane unit vector; trees lean and sway along it
+    float windStrength = 0.0f;           // 0 still to 1 gale
+    float fogHeightFalloff = 0.0f;       // per metre; zero is fog of one density at every height
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;

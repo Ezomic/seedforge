@@ -4,6 +4,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/geometric.hpp>
+
 #include <cmath>
 
 using namespace ichor;
@@ -97,4 +99,30 @@ TEST_CASE("an atmosphere is copied into a view and turns the sky on")
     REQUIRE(view.fogColor == dusk.fogColor);
     REQUIRE(view.fogDensity == Approx(dusk.fogDensity));
     REQUIRE(view.sunIntensity == Approx(dusk.sunIntensity));
+}
+
+TEST_CASE("the wind has a unit direction that veers slowly and a moderate strength")
+{
+    glm::vec2 previous = atmosphereAt(0.0f).windDirection;
+    for (float hour = 0.01f; hour <= 24.0f; hour += 0.01f) {
+        const Atmosphere a = atmosphereAt(hour);
+        REQUIRE(glm::length(a.windDirection) == Approx(1.0f).margin(1e-4));
+        REQUIRE(glm::length(a.windDirection - previous) < 0.01f);
+        REQUIRE(a.windStrength > 0.0f);
+        REQUIRE(a.windStrength < 0.5f);
+        REQUIRE(a.fogHeightFalloff > 0.0f);
+        previous = a.windDirection;
+    }
+}
+
+TEST_CASE("the wind and the height fog are copied into the view")
+{
+    RenderView view;
+    REQUIRE(view.windStrength == 0.0f);
+    REQUIRE(view.fogHeightFalloff == 0.0f);
+    const Atmosphere a = atmosphereAt(10.0f);
+    applyAtmosphere(a, view);
+    REQUIRE(view.windDirection == a.windDirection);
+    REQUIRE(view.windStrength == Approx(a.windStrength));
+    REQUIRE(view.fogHeightFalloff == Approx(a.fogHeightFalloff));
 }

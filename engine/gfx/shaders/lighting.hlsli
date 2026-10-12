@@ -88,8 +88,18 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
 // Exponential fog by distance from the camera; positions are camera-relative.
 float3 applyFog(float3 color, float3 worldPos)
 {
-    const float amount = 1.0 - exp(-frame.fogColor.w * length(worldPos));
-    return lerp(color, frame.fogColor.rgb, amount);
+    // With a height falloff the density at a point is base * exp(-k * (y - reference)); the
+    // optical depth along the ray from the camera is the integral of that, which has a
+    // closed form. The reference height is where the fog has its stated density.
+    const float k = frame.wind.w;
+    float depth = frame.fogColor.w * length(worldPos);
+    if (k > 0.0) {
+        const float cameraY = frame.cameraWorld.y;
+        const float t = k * worldPos.y;
+        const float integral = abs(t) > 1e-3 ? (1.0 - exp(-t)) / t : 1.0;
+        depth *= exp(-k * (cameraY - 120.0)) * integral;
+    }
+    return lerp(color, frame.fogColor.rgb, 1.0 - exp(-depth));
 }
 
 #endif

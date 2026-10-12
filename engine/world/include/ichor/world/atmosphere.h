@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
 #include <cstdint>
@@ -20,6 +21,9 @@ struct Atmosphere {
     glm::vec3 fogColor{0.0f};
     float fogDensity = 0.0f; // per metre
     float rain = 0.0f;       // 0 dry to 1 downpour; set by applyWeather
+    glm::vec2 windDirection{1.0f, 0.0f}; // ground-plane unit vector the wind blows towards
+    float windStrength = 0.0f;           // 0 still to 1 gale; applyWeather raises it under cloud
+    float fogHeightFalloff = 0.0f;       // per metre: how fast the fog thins with height, so it pools in hollows
     float sunElevation = 0.0f; // sine of the sun's angle along its daily circle, about its height over the horizon, for tests and tuning
 };
 
