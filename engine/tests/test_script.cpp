@@ -1,4 +1,6 @@
+#include "ichor/script/scene_bindings.h"
 #include "ichor/script/script_host.h"
+#include "ichor/sim/scene.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -246,4 +248,84 @@ TEST_CASE("a log sink cannot call back into the host")
     });
     REQUIRE_FALSE(host.run("outer", "while true do ichor.log('tick') end"));
     REQUIRE(inner == "reentrant script call");
+}
+
+namespace {
+
+constexpr double kDt = 1.0 / 60.0;
+
+bool isPresent(const Scene& scene, const char* name)
+{
+    return scene.find(StableId::of(name)) != entt::entity{entt::null};
+}
+
+std::uint64_t populate(std::uint64_t sceneSeed, std::uint64_t scriptSeed, const std::string& code)
+{
+    Scene scene(sceneSeed);
+    ScriptHost host(scriptSeed);
+    bindScene(host, scene);
+    REQUIRE(host.run("populate", code));
+    scene.tick(kDt);
+    return scene.stateHash();
+}
+
+}
+
+TEST_CASE("a script spawns, moves and destroys through commands")
+{
+    Scene scene(1);
+    ScriptHost host(1);
+    bindScene(host, scene);
+    REQUIRE(host.run("world", R"(
+        ichor.spawn('well', 10, 0, 20)
+        ichor.spawn('cart', 1, 2, 3, 4)
+        function present(name) return ichor.exists(name) end
+    )"));
+
+    // Nothing exists until the tick applies the commands.
+    ScriptValue result;
+    REQUIRE(host.call("present", {std::string("well")}, &result));
+    REQUIRE(std::get<bool>(result) == false);
+    scene.tick(kDt);
+    REQUIRE(host.call("present", {std::string("well")}, &result));
+    REQUIRE(std::get<bool>(result) == true);
+
+    const entt::entity cart = scene.find(StableId::of("cart"));
+    REQUIRE(isPresent(scene, "cart"));
+    REQUIRE(scene.registry().get<MeshRef>(cart).mesh == 4);
+    REQUIRE(scene.registry().get<Transform>(cart).position == glm::dvec3(1.0, 2.0, 3.0));
+
+    REQUIRE(host.run("more", "ichor.move('cart', 5, 0, -1) ichor.destroy('well')"));
+    scene.tick(kDt);
+    REQUIRE(scene.registry().get<Transform>(scene.find(StableId::of("cart"))).position == glm::dvec3(6.0, 2.0, 2.0));
+    REQUIRE_FALSE(isPresent(scene, "well"));
+}
+
+TEST_CASE("bad arguments are Lua errors that name the function")
+{
+    Scene scene(1);
+    ScriptHost host(1);
+    bindScene(host, scene);
+    REQUIRE_FALSE(host.run("a", "ichor.spawn('x', 1, 2)"));
+    REQUIRE(host.lastError().find("spawn") != std::string::npos);
+    REQUIRE_FALSE(host.run("b", "ichor.spawn('', 1, 2, 3)"));
+    REQUIRE_FALSE(host.run("c", "ichor.destroy(5)"));
+    REQUIRE_FALSE(host.run("d", "ichor.spawn('x', 0, 0, 0, -1)"));
+    REQUIRE(host.run("e", "ichor.spawn('fine', 0, 0, 0)"));
+    scene.tick(kDt);
+    REQUIRE(isPresent(scene, "fine"));
+    REQUIRE_FALSE(isPresent(scene, "x"));
+}
+
+TEST_CASE("scripted worlds are deterministic and a different script gives a different world")
+{
+    const std::string code = R"(
+        for i = 1, 20 do
+            ichor.spawn('rock' .. i, ichor.random_range('place', -50, 50), 0, ichor.random_range('place', -50, 50))
+        end
+    )";
+    const std::uint64_t first = populate(7, 99, code);
+    REQUIRE(first == populate(7, 99, code));
+    REQUIRE(first != populate(7, 100, code));
+    REQUIRE(first != populate(7, 99, "ichor.spawn('lonely', 0, 0, 0)"));
 }
