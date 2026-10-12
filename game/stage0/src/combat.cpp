@@ -63,8 +63,9 @@ glm::vec3 forwardFromYaw(float yaw)
 
 float yawTowards(glm::dvec3 from, glm::dvec3 to)
 {
-    const glm::dvec3 d = to - from;
-    return static_cast<float>(std::atan2(d.x, -d.z));
+    // Yaw is hashed, so this goes through the deterministic atan2, not libm.
+    const glm::vec3 d(to - from);
+    return dmath::atan2(d.x, -d.z);
 }
 
 Stage0::Stage0(Tuning tuning)
@@ -116,7 +117,7 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
 
 void Stage0::resetFight(Scene& scene)
 {
-    recorder_.abandon(scene.time());
+    recorder_.noteRetry(scene.time());
     for (auto [entity, id, transform] : scene.registry().view<const StableId, Transform>().each()) {
         const bool isPlayer = id == player_;
         const bool isFoe = id == foe_;
@@ -125,6 +126,10 @@ void Stage0::resetFight(Scene& scene)
         }
         Combatant c;
         c.side = isPlayer ? 0 : 1;
+        // The button that caused this reset is still down; forgetting that would reset again next tick.
+        if (const auto* previous = scene.registry().try_get<Combatant>(entity)) {
+            c.retryHeld = previous->retryHeld;
+        }
         c.health = tuning_.maxHealth;
         c.stamina = tuning_.maxStamina;
         c.poise = tuning_.maxPoise;
@@ -225,6 +230,7 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
             enterState(scene, victim, c, CombatState::Staggered);
         }
     }
+    applied = std::min(applied, c.health); // overkill is not damage dealt
     c.health = std::max(0.0f, c.health - applied);
     const float appliedPoise = blocked ? poiseDamage * tuning_.blockedPoiseRatio : poiseDamage;
     if (appliedPoise > 0.0f) {
@@ -234,11 +240,14 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     recorder_.noteHit(a.side == 0, applied, blocked);
 
     if (c.health <= 0.0f) {
+        const glm::dvec3 at = scene.registry().get<Transform>(victim).position;
+        const bool againstWall = std::max(std::abs(at.x), std::abs(at.z)) > kArenaHalf - tuning_.bodyRadius - 0.6;
         DeathCause cause = DeathCause::Unreadable;
         if (!attackerOnScreen) cause = DeathCause::OffScreen;
         else if (c.combatState() == CombatState::Recovery) cause = DeathCause::WhiffPunished;
         else if (blocked) cause = DeathCause::MistimedBlock;
         else if (c.stamina <= 1.0f) cause = DeathCause::OutOfStamina;
+        else if (againstWall) cause = DeathCause::Cornered;
         c.deathCause = static_cast<std::uint8_t>(cause);
         enterState(scene, victim, c, CombatState::Dead);
         const Combatant& playerC = scene.registry().get<Combatant>(scene.find(player_));
@@ -251,7 +260,7 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     }
 }
 
-void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c)
+void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits)
 {
     const bool heavy = c.attack == static_cast<std::uint8_t>(AttackKind::Heavy);
     const float damage = heavy ? tuning_.heavyDamage : tuning_.lightDamage;
@@ -276,7 +285,7 @@ void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c)
         // Was the attacker in front of the victim? A forward-facing test stands in for the camera.
         const glm::vec3 toAttacker = glm::normalize(glm::vec3(origin - otherT.position));
         const bool onScreen = glm::dot(forwardFromYaw(otherC.yaw), toAttacker) > -0.2f;
-        receiveHit(scene, other, attacker, damage, poiseDamage, onScreen);
+        hits.push_back({other, attacker, damage, poiseDamage, onScreen});
     }
     if (!struck) {
         recorder_.noteWhiff(c.side == 0);
@@ -292,22 +301,52 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
         return;
     }
 
+    // Retry lives in the input stream, so a recorded session replays its restarts too.
+    {
+        Combatant& c = scene.registry().get<Combatant>(playerEntity);
+        const bool retry = (input.buttons & InputFrame::Confirm) != 0;
+        const bool pressed = retry && !c.retryHeld;
+        c.retryHeld = retry;
+        if (pressed) {
+            resetFight(scene);
+            return;
+        }
+    }
+
     // Player intent: the committed states refuse everything but time.
     {
         Combatant& c = scene.registry().get<Combatant>(playerEntity);
         if (c.combatState() == CombatState::Idle) {
-            const glm::vec3 stick(input.moveX, 0.0f, -input.moveY);
+            // Replay files are data: the stick is sanitised here as applyInput does.
+            glm::vec3 stick(std::isfinite(input.moveX) ? input.moveX : 0.0f, 0.0f, std::isfinite(input.moveY) ? -input.moveY : 0.0f);
+            if (glm::dot(stick, stick) > 1.0f) stick = glm::normalize(stick);
+            c.blocking = (input.buttons & InputFrame::Block) != 0;
             if ((input.buttons & InputFrame::Attack) != 0) tryAttack(scene, playerEntity, AttackKind::Light);
             else if ((input.buttons & InputFrame::Heavy) != 0) tryAttack(scene, playerEntity, AttackKind::Heavy);
             else if ((input.buttons & InputFrame::Dodge) != 0) tryDodge(scene, playerEntity, stick);
-            else c.blocking = (input.buttons & InputFrame::Block) != 0;
         }
     }
 
-    for (auto [entity, id, transform, c, body] : scene.registry().view<const StableId, const Transform, Combatant, CharacterBody>().each()) {
+    // Player first, then the foe, whatever order the registry holds them in, and
+    // hits land after both have moved so a simultaneous trade stays a trade.
+    std::vector<PendingHit> hits;
+    tickCombatant(scene, playerEntity, foeEntity, fdt, hits);
+    tickCombatant(scene, foeEntity, playerEntity, fdt, hits);
+    for (const PendingHit& hit : hits) {
+        receiveHit(scene, hit.victim, hit.attacker, hit.damage, hit.poiseDamage, hit.onScreen);
+    }
+}
+
+void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity opponent, float fdt, std::vector<PendingHit>& hits)
+{
+    auto& registry = scene.registry();
+    const Transform& transform = registry.get<Transform>(entity);
+    Combatant& c = registry.get<Combatant>(entity);
+    CharacterBody& body = registry.get<CharacterBody>(entity);
+    {
         if (!c.alive()) {
             body.intent = glm::vec3(0.0f);
-            continue;
+            return;
         }
         c.stateTime += fdt;
         c.sinceStaminaSpend += fdt;
@@ -322,8 +361,7 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
         }
 
         // Face the opponent, as fast as the state allows. This clamp replaces i-frames.
-        const entt::entity opponent = entity == playerEntity ? foeEntity : playerEntity;
-        const float wanted = yawTowards(transform.position, scene.registry().get<Transform>(opponent).position);
+        const float wanted = yawTowards(transform.position, registry.get<Transform>(opponent).position);
         const float maxStep = allowedTurnRate(c) * (kPi / 180.0f) * fdt;
         c.yaw = wrapAngle(c.yaw + std::clamp(wrapAngle(wanted - c.yaw), -maxStep, maxStep));
 
@@ -337,7 +375,7 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
             body.intent = glm::vec3(0.0f);
             if (!c.traceDone) {
                 c.traceDone = true;
-                attackTrace(scene, entity, c);
+                attackTrace(scene, entity, c, hits);
             }
             if (elapsed(c.stateTime, heavy ? tuning_.heavyActive : tuning_.lightActive, fdt)) enterState(scene, entity, c, CombatState::Recovery);
             break;

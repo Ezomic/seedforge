@@ -44,6 +44,12 @@ void FightRecorder::open(const std::filesystem::path& csv)
     while (std::getline(in, line)) {
         ++lines;
     }
+    if (lines == 0) {
+        std::ofstream out(csv_, std::ios::app);
+        out << "fight,seconds,gap_to_retry,loser,cause,"
+               "p_hp,p_attacks,p_hits,p_whiffs,p_blocked,p_dodges,p_staggers,p_dealt,p_taken,"
+               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken\n";
+    }
     fights_ = std::max(0, lines - 1);
     logf(LogLevel::Info, "fight log has {} fights already; next is #{}", fights_, fights_ + 1);
 }
@@ -102,7 +108,7 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
     player_.healthLeft = playerHealth;
     foe_.healthLeft = foeHealth;
     lastCause_ = cause;
-    const double gap = lastEnd_ >= 0.0 ? start_ - lastEnd_ : 0.0;
+    const double gap = retryGap_;
     lastRow_ = std::format("{},{:.2f},{:.2f},{},{},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f}\n",
         fights_ + 1, now - start_, gap, playerDied ? "player" : "foe", causeName(cause),
         player_.healthLeft, player_.attacks, player_.hits, player_.whiffs, player_.blocked, player_.dodges, player_.staggers, player_.damageDealt, player_.damageTaken,
@@ -117,15 +123,17 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
     running_ = false;
     fights_ += 1;
     lastEnd_ = now;
+    retryGap_ = 0.0;
 }
 
-void FightRecorder::abandon(double now)
+void FightRecorder::noteRetry(double now)
 {
     if (running_) {
         logf(LogLevel::Info, "fight #{} abandoned on retry, not recorded", fights_ + 1);
         running_ = false;
     }
-    lastEnd_ = now;
+    // Hesitation before restarting is what frustration looks like in telemetry.
+    retryGap_ = lastEnd_ >= 0.0 ? now - lastEnd_ : 0.0;
 }
 
 }

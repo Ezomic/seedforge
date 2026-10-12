@@ -38,6 +38,7 @@ struct Combatant {
     float yaw = 0.0f; // radians, 0 looks down -Z
     glm::vec3 dodgeDirection{0.0f};
     std::uint8_t deathCause = 0;
+    bool retryHeld = false; // edge detection for the retry button, part of the state so replay sees it
 
     CombatState combatState() const { return static_cast<CombatState>(state); }
     bool alive() const { return combatState() != CombatState::Dead; }
@@ -153,7 +154,15 @@ private:
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
     void skirmisherSystem(Scene& scene, double dt);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
-    void attackTrace(Scene& scene, entt::entity attacker, Combatant& c);
+    struct PendingHit {
+        entt::entity victim;
+        entt::entity attacker;
+        float damage;
+        float poiseDamage;
+        bool onScreen;
+    };
+    void attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits);
+    void tickCombatant(Scene& scene, entt::entity entity, entt::entity opponent, float fdt, std::vector<PendingHit>& hits);
 
     Tuning tuning_;
     FightRecorder recorder_;
@@ -165,6 +174,7 @@ private:
 
 glm::vec3 forwardFromYaw(float yaw);
 float yawTowards(glm::dvec3 from, glm::dvec3 to);
+constexpr float kArenaHalf = 10.0f; // the arena is 20 m square, walls at plus and minus this
 
 }
 
@@ -179,7 +189,7 @@ struct Reflect<stage0::Combatant> {
             field("state", &C::state), field("attack", &C::attack), field("stateTime", &C::stateTime),
             field("sinceStaminaSpend", &C::sinceStaminaSpend), field("sincePoiseDamage", &C::sincePoiseDamage),
             field("blocking", &C::blocking), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
-            field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause));
+            field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause), field("retryHeld", &C::retryHeld));
     }
 };
 

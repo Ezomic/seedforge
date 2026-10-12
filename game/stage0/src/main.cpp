@@ -129,14 +129,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     engine.setOverlayBuilder([&](const ichor::Scene& scene, std::vector<std::string>& lines) { stage.overlay(scene, lines); });
 
     double last = platform.now();
-    bool retryHeld = false;
     for (;;) {
         ZoneScopedN("frame");
-        const bool retry = (platform.input().buttons & ichor::InputFrame::Confirm) != 0;
-        if (retry && !retryHeld) {
-            stage.resetFight(engine.scene());
-        }
-        retryHeld = retry;
         const double now = platform.now();
         const double dt = options.headless ? config.fixedDt : now - last;
         last = now;

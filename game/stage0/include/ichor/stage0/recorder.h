@@ -35,7 +35,9 @@ public:
     void noteDodge(bool playerSide);
     void noteStagger(bool playerSide);
     void noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now);
-    void abandon(double now);
+    // A retry press: an unfinished fight is dropped, and the time since the
+    // last death becomes the next row's gap_to_retry.
+    void noteRetry(double now);
 
     bool running() const { return running_; }
     int fightsWritten() const { return fights_; }
@@ -55,6 +57,7 @@ private:
     int fights_ = 0;
     double start_ = 0.0;
     double lastEnd_ = -1.0;
+    double retryGap_ = 0.0;
     DeathCause lastCause_ = DeathCause::Unknown;
     std::string lastRow_;
 };

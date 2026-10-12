@@ -216,6 +216,9 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
     const auto applyHooks = [&](std::size_t i) {
         BinaryReader again(std::span(bytes.data() + hookOffsets[i], bytes.size() - hookOffsets[i]));
         const entt::entity entity = scene.find(spawns[i].id);
+        if (entity == entt::null) {
+            return;
+        }
         for (const Scene::ComponentHooks& hook : hooks) {
             std::uint8_t has = 0;
             again.read(has);

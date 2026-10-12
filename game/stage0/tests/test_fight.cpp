@@ -230,4 +230,42 @@ TEST_CASE("a scripted fight replays to the same hash and survives a snapshot")
     REQUIRE(c.scene.stateHash() == a.scene.stateHash());
     REQUIRE(c.foe().health == a.foe().health);
     REQUIRE(c.brain().commits == a.brain().commits);
+
+    // The restored fight continues exactly as the live one, trades included.
+    for (int tick = 600; tick < 900; ++tick) {
+        a.scene.tick(kDt, script(tick));
+        c.scene.tick(kDt, script(tick));
+    }
+    REQUIRE(c.scene.stateHash() == a.scene.stateHash());
+}
+
+TEST_CASE("retry comes from the input stream and measures hesitation")
+{
+    Arena a(10);
+    for (int i = 0; i < 60 * 60 && a.player().alive(); ++i) {
+        a.scene.tick(kDt);
+    }
+    REQUIRE_FALSE(a.player().alive());
+    for (int i = 0; i < 120; ++i) {
+        a.scene.tick(kDt); // two seconds of staring at the corpse
+    }
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    REQUIRE(a.player().alive());
+    REQUIRE(a.player().health == 100.0f);
+    // Holding the button does not keep resetting.
+    a.scene.tick(kDt, press(InputFrame::Confirm | InputFrame::Attack));
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    REQUIRE(a.player().combatState() == CombatState::Windup);
+
+    for (int i = 0; i < 60 * 60 && a.player().alive(); ++i) {
+        a.scene.tick(kDt);
+    }
+    REQUIRE(a.stage.recorder().fightsWritten() == 2);
+    const std::string& row = a.stage.recorder().lastRow();
+    const std::size_t first = row.find(',');
+    const std::size_t second = row.find(',', first + 1);
+    const std::size_t third = row.find(',', second + 1);
+    const double gap = std::stod(row.substr(second + 1, third - second - 1));
+    REQUIRE(gap == Catch::Approx(2.0).margin(0.05));
 }

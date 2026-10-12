@@ -72,6 +72,11 @@ public:
     template <class T>
     void registerComponent(std::string name)
     {
+        for (const ComponentHooks& existing : hooks_) {
+            if (existing.name == name) {
+                return;
+            }
+        }
         ComponentHooks hooks;
         hooks.name = std::move(name);
         hooks.has = [this](entt::entity e) { return registry_.all_of<T>(e); };

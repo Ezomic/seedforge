@@ -134,16 +134,15 @@ void Stage0::skirmisherSystem(Scene& scene, double dt)
         // A weight shift before the wind-up proper: the cheapest fairness upgrade there is.
         if (brain.stateTime >= tuning_.tellDuration) {
             const AttackKind kind = rng.nextFloat() < tuning_.heavyChance ? AttackKind::Heavy : AttackKind::Light;
-            tryAttack(scene, foeEntity, kind);
-            enter(brain, BrainState::Committing);
+            // Out of stamina is not a commit: back to neutral, desire kept, so it tries again soon.
+            enter(brain, tryAttack(scene, foeEntity, kind) ? BrainState::Committing : BrainState::Neutral);
         }
         break;
 
     case BrainState::Punish:
         if (distance > strikeRange * 0.8f) moveToward(forward, 1.0f);
         if (brain.stateTime >= tuning_.punishReactionTime) {
-            tryAttack(scene, foeEntity, AttackKind::Light);
-            enter(brain, BrainState::Committing);
+            enter(brain, tryAttack(scene, foeEntity, AttackKind::Light) ? BrainState::Committing : BrainState::Neutral);
         }
         break;
 
