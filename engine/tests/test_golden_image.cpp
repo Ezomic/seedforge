@@ -6,6 +6,7 @@
 #include "ichor/gfx/vk_offscreen.h"
 #include "ichor/gfx/vulkan_ui.h"
 #include "ichor/ui/ui_context.h"
+#include "ichor/world/atmosphere.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
@@ -301,4 +302,85 @@ TEST_CASE("golden image: the game UI drawn with Vulkan")
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);
+}
+
+namespace {
+
+// The terrain at the world's centre under the sky of a given hour, looking
+// towards where the sun sets, so the dusk glow and the fog are in view.
+void checkTerrainAtHour(float hour, const char* name)
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
+    Heightfield heightfield;
+    REQUIRE(readWorld(worldDir, heightfield));
+    SceneBundle layers;
+    REQUIRE(readBundle(worldDir / "terrain.iscene", layers));
+    REQUIRE(renderer.setTerrainMaterials(layers));
+
+    RenderView view;
+    const double centre = heightfield.desc().sizeMetres * 0.5;
+    const CellId home = heightfield.cellAt(centre, centre);
+    for (int dz = -2; dz <= 2; ++dz) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            const CellId id{home.x + dx, home.z + dz};
+            if (!heightfield.contains(id)) continue;
+            CellPayload payload;
+            WorldStreamer::buildPayload(heightfield, id, StreamerConfig{}, payload);
+            const std::uint32_t handle = renderer.uploadTerrainCell(payload.lods);
+            REQUIRE(handle != Renderer::kNoHandle);
+            const int ring = std::max(std::abs(dx), std::abs(dz));
+            view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, static_cast<std::uint32_t>(std::min(ring, 2))});
+        }
+    }
+    applyAtmosphere(atmosphereAt(hour), view);
+    const glm::dvec3 eye(centre - 60.0, heightfield.heightAt(centre - 60.0, centre + 90.0) + 25.0, centre + 90.0);
+    const glm::dvec3 west(centre - 900.0, heightfield.heightAt(centre - 900.0, centre - 100.0) + 30.0, centre - 100.0);
+    view.camera.position = eye;
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(west - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+    view.camera.farPlane = 3000.0f;
+
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / (std::string(name) + ".actual.png"), kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / (std::string(name) + ".png");
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect " << name << ".actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / (std::string(name) + ".diff.png"), kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+}
+
+TEST_CASE("golden image: the terrain at noon")
+{
+    checkTerrainAtHour(12.0f, "terrain_noon");
+}
+
+TEST_CASE("golden image: the terrain at dusk")
+{
+    checkTerrainAtHour(17.7f, "terrain_dusk");
+}
+
+TEST_CASE("golden image: the terrain at night")
+{
+    checkTerrainAtHour(1.0f, "terrain_night");
 }

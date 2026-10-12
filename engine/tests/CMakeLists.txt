@@ -20,6 +20,7 @@ add_executable(ichor_tests
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
+    test_atmosphere.cpp
     test_ui.cpp
     test_save.cpp
 )

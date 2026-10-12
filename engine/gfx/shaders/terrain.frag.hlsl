@@ -30,5 +30,5 @@ float4 main(PSIn i) : SV_Target
     const float3 s = snowTex.Sample(materialSampler, i.uv * 0.5).rgb;
     const float3 baseColor = g * grass + r * rock + s * snow;
     const float roughness = lerp(0.95, 0.7, snow);
-    return toneMap(shade(i.worldPos, n, n, baseColor, 0.0, roughness));
+    return toneMap(applyFog(shade(i.worldPos, n, n, baseColor, 0.0, roughness), i.worldPos));
 }

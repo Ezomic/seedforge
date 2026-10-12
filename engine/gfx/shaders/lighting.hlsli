@@ -85,10 +85,11 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
     return color;
 }
 
-float4 toneMap(float3 color)
+// Exponential fog by distance from the camera; positions are camera-relative.
+float3 applyFog(float3 color, float3 worldPos)
 {
-    color = color / (color + 1.0);
-    return float4(pow(color, 1.0 / 2.2), 1.0);
+    const float amount = 1.0 - exp(-frame.fogColor.w * length(worldPos));
+    return lerp(color, frame.fogColor.rgb, amount);
 }
 
 #endif

@@ -52,6 +52,13 @@ struct RenderView {
     float sunIntensity = 3.0f;
     glm::vec3 ambient{0.18f, 0.2f, 0.26f};
     glm::vec3 clearColor{0.45f, 0.58f, 0.75f};
+    // The sky is drawn instead of the flat clear colour when enabled, and fog
+    // fades everything towards fogColor with distance. Both are linear colours.
+    bool skyEnabled = false;
+    glm::vec3 skyZenith{0.12f, 0.3f, 0.65f};
+    glm::vec3 skyHorizon{0.55f, 0.7f, 0.85f};
+    glm::vec3 fogColor{0.55f, 0.7f, 0.85f};
+    float fogDensity = 0.0f; // per metre; zero is no fog
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;

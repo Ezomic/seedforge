@@ -81,6 +81,7 @@ private:
     VkPipeline pbrPipeline_ = VK_NULL_HANDLE;
     VkPipeline pbrSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline terrainPipeline_ = VK_NULL_HANDLE;
+    VkPipeline skyPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline debugPipeline_ = VK_NULL_HANDLE;

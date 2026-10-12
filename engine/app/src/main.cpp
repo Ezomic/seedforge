@@ -17,6 +17,7 @@
 #include "ichor/script/scene_bindings.h"
 #include "ichor/script/script_host.h"
 #include "ichor/sim/scene_io.h"
+#include "ichor/world/atmosphere.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
@@ -53,6 +54,8 @@ struct Options {
     std::filesystem::path exportChronicle; // written at exit when set
     std::string loadSlot;
     bool ironman = false;
+    float startHour = 9.0f;      // hour of the day when play starts
+    double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
     std::filesystem::path replay;
@@ -96,6 +99,10 @@ bool parse(int argc, char** argv, Options& options)
             options.exportChronicle = argv[++i];
         } else if (arg == "--load-slot" && hasValue) {
             options.loadSlot = argv[++i];
+        } else if (arg == "--hour" && hasValue) {
+            if (!parseNumber(argv[++i], options.startHour)) return false;
+        } else if (arg == "--day-seconds" && hasValue) {
+            if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -323,8 +330,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             streamer.update(position);
             return streamer.ready(position);
         });
-        engine.setOverlayBuilder([&](const ichor::Scene&, std::vector<std::string>& lines) {
+        engine.setOverlayBuilder([&](const ichor::Scene& scene, std::vector<std::string>& lines) {
             lines.push_back(std::format("cells {} resident, {} pending, {} nav tiles", streamer.resident().size(), streamer.pending(), navigation.tileCount()));
+            const float hour = ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
+            lines.push_back(std::format("time {:02}:{:02}", static_cast<int>(hour), static_cast<int>((hour - std::floor(hour)) * 60.0f)));
         });
     }
     if (!options.replay.empty()) {
@@ -386,6 +395,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         view.camera = reference.camera;
         if (!heightfield.empty()) {
             view.camera.farPlane = 2500.0f;
+            // Time of day follows the tick, so it needs no saved state and a replay sees the same sky.
+            ichor::applyAtmosphere(ichor::atmosphereAt(ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour)), view);
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -549,7 +560,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s]");
         return 2;
     }
 

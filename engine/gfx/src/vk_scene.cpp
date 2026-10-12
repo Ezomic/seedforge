@@ -34,6 +34,10 @@ struct FrameData {
     glm::vec4 ambient;
     glm::vec4 shadowParams;
     glm::vec4 cameraWorld;
+    glm::vec4 skyZenith;
+    glm::vec4 skyHorizon;
+    glm::vec4 fogColor;
+    glm::vec4 skyParams;
 };
 
 struct PushData {
@@ -141,7 +145,7 @@ SceneRenderer::~SceneRenderer()
         ctx_.destroyBuffer(slot.jointPalette);
     }
     vkDestroyDescriptorPool(device, pool_, nullptr);
-    for (VkPipeline pipeline : {pbrPipeline_, pbrSkinnedPipeline_, terrainPipeline_, shadowPipeline_, shadowSkinnedPipeline_, debugPipeline_}) {
+    for (VkPipeline pipeline : {pbrPipeline_, pbrSkinnedPipeline_, terrainPipeline_, skyPipeline_, shadowPipeline_, shadowSkinnedPipeline_, debugPipeline_}) {
         vkDestroyPipeline(device, pipeline, nullptr);
     }
     vkDestroyPipelineLayout(device, pipelineLayout_, nullptr);
@@ -263,13 +267,15 @@ bool SceneRenderer::createPipelines()
     VkShaderModule shadowSkinnedVert = ctx_.loadShader("shadow_skinned.vert.spv");
     VkShaderModule debugVert = ctx_.loadShader("debug.vert.spv");
     VkShaderModule debugFrag = ctx_.loadShader("debug.frag.spv");
+    VkShaderModule skyVert = ctx_.loadShader("sky.vert.spv");
+    VkShaderModule skyFrag = ctx_.loadShader("sky.frag.spv");
     const auto destroyModules = [&] {
-        for (VkShaderModule m : {pbrVert, pbrSkinnedVert, pbrFrag, terrainFrag, shadowVert, shadowSkinnedVert, debugVert, debugFrag}) {
+        for (VkShaderModule m : {pbrVert, pbrSkinnedVert, pbrFrag, terrainFrag, shadowVert, shadowSkinnedVert, debugVert, debugFrag, skyVert, skyFrag}) {
             vkDestroyShaderModule(ctx_.device(), m, nullptr);
         }
     };
     if (pbrVert == VK_NULL_HANDLE || pbrSkinnedVert == VK_NULL_HANDLE || pbrFrag == VK_NULL_HANDLE || terrainFrag == VK_NULL_HANDLE || shadowVert == VK_NULL_HANDLE
-        || shadowSkinnedVert == VK_NULL_HANDLE || debugVert == VK_NULL_HANDLE || debugFrag == VK_NULL_HANDLE) {
+        || shadowSkinnedVert == VK_NULL_HANDLE || debugVert == VK_NULL_HANDLE || debugFrag == VK_NULL_HANDLE || skyVert == VK_NULL_HANDLE || skyFrag == VK_NULL_HANDLE) {
         destroyModules();
         return false;
     }
@@ -397,6 +403,35 @@ bool SceneRenderer::createPipelines()
         ok = ok && vkCheck(vkCreateGraphicsPipelines(ctx_.device(), VK_NULL_HANDLE, 1, &info, nullptr, variant == 0 ? &shadowPipeline_ : &shadowSkinnedPipeline_), "shadow pipeline");
     }
 
+    // Sky: a screen-covering triangle behind everything, no depth.
+    {
+        const std::array stages{stage(VK_SHADER_STAGE_VERTEX_BIT, skyVert), stage(VK_SHADER_STAGE_FRAGMENT_BIT, skyFrag)};
+        VkPipelineVertexInputStateCreateInfo noInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+        VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+        assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        VkPipelineRasterizationStateCreateInfo raster{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+        raster.polygonMode = VK_POLYGON_MODE_FILL;
+        raster.cullMode = VK_CULL_MODE_NONE;
+        raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        raster.lineWidth = 1.0f;
+        VkPipelineDepthStencilStateCreateInfo skyDepth{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+
+        VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+        info.pNext = &mainRendering;
+        info.stageCount = static_cast<std::uint32_t>(stages.size());
+        info.pStages = stages.data();
+        info.pVertexInputState = &noInput;
+        info.pInputAssemblyState = &assembly;
+        info.pViewportState = &viewport;
+        info.pRasterizationState = &raster;
+        info.pMultisampleState = &multisample;
+        info.pDepthStencilState = &skyDepth;
+        info.pColorBlendState = &blend;
+        info.pDynamicState = &dynamic;
+        info.layout = pipelineLayout_;
+        ok = ok && vkCheck(vkCreateGraphicsPipelines(ctx_.device(), VK_NULL_HANDLE, 1, &info, nullptr, &skyPipeline_), "sky pipeline");
+    }
+
     // Debug lines
     {
         const std::array stages{stage(VK_SHADER_STAGE_VERTEX_BIT, debugVert), stage(VK_SHADER_STAGE_FRAGMENT_BIT, debugFrag)};
@@ -438,7 +473,7 @@ bool SceneRenderer::createPipelines()
 bool SceneRenderer::reloadPipelines()
 {
     vkDeviceWaitIdle(ctx_.device());
-    for (VkPipeline* pipeline : {&pbrPipeline_, &pbrSkinnedPipeline_, &terrainPipeline_, &shadowPipeline_, &shadowSkinnedPipeline_, &debugPipeline_}) {
+    for (VkPipeline* pipeline : {&pbrPipeline_, &pbrSkinnedPipeline_, &terrainPipeline_, &skyPipeline_, &shadowPipeline_, &shadowSkinnedPipeline_, &debugPipeline_}) {
         vkDestroyPipeline(ctx_.device(), *pipeline, nullptr);
         *pipeline = VK_NULL_HANDLE;
     }
@@ -738,6 +773,11 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.ambient = glm::vec4(view.ambient, 0.0f);
     data.shadowParams = glm::vec4(1.0f / static_cast<float>(kShadowSize), 0.0008f, 0.02f, 0.0f);
     data.cameraWorld = glm::vec4(glm::vec3(view.camera.position), 1.0f);
+    data.skyZenith = glm::vec4(view.skyZenith, 0.0f);
+    data.skyHorizon = glm::vec4(view.skyHorizon, 0.0f);
+    data.fogColor = glm::vec4(view.fogColor, view.fogDensity);
+    const float tanHalf = std::tan(view.camera.fovY * 0.5f);
+    data.skyParams = glm::vec4(tanHalf * aspect, tanHalf, 0.0f, 0.0f);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
     vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 
@@ -887,6 +927,10 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     const VkRect2D scissor{{0, 0}, extent};
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     vkCmdSetScissor(cmd, 0, 1, &scissor);
+    if (view.skyEnabled && skyPipeline_ != VK_NULL_HANDLE) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipeline_);
+        vkCmdDraw(cmd, 3, 1, 0, 0);
+    }
     drawInstances(false, 0);
     drawTerrain(false, 0);
 
