@@ -16,11 +16,11 @@ So: **three generators, used for different things.**
 
 ### Landmark dungeons — 10–15, fully authored
 
-Built as ordinary UE levels with hand-placed encounters, **baked lighting**, and real
+Built as hand-authored scene files with hand-placed encounters, **baked lighting**, and real
 architectural intent. The seed decides only *where* they appear and which faction holds
 them.
 
-Large practical bonus: as normal levels they get baked lighting, tuned Lumen settings,
+Large practical bonus: as authored scenes they get baked lighting, tuned light probes,
 proper occlusion, and art direction. They will look markedly better than anything
 generated — that is fine, they are the peaks. They carry the
 [set-piece quests](04-quests.md#set-pieces).
@@ -89,7 +89,7 @@ prefabs with rules, and implement **guide lighting**: a subtle brightness and wa
 gradient toward the objective. Shipped games do this constantly and players never
 consciously notice.
 
-Budget realistically for Lumen in generated interiors — the main performance risk here, and
+Budget realistically for lighting in generated interiors, the main performance risk here, and
 another reason to keep procedural sites small. The authored tier sidesteps it entirely.
 
 ### Seams

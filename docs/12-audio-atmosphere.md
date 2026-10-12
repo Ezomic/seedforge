@@ -126,9 +126,9 @@ read as one world. See [16](16-art-direction.md#the-unification-stack).
 
 ## Production
 
-- **MetaSounds plus UE submixes** is enough. Wwise is better for complex adaptive music but
-  adds a dependency, a licence tier, and integration time — take it only if the music system
-  genuinely needs it. Every plugin is an [engine-upgrade liability](17-tech-stack.md#plugins-are-engine-upgrade-liabilities)
+- **miniaudio plus our own submix graph** is enough. Wwise is better for complex adaptive music but
+  adds a dependency, a licence tier, and integration time; take it only if the music system
+  genuinely needs it. Every dependency is [a written-down decision](17-tech-stack.md#dependencies-are-a-written-down-list)
 - **Commercial sound libraries are excellent and cheap.** Record own foley for the
   distinctive things — the magic system, the creatures, whatever the axioms make unique
 - **Set a loudness budget and ducking rules on day one.** Mixing is where amateur projects

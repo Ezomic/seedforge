@@ -16,8 +16,9 @@ individual pieces are.
 
 Photoreal foundation with heavy atmospheric and grading treatment.
 
-Not because it is the best aesthetic — because the free and cheap UE asset ecosystem is
-overwhelmingly photoreal, and Megascans/Fab material is internally consistent and enormous.
+Not because it is the best aesthetic, but because the free and cheap asset ecosystem is
+overwhelmingly photoreal, and Megascans material is internally consistent, enormous, and
+imports as plain glTF and PNG.
 Going stylised means making nearly everything by hand, which is a different project.
 
 That is a budget-driven call, and budget-driven calls are legitimate. The trap: photoreal
@@ -28,7 +29,7 @@ out-compete, not detail density, where it cannot.
 
 Techniques that make mixed-source assets read as one world, roughly in value order:
 
-**1. Runtime Virtual Texture blending.** Rocks, buildings, and props blend into the landscape
+**1. Terrain blending.** Rocks, buildings, and props blend into the terrain
 material at their base.
 > Highest-value item on the list. **Objects sitting visibly on top of terrain is the number
 > one visual tell of procedural placement.** Fix it and half the "generated" feeling disappears.
@@ -46,7 +47,7 @@ haze hides quality falloff, makes vistas read, and does most of the emotional wo
 **5. One lighting model.** A single sun/sky setup parameterised per biome and time of day —
 never per asset, never hand-tuned per region.
 
-**6. A weathering pass.** PCG scatters grime, moss, and damage decals uniformly. This is what
+**6. A weathering pass.** The scatter pass spreads grime, moss, and damage decals uniformly. This is what
 disguises kit seams and makes assembled architecture look weathered rather than snapped together.
 
 ## Silhouette discipline

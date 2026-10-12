@@ -15,6 +15,6 @@
     { "title": "Handle the Dark Age post-state faction ecology", "description": "No Incumbent at all; Parasites and Refuseniks expand into the vacuum. The Greek Dark Age is attested, not invented. Doc 03.", "type": "feature", "priority": "low", "estimate": "3d", "labels": ["worldgen", "factions"] },
     { "title": "World title and summary composition", "description": "Generate the new-game screen block (e.g. 'The Salt Years - the flood never fully drew back...'). This is save identity, marketing, and the thing players screenshot.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["worldgen", "ui", "content"] },
     { "title": "New-game screen: show slots A-C, hide D and E", "description": "Players choose their fantasy from Cataclysm, Law and Powers; the prophecy and the anomaly are discovered in play.", "type": "feature", "priority": "medium", "estimate": "2d", "labels": ["worldgen", "ui"] },
-    { "title": "Shared data/ loading in both generator and game", "description": "Axiom JSON read by libworldforge and imported to UE DataAssets at build time. Single source of truth. Doc 17.", "type": "chore", "priority": "high", "estimate": "3d", "labels": ["worldgen", "tooling", "data"] }
+    { "title": "Shared data/ loading in both generator and game", "description": "Axiom JSON read by libworldforge and cooked to the engine's binary data format at build time. Single source of truth. Doc 17.", "type": "chore", "priority": "high", "estimate": "3d", "labels": ["worldgen", "tooling", "data"] }
   ]
 }
