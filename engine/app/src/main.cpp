@@ -11,6 +11,7 @@
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
+#include "ichor/save/save_slots.h"
 #include "ichor/script/data_bindings.h"
 #include "ichor/script/scene_bindings.h"
 #include "ichor/script/script_host.h"
@@ -46,6 +47,10 @@ struct Options {
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
+    std::filesystem::path saves = "saves";
+    std::string loadSlot;
+    bool ironman = false;
+    double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
     std::filesystem::path replay;
     std::filesystem::path load;
@@ -82,6 +87,14 @@ bool parse(int argc, char** argv, Options& options)
             options.script = argv[++i];
         } else if (arg == "--data" && hasValue) {
             options.data = argv[++i];
+        } else if (arg == "--saves" && hasValue) {
+            options.saves = argv[++i];
+        } else if (arg == "--load-slot" && hasValue) {
+            options.loadSlot = argv[++i];
+        } else if (arg == "--ironman") {
+            options.ironman = true;
+        } else if (arg == "--autosave" && hasValue) {
+            if (!parseNumber(argv[++i], options.autosaveSeconds) || options.autosaveSeconds < 0.0) return false;
         } else if (arg == "--record" && hasValue) {
             options.record = argv[++i];
         } else if (arg == "--replay" && hasValue) {
@@ -219,7 +232,30 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     engine.scene().setAnimations(&animations);
     engine.setAudio(&audio);
 
-    if (!options.load.empty()) {
+    // Content scripts and the data layer. A broken script or data file is
+    // logged and the game runs on without it; the watcher below reloads both.
+    ichor::DataSet data;
+    if (!data.loadDirectory(options.data)) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
+    }
+
+    // A campaign owns the world; its slots are snapshots inside it (doc 14).
+    const std::uint64_t worldSeed = heightfield.empty() ? options.seed : heightfield.desc().seed;
+    constexpr std::uint32_t kGenVersion = 1;
+    const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
+    ichor::SaveSlots slots(options.saves / ("campaign-" + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
+    const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
+    const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
+
+    if (!options.loadSlot.empty()) {
+        const ichor::LoadResult loaded = slots.load(options.loadSlot, engine.scene(), saveContext());
+        if (loaded.status != ichor::LoadStatus::Loaded) {
+            ichor::logf(ichor::LogLevel::Error, "slot '{}' did not load (status {})", options.loadSlot, static_cast<int>(loaded.status));
+            return 1;
+        }
+        ichor::logf(ichor::LogLevel::Info, "slot '{}' loaded at tick {}{}{}", options.loadSlot, loaded.info.tick, loaded.fromBackup ? ", from a backup" : "",
+            loaded.dataChanged ? ", data has changed since it was saved" : "");
+    } else if (!options.load.empty()) {
         if (!ichor::loadScene(options.load, engine.scene())) {
             return 1;
         }
@@ -289,12 +325,6 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     engine.recordInputs(!options.record.empty());
 
-    // Content scripts and the data layer. A broken script or data file is
-    // logged and the game runs on without it; the watcher below reloads both.
-    ichor::DataSet data;
-    if (!data.loadDirectory(options.data)) {
-        ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
-    }
     ichor::ScriptHost scripts(options.seed);
     ichor::bindScene(scripts, engine.scene());
     ichor::bindData(scripts, data);
@@ -391,6 +421,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     double last = platform.now();
     bool confirmHeld = false;
+    bool quickSaveHeld = false;
+    bool quickLoadHeld = false;
+    const auto autosaveTicks = static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt);
+    std::uint64_t lastAutosave = engine.scene().tickCount();
     for (;;) {
         ZoneScopedN("frame");
         // Enter starts the light attack on the arm, with its wind-up and tell cues.
@@ -399,6 +433,35 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             engine.scene().enqueue(ichor::PlayMontageCommand{ichor::StableId::of("arm"), armClip, 0.35f, 0.5f, 0.9f, windupCue, tellCue});
         }
         confirmHeld = confirm;
+        const std::uint32_t buttons = platform.input().buttons;
+        const bool quickSave = (buttons & ichor::InputFrame::QuickSave) != 0;
+        const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
+        if (quickSave && !quickSaveHeld) {
+            if (slots.save(quickSlot, engine.scene(), saveContext())) {
+                ichor::logf(ichor::LogLevel::Info, "saved '{}' at tick {}", quickSlot, engine.scene().tickCount());
+            } else {
+                ichor::logf(ichor::LogLevel::Warn, "save failed: {}", slots.lastError());
+            }
+        }
+        // A restore mid-replay would diverge from the recording, so loading waits for a live run.
+        if (quickLoad && !quickLoadHeld && options.replay.empty()) {
+            const ichor::LoadResult loaded = slots.load(quickSlot, engine.scene(), saveContext());
+            if (loaded.status == ichor::LoadStatus::Loaded) {
+                // The restore cleared the physics world, terrain collision included, so the streamer starts over.
+                streamer.clear();
+                ichor::logf(ichor::LogLevel::Info, "loaded '{}' at tick {}", quickSlot, loaded.info.tick);
+            } else {
+                ichor::logf(ichor::LogLevel::Warn, "load of '{}' failed (status {})", quickSlot, static_cast<int>(loaded.status));
+            }
+        }
+        quickSaveHeld = quickSave;
+        quickLoadHeld = quickLoad;
+        if (autosaveTicks > 0 && engine.scene().tickCount() >= lastAutosave + autosaveTicks) {
+            lastAutosave = engine.scene().tickCount();
+            if (!slots.save(autoSlot, engine.scene(), saveContext())) {
+                ichor::logf(ichor::LogLevel::Warn, "autosave failed: {}", slots.lastError());
+            }
+        }
         const double now = platform.now();
         const double dt = options.headless ? config.fixedDt : now - last;
         last = now;
@@ -460,7 +523,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman]");
         return 2;
     }
 
