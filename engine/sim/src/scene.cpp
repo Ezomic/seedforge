@@ -132,6 +132,7 @@ void Scene::apply(const Command& command)
                     transform.position += c.delta;
                 } else {
                     transform = c.transform;
+                    transform.rotation = glm::normalize(transform.rotation);
                 }
                 // A teleport must not be interpolated across.
                 PreviousTransform& previous = registry_.get<PreviousTransform>(entity);
@@ -142,8 +143,7 @@ void Scene::apply(const Command& command)
                 }
                 // A collider that stayed behind would block where the thing used to be.
                 if (const auto* box = registry_.try_get<StaticBox>(entity)) {
-                    physics_->remove(c.id);
-                    physics_->addStaticBox(c.id, *box, transform);
+                    physics_->addStaticBox(c.id, *box, transform); // replaces the body it had
                 }
             }
         }

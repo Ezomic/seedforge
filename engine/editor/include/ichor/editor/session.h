@@ -32,7 +32,8 @@ public:
     explicit EditorSession(Scene& scene, std::size_t maxHistory = 256);
 
     std::vector<OutlinerEntry> outliner() const;
-    std::optional<StableId> selection() const { return selection_; }
+    // The selected entity, or nothing once it has gone, whoever removed it.
+    std::optional<StableId> selection() const;
     void select(std::optional<StableId> id);
     bool exists(StableId id) const;
     std::optional<Transform> transformOf(StableId id) const;
@@ -48,11 +49,15 @@ public:
     void beginTransaction();
     void endTransaction();
 
-    bool canUndo() const { return !undo_.empty(); }
-    bool canRedo() const { return !redo_.empty(); }
+    bool canUndo() const { return depth_ == 0 && !undo_.empty(); }
+    bool canRedo() const { return depth_ == 0 && !redo_.empty(); }
     bool undo();
     bool redo();
     std::size_t historySize() const { return undo_.size(); }
+
+    // Forgets everything the session knows: the history, the selection and what it had queued.
+    // A restore of the scene (loading a save) invalidates all of it, so the loader calls this.
+    void reset();
 
 private:
     struct EntityState {
@@ -72,6 +77,7 @@ private:
 
     std::optional<EntityState> stateOf(StableId id) const;
     bool editable(StableId id) const;
+    bool conflicts(const Step& step, bool undoing) const;
     void apply(StableId id, const std::optional<EntityState>& from, const std::optional<EntityState>& to);
     void record(Edit edit);
     void forgetPendingIfTicked() const;
@@ -82,7 +88,7 @@ private:
     std::vector<Step> undo_;
     std::vector<Step> redo_;
     Step transaction_;
-    bool inTransaction_ = false;
+    int depth_ = 0; // open transactions; they nest, and only the outermost closes the step
 
     // What the session has asked for this tick and the scene has not applied yet.
     mutable std::map<StableId, std::optional<EntityState>> pending_;

@@ -1,6 +1,9 @@
 #include "ichor/editor/session.h"
 
 #include <algorithm>
+#include <cmath>
+
+#include <glm/geometric.hpp>
 
 namespace ichor {
 
@@ -47,8 +50,46 @@ bool EditorSession::editable(StableId id) const
     if (entity == entt::null) {
         return true; // not applied yet, or not there: stateOf decides
     }
+    // An allow-list: the session can rebuild exactly what it captures, so an entity with any
+    // other component, now or one added later, is the game's and is left alone.
     const entt::registry& registry = scene_.registry();
-    return !registry.all_of<Player>(entity) && !registry.all_of<CharacterBody>(entity) && !registry.all_of<Animator>(entity);
+    std::size_t present = 0;
+    for (const auto&& storage : registry.storage()) {
+        present += storage.second.contains(entity) ? 1 : 0;
+    }
+    const std::size_t known = 3 + (registry.all_of<PreviousTransform>(entity) ? 1 : 0) + (registry.all_of<MeshRef>(entity) ? 1 : 0)
+        + (registry.all_of<Spin>(entity) ? 1 : 0) + (registry.all_of<StaticBox>(entity) ? 1 : 0); // StableId, Name, Transform
+    return present == known;
+}
+
+std::optional<StableId> EditorSession::selection() const
+{
+    return selection_ && exists(*selection_) ? selection_ : std::nullopt;
+}
+
+void EditorSession::reset()
+{
+    pending_.clear();
+    pendingTick_ = scene_.tickCount();
+    undo_.clear();
+    redo_.clear();
+    transaction_.clear();
+    depth_ = 0;
+    selection_.reset();
+}
+
+// Whether putting a step back would spawn something whose id is taken again, which
+// the scene would silently ignore.
+bool EditorSession::conflicts(const Step& step, bool undoing) const
+{
+    for (const Edit& edit : step) {
+        const std::optional<EntityState>& from = undoing ? edit.after : edit.before;
+        const std::optional<EntityState>& to = undoing ? edit.before : edit.after;
+        if (!from && to && exists(edit.id)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool EditorSession::exists(StableId id) const
@@ -67,10 +108,12 @@ std::vector<OutlinerEntry> EditorSession::outliner() const
     forgetPendingIfTicked();
     std::vector<OutlinerEntry> entries;
     for (auto [entity, id, name] : scene_.registry().view<const StableId, const Name>().each()) {
-        if (const auto found = pending_.find(id); found != pending_.end() && !found->second) {
+        const auto found = pending_.find(id);
+        if (found != pending_.end() && !found->second) {
             continue; // destroyed this tick
         }
-        entries.push_back({id, name.value, selection_ && *selection_ == id});
+        // What was asked for this tick wins over what the registry still holds.
+        entries.push_back({id, found != pending_.end() ? found->second->name : name.value, selection_ && *selection_ == id});
     }
     for (const auto& [id, state] : pending_) {
         if (state && scene_.find(id) == entt::null) {
@@ -106,7 +149,16 @@ void EditorSession::apply(StableId id, const std::optional<EntityState>& from, c
         spawn.staticBox = to->box;
         scene_.enqueue(spawn);
     } else if (from && to) {
-        scene_.enqueue(SetTransformCommand{id, to->transform});
+        Transform placed = to->transform;
+        // A spinning entity turns by itself; undoing a move must not snap it back to an old angle.
+        if (to->spin) {
+            if (const auto live = stateOf(id)) {
+                placed.rotation = live->transform.rotation;
+            }
+        }
+        scene_.enqueue(SetTransformCommand{id, placed});
+        pending_[id] = EntityState{to->name, placed, to->mesh, to->spin, to->box};
+        return;
     }
     pending_[id] = to;
 }
@@ -114,7 +166,7 @@ void EditorSession::apply(StableId id, const std::optional<EntityState>& from, c
 void EditorSession::record(Edit edit)
 {
     redo_.clear();
-    if (inTransaction_) {
+    if (depth_ > 0) {
         transaction_.push_back(std::move(edit));
         return;
     }
@@ -159,8 +211,15 @@ bool EditorSession::setTransform(StableId id, const Transform& transform)
     if (!before || !editable(id)) {
         return false;
     }
+    // A gizmo that accumulates rotations drifts off the unit sphere; one that breaks yields nonsense.
+    const auto finite = [](glm::dvec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); };
+    const float length = glm::length(transform.rotation);
+    if (!finite(transform.position) || !finite(glm::dvec3(transform.scale)) || !std::isfinite(length) || length < 1e-6f) {
+        return false;
+    }
     EntityState after = *before;
     after.transform = transform;
+    after.transform.rotation = transform.rotation / length;
     apply(id, before, after);
     record({id, before, after});
     return true;
@@ -168,18 +227,16 @@ bool EditorSession::setTransform(StableId id, const Transform& transform)
 
 void EditorSession::beginTransaction()
 {
-    if (!inTransaction_) {
-        inTransaction_ = true;
+    if (depth_++ == 0) {
         transaction_.clear();
     }
 }
 
 void EditorSession::endTransaction()
 {
-    if (!inTransaction_) {
+    if (depth_ == 0 || --depth_ > 0) {
         return;
     }
-    inTransaction_ = false;
     if (transaction_.empty()) {
         return;
     }
@@ -192,11 +249,14 @@ void EditorSession::endTransaction()
 
 bool EditorSession::undo()
 {
-    if (inTransaction_ || undo_.empty()) {
+    if (depth_ > 0 || undo_.empty()) {
         return false;
     }
     Step step = std::move(undo_.back());
     undo_.pop_back();
+    if (conflicts(step, true)) {
+        return false; // the step is dropped: it can no longer be applied
+    }
     for (auto edit = step.rbegin(); edit != step.rend(); ++edit) {
         apply(edit->id, edit->after, edit->before);
     }
@@ -206,11 +266,14 @@ bool EditorSession::undo()
 
 bool EditorSession::redo()
 {
-    if (inTransaction_ || redo_.empty()) {
+    if (depth_ > 0 || redo_.empty()) {
         return false;
     }
     Step step = std::move(redo_.back());
     redo_.pop_back();
+    if (conflicts(step, false)) {
+        return false;
+    }
     for (const Edit& edit : step) {
         apply(edit.id, edit.before, edit.after);
     }
