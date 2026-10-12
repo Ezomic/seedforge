@@ -6,10 +6,12 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <vector>
 
 namespace ichor {
 
+struct Mesh;
 struct SceneBundle;
 
 constexpr std::uint32_t kCascadeCount = 3;
@@ -27,6 +29,10 @@ public:
     // Appends; mesh and material indices continue from what is already loaded.
     bool uploadBundle(const SceneBundle& bundle);
     std::uint32_t meshCount() const { return static_cast<std::uint32_t>(meshes_.size()); }
+
+    bool setTerrainMaterials(const SceneBundle& layers);
+    std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods);
+    void removeTerrainCell(std::uint32_t cell);
 
     // Drops the pipelines and builds them again from the shader files on disk.
     bool reloadPipelines();
@@ -74,6 +80,7 @@ private:
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline pbrPipeline_ = VK_NULL_HANDLE;
     VkPipeline pbrSkinnedPipeline_ = VK_NULL_HANDLE;
+    VkPipeline terrainPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline debugPipeline_ = VK_NULL_HANDLE;
@@ -93,6 +100,25 @@ private:
     std::vector<MaterialConstants> materials_;
     std::vector<GpuMesh> meshes_;
     bool paletteOverflowLogged_ = false;
+
+    // Terrain: the splat layers' textures and set, and one mesh per LOD per cell.
+    std::vector<GpuImage> terrainTextures_;
+    VkDescriptorSet terrainSet_ = VK_NULL_HANDLE;
+    struct TerrainCell {
+        std::vector<GpuMesh> lods;
+    };
+    std::map<std::uint32_t, TerrainCell> terrainCells_;
+    std::uint32_t nextTerrainCell_ = 0;
+    // Removed cells wait here until every frame that could read them has retired.
+    struct RetiredMesh {
+        std::uint64_t frame = 0;
+        GpuMesh mesh;
+    };
+    std::vector<RetiredMesh> retired_;
+    std::uint64_t renderedFrames_ = 0;
+    void destroyRetired(bool all);
+    GpuMesh makeGpuMesh(const Mesh& mesh, std::uint32_t material);
+    void destroyGpuMesh(GpuMesh& mesh);
 };
 
 }

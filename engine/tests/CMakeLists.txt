@@ -17,9 +17,10 @@ add_executable(ichor_tests
     test_animation.cpp
     test_animation_system.cpp
     test_audio.cpp
+    test_terrain.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
-    ichor_loop ichor_assets ichor_anim ichor_audio ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain
+    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain
 )
 target_compile_definitions(ichor_tests PRIVATE ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_ART_DIR="${ICHOR_ART_DIR}")
 catch_discover_tests(ichor_tests)
@@ -28,7 +29,7 @@ if(ENGINE_RUNTIME)
     add_executable(ichor_gfx_tests
         test_golden_image.cpp
     )
-    target_link_libraries(ichor_gfx_tests PRIVATE ichor_gfx_vulkan ichor_assets ichor_anim Catch2::Catch2WithMain)
+    target_link_libraries(ichor_gfx_tests PRIVATE ichor_gfx_vulkan ichor_assets ichor_anim ichor_world Catch2::Catch2WithMain)
     target_compile_definitions(ichor_gfx_tests PRIVATE
         ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data"
         ICHOR_CONTENT_DIR="${ICHOR_CONTENT_DIR}"

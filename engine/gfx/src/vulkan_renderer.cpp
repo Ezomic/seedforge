@@ -245,6 +245,21 @@ std::uint32_t VulkanRenderer::meshCount() const
     return impl_->scene ? impl_->scene->meshCount() : 0;
 }
 
+bool VulkanRenderer::setTerrainMaterials(const SceneBundle& layers)
+{
+    return impl_->scene->setTerrainMaterials(layers);
+}
+
+std::uint32_t VulkanRenderer::uploadTerrainCell(const std::vector<Mesh>& lods)
+{
+    return impl_->scene->uploadTerrainCell(lods);
+}
+
+void VulkanRenderer::removeTerrainCell(std::uint32_t cell)
+{
+    impl_->scene->removeTerrainCell(cell);
+}
+
 bool VulkanRenderer::reloadShaders()
 {
     return impl_->scene->reloadPipelines();

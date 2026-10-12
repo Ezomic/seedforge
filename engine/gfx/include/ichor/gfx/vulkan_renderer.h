@@ -20,6 +20,9 @@ public:
     bool init() override;
     bool uploadBundle(const SceneBundle& bundle) override;
     std::uint32_t meshCount() const override;
+    bool setTerrainMaterials(const SceneBundle& layers) override;
+    std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) override;
+    void removeTerrainCell(std::uint32_t cell) override;
     bool reloadShaders() override;
     void beginFrame() override;
     void submit(const RenderView& view) override;

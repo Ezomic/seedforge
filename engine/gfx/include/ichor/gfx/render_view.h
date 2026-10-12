@@ -23,6 +23,14 @@ struct RenderInstance {
     std::uint32_t jointCount = 0; // zero draws the mesh rigid
 };
 
+// A resident terrain cell: the handle the renderer gave its meshes, where
+// its origin sits in the world, and which level of detail to draw.
+struct TerrainDraw {
+    std::uint32_t cell = 0;
+    glm::dvec3 origin{0.0};
+    std::uint32_t lod = 0;
+};
+
 struct RenderCamera {
     glm::dvec3 position{0.0};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f}; // looks down -Z, Y up
@@ -46,6 +54,7 @@ struct RenderView {
     glm::vec3 clearColor{0.45f, 0.58f, 0.75f};
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
+    std::vector<TerrainDraw> terrain;
     std::vector<DebugLine> lines;
 };
 

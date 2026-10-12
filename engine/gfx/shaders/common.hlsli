@@ -13,6 +13,7 @@ struct FrameData {
     float4 sunColor;        // rgb, w intensity
     float4 ambient;         // rgb
     float4 shadowParams;    // x texel size, y depth bias, z normal offset, w unused
+    float4 cameraWorld;     // xyz world position of the camera, which is the origin of worldPos
 };
 
 struct PushData {

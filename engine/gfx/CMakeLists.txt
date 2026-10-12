@@ -17,7 +17,7 @@ if(ENGINE_RUNTIME)
     set(ICHOR_SHADER_DIR ${CMAKE_BINARY_DIR}/shaders)
     file(MAKE_DIRECTORY ${ICHOR_SHADER_DIR})
 
-    set(shaders pbr.vert pbr_skinned.vert pbr.frag shadow.vert shadow_skinned.vert debug.vert debug.frag)
+    set(shaders pbr.vert pbr_skinned.vert pbr.frag terrain.frag shadow.vert shadow_skinned.vert debug.vert debug.frag)
     set(shader_outputs)
     foreach(shader ${shaders})
         if(shader MATCHES "\.vert$")
@@ -30,7 +30,7 @@ if(ENGINE_RUNTIME)
         add_custom_command(
             OUTPUT ${out}
             COMMAND ${DIRECTX_DXC_TOOL} -spirv -fspv-target-env=vulkan1.3 -T ${profile} -E main -I ${CMAKE_CURRENT_SOURCE_DIR}/shaders -Fo ${out} ${src}
-            DEPENDS ${src} ${CMAKE_CURRENT_SOURCE_DIR}/shaders/common.hlsli
+            DEPENDS ${src} ${CMAKE_CURRENT_SOURCE_DIR}/shaders/common.hlsli ${CMAKE_CURRENT_SOURCE_DIR}/shaders/lighting.hlsli
             COMMENT "dxc: ${shader}"
             VERBATIM
         )

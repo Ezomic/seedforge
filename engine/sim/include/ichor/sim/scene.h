@@ -52,6 +52,8 @@ public:
 
     const CommandLog& log() const { return log_; }
     const PhysicsWorld& physics() const { return *physics_; }
+    // Streaming adds and removes terrain collision here; it is not simulation state.
+    PhysicsWorld& physics() { return *physics_; }
 
     // The clips Animator components refer to. The scene does not own it; the
     // app or test keeps it alive and loads bundles into it.

@@ -50,7 +50,11 @@ bool Engine::frame(double frameSeconds)
         // Cues raised this frame are heard from where the camera was last drawn.
         audio_->setListener(view_.camera.position, view_.camera.rotation);
     }
-    const int steps = step_.advance(frameSeconds);
+    gated_ = tickGate_ && !tickGate_(scene_);
+    if (gated_) {
+        step_.reset();
+    }
+    const int steps = gated_ ? 0 : step_.advance(frameSeconds);
     for (int i = 0; i < steps && !replayFinished(); ++i) {
         scene_.tick(step_.dt(), nextInput());
         if (audio_ != nullptr) {
@@ -65,11 +69,12 @@ bool Engine::frame(double frameSeconds)
         view_.instances.clear();
         view_.lines.clear();
         view_.jointPalette.clear();
+        view_.terrain.clear();
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
     }
-    renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}", frameCount_, scene_.tickCount(), scene_.time(),
-        replaying_ ? "  [replay]" : recording_ ? "  [rec]" : ""));
+    renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}{}", frameCount_, scene_.tickCount(), scene_.time(),
+        replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
     renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
     if (overlayBuilder_) {
         overlay_.clear();
