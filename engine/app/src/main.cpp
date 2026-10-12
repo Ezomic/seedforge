@@ -2,6 +2,7 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
+#include "ichor/audio/reverb.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/data/data_set.h"
@@ -256,6 +257,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::DataSet data;
     if (!data.loadDirectory(options.data)) {
         ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
+    }
+    // The reverb of the places the listener walks into, from the "reverb" table of the data layer.
+    ichor::ReverbField reverbField;
+    if (!ichor::loadReverbStamps(data, reverbField)) {
+        ichor::log(ichor::LogLevel::Warn, "data: a reverb stamp is malformed, so none were loaded");
     }
 
     // A campaign owns the world; its slots are snapshots inside it (doc 14).
@@ -517,6 +523,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!engine.frame(dt)) {
             break;
         }
+        audio.setReverb(reverbField.at(playerPosition(engine.scene())));
         if (options.frames != 0 && engine.frameCount() >= options.frames) {
             break;
         }
@@ -542,6 +549,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (reloadAllowed && dataChanged) {
                 if (data.loadDirectory(options.data)) {
                     ichor::logf(ichor::LogLevel::Info, "data reloaded, digest {:016x}", data.digest());
+                    reverbField.clear();
+                    if (!ichor::loadReverbStamps(data, reverbField)) {
+                        ichor::log(ichor::LogLevel::Warn, "data: a reverb stamp is malformed, so none were loaded");
+                    }
                 } else {
                     ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
                 }

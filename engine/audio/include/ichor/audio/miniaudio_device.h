@@ -19,6 +19,7 @@ public:
     std::uint32_t findSound(std::string_view name) const override { return mixer_.findClip(name); }
     void play(std::uint32_t sound, glm::dvec3 position, bool spatial) override;
     void setListener(glm::dvec3 position, glm::quat rotation) override;
+    void setReverb(const ReverbSettings& settings) override { mixer_.setReverb(settings); }
 
     bool running() const;
 

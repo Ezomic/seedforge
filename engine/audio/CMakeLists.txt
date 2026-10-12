@@ -10,11 +10,12 @@ target_compile_definitions(ichor_miniaudio PUBLIC MA_NO_ENCODING MA_NO_GENERATIO
 
 add_library(ichor_audio
     src/mixer.cpp
+    src/reverb.cpp
     src/null_audio.cpp
     src/miniaudio_device.cpp
 )
 target_include_directories(ichor_audio PUBLIC include)
 target_link_libraries(ichor_audio
-    PUBLIC ichor_core ichor_assets
+    PUBLIC ichor_core ichor_assets ichor_data
     PRIVATE ichor_miniaudio
 )
