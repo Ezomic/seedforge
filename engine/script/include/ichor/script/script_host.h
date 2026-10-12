@@ -13,19 +13,26 @@ namespace ichor {
 
 using ScriptValue = std::variant<std::monostate, bool, double, std::string>;
 
+struct ScriptLimits {
+    std::uint64_t instructions = 1'000'000; // per entry into Lua
+    std::uint64_t memoryBytes = 64ull * 1024 * 1024;
+};
+
 // A sandboxed Lua state for composing content: dialogue, quest steps,
 // encounter dressing, tuning tables (doc 17, architecture rule 10). It has no
-// io, os, package, debug or load. Randomness comes from named streams derived
+// io, os, package, debug, load or print to stdout. Randomness comes from named streams derived
 // from the engine seed, so a script draws identically on every machine, and a
-// runaway script is stopped by an instruction budget. Errors are returned,
-// never thrown.
+// runaway script is stopped by an instruction budget that pcall cannot swallow,
+// and a script that allocates too much gets a memory error. Pattern matching
+// inside one string.find call is a single C call, so it is not interruptible.
+// Errors are returned, never thrown.
 //
 // Lua 5.4 seeds its string hash per process, so the order of pairs() over
 // string keys can differ between runs. Scripts that need an order use
 // ichor.sorted_pairs.
 class ScriptHost {
 public:
-    explicit ScriptHost(std::uint64_t seed, std::uint64_t instructionBudget = 1'000'000);
+    explicit ScriptHost(std::uint64_t seed, ScriptLimits limits = {});
     ~ScriptHost();
     ScriptHost(const ScriptHost&) = delete;
     ScriptHost& operator=(const ScriptHost&) = delete;

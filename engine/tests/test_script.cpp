@@ -69,7 +69,7 @@ TEST_CASE("errors come back as results with the chunk name")
 
 TEST_CASE("a runaway script is stopped by the instruction budget and the host survives")
 {
-    ScriptHost host(1, 50'000);
+    ScriptHost host(1, {50'000});
     REQUIRE_FALSE(host.run("spin", "while true do end"));
     REQUIRE(host.lastError().find("budget") != std::string::npos);
     REQUIRE(host.run("after", "function ok() return 7 end"));
@@ -84,7 +84,7 @@ TEST_CASE("a runaway script is stopped by the instruction budget and the host su
 
 TEST_CASE("the budget is per entry, so many small calls never add up")
 {
-    ScriptHost host(1, 20'000);
+    ScriptHost host(1, {20'000});
     REQUIRE(host.run("f", "function small() local n = 0 for i = 1, 2000 do n = n + i end return n end"));
     for (int i = 0; i < 200; ++i) {
         REQUIRE(host.call("small"));
@@ -185,4 +185,65 @@ TEST_CASE("log lines go to the sink")
     REQUIRE(host.run("l", "ichor.log('a') ichor.warn('b')"));
     REQUIRE(lines == std::vector<std::string>{"a", "b"});
     REQUIRE(warnings == 1);
+}
+
+TEST_CASE("pcall cannot swallow the budget and keep the script running")
+{
+    ScriptHost host(1, {50'000});
+    REQUIRE_FALSE(host.run("swallow", "while true do pcall(function() while true do end end) end"));
+    REQUIRE(host.lastError().find("budget") != std::string::npos);
+    REQUIRE_FALSE(host.run("swallow-once", "pcall(function() while true do end end) x = 1"));
+    REQUIRE(host.lastError().find("budget") != std::string::npos);
+    REQUIRE(host.run("after", "y = 2")); // a fresh entry gets a fresh budget
+}
+
+TEST_CASE("a script that allocates too much gets a memory error and the host survives")
+{
+    ScriptHost host(1, {1'000'000, 8ull * 1024 * 1024});
+    REQUIRE_FALSE(host.run("hog", "local s = ('x'):rep(100000000)"));
+    REQUIRE_FALSE(host.run("grow", "local t = {} for i = 1, 1e9 do t[i] = {i} end"));
+    REQUIRE(host.run("after", "z = 3"));
+}
+
+TEST_CASE("random_range survives extreme bounds")
+{
+    ScriptHost host(5);
+    REQUIRE(host.run("r", R"(
+        local lo, hi = math.mininteger, math.maxinteger
+        local a = ichor.random_range('x', lo, hi)
+        local b = ichor.random_range('x', -1, hi)
+        local c = ichor.random_range('x', lo, 1)
+        local d = ichor.random_range('x', 5, 5)
+        assert(math.type(a) == 'integer' and b >= -1 and c <= 1 and d == 5)
+    )"));
+}
+
+TEST_CASE("finalizers and bytecode are refused")
+{
+    ScriptHost host(1);
+    REQUIRE_FALSE(host.run("gc", "setmetatable({}, { __gc = function() end })"));
+    REQUIRE_FALSE(host.run("close", "setmetatable({}, { __close = function() end })"));
+    REQUIRE(host.run("ok", "setmetatable({}, { __index = function() return 1 end })"));
+    REQUIRE_FALSE(host.run("bytecode", "Lua"));
+    REQUIRE(host.run("nodump", "assert(string.dump == nil)"));
+}
+
+TEST_CASE("print goes to the log sink, not stdout")
+{
+    ScriptHost host(1);
+    std::vector<std::string> lines;
+    host.setLogSink([&](ScriptHost::Level, const std::string& message) { lines.push_back(message); });
+    REQUIRE(host.run("p", "print('a', 1, true)"));
+    REQUIRE(lines == std::vector<std::string>{"a	1	true"});
+}
+
+TEST_CASE("a log sink cannot call back into the host")
+{
+    ScriptHost host(1, {30'000});
+    std::string inner;
+    host.setLogSink([&](ScriptHost::Level, const std::string&) {
+        if (!host.run("inner", "x = 1")) inner = host.lastError();
+    });
+    REQUIRE_FALSE(host.run("outer", "while true do ichor.log('tick') end"));
+    REQUIRE(inner == "reentrant script call");
 }
