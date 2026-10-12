@@ -181,7 +181,7 @@ TEST_CASE("golden image: the forged terrain at the world's centre")
         for (int dx = -1; dx <= 1; ++dx) {
             const CellId id{home.x + dx, home.z + dz};
             CellPayload payload;
-            WorldStreamer::buildPayload(heightfield, id, 3, payload);
+            WorldStreamer::buildPayload(heightfield, id, StreamerConfig{}, payload);
             const std::uint32_t handle = renderer.uploadTerrainCell(payload.lods);
             REQUIRE(handle != Renderer::kNoHandle);
             view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, (dx == 0 && dz == 0) ? 0u : 1u});

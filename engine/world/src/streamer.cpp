@@ -87,14 +87,20 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
 
 }
 
-void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, std::uint32_t lodCount, CellPayload& out)
+void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, const StreamerConfig& config, CellPayload& out)
 {
+    const std::uint32_t lodCount = config.lodCount;
     heightfield.cell(id, out.cell);
     out.lods.clear();
+    out.nav.data.clear();
     std::uint32_t stride = 1;
     for (std::uint32_t lod = 0; lod < lodCount && (out.cell.samplesPerSide - 1) % stride == 0 && (out.cell.samplesPerSide - 1) / stride >= 2; ++lod) {
         out.lods.push_back(buildLod(heightfield, out.cell, stride));
         stride *= 4;
+    }
+    if (config.navmesh && !buildNavTile(heightfield, id, config.nav, out.nav)) {
+        logf(LogLevel::Warn, "navmesh: cell {},{} failed to build", id.x, id.z);
+        out.nav.data.clear();
     }
 }
 
@@ -135,7 +141,7 @@ void WorldStreamer::worker()
             generation = generation_;
         }
         auto payload = std::make_unique<CellPayload>();
-        buildPayload(heightfield_, id, config_.lodCount, *payload);
+        buildPayload(heightfield_, id, config_, *payload);
         const std::lock_guard lock(mutex_);
         if (generation == generation_) {
             finished_[id] = std::move(payload);
@@ -151,7 +157,7 @@ void WorldStreamer::request(CellId id)
     requested_.insert(id);
     if (config_.synchronous) {
         auto payload = std::make_unique<CellPayload>();
-        buildPayload(heightfield_, id, config_.lodCount, *payload);
+        buildPayload(heightfield_, id, config_, *payload);
         finished_[id] = std::move(payload);
         return;
     }
