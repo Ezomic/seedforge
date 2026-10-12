@@ -15,6 +15,8 @@ target_compile_definitions(ichor_sim PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORC
 # library (joltphysics port defaults: USE_AVX2, USE_FMADD, USE_LZCNT, USE_TZCNT,
 # USE_F16C, USE_SSE4_2 on) enables AVX2 and friends. The one file that includes
 # its headers must see the same instruction set or inline code and the library
-# disagree. The engine therefore needs an AVX2 CPU; doc 17 says so.
+# disagree. The engine therefore needs an AVX2 CPU; doc 17 says so. The port
+# also builds Jolt without RTTI, and classes deriving from its interfaces must
+# match or the typeinfo references fail to link on Linux.
 set_source_files_properties(src/physics.cpp PROPERTIES COMPILE_OPTIONS
-    "$<IF:$<CXX_COMPILER_ID:MSVC>,/arch:AVX2,-mavx2;-mfma;-mbmi;-mlzcnt;-mf16c;-msse4.2>")
+    "$<IF:$<CXX_COMPILER_ID:MSVC>,/arch:AVX2;/GR-,-mavx2;-mfma;-mbmi;-mlzcnt;-mf16c;-msse4.2;-fno-rtti>")
