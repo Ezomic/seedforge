@@ -2,6 +2,7 @@
 
 #include "ichor/assets/bundle.h"
 #include "ichor/world/heightfield.h"
+#include "ichor/world/navmesh.h"
 
 #include <glm/vec3.hpp>
 
@@ -23,6 +24,7 @@ namespace ichor {
 struct CellPayload {
     Heightfield::Cell cell;
     std::vector<Mesh> lods; // 0 is full resolution
+    NavTile nav;            // empty when navmeshes are off or the cell has nothing to walk on
 };
 
 struct StreamerConfig {
@@ -32,6 +34,8 @@ struct StreamerConfig {
     std::uint32_t activationsPerUpdate = 2;
     bool synchronous = false; // build on the calling thread; tests use this
     std::uint32_t lodCount = 3;
+    bool navmesh = false; // build a Detour tile per cell beside its meshes
+    NavParams nav;
 };
 
 // Keeps the cells around the player resident, building them on a worker
@@ -65,7 +69,7 @@ public:
     // Drops everything, synchronously.
     void clear();
 
-    static void buildPayload(const Heightfield& heightfield, CellId id, std::uint32_t lodCount, CellPayload& out);
+    static void buildPayload(const Heightfield& heightfield, CellId id, const StreamerConfig& config, CellPayload& out);
 
 private:
     void worker();

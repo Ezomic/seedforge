@@ -3,12 +3,14 @@
 #include "ichor/platform/null_platform.h"
 #include "ichor/sim/scene.h"
 #include "ichor/world/forge.h"
+#include "ichor/world/navmesh.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <set>
@@ -122,7 +124,7 @@ TEST_CASE("a cell builds three levels of detail with skirts and valid indices")
 {
     const Heightfield field = forgeHeightfield(smallWorld());
     CellPayload payload;
-    WorldStreamer::buildPayload(field, {1, 2}, 3, payload);
+    WorldStreamer::buildPayload(field, {1, 2}, StreamerConfig{}, payload);
     REQUIRE(payload.lods.size() == 3);
     REQUIRE(payload.lods[0].vertices.size() == 33u * 33u + 33u * 4u);
     REQUIRE(payload.lods[1].vertices.size() == 9u * 9u + 9u * 4u);
@@ -315,4 +317,67 @@ TEST_CASE("the floating origin does not thrash on a boundary walk")
     REQUIRE(scene.physics().origin() == glm::dvec3(1024.0, 0.0, 0.0));
     moveTo(1000.0);
     REQUIRE(scene.physics().origin() == glm::dvec3(1024.0, 0.0, 0.0));
+}
+
+TEST_CASE("navmesh tiles follow residency and a path crosses a cell border")
+{
+    const Heightfield field = forgeHeightfield(smallWorld());
+    StreamerConfig config;
+    config.synchronous = true;
+    config.radiusCells = 1;
+    config.requiredRadius = 1;
+    config.activationsPerUpdate = 16;
+    config.navmesh = true;
+    WorldStreamer streamer(field, config);
+    NavWorld nav;
+    REQUIRE(nav.init(field.desc(), 32));
+    std::size_t withTiles = 0;
+    streamer.onLoaded([&](const CellPayload& payload) {
+        CellPayload copy;
+        copy.nav = payload.nav;
+        if (!copy.nav.empty()) {
+            ++withTiles;
+            REQUIRE(nav.addTile(payload.cell.id, std::move(copy.nav)));
+        }
+    });
+    streamer.onUnloaded([&](CellId id) { nav.removeTile(id); });
+
+    const glm::dvec3 anchor(384.0, 0.0, 384.0); // cell 1,1; the ring is cells 0 to 2
+    streamer.update(anchor);
+    REQUIRE(streamer.ready(anchor));
+    REQUIRE(withTiles > 0);
+    REQUIRE(nav.tileCount() == withTiles);
+
+    // Flat ground either side of the seam at x = 512, close enough that only
+    // a linked border can join them.
+    std::vector<glm::dvec3> west;
+    std::vector<glm::dvec3> east;
+    for (double z = 264.0; z <= 496.0; z += 8.0) {
+        for (double x = 456.0; x <= 504.0; x += 8.0) {
+            if (field.normalAt(x, z).y > 0.97f) west.push_back({x, field.heightAt(x, z), z});
+            if (field.normalAt(x + 64.0, z).y > 0.97f) east.push_back({x + 64.0, field.heightAt(x + 64.0, z), z});
+        }
+    }
+    REQUIRE_FALSE(west.empty());
+    REQUIRE_FALSE(east.empty());
+    bool crossed = false;
+    std::vector<glm::dvec3> path;
+    for (const glm::dvec3& from : west) {
+        for (const glm::dvec3& to : east) {
+            if (std::abs(from.z - to.z) <= 24.0 && nav.findPath(from, to, path) && path.size() >= 2) {
+                crossed = true;
+                REQUIRE(path.front().x < 512.0);
+                REQUIRE(path.back().x > 512.0);
+                REQUIRE(glm::length(glm::dvec2(path.back().x - to.x, path.back().z - to.z)) < 4.0);
+                break;
+            }
+        }
+        if (crossed) break;
+    }
+    REQUIRE(crossed);
+
+    // Walking away drops the tiles that left the ring and the rest still link.
+    const std::size_t before = nav.tileCount();
+    streamer.update({900.0, 0.0, 900.0});
+    REQUIRE(nav.tileCount() <= before);
 }

@@ -11,6 +11,7 @@
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/sim/scene_io.h"
+#include "ichor/world/navmesh.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
@@ -186,6 +187,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     ichor::StreamerConfig streaming;
     streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
+    streaming.navmesh = true;
+    ichor::NavWorld navigation;
+    if (!heightfield.empty() && !navigation.init(heightfield.desc(), 128)) {
+        return 1;
+    }
     ichor::WorldStreamer streamer(heightfield, streaming);
 
     const std::uint32_t armClip = animations.findClip("wave");
@@ -222,6 +228,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
+        ichor::NavTile tile = payload.nav;
+        if (!tile.empty()) {
+            navigation.addTile(payload.cell.id, std::move(tile));
+        }
     });
     streamer.onUnloaded([&](ichor::CellId id) {
         if (const auto found = cells.find(id); found != cells.end()) {
@@ -229,6 +239,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             cells.erase(found);
         }
         engine.scene().physics().remove(ichor::StableId::of("cell", ichor::cellKey(id)));
+        navigation.removeTile(id);
     });
     // Until the player exists the arena's anchor stands in, so the first
     // tick, which spawns the player there, finds its ground resident.
@@ -255,7 +266,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             return streamer.ready(position);
         });
         engine.setOverlayBuilder([&](const ichor::Scene&, std::vector<std::string>& lines) {
-            lines.push_back(std::format("cells {} resident, {} pending", streamer.resident().size(), streamer.pending()));
+            lines.push_back(std::format("cells {} resident, {} pending, {} nav tiles", streamer.resident().size(), streamer.pending(), navigation.tileCount()));
         });
     }
     if (!options.replay.empty()) {

@@ -11,6 +11,7 @@
     "meshoptimizer",
     "entt",
     "joltphysics",
+    "recastnavigation",
     "ozz-animation",
     "miniaudio"
   ],
