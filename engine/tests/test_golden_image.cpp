@@ -4,10 +4,14 @@
 #include "ichor/gfx/reference_view.h"
 #include "ichor/gfx/renderer.h"
 #include "ichor/gfx/vk_offscreen.h"
+#include "ichor/gfx/vulkan_ui.h"
+#include "ichor/ui/ui_context.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <RmlUi/Core/ElementDocument.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -214,6 +218,74 @@ TEST_CASE("golden image: the forged terrain at the world's centre")
     }
     const Diff diff = compare(actual, expected, 16);
     writePng(kOutDir / "terrain.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+namespace {
+
+constexpr const char* kUiDocument = R"(<rml><head><style>
+    body, div { display: block; }
+    body { width: 640px; height: 360px; }
+    .panel { position: absolute; left: 40px; top: 40px; width: 300px; height: 200px; background-color: #203050; border: 4px #8090c0; }
+    .bar { position: absolute; left: 60px; top: 60px; width: 200px; height: 24px; background-color: #e0a020; }
+    .glass { position: absolute; left: 200px; top: 120px; width: 260px; height: 160px; background-color: #ff208080; }
+    .clip { position: absolute; left: 380px; top: 40px; width: 120px; height: 90px; overflow: hidden; background-color: #204020; }
+    .big { width: 300px; height: 300px; background-color: #40e040; }
+    .round { position: absolute; left: 500px; top: 200px; width: 100px; height: 100px; background-color: #f0f0f0; border-radius: 24px; }
+</style></head><body>
+    <div class="panel"></div>
+    <div class="bar"></div>
+    <div class="glass"></div>
+    <div class="clip"><div class="big"></div></div>
+    <div class="round"></div>
+</body></rml>)";
+
+}
+
+TEST_CASE("golden image: the game UI drawn with Vulkan")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    Rml::ElementDocument* document = ui.loadDocumentFromMemory(kUiDocument);
+    REQUIRE(document != nullptr);
+    document->Show();
+    ui.update(0.0);
+
+    RenderView view;
+    view.clearColor = glm::vec3(0.12f, 0.14f, 0.18f);
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    REQUIRE(vkUi.liveGeometry() > 0);
+
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "ui.actual.png", kWidth, kHeight, actual.data()));
+    const std::filesystem::path goldenPath = kGoldenDir / "ui.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect ui.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "ui.diff.png", kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);

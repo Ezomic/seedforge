@@ -5,6 +5,7 @@
 #include "ichor/gfx/vk_scene.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -24,7 +25,13 @@ public:
     bool uploadBundle(const SceneBundle& bundle);
     bool setTerrainMaterials(const SceneBundle& layers) { return scene_->setTerrainMaterials(layers); }
     std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) { return scene_->uploadTerrainCell(lods); }
-    bool render(const RenderView& view, std::vector<std::uint8_t>& rgba);
+    // The overlay, when given, records inside the scene's pass after everything else, with an upright viewport.
+    using Overlay = std::function<void(VkCommandBuffer, VkExtent2D)>;
+    bool render(const RenderView& view, std::vector<std::uint8_t>& rgba, const Overlay& overlay = {});
+
+    VulkanContext& context() { return context_; }
+    VkFormat colorFormat() const { return VK_FORMAT_R8G8B8A8_UNORM; }
+    VkExtent2D extent() const { return extent_; }
 
     const char* deviceName() const { return context_.deviceName(); }
 
