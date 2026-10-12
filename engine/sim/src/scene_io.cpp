@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <span>
 #include <iterator>
 
 namespace ichor {
@@ -15,7 +16,7 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'A', 'V'};
-constexpr std::uint32_t kVersion = 2; // 2: montage players carry their cues
+constexpr std::uint32_t kVersion = 3; // 2: montage cues; 3: registered game components
 
 enum ComponentBits : std::uint32_t {
     HasMesh = 1u << 0,
@@ -59,6 +60,12 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
     }
     w.write(rngs);
 
+    std::vector<std::string> hookNames;
+    for (const Scene::ComponentHooks& hooks : scene.componentHooks()) {
+        hookNames.push_back(hooks.name);
+    }
+    w.write(hookNames);
+
     const entt::registry& registry = scene.registry();
     std::vector<entt::entity> entities;
     for (auto entity : registry.view<const StableId>()) {
@@ -95,6 +102,11 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
         if (body) w.write(*body);
         if (animator) w.write(*animator);
         if (montage) w.write(*montage);
+        for (const Scene::ComponentHooks& hooks : scene.componentHooks()) {
+            const bool has = hooks.has(entity);
+            w.write(static_cast<std::uint8_t>(has ? 1 : 0));
+            if (has) hooks.write(entity, w);
+        }
     }
 
     return writeFileAtomically(path, w.bytes());
@@ -124,6 +136,13 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
 
     std::vector<RngState> rngs;
     if (!r.read(rngs)) return bad("truncated generators");
+    std::vector<std::string> hookNames;
+    if (!r.read(hookNames)) return bad("truncated component list");
+    const auto& hooks = scene.componentHooks();
+    if (hookNames.size() != hooks.size()) return bad("registered components differ from the snapshot");
+    for (std::size_t i = 0; i < hooks.size(); ++i) {
+        if (hookNames[i] != hooks[i].name) return bad("registered components differ from the snapshot");
+    }
 
     std::uint32_t count = 0;
     if (!r.read(count) || count > r.remaining()) return bad("bad entity count");
@@ -134,6 +153,8 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
     // Everything is parsed before the scene is touched, so a bad file leaves it intact.
     std::vector<SpawnCommand> spawns;
     std::vector<std::optional<MontagePlayer>> montages;
+    std::vector<std::size_t> hookOffsets; // where each entity's game components start in the file
+    const std::size_t total = bytes.size();
     for (std::uint32_t i = 0; i < count; ++i) {
         SpawnCommand spawn;
         std::uint32_t bits = 0;
@@ -176,6 +197,13 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
         }
         spawns.push_back(std::move(spawn));
         montages.push_back(montage);
+        // Game components are validated now by skipping, and applied once the entity exists.
+        hookOffsets.push_back(total - r.remaining());
+        for (const Scene::ComponentHooks& hook : hooks) {
+            std::uint8_t has = 0;
+            if (!r.read(has)) return bad("truncated component");
+            if (has != 0 && !hook.skip(r)) return bad("truncated component");
+        }
     }
     if (!r.atEnd()) return bad("trailing bytes");
 
@@ -185,11 +213,26 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
         scene.restoreRng(state.system, Rng::fromState(state.seed, state.state, state.inc));
     }
     // Static bodies first, so characters find their ground whatever the id order.
-    for (const SpawnCommand& spawn : spawns) {
-        if (spawn.staticBox) scene.restore(spawn);
+    const auto applyHooks = [&](std::size_t i) {
+        BinaryReader again(std::span(bytes.data() + hookOffsets[i], bytes.size() - hookOffsets[i]));
+        const entt::entity entity = scene.find(spawns[i].id);
+        for (const Scene::ComponentHooks& hook : hooks) {
+            std::uint8_t has = 0;
+            again.read(has);
+            if (has != 0) hook.read(entity, again);
+        }
+    };
+    for (std::size_t i = 0; i < spawns.size(); ++i) {
+        if (spawns[i].staticBox) {
+            scene.restore(spawns[i]);
+            applyHooks(i);
+        }
     }
     for (std::size_t i = 0; i < spawns.size(); ++i) {
-        if (!spawns[i].staticBox) scene.restore(spawns[i], montages[i]);
+        if (!spawns[i].staticBox) {
+            scene.restore(spawns[i], montages[i]);
+            applyHooks(i);
+        }
     }
     return true;
 }

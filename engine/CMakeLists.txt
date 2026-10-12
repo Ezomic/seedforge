@@ -65,3 +65,6 @@ include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+# Ichor itself. Stage 0 is the first thing built on the engine (doc 18).
+add_subdirectory(${CMAKE_SOURCE_DIR}/../game/stage0 stage0)

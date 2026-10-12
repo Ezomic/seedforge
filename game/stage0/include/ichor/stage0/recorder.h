@@ -1,0 +1,62 @@
+#pragma once
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+
+namespace ichor::stage0 {
+
+// Stamped by the state machine at the killing blow, never reconstructed later.
+// The distribution is the diagnosis (doc 18, stage0-log.md section 4).
+enum class DeathCause : std::uint8_t { Unknown, OutOfStamina, WhiffPunished, Cornered, MistimedBlock, OffScreen, Unreadable };
+
+struct SideRecord {
+    float healthLeft = 0.0f;
+    int attacks = 0;
+    int hits = 0;
+    int whiffs = 0;
+    int blocked = 0;
+    int dodges = 0;
+    int staggers = 0;
+    float damageDealt = 0.0f;
+    float damageTaken = 0.0f;
+};
+
+// Every fight becomes one CSV row. A fight starts at the first swing and ends
+// at a death; an abandoned fight is dropped rather than written.
+class FightRecorder {
+public:
+    // No path means record in memory only.
+    void open(const std::filesystem::path& csv);
+
+    void noteAttack(bool playerSide, double now);
+    void noteHit(bool attackerIsPlayer, float damage, bool blocked);
+    void noteWhiff(bool playerSide);
+    void noteDodge(bool playerSide);
+    void noteStagger(bool playerSide);
+    void noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now);
+    void abandon(double now);
+
+    bool running() const { return running_; }
+    int fightsWritten() const { return fights_; }
+    const SideRecord& player() const { return player_; }
+    const SideRecord& foe() const { return foe_; }
+    DeathCause lastCause() const { return lastCause_; }
+    const std::string& lastRow() const { return lastRow_; }
+
+private:
+    SideRecord& side(bool playerSide) { return playerSide ? player_ : foe_; }
+    void begin(double now);
+
+    std::filesystem::path csv_;
+    SideRecord player_;
+    SideRecord foe_;
+    bool running_ = false;
+    int fights_ = 0;
+    double start_ = 0.0;
+    double lastEnd_ = -1.0;
+    DeathCause lastCause_ = DeathCause::Unknown;
+    std::string lastRow_;
+};
+
+}

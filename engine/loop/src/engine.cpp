@@ -71,6 +71,13 @@ bool Engine::frame(double frameSeconds)
     renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}", frameCount_, scene_.tickCount(), scene_.time(),
         replaying_ ? "  [replay]" : recording_ ? "  [rec]" : ""));
     renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
+    if (overlayBuilder_) {
+        overlay_.clear();
+        overlayBuilder_(scene_, overlay_);
+        for (std::string& line : overlay_) {
+            renderer_.debugText(std::move(line));
+        }
+    }
     renderer_.endFrame();
 
     ++frameCount_;
