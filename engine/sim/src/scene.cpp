@@ -124,15 +124,26 @@ void Scene::apply(const Command& command)
                 index_.erase(c.id.value);
                 physics_->remove(c.id);
             }
-        } else if constexpr (std::is_same_v<T, MoveCommand>) {
+        } else if constexpr (std::is_same_v<T, MoveCommand> || std::is_same_v<T, SetTransformCommand>) {
             const entt::entity entity = find(c.id);
             if (entity != entt::null) {
                 Transform& transform = registry_.get<Transform>(entity);
-                transform.position += c.delta;
+                if constexpr (std::is_same_v<T, MoveCommand>) {
+                    transform.position += c.delta;
+                } else {
+                    transform = c.transform;
+                    transform.rotation = glm::normalize(transform.rotation);
+                }
                 // A teleport must not be interpolated across.
-                registry_.get<PreviousTransform>(entity).position = transform.position;
+                PreviousTransform& previous = registry_.get<PreviousTransform>(entity);
+                previous.position = transform.position;
+                previous.rotation = transform.rotation;
                 if (registry_.all_of<CharacterBody>(entity)) {
                     physics_->setCharacterPosition(c.id, transform.position);
+                }
+                // A collider that stayed behind would block where the thing used to be.
+                if (const auto* box = registry_.try_get<StaticBox>(entity)) {
+                    physics_->addStaticBox(c.id, *box, transform); // replaces the body it had
                 }
             }
         }
