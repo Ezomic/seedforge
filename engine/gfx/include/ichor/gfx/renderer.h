@@ -18,6 +18,10 @@ public:
     // indices in RenderInstance refer to this bundle.
     virtual bool uploadBundle(const SceneBundle& bundle) = 0;
 
+    // Rebuilds pipelines from the shader files on disk. Hot reload calls this
+    // when a compiled shader changes; a renderer without shaders does nothing.
+    virtual bool reloadShaders() { return true; }
+
     virtual void beginFrame() = 0;
     virtual void submit(const RenderView& view) = 0;
     virtual void endFrame() = 0;

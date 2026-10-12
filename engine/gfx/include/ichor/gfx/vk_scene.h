@@ -26,6 +26,9 @@ public:
     bool init();
     bool uploadBundle(const SceneBundle& bundle);
 
+    // Drops the pipelines and builds them again from the shader files on disk.
+    bool reloadPipelines();
+
     // Records everything for one frame. The colour image must already be in
     // COLOR_ATTACHMENT_OPTIMAL; the depth image is owned by the caller too.
     // `overlay` runs inside the main render pass, after the scene.

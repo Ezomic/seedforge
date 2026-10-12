@@ -19,6 +19,7 @@ public:
     bool quitRequested() const override { return quit_; }
     double now() const override;
     Extent drawableSize() const override;
+    InputFrame input() const override { return input_; }
 
     SDL_Window* window() const { return window_; }
 
@@ -28,6 +29,7 @@ public:
 private:
     SDL_Window* window_ = nullptr;
     bool quit_ = false;
+    InputFrame input_;
     std::function<void(const SDL_Event&)> hook_;
 };
 
