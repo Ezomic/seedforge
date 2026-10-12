@@ -21,7 +21,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UPROJECT = os.path.join(HERE, "..", "prototype", "Ichor", "Ichor.uproject")
+UPROJECT = os.path.join(HERE, "..", "game", "Ichor.uproject")
 
 # name -> (allowed target scope, why it is here)
 #
