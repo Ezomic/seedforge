@@ -3,6 +3,7 @@
 #include "ichor/gfx/renderer.h"
 
 #include <cstdint>
+#include <set>
 
 namespace ichor {
 
@@ -11,6 +12,9 @@ public:
     bool init() override { return true; }
     bool uploadBundle(const SceneBundle& bundle) override;
     std::uint32_t meshCount() const override { return meshes_; }
+    bool setTerrainMaterials(const SceneBundle& layers) override;
+    std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) override;
+    void removeTerrainCell(std::uint32_t cell) override;
     void beginFrame() override;
     void submit(const RenderView& view) override;
     void endFrame() override;
@@ -21,7 +25,9 @@ public:
     std::uint64_t linesDropped() const { return lines_; }
     std::uint64_t instancesSubmitted() const { return instances_; }
     std::uint64_t skinnedInstancesSubmitted() const { return skinned_; }
+    std::uint64_t terrainDrawsSubmitted() const { return terrainDraws_; }
     std::uint32_t meshesUploaded() const { return meshes_; }
+    std::size_t terrainCellsHeld() const { return cells_.size(); }
 
 private:
     std::uint64_t begun_ = 0;
@@ -29,7 +35,10 @@ private:
     std::uint64_t lines_ = 0;
     std::uint64_t instances_ = 0;
     std::uint64_t skinned_ = 0;
+    std::uint64_t terrainDraws_ = 0;
     std::uint32_t meshes_ = 0;
+    std::uint32_t nextCell_ = 0;
+    std::set<std::uint32_t> cells_;
 };
 
 }

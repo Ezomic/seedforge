@@ -10,6 +10,7 @@
 
 namespace ichor {
 
+struct Mesh;
 struct SceneBundle;
 
 // Renders a view on a headless device and reads the pixels back. This is what
@@ -21,6 +22,8 @@ public:
 
     bool init(std::uint32_t width, std::uint32_t height, bool validation);
     bool uploadBundle(const SceneBundle& bundle);
+    bool setTerrainMaterials(const SceneBundle& layers) { return scene_->setTerrainMaterials(layers); }
+    std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) { return scene_->uploadTerrainCell(lods); }
     bool render(const RenderView& view, std::vector<std::uint8_t>& rgba);
 
     const char* deviceName() const { return context_.deviceName(); }

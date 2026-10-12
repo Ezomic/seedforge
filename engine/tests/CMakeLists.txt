@@ -29,7 +29,7 @@ if(ENGINE_RUNTIME)
     add_executable(ichor_gfx_tests
         test_golden_image.cpp
     )
-    target_link_libraries(ichor_gfx_tests PRIVATE ichor_gfx_vulkan ichor_assets ichor_anim Catch2::Catch2WithMain)
+    target_link_libraries(ichor_gfx_tests PRIVATE ichor_gfx_vulkan ichor_assets ichor_anim ichor_world Catch2::Catch2WithMain)
     target_compile_definitions(ichor_gfx_tests PRIVATE
         ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data"
         ICHOR_CONTENT_DIR="${ICHOR_CONTENT_DIR}"

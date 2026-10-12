@@ -11,6 +11,8 @@
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/sim/scene_io.h"
+#include "ichor/world/streamer.h"
+#include "ichor/world/world_io.h"
 
 #include <glm/gtc/quaternion.hpp>
 #include <tracy/Tracy.hpp>
@@ -19,6 +21,8 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <format>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -34,6 +38,7 @@ struct Options {
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
+    std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path record;
     std::filesystem::path replay;
     std::filesystem::path load;
@@ -64,6 +69,8 @@ bool parse(int argc, char** argv, Options& options)
             options.scene = argv[++i];
         } else if (arg == "--actor" && hasValue) {
             options.actor = argv[++i];
+        } else if (arg == "--world" && hasValue) {
+            options.world = argv[++i];
         } else if (arg == "--record" && hasValue) {
             options.record = argv[++i];
         } else if (arg == "--replay" && hasValue) {
@@ -82,7 +89,7 @@ bool parse(int argc, char** argv, Options& options)
 
 // The kit laid out as entities: the three pieces, a slowly turning helmet,
 // and the player, whose transform is the camera.
-void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32_t armMesh, std::uint32_t armClip)
+void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32_t armMesh, std::uint32_t armClip, glm::dvec3 anchor)
 {
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     for (std::size_t i = 0; i < bundle.nodes.size(); ++i) {
@@ -90,7 +97,7 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
         ichor::SpawnCommand spawn;
         spawn.id = ichor::StableId::of(node.name, i);
         spawn.name.value = node.name;
-        spawn.transform.position = reference.instances[i].position;
+        spawn.transform.position = anchor + reference.instances[i].position;
         spawn.transform.rotation = glm::quat_cast(node.world);
         spawn.transform.scale = glm::vec3(glm::length(node.world[0]), glm::length(node.world[1]), glm::length(node.world[2]));
         spawn.mesh = ichor::MeshRef{node.mesh};
@@ -105,7 +112,7 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
         ichor::SpawnCommand spawn;
         spawn.id = ichor::StableId::of(name);
         spawn.name.value = std::string(name);
-        spawn.transform.position = position;
+        spawn.transform.position = anchor + position;
         spawn.staticBox = ichor::StaticBox{half};
         scene.enqueue(spawn);
     };
@@ -120,7 +127,7 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
     ichor::SpawnCommand arm;
     arm.id = ichor::StableId::of("arm");
     arm.name.value = "arm";
-    arm.transform.position = {-1.3, -0.45, -0.7};
+    arm.transform.position = anchor + glm::dvec3{-1.3, -0.45, -0.7};
     arm.mesh = ichor::MeshRef{armMesh};
     arm.animator = ichor::Animator{armClip, 0.0f, 1.0f, true, false};
     scene.enqueue(arm);
@@ -128,7 +135,7 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
     ichor::SpawnCommand player;
     player.id = ichor::StableId::of("player");
     player.name.value = "player";
-    player.transform.position = {reference.camera.position.x, 0.5, reference.camera.position.z};
+    player.transform.position = anchor + glm::dvec3{reference.camera.position.x, 0.5, reference.camera.position.z};
     player.player = ichor::Player{};
     player.character = ichor::CharacterBody{};
     scene.enqueue(player);
@@ -157,6 +164,30 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     audio.addBundle(bundle);
+
+    // The forged world, if there is one: its splat layers go to the renderer
+    // and its cells stream around the player. The arena sits on a plateau at
+    // the world's centre, above the terrain under it.
+    ichor::Heightfield heightfield;
+    glm::dvec3 anchor(0.0);
+    if (!options.world.empty()) {
+        ichor::SceneBundle layers;
+        if (!ichor::readWorld(options.world, heightfield) || !ichor::readBundle(options.world / "terrain.iscene", layers) || !renderer.setTerrainMaterials(layers)) {
+            return 1;
+        }
+        const double centre = heightfield.desc().sizeMetres * 0.5;
+        float plateau = -1e30f;
+        for (int z = -12; z <= 12; z += 2) {
+            for (int x = -12; x <= 12; x += 2) {
+                plateau = std::max(plateau, heightfield.heightAt(centre + x, centre + z));
+            }
+        }
+        anchor = {centre, plateau + 0.5, centre};
+    }
+    ichor::StreamerConfig streaming;
+    streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
+    ichor::WorldStreamer streamer(heightfield, streaming);
+
     const std::uint32_t armClip = animations.findClip("wave");
     const std::uint32_t windupCue = audio.findSound("A_WindupLight");
     const std::uint32_t tellCue = audio.findSound("A_Tell");
@@ -176,7 +207,49 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             return 1;
         }
     } else {
-        populate(engine.scene(), bundle, armMesh, armClip);
+        populate(engine.scene(), bundle, armMesh, armClip, anchor);
+    }
+
+    struct ResidentCell {
+        std::uint32_t handle = ichor::Renderer::kNoHandle;
+        glm::dvec3 origin{0.0};
+    };
+    std::map<ichor::CellId, ResidentCell> cells;
+    const auto cellBody = [](ichor::CellId id) { return ichor::StableId::of("cell", static_cast<std::uint64_t>(id.x) * 1000 + id.z); };
+    streamer.onLoaded([&](const ichor::CellPayload& payload) {
+        ResidentCell cell;
+        cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
+        cell.handle = renderer.uploadTerrainCell(payload.lods);
+        engine.scene().physics().addHeightField(cellBody(payload.cell.id), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
+            static_cast<float>(heightfield.desc().metresPerSample));
+        cells[payload.cell.id] = cell;
+    });
+    streamer.onUnloaded([&](ichor::CellId id) {
+        if (const auto found = cells.find(id); found != cells.end()) {
+            renderer.removeTerrainCell(found->second.handle);
+            cells.erase(found);
+        }
+        engine.scene().physics().remove(cellBody(id));
+    });
+    const auto playerPosition = [](const ichor::Scene& scene) {
+        glm::dvec3 position(0.0);
+        for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+            position = transform.position;
+        }
+        return position;
+    };
+    if (!heightfield.empty()) {
+        engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
+            streamer.update(playerPosition(scene));
+        });
+        engine.setTickGate([&](const ichor::Scene& scene) {
+            const glm::dvec3 position = playerPosition(scene);
+            streamer.update(position);
+            return streamer.ready(position);
+        });
+        engine.setOverlayBuilder([&](const ichor::Scene&, std::vector<std::string>& lines) {
+            lines.push_back(std::format("cells {} resident, {} pending", streamer.resident().size(), streamer.pending()));
+        });
     }
     if (!options.replay.empty()) {
         ichor::InputStream stream;
@@ -192,6 +265,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
         view.camera = reference.camera;
+        if (!heightfield.empty()) {
+            view.camera.farPlane = 2500.0f;
+        }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
             return std::pair{glm::mix(previous.position, current.position, alpha), glm::slerp(previous.rotation, current.rotation, static_cast<float>(alpha))};
@@ -210,10 +286,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
-            const glm::dvec3 target(0.0, 0.55, 0.0);
+            const glm::dvec3 target = anchor + glm::dvec3(0.0, 0.55, 0.0);
             const glm::dvec3 eye = blend(previous, transform).first + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
             view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        const double cellMetres = heightfield.desc().cellMetres;
+        for (const auto& [id, cell] : cells) {
+            if (cell.handle == ichor::Renderer::kNoHandle) continue;
+            const glm::dvec3 centre = cell.origin + glm::dvec3(cellMetres * 0.5, 0.0, cellMetres * 0.5);
+            const double distance = glm::length(glm::dvec2(centre.x - view.camera.position.x, centre.z - view.camera.position.z)) / cellMetres;
+            const std::uint32_t lod = distance < 1.2 ? 0u : distance < 2.2 ? 1u : 2u;
+            view.terrain.push_back({cell.handle, cell.origin, lod});
         }
         std::vector<ichor::LineSegment> colliders;
         scene.physics().debugLines(colliders);
@@ -281,7 +365,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav]");
         return 2;
     }
 

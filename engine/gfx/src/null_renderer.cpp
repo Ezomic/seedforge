@@ -10,6 +10,26 @@ bool NullRenderer::uploadBundle(const SceneBundle& bundle)
     return true;
 }
 
+bool NullRenderer::setTerrainMaterials(const SceneBundle& layers)
+{
+    return layers.textures.size() >= 3;
+}
+
+std::uint32_t NullRenderer::uploadTerrainCell(const std::vector<Mesh>& lods)
+{
+    if (lods.empty()) {
+        return kNoHandle;
+    }
+    const std::uint32_t handle = nextCell_++;
+    cells_.insert(handle);
+    return handle;
+}
+
+void NullRenderer::removeTerrainCell(std::uint32_t cell)
+{
+    cells_.erase(cell);
+}
+
 void NullRenderer::beginFrame()
 {
     ++begun_;
@@ -21,6 +41,7 @@ void NullRenderer::submit(const RenderView& view)
     for (const RenderInstance& instance : view.instances) {
         skinned_ += instance.jointCount > 0 ? 1 : 0;
     }
+    terrainDraws_ += view.terrain.size();
 }
 
 void NullRenderer::endFrame()

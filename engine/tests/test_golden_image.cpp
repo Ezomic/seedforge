@@ -3,6 +3,8 @@
 #include "ichor/assets/image.h"
 #include "ichor/gfx/reference_view.h"
 #include "ichor/gfx/vk_offscreen.h"
+#include "ichor/world/streamer.h"
+#include "ichor/world/world_io.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -152,6 +154,65 @@ TEST_CASE("golden image: the skinned arm mid-wave")
     }
     const Diff diff = compare(actual, expected, 16);
     writePng(kOutDir / "arm.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the forged terrain at the world's centre")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
+    Heightfield heightfield;
+    REQUIRE(readWorld(worldDir, heightfield));
+    SceneBundle layers;
+    REQUIRE(readBundle(worldDir / "terrain.iscene", layers));
+    REQUIRE(renderer.setTerrainMaterials(layers));
+
+    // The nine cells around the centre, the near one at full detail.
+    RenderView view;
+    const double centre = heightfield.desc().sizeMetres * 0.5;
+    const CellId home = heightfield.cellAt(centre, centre);
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const CellId id{home.x + dx, home.z + dz};
+            CellPayload payload;
+            WorldStreamer::buildPayload(heightfield, id, 3, payload);
+            const std::uint32_t handle = renderer.uploadTerrainCell(payload.lods);
+            REQUIRE(handle != 0xffffffffu);
+            view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, (dx == 0 && dz == 0) ? 0u : 1u});
+        }
+    }
+    view.sunDirection = glm::normalize(glm::vec3(-0.5f, 0.6f, 0.35f));
+    const glm::dvec3 eye(centre - 60.0, heightfield.heightAt(centre - 60.0, centre + 90.0) + 25.0, centre + 90.0);
+    const glm::dvec3 target(centre + 120.0, heightfield.heightAt(centre + 120.0, centre - 200.0), centre - 200.0);
+    view.camera.position = eye;
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+    view.camera.farPlane = 2500.0f;
+
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "terrain.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "terrain.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect terrain.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "terrain.diff.png", kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);
