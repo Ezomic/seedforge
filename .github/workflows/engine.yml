@@ -15,6 +15,8 @@ jobs:
       VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
@@ -48,6 +50,8 @@ jobs:
       VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
