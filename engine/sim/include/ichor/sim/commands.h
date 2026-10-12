@@ -44,6 +44,8 @@ struct PlayMontageCommand {
     float activeStart = 0.0f;
     float activeEnd = 0.0f;
     float recoveryEnd = 0.0f;
+    std::uint32_t windupSound = 0xffffffffu;
+    std::uint32_t activeSound = 0xffffffffu;
 };
 
 using Command = std::variant<SpawnCommand, DestroyCommand, MoveCommand, PlayMontageCommand>;

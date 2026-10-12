@@ -11,7 +11,8 @@
     "meshoptimizer",
     "entt",
     "joltphysics",
-    "ozz-animation"
+    "ozz-animation",
+    "miniaudio"
   ],
   "default-features": [
     "runtime"

@@ -1,5 +1,7 @@
 #include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
+#include "ichor/audio/miniaudio_device.h"
+#include "ichor/audio/null_audio.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/gfx/null_renderer.h"
@@ -27,6 +29,7 @@ namespace {
 
 struct Options {
     bool headless = false;
+    bool audioProbe = false; // open the device, play nothing, exit
     std::uint64_t frames = 0; // 0 runs until quit
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
@@ -51,6 +54,8 @@ bool parse(int argc, char** argv, Options& options)
         const bool hasValue = i + 1 < argc;
         if (arg == "--headless") {
             options.headless = true;
+        } else if (arg == "--audio-probe") {
+            options.audioProbe = true;
         } else if (arg == "--frames" && hasValue) {
             if (!parseNumber(argv[++i], options.frames)) return false;
         } else if (arg == "--seed" && hasValue) {
@@ -129,9 +134,9 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
     scene.enqueue(player);
 }
 
-int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& options)
+int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& audio, const Options& options)
 {
-    if (!platform.init({}) || !renderer.init()) {
+    if (!platform.init({}) || !renderer.init() || !audio.init()) {
         return 1;
     }
 
@@ -145,7 +150,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
     if (!ichor::readBundle(options.actor, actor) || !renderer.uploadBundle(actor) || !animations.load(actor)) {
         return 1;
     }
+    audio.addBundle(bundle);
     const std::uint32_t armClip = animations.findClip("wave");
+    const std::uint32_t windupCue = audio.findSound("A_WindupLight");
+    const std::uint32_t tellCue = audio.findSound("A_Tell");
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -155,6 +163,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.scene().setAnimations(&animations);
+    engine.setAudio(&audio);
 
     if (!options.load.empty()) {
         if (!ichor::loadScene(options.load, engine.scene())) {
@@ -212,8 +221,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
     watcher.watchDirectory(ICHOR_SHADER_DIR, ".spv");
 
     double last = platform.now();
+    bool confirmHeld = false;
     for (;;) {
         ZoneScopedN("frame");
+        // Space starts the light attack on the arm, with its wind-up and tell cues.
+        const bool confirm = (platform.input().buttons & ichor::InputFrame::Confirm) != 0;
+        if (confirm && !confirmHeld) {
+            engine.scene().enqueue(ichor::PlayMontageCommand{ichor::StableId::of("arm"), armClip, 0.35f, 0.5f, 0.9f, windupCue, tellCue});
+        }
+        confirmHeld = confirm;
         const double now = platform.now();
         const double dt = options.headless ? config.fixedDt : now - last;
         last = now;
@@ -263,13 +279,23 @@ int main(int argc, char** argv)
         return 2;
     }
 
+    if (options.audioProbe) {
+        ichor::MiniaudioDevice device;
+        if (!device.init()) {
+            return 1;
+        }
+        ichor::log(ichor::LogLevel::Info, "audio probe: device opened and started");
+        return 0;
+    }
     if (options.headless) {
         ichor::NullPlatform platform;
         ichor::NullRenderer renderer;
-        return run(platform, renderer, options);
+        ichor::NullAudio audio;
+        return run(platform, renderer, audio, options);
     }
 
     ichor::SdlPlatform platform;
     ichor::VulkanRenderer renderer(platform);
-    return run(platform, renderer, options);
+    ichor::MiniaudioDevice audio;
+    return run(platform, renderer, audio, options);
 }

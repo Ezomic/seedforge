@@ -1,5 +1,6 @@
 #include "ichor/loop/engine.h"
 
+#include "ichor/audio/audio_host.h"
 #include "ichor/gfx/renderer.h"
 #include "ichor/platform/platform.h"
 
@@ -48,6 +49,11 @@ bool Engine::frame(double frameSeconds)
     const int steps = step_.advance(frameSeconds);
     for (int i = 0; i < steps && !replayFinished(); ++i) {
         scene_.tick(step_.dt(), nextInput());
+        if (audio_ != nullptr) {
+            for (const SoundEvent& event : scene_.soundEvents()) {
+                audio_->play(event.sound, event.position, true);
+            }
+        }
     }
 
     renderer_.beginFrame();
@@ -57,6 +63,9 @@ bool Engine::frame(double frameSeconds)
         view_.jointPalette.clear();
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
+        if (audio_ != nullptr) {
+            audio_->setListener(view_.camera.position, view_.camera.rotation);
+        }
     }
     renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}", frameCount_, scene_.tickCount(), scene_.time(),
         replaying_ ? "  [replay]" : recording_ ? "  [rec]" : ""));

@@ -13,7 +13,7 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'C', 'N'};
-constexpr std::uint32_t kVersion = 2;
+constexpr std::uint32_t kVersion = 3;
 
 class Writer {
 public:
@@ -170,6 +170,9 @@ bool validate(const SceneBundle& bundle, const std::string& file)
             if (s.material >= bundle.materials.size() || s.firstIndex > m.indices.size() || s.indexCount > m.indices.size() - s.firstIndex) return fail("submesh range");
         }
     }
+    for (const SoundClip& s : bundle.sounds) {
+        if (s.sampleRate < 8000 || s.sampleRate > 192000 || s.samples.size() < 2) return fail("sound shape");
+    }
     for (const Node& n : bundle.nodes) {
         if (n.mesh >= bundle.meshes.size()) return fail("node mesh index");
     }
@@ -237,6 +240,13 @@ bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle)
         w.pod(m.skeleton);
     }
 
+    w.pod(static_cast<std::uint32_t>(bundle.sounds.size()));
+    for (const auto& s : bundle.sounds) {
+        w.string(s.name);
+        w.pod(s.sampleRate);
+        w.pods(s.samples);
+    }
+
     w.pod(static_cast<std::uint32_t>(bundle.nodes.size()));
     for (const auto& n : bundle.nodes) {
         w.string(n.name);
@@ -301,6 +311,14 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
     bundle.meshes.resize(count);
     for (auto& m : bundle.meshes) {
         if (!r.string(m.name) || !r.pods(m.vertices) || !r.pods(m.indices) || !r.pods(m.submeshes) || !r.pod(m.boundsMin) || !r.pod(m.boundsMax) || !r.pod(m.skeleton)) {
+            return false;
+        }
+    }
+
+    if (!r.count(count, 12)) return false;
+    bundle.sounds.resize(count);
+    for (auto& s : bundle.sounds) {
+        if (!r.string(s.name) || !r.pod(s.sampleRate) || !r.pods(s.samples)) {
             return false;
         }
     }

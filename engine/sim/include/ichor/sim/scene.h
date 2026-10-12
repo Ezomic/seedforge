@@ -6,6 +6,7 @@
 #include "ichor/sim/components.h"
 #include "ichor/anim/animation.h"
 #include "ichor/sim/physics.h"
+#include "ichor/sim/sound_event.h"
 
 #include <entt/entity/registry.hpp>
 
@@ -54,6 +55,9 @@ public:
     void setAnimations(const AnimationSet* animations) { animations_ = animations; }
     const AnimationSet* animations() const { return animations_; }
 
+    // What became audible during the last tick, cleared at the start of the next.
+    const std::vector<SoundEvent>& soundEvents() const { return soundEvents_; }
+
     // Snapshot support: scene_io writes and restores these directly.
     struct Clock {
         std::uint64_t tick = 0;
@@ -90,6 +94,7 @@ private:
     const AnimationSet* animations_ = nullptr;
     std::map<std::string, Rng, std::less<>> rngs_;
     std::vector<Command> pending_;
+    std::vector<SoundEvent> soundEvents_;
     CommandLog log_;
     std::uint64_t tickCount_ = 0;
     double time_ = 0.0;

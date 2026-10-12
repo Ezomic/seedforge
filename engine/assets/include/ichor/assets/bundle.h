@@ -84,6 +84,13 @@ struct AnimationClip {
     std::vector<std::uint8_t> ozzBytes;
 };
 
+// Mono PCM at the source rate; the mixer resamples.
+struct SoundClip {
+    std::string name;
+    std::uint32_t sampleRate = 0;
+    std::vector<std::int16_t> samples;
+};
+
 struct Node {
     std::string name;
     std::uint32_t mesh = 0;
@@ -96,6 +103,7 @@ struct SceneBundle {
     std::vector<Mesh> meshes;
     std::vector<Skeleton> skeletons;
     std::vector<AnimationClip> clips;
+    std::vector<SoundClip> sounds;
     std::vector<Node> nodes;
 };
 

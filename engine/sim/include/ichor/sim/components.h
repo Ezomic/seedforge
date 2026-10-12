@@ -92,6 +92,8 @@ struct MontagePlayer {
     float recoveryEnd = 0.0f;
     float time = 0.0f;
     std::uint8_t phase = 0; // MontagePhase
+    std::uint32_t windupSound = 0xffffffffu; // raised when the wind-up begins
+    std::uint32_t activeSound = 0xffffffffu; // raised when the active window opens
 };
 
 // Skinning matrices for rendering, rebuilt every tick; never saved.
@@ -140,7 +142,8 @@ struct Reflect<MontagePlayer> {
     {
         return std::make_tuple(field("clip", &MontagePlayer::clip), field("activeStart", &MontagePlayer::activeStart),
             field("activeEnd", &MontagePlayer::activeEnd), field("recoveryEnd", &MontagePlayer::recoveryEnd),
-            field("time", &MontagePlayer::time), field("phase", &MontagePlayer::phase));
+            field("time", &MontagePlayer::time), field("phase", &MontagePlayer::phase),
+            field("windupSound", &MontagePlayer::windupSound), field("activeSound", &MontagePlayer::activeSound));
     }
 };
 template <>
