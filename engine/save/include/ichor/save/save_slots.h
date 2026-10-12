@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/save/chronicle.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -45,6 +47,7 @@ struct LoadResult {
     bool fromBackup = false;     // the newest slot file was bad and a backup was used
     bool dataChanged = false;    // loaded, but the data layer differs from when it was saved
     SlotInfo info;
+    Chronicle chronicle;         // the story up to the moment of the save
 };
 
 class SaveSlots {
@@ -56,7 +59,7 @@ public:
     // Slot names are plain: letters, digits, dash and underscore.
     static bool validName(std::string_view name);
 
-    bool save(std::string_view name, const Scene& scene, const SaveContext& context);
+    bool save(std::string_view name, const Scene& scene, const SaveContext& context, const Chronicle& chronicle = {});
     LoadResult load(std::string_view name, Scene& scene, const SaveContext& expected);
 
     // Slots that have a readable newest file, by name.

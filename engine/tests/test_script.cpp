@@ -1,4 +1,6 @@
 #include "ichor/script/scene_bindings.h"
+#include "ichor/script/chronicle_bindings.h"
+#include "ichor/save/chronicle.h"
 #include "ichor/script/script_host.h"
 #include "ichor/sim/scene.h"
 
@@ -360,4 +362,21 @@ TEST_CASE("spawning a name twice, or touching one that is not there, is an error
     REQUIRE(host.run("q", "function known(n) return ichor.exists(n) end"));
     REQUIRE(host.call("known", {std::string("ghost")}, &result));
     REQUIRE(std::get<bool>(result) == false);
+}
+
+TEST_CASE("scripts write the chronicle at the current tick")
+{
+    Scene scene(1);
+    Chronicle story;
+    ScriptHost host(1);
+    bindChronicle(host, story, scene);
+    scene.tick(kDt);
+    scene.tick(kDt);
+    REQUIRE(host.run("c", "ichor.chronicle('quest', 'The well was cleared.')"));
+    REQUIRE(story.entries().size() == 1);
+    REQUIRE(story.entries()[0].tick == 2);
+    REQUIRE(story.entries()[0].category == "quest");
+    REQUIRE_FALSE(host.run("bad", "ichor.chronicle('Not Plain', 'x')"));
+    REQUIRE_FALSE(host.run("few", "ichor.chronicle('quest')"));
+    REQUIRE(story.entries().size() == 1);
 }
