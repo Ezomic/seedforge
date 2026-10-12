@@ -12,6 +12,8 @@
     "entt",
     "joltphysics",
     "recastnavigation",
+    "sol2",
+    "lua",
     "ozz-animation",
     "miniaudio"
   ],
