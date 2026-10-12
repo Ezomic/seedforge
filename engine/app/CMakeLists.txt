@@ -4,11 +4,12 @@ add_executable(ichor
 target_link_libraries(ichor PRIVATE
     ichor_loop ichor_assets ichor_audio ichor_world ichor_script ichor_data ichor_platform_sdl ichor_platform_null ichor_gfx_vulkan ichor_gfx_null ichor_profile
 )
+get_filename_component(ICHOR_DATA_PATH ../data ABSOLUTE BASE_DIR ${PROJECT_SOURCE_DIR})
 target_compile_definitions(ichor PRIVATE
     ICHOR_CONTENT_DIR="${ICHOR_CONTENT_DIR}"
     ICHOR_SHADER_DIR="${ICHOR_SHADER_DIR}"
-    ICHOR_SCRIPT_DIR="${CMAKE_SOURCE_DIR}/content/scripts"
-    ICHOR_DATA_DIR="${CMAKE_SOURCE_DIR}/../data"
+    ICHOR_SCRIPT_DIR="${PROJECT_SOURCE_DIR}/content/scripts"
+    ICHOR_DATA_DIR="${ICHOR_DATA_PATH}"
 )
 add_dependencies(ichor ichor_content)
 

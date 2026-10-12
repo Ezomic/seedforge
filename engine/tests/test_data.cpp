@@ -78,7 +78,7 @@ TEST_CASE("several files of one table share their ids")
     REQUIRE_FALSE(data.loadDirectory(fixture.root()));
     REQUIRE(data.lastError().find("duplicate id 'one'") != std::string::npos);
     REQUIRE(data.lastError().find("c.json") != std::string::npos);
-    REQUIRE(data.tableCount() == 0); // all or nothing
+    REQUIRE(data.table("catalogue")->records.size() == 2); // the last good data stays
 }
 
 TEST_CASE("malformed data is refused with the file named")

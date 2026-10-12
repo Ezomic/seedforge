@@ -28,3 +28,33 @@ TEST_CASE("the watcher reports a file once per change")
     std::filesystem::remove_all(dir);
     REQUIRE(watcher.poll().size() == 1); // deletion counts as a change too
 }
+
+TEST_CASE("a watched tree sees nested files, new files and new directories")
+{
+    const auto dir = std::filesystem::temp_directory_path() / "ichor_watch_tree";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "kits" / "deep");
+    const auto nested = dir / "kits" / "deep" / "x.json";
+    std::ofstream(nested) << "[]";
+    std::ofstream(dir / "ignored.txt") << "no";
+
+    FileWatcher watcher;
+    watcher.watchTree(dir, ".json");
+    REQUIRE(watcher.poll().empty());
+
+    std::filesystem::last_write_time(nested, std::filesystem::last_write_time(nested) + std::chrono::seconds(2));
+    REQUIRE(watcher.poll() == std::vector<std::filesystem::path>{nested});
+
+    const auto fresh = dir / "kits" / "added.json";
+    std::ofstream(fresh) << "[]";
+    REQUIRE(watcher.poll() == std::vector<std::filesystem::path>{fresh});
+    REQUIRE(watcher.poll().empty());
+
+    std::filesystem::create_directories(dir / "tables");
+    const auto table = dir / "tables" / "t.json";
+    std::ofstream(table) << "[]";
+    REQUIRE(watcher.poll() == std::vector<std::filesystem::path>{table});
+
+    std::filesystem::remove_all(dir);
+    REQUIRE(watcher.poll().size() == 3); // deletions count too, and a missing root does not throw
+}

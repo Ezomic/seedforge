@@ -3,8 +3,8 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/core/file_watch.h"
-#include "ichor/data/data_set.h"
 #include "ichor/core/log.h"
+#include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
 #include "ichor/gfx/vulkan_renderer.h"
@@ -305,19 +305,37 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         return true;
     };
-    if (loadScript() && scripts.has("on_start") && !scripts.call("on_start")) {
+    if (loadScript() && scripts.has("on_start") && !scripts.call("on_start", {!options.load.empty()})) {
         ichor::logf(ichor::LogLevel::Warn, "script on_start: {}", scripts.lastError());
     }
+    // Logged when it starts failing or the message changes, not every tick, and
+    // given up on after a run of failures until the next reload.
+    constexpr int kMaxFailures = 60;
     std::string lastScriptError;
+    int failures = 0;
     engine.scene().addSystem("script", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
-        if (!scripts.has("on_tick")) {
+        if (failures >= kMaxFailures || !scripts.has("on_tick")) {
             return;
         }
-        if (!scripts.call("on_tick", {static_cast<double>(scene.tickCount())}) && scripts.lastError() != lastScriptError) {
+        if (scripts.call("on_tick", {static_cast<double>(scene.tickCount())})) {
+            lastScriptError.clear();
+            failures = 0;
+            return;
+        }
+        if (scripts.lastError() != lastScriptError) {
             lastScriptError = scripts.lastError();
             ichor::logf(ichor::LogLevel::Warn, "script on_tick: {}", lastScriptError);
         }
+        if (++failures == kMaxFailures) {
+            ichor::log(ichor::LogLevel::Warn, "script on_tick disabled after repeated failures until the script reloads");
+        }
     });
+    // A reload mid-replay or mid-recording would change what the script asks
+    // for from that tick on, and the recording keeps no record of the version.
+    const bool reloadAllowed = options.replay.empty() && options.record.empty();
+    if (!reloadAllowed) {
+        ichor::log(ichor::LogLevel::Info, "hot reload of scripts and data is off while recording or replaying");
+    }
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
@@ -369,13 +387,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     watcher.watch(options.scene);
     watcher.watchDirectory(ICHOR_SHADER_DIR, ".spv");
     watcher.watch(options.script);
-    // The watcher is not recursive, and each data table is a directory.
-    std::error_code listing;
-    for (const auto& entry : std::filesystem::directory_iterator(options.data, listing)) {
-        if (entry.is_directory()) {
-            watcher.watchDirectory(entry.path(), ".json");
-        }
-    }
+    watcher.watchTree(options.data, ".json");
 
     double last = platform.now();
     bool confirmHeld = false;
@@ -410,11 +422,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 scriptChanged = scriptChanged || path == options.script;
                 dataChanged = dataChanged || path.extension() == ".json";
             }
-            if (scriptChanged && loadScript()) {
+            if (reloadAllowed && scriptChanged && loadScript()) {
                 ichor::log(ichor::LogLevel::Info, "script reloaded");
                 lastScriptError.clear();
+                failures = 0;
             }
-            if (dataChanged) {
+            if (reloadAllowed && dataChanged) {
                 if (data.loadDirectory(options.data)) {
                     ichor::logf(ichor::LogLevel::Info, "data reloaded, digest {:016x}", data.digest());
                 } else {
