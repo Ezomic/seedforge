@@ -35,6 +35,18 @@ target_compile_definitions(ichor_tests PRIVATE ICHOR_TEST_DATA="${CMAKE_CURRENT_
 catch_discover_tests(ichor_tests)
 
 if(ENGINE_RUNTIME)
+    add_executable(ichor_editor_ui_tests
+        test_editor_panels.cpp
+    )
+    target_link_libraries(ichor_editor_ui_tests PRIVATE ichor_editor_ui Catch2::Catch2WithMain)
+    catch_discover_tests(ichor_editor_ui_tests)
+    if(WIN32)
+        add_custom_command(TARGET ichor_editor_ui_tests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:ichor_editor_ui_tests> $<TARGET_FILE_DIR:ichor_editor_ui_tests>
+            COMMAND_EXPAND_LISTS
+        )
+    endif()
+
     add_executable(ichor_gfx_tests
         test_golden_image.cpp
     )
