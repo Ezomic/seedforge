@@ -243,7 +243,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint64_t worldSeed = heightfield.empty() ? options.seed : heightfield.desc().seed;
     constexpr std::uint32_t kGenVersion = 1;
     const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
-    ichor::SaveSlots slots(options.saves / ("campaign-" + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
+    // Ironman keeps its own directory, so a normal run can never load its rolling slot.
+    ichor::SaveSlots slots(options.saves / ((options.ironman ? "ironman-" : "campaign-") + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
 
@@ -335,7 +336,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         return true;
     };
-    if (loadScript() && scripts.has("on_start") && !scripts.call("on_start", {!options.load.empty()})) {
+    if (loadScript() && scripts.has("on_start") && !scripts.call("on_start", {!options.load.empty() || !options.loadSlot.empty()})) {
         ichor::logf(ichor::LogLevel::Warn, "script on_start: {}", scripts.lastError());
     }
     // Logged when it starts failing or the message changes, not every tick, and
@@ -423,7 +424,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool confirmHeld = false;
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
-    const auto autosaveTicks = static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt);
+    const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
     for (;;) {
         ZoneScopedN("frame");
@@ -436,19 +437,22 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const std::uint32_t buttons = platform.input().buttons;
         const bool quickSave = (buttons & ichor::InputFrame::QuickSave) != 0;
         const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
-        if (quickSave && !quickSaveHeld) {
+        // Saving over the player's quicksave while a replay drives the run would be a surprise.
+        if (quickSave && !quickSaveHeld && options.replay.empty()) {
             if (slots.save(quickSlot, engine.scene(), saveContext())) {
                 ichor::logf(ichor::LogLevel::Info, "saved '{}' at tick {}", quickSlot, engine.scene().tickCount());
             } else {
                 ichor::logf(ichor::LogLevel::Warn, "save failed: {}", slots.lastError());
             }
         }
-        // A restore mid-replay would diverge from the recording, so loading waits for a live run.
-        if (quickLoad && !quickLoadHeld && options.replay.empty()) {
+        // A restore mid-replay or mid-recording would diverge from the recording, and in ironman
+        // a reload would undo a death, so loading waits for a live, unrecorded, non-ironman run.
+        if (quickLoad && !quickLoadHeld && options.replay.empty() && options.record.empty() && !options.ironman) {
             const ichor::LoadResult loaded = slots.load(quickSlot, engine.scene(), saveContext());
             if (loaded.status == ichor::LoadStatus::Loaded) {
                 // The restore cleared the physics world, terrain collision included, so the streamer starts over.
                 streamer.clear();
+                lastAutosave = engine.scene().tickCount(); // the clock just moved, usually backwards
                 ichor::logf(ichor::LogLevel::Info, "loaded '{}' at tick {}", quickSlot, loaded.info.tick);
             } else {
                 ichor::logf(ichor::LogLevel::Warn, "load of '{}' failed (status {})", quickSlot, static_cast<int>(loaded.status));
@@ -456,7 +460,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         quickSaveHeld = quickSave;
         quickLoadHeld = quickLoad;
-        if (autosaveTicks > 0 && engine.scene().tickCount() >= lastAutosave + autosaveTicks) {
+        const std::uint64_t tickNow = engine.scene().tickCount();
+        if (autosaveTicks > 0 && (tickNow < lastAutosave || tickNow - lastAutosave >= autosaveTicks)) {
             lastAutosave = engine.scene().tickCount();
             if (!slots.save(autoSlot, engine.scene(), saveContext())) {
                 ichor::logf(ichor::LogLevel::Warn, "autosave failed: {}", slots.lastError());

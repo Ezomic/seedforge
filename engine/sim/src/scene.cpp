@@ -56,6 +56,9 @@ void Scene::clearForRestore()
     registry_.clear();
     index_.clear();
     physics_->clear();
+    // The origin follows the restored player on the next step; until then it
+    // must not be left wherever the session being replaced had put it.
+    physics_->setOrigin(glm::dvec3(0.0));
     rngs_.clear();
     pending_.clear();
     soundEvents_.clear();
