@@ -17,7 +17,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -88,11 +91,27 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle)
         scene.enqueue(spawn);
     }
 
+    // The arena: a floor whose top meets the kit's ground plane, and four walls.
+    const auto box = [&](std::string_view name, glm::dvec3 position, glm::vec3 half) {
+        ichor::SpawnCommand spawn;
+        spawn.id = ichor::StableId::of(name);
+        spawn.name.value = std::string(name);
+        spawn.transform.position = position;
+        spawn.staticBox = ichor::StaticBox{half};
+        scene.enqueue(spawn);
+    };
+    box("floor", {0.0, -0.95, 0.0}, {10.0f, 0.5f, 10.0f});
+    box("wall-east", {10.25, 0.5, 0.0}, {0.25f, 1.5f, 10.0f});
+    box("wall-west", {-10.25, 0.5, 0.0}, {0.25f, 1.5f, 10.0f});
+    box("wall-north", {0.0, 0.5, -10.25}, {10.0f, 1.5f, 0.25f});
+    box("wall-south", {0.0, 0.5, 10.25}, {10.0f, 1.5f, 0.25f});
+
     ichor::SpawnCommand player;
     player.id = ichor::StableId::of("player");
     player.name.value = "player";
-    player.transform.position = reference.camera.position;
+    player.transform.position = {reference.camera.position.x, 0.5, reference.camera.position.z};
     player.player = ichor::Player{};
+    player.character = ichor::CharacterBody{};
     scene.enqueue(player);
 }
 
@@ -128,21 +147,32 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
     engine.recordInputs(!options.record.empty());
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
-    engine.setViewBuilder([&](const ichor::Scene& scene, double, ichor::RenderView& view) {
+    engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
         view.camera = reference.camera;
-        for (auto [entity, transform, mesh] : scene.registry().view<const ichor::Transform, const ichor::MeshRef>().each()) {
+        // Rendering sits between the last two fixed steps.
+        const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
+            return std::pair{glm::mix(previous.position, current.position, alpha), glm::slerp(previous.rotation, current.rotation, static_cast<float>(alpha))};
+        };
+        for (auto [entity, previous, transform, mesh] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::MeshRef>().each()) {
+            const auto [position, rotation] = blend(previous, transform);
             ichor::RenderInstance instance;
             instance.mesh = mesh.mesh;
-            instance.position = transform.position;
-            instance.basis = glm::mat3_cast(transform.rotation) * glm::mat3(glm::vec3(transform.scale.x, 0.0f, 0.0f), glm::vec3(0.0f, transform.scale.y, 0.0f), glm::vec3(0.0f, 0.0f, transform.scale.z));
+            instance.position = position;
+            instance.basis = glm::mat3_cast(rotation) * glm::mat3(glm::vec3(transform.scale.x, 0.0f, 0.0f), glm::vec3(0.0f, transform.scale.y, 0.0f), glm::vec3(0.0f, 0.0f, transform.scale.z));
             view.instances.push_back(instance);
         }
-        for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+        for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
             const glm::dvec3 target(0.0, 0.55, 0.0);
-            view.camera.position = transform.position;
-            view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - transform.position)), glm::vec3(0.0f, 1.0f, 0.0f));
+            const glm::dvec3 eye = blend(previous, transform).first + glm::dvec3(0.0, 1.6, 0.0);
+            view.camera.position = eye;
+            view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        std::vector<ichor::LineSegment> colliders;
+        scene.physics().debugLines(colliders);
+        for (const ichor::LineSegment& line : colliders) {
+            view.lines.push_back({line.a, line.b, line.color});
         }
     });
 

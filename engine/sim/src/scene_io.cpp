@@ -21,6 +21,8 @@ enum ComponentBits : std::uint32_t {
     HasMesh = 1u << 0,
     HasSpin = 1u << 1,
     HasPlayer = 1u << 2,
+    HasStaticBox = 1u << 3,
+    HasCharacter = 1u << 4,
 };
 
 struct RngState {
@@ -69,9 +71,13 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
         const auto* mesh = registry.try_get<MeshRef>(entity);
         const auto* spin = registry.try_get<Spin>(entity);
         const auto* player = registry.try_get<Player>(entity);
+        const auto* box = registry.try_get<StaticBox>(entity);
+        const auto* body = registry.try_get<CharacterBody>(entity);
         if (mesh) bits |= HasMesh;
         if (spin) bits |= HasSpin;
         if (player) bits |= HasPlayer;
+        if (box) bits |= HasStaticBox;
+        if (body) bits |= HasCharacter;
         w.write(registry.get<StableId>(entity));
         w.write(registry.get<Name>(entity));
         w.write(registry.get<Transform>(entity));
@@ -79,6 +85,8 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
         if (mesh) w.write(*mesh);
         if (spin) w.write(*spin);
         if (player) w.write(*player);
+        if (box) w.write(*box);
+        if (body) w.write(*body);
     }
 
     return writeFileAtomically(path, w.bytes());
@@ -135,6 +143,16 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
             Player player;
             if (!r.read(player)) return bad("truncated player");
             spawn.player = player;
+        }
+        if ((bits & HasStaticBox) != 0) {
+            StaticBox box;
+            if (!r.read(box)) return bad("truncated static box");
+            spawn.staticBox = box;
+        }
+        if ((bits & HasCharacter) != 0) {
+            CharacterBody body;
+            if (!r.read(body)) return bad("truncated character");
+            spawn.character = body;
         }
         spawns.push_back(std::move(spawn));
     }

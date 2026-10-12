@@ -33,6 +33,13 @@ struct Transform {
     glm::vec3 scale{1.0f};
 };
 
+// Where the entity was at the start of the tick. Rendering interpolates
+// between this and Transform; it is never saved.
+struct PreviousTransform {
+    glm::dvec3 position{0.0};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+};
+
 struct MeshRef {
     std::uint32_t mesh = 0;
 };
@@ -46,6 +53,21 @@ struct Spin {
 // Moves under player input. Only the speed is data; the input arrives per tick.
 struct Player {
     float metresPerSecond = 3.0f;
+};
+
+// A static collider; the transform gives its centre and rotation.
+struct StaticBox {
+    glm::vec3 halfExtents{1.0f};
+};
+
+// A capsule character standing on Transform::position. The horizontal
+// intent is set from input each tick; the rest is written back by physics.
+struct CharacterBody {
+    float radius = 0.3f;
+    float halfHeight = 0.6f;
+    glm::vec3 intent{0.0f};
+    glm::vec3 velocity{0.0f};
+    bool onGround = false;
 };
 
 template <>
@@ -74,6 +96,18 @@ struct Reflect<Spin> {
 template <>
 struct Reflect<Player> {
     static constexpr auto fields() { return std::make_tuple(field("metresPerSecond", &Player::metresPerSecond)); }
+};
+template <>
+struct Reflect<StaticBox> {
+    static constexpr auto fields() { return std::make_tuple(field("halfExtents", &StaticBox::halfExtents)); }
+};
+template <>
+struct Reflect<CharacterBody> {
+    static constexpr auto fields()
+    {
+        return std::make_tuple(field("radius", &CharacterBody::radius), field("halfHeight", &CharacterBody::halfHeight),
+            field("intent", &CharacterBody::intent), field("velocity", &CharacterBody::velocity), field("onGround", &CharacterBody::onGround));
+    }
 };
 
 }
