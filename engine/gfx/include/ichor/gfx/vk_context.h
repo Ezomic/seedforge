@@ -62,7 +62,8 @@ public:
     const vkb::Device& vkbDevice() const { return device_; }
     const char* deviceName() const { return device_.physical_device.name.c_str(); }
 
-    GpuBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisible);
+    enum class HostAccess { None, Write, Read };
+    GpuBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, HostAccess access);
     void destroyBuffer(GpuBuffer& buffer);
     bool uploadBuffer(GpuBuffer& dst, const void* data, VkDeviceSize size);
 

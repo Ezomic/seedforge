@@ -29,7 +29,7 @@ bool OffscreenRenderer::init(std::uint32_t width, std::uint32_t height, bool val
     color_ = context_.createImage(extent_, VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
     depth_ = context_.createImage(extent_, SceneRenderer::depthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-    readback_ = context_.createBuffer(static_cast<VkDeviceSize>(width) * height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
+    readback_ = context_.createBuffer(static_cast<VkDeviceSize>(width) * height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VulkanContext::HostAccess::Read);
     if (color_.image == VK_NULL_HANDLE || depth_.image == VK_NULL_HANDLE || readback_.mapped == nullptr) {
         return false;
     }

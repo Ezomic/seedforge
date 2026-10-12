@@ -16,7 +16,7 @@ namespace ichor {
 struct RenderInstance {
     std::uint32_t mesh = 0;
     glm::dvec3 position{0.0};
-    glm::mat3 basis{1.0f}; // rotation and scale
+    glm::mat3 basis{1.0f}; // rotation and uniform scale; normals are transformed by it directly
 };
 
 struct RenderCamera {

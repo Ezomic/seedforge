@@ -141,6 +141,10 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, Cook
         }
         const bool hasUv = readAccessor(uvAcc, 2, uvs);
         const bool hasTangents = readAccessor(tanAcc, 4, tangents);
+        if (normAcc->count != posAcc->count || (hasUv && uvAcc->count != posAcc->count) || (hasTangents && tanAcc->count != posAcc->count)) {
+            logf(LogLevel::Error, "mesh {}: attribute counts disagree", mesh.name);
+            return false;
+        }
         needTangents = needTangents || !hasTangents;
 
         const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
@@ -166,6 +170,7 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, Cook
     }
 
     if (mesh.vertices.empty()) {
+        logf(LogLevel::Error, "mesh {}: no triangle primitives", mesh.name);
         return false;
     }
     if (needTangents) {
@@ -200,6 +205,11 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
     }
     if (cgltf_load_buffers(&options, data, file.c_str()) != cgltf_result_success) {
         logf(LogLevel::Error, "cannot load buffers for {}", file);
+        cgltf_free(data);
+        return false;
+    }
+    if (cgltf_validate(data) != cgltf_result_success) {
+        logf(LogLevel::Error, "{} fails glTF validation", file);
         cgltf_free(data);
         return false;
     }
@@ -240,10 +250,12 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
     std::unordered_map<const cgltf_mesh*, std::uint32_t> meshIndex;
     for (cgltf_size m = 0; m < data->meshes_count && ok; ++m) {
         Mesh mesh;
-        if (cookMesh(*data, data->meshes[m], mesh, stats)) {
-            meshIndex[&data->meshes[m]] = static_cast<std::uint32_t>(bundle.meshes.size());
-            bundle.meshes.push_back(std::move(mesh));
+        if (!cookMesh(*data, data->meshes[m], mesh, stats)) {
+            ok = false;
+            break;
         }
+        meshIndex[&data->meshes[m]] = static_cast<std::uint32_t>(bundle.meshes.size());
+        bundle.meshes.push_back(std::move(mesh));
     }
 
     for (cgltf_size n = 0; n < data->nodes_count && ok; ++n) {

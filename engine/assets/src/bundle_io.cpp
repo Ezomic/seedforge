@@ -2,6 +2,7 @@
 
 #include "ichor/core/log.h"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <fstream>
@@ -45,22 +46,31 @@ private:
 
 class Reader {
 public:
-    explicit Reader(std::ifstream& in)
+    Reader(std::ifstream& in, std::uintmax_t fileSize)
         : in_(in)
+        , remaining_(fileSize)
     {
     }
 
     template <class T>
     bool pod(T& value)
     {
+        if (!take(sizeof(T))) return false;
         in_.read(reinterpret_cast<char*>(&value), sizeof(T));
         return in_.good();
+    }
+
+    // Every count is checked against the bytes left in the file before anything
+    // is allocated, so a corrupt header cannot request gigabytes.
+    bool count(std::uint32_t& value, std::size_t elementSize)
+    {
+        return pod(value) && value <= remaining_ / std::max<std::size_t>(elementSize, 1);
     }
 
     bool string(std::string& value)
     {
         std::uint32_t size = 0;
-        if (!pod(size) || size > kMaxCount) return false;
+        if (!count(size, 1) || !take(size)) return false;
         value.resize(size);
         in_.read(value.data(), size);
         return in_.good();
@@ -69,17 +79,59 @@ public:
     template <class T>
     bool pods(std::vector<T>& values)
     {
-        std::uint32_t count = 0;
-        if (!pod(count) || count > kMaxCount) return false;
-        values.resize(count);
-        in_.read(reinterpret_cast<char*>(values.data()), static_cast<std::streamsize>(count * sizeof(T)));
-        return in_.good() || (count == 0);
+        std::uint32_t n = 0;
+        if (!count(n, sizeof(T)) || !take(static_cast<std::size_t>(n) * sizeof(T))) return false;
+        values.resize(n);
+        in_.read(reinterpret_cast<char*>(values.data()), static_cast<std::streamsize>(n * sizeof(T)));
+        return in_.good() || (n == 0);
     }
 
 private:
-    static constexpr std::uint32_t kMaxCount = 1u << 28;
+    bool take(std::size_t bytes)
+    {
+        if (bytes > remaining_) return false;
+        remaining_ -= bytes;
+        return true;
+    }
+
     std::ifstream& in_;
+    std::size_t remaining_;
 };
+
+bool validate(const SceneBundle& bundle, const std::string& file)
+{
+    const auto fail = [&](const std::string& why) {
+        logf(LogLevel::Error, "{}: {}", file, why);
+        return false;
+    };
+    for (const Texture& t : bundle.textures) {
+        if (t.width == 0 || t.height == 0 || t.mipCount != mipLevelCount(t.width, t.height)) return fail("texture dimensions");
+        if (t.format != TextureFormat::Rgba8Srgb && t.format != TextureFormat::Rgba8Unorm) return fail("texture format");
+        std::size_t expected = 0;
+        for (std::uint32_t w = t.width, h = t.height, mip = 0; mip < t.mipCount; ++mip, w = std::max(1u, w / 2), h = std::max(1u, h / 2)) {
+            expected += static_cast<std::size_t>(w) * h * 4;
+        }
+        if (t.pixels.size() != expected) return fail("texture pixel size");
+    }
+    if (bundle.materials.empty()) return fail("no materials");
+    const auto textureOk = [&](std::uint32_t index) { return index == kNoTexture || index < bundle.textures.size(); };
+    for (const Material& m : bundle.materials) {
+        if (!textureOk(m.baseColorTexture) || !textureOk(m.metallicRoughnessTexture) || !textureOk(m.normalTexture)) return fail("material texture index");
+    }
+    for (const Mesh& m : bundle.meshes) {
+        if (m.vertices.empty() || m.indices.size() % 3 != 0 || m.submeshes.empty()) return fail("mesh shape");
+        for (std::uint32_t index : m.indices) {
+            if (index >= m.vertices.size()) return fail("index out of range");
+        }
+        for (const Submesh& s : m.submeshes) {
+            if (s.material >= bundle.materials.size() || s.firstIndex > m.indices.size() || s.indexCount > m.indices.size() - s.firstIndex) return fail("submesh range");
+        }
+    }
+    for (const Node& n : bundle.nodes) {
+        if (n.mesh >= bundle.meshes.size()) return fail("node mesh index");
+    }
+    return true;
+}
 
 }
 
@@ -136,12 +188,14 @@ bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle)
 
 bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
 {
+    std::error_code ec;
+    const std::uintmax_t fileSize = std::filesystem::file_size(path, ec);
     std::ifstream in(path, std::ios::binary);
-    if (!in) {
+    if (ec || !in) {
         logf(LogLevel::Error, "cannot open {}", path.string());
         return false;
     }
-    Reader r(in);
+    Reader r(in, fileSize);
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
     if (!r.pod(magic) || magic != kMagic || !r.pod(version) || version != kVersion) {
@@ -150,7 +204,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
     }
 
     std::uint32_t count = 0;
-    if (!r.pod(count)) return false;
+    if (!r.count(count, 24)) return false;
     bundle.textures.resize(count);
     for (auto& t : bundle.textures) {
         if (!r.string(t.name) || !r.pod(t.width) || !r.pod(t.height) || !r.pod(t.mipCount) || !r.pod(t.format) || !r.pods(t.pixels)) {
@@ -158,7 +212,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
         }
     }
 
-    if (!r.pod(count)) return false;
+    if (!r.count(count, 44)) return false;
     bundle.materials.resize(count);
     for (auto& m : bundle.materials) {
         if (!r.string(m.name) || !r.pod(m.baseColorFactor) || !r.pod(m.metallicFactor) || !r.pod(m.roughnessFactor)
@@ -167,7 +221,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
         }
     }
 
-    if (!r.pod(count)) return false;
+    if (!r.count(count, 40)) return false;
     bundle.meshes.resize(count);
     for (auto& m : bundle.meshes) {
         if (!r.string(m.name) || !r.pods(m.vertices) || !r.pods(m.indices) || !r.pods(m.submeshes) || !r.pod(m.boundsMin) || !r.pod(m.boundsMax)) {
@@ -175,14 +229,14 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
         }
     }
 
-    if (!r.pod(count)) return false;
+    if (!r.count(count, 72)) return false;
     bundle.nodes.resize(count);
     for (auto& n : bundle.nodes) {
         if (!r.string(n.name) || !r.pod(n.mesh) || !r.pod(n.world)) {
             return false;
         }
     }
-    return true;
+    return validate(bundle, path.string());
 }
 
 }

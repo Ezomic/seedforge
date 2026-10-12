@@ -84,6 +84,12 @@ bool VulkanRenderer::Impl::createSwapchain()
         logf(LogLevel::Error, "vulkan swapchain: {}", result.error().message());
         return false;
     }
+    if (result.value().image_format != VK_FORMAT_B8G8R8A8_UNORM && result.value().image_format != VK_FORMAT_R8G8B8A8_UNORM) {
+        // The shaders gamma-encode themselves; an sRGB target would double it.
+        logf(LogLevel::Error, "vulkan swapchain: no UNORM format offered (got {})", static_cast<int>(result.value().image_format));
+        vkb::destroy_swapchain(result.value());
+        return false;
+    }
     destroySwapchain();
     vkb::destroy_swapchain(swapchain);
     swapchain = result.value();
@@ -312,7 +318,8 @@ void VulkanRenderer::endFrame()
         VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, 0,
         VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
-    const RenderView& view = hasView_ ? view_ : RenderView{};
+    static const RenderView kEmptyView;
+    const RenderView& view = hasView_ ? view_ : kEmptyView;
     v.scene->render(cmd, v.frame, view, v.swapchainViews[v.imageIndex], v.depth.view, v.swapchain.extent,
         [](VkCommandBuffer overlayCmd) { ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), overlayCmd); });
 

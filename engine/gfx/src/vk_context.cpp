@@ -143,7 +143,7 @@ bool VulkanContext::init(SDL_Window* window, bool validation)
     return vkCheck(vkCreateFence(device_.device, &fenceInfo, nullptr, &immediateFence_), "vkCreateFence");
 }
 
-GpuBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisible)
+GpuBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, HostAccess access)
 {
     GpuBuffer buffer;
     buffer.size = size;
@@ -152,8 +152,10 @@ GpuBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usag
     info.usage = usage;
     VmaAllocationCreateInfo alloc{};
     alloc.usage = VMA_MEMORY_USAGE_AUTO;
-    if (hostVisible) {
+    if (access == HostAccess::Write) {
         alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    } else if (access == HostAccess::Read) {
+        alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
     }
     VmaAllocationInfo result{};
     if (!vkCheck(vmaCreateBuffer(allocator_, &info, &alloc, &buffer.buffer, &buffer.allocation, &result), "vmaCreateBuffer")) {
@@ -173,11 +175,12 @@ void VulkanContext::destroyBuffer(GpuBuffer& buffer)
 
 bool VulkanContext::uploadBuffer(GpuBuffer& dst, const void* data, VkDeviceSize size)
 {
-    GpuBuffer staging = createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, true);
+    GpuBuffer staging = createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, HostAccess::Write);
     if (staging.mapped == nullptr) {
         return false;
     }
     std::memcpy(staging.mapped, data, static_cast<std::size_t>(size));
+    vmaFlushAllocation(allocator_, staging.allocation, 0, size);
     const bool ok = immediate([&](VkCommandBuffer cmd) {
         VkBufferCopy region{0, 0, size};
         vkCmdCopyBuffer(cmd, staging.buffer, dst.buffer, 1, &region);
@@ -248,11 +251,12 @@ void VulkanContext::destroyImage(GpuImage& image)
 
 bool VulkanContext::uploadTexture(GpuImage& dst, const Texture& texture)
 {
-    GpuBuffer staging = createBuffer(texture.pixels.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, true);
+    GpuBuffer staging = createBuffer(texture.pixels.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, HostAccess::Write);
     if (staging.mapped == nullptr) {
         return false;
     }
     std::memcpy(staging.mapped, texture.pixels.data(), texture.pixels.size());
+    vmaFlushAllocation(allocator_, staging.allocation, 0, texture.pixels.size());
 
     std::vector<VkBufferImageCopy> regions;
     VkDeviceSize offset = 0;

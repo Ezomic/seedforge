@@ -46,6 +46,8 @@ struct DebugVertex {
 
 // Cascade boundaries from the practical split scheme (blend of linear and
 // logarithmic), then a texel-snapped orthographic box around each slice.
+constexpr float kCasterMargin = 50.0f; // metres of headroom above a cascade for tall casters
+
 void computeCascades(const RenderCamera& camera, float aspect, const glm::mat4& view, glm::vec3 sunDirection,
     glm::mat4 outViewProj[kCascadeCount], glm::vec4& outSplits)
 {
@@ -86,18 +88,19 @@ void computeCascades(const RenderCamera& camera, float aspect, const glm::mat4& 
         radius = std::ceil(radius * 16.0f) / 16.0f;
 
         const glm::vec3 up = std::abs(sunDirection.y) > 0.95f ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
-        const glm::mat4 lightView = glm::lookAt(center + sunDirection * radius * 2.0f, center, up);
-        glm::mat4 lightProj = glm::ortho(-radius, radius, -radius, radius, 0.0f, radius * 4.0f);
+        const float back = radius * 2.0f + kCasterMargin;
+        const glm::mat4 lightView = glm::lookAt(center + sunDirection * back, center, up);
+        glm::mat4 lightProj = glm::ortho(-radius, radius, -radius, radius, 0.0f, back + radius * 2.0f);
 
-        // Snap the box to shadow texels so the edges do not shimmer as the camera moves.
-        const float texelsPerUnit = static_cast<float>(kShadowSize) / (radius * 2.0f);
-        glm::vec4 origin = lightProj * lightView * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        // Snap the box to a texel grid fixed in world space. Positions here are
+        // camera-relative, so the world origin sits at minus the camera position.
+        const glm::vec3 worldOrigin = glm::vec3(-camera.position);
+        glm::vec4 origin = lightProj * lightView * glm::vec4(worldOrigin, 1.0f);
         origin *= static_cast<float>(kShadowSize) * 0.5f;
         const glm::vec2 rounded = glm::round(glm::vec2(origin));
         const glm::vec2 offset = (rounded - glm::vec2(origin)) * 2.0f / static_cast<float>(kShadowSize);
         lightProj[3][0] += offset.x;
         lightProj[3][1] += offset.y;
-        (void)texelsPerUnit;
 
         outViewProj[c] = lightProj * lightView;
     }
@@ -430,8 +433,8 @@ bool SceneRenderer::createDefaultTextures()
 bool SceneRenderer::createFrameSlots()
 {
     for (auto& slot : slots_) {
-        slot.frameUbo = ctx_.createBuffer(sizeof(FrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, true);
-        slot.debugVertices = ctx_.createBuffer(sizeof(DebugVertex) * 2 * kMaxDebugLines, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, true);
+        slot.frameUbo = ctx_.createBuffer(sizeof(FrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VulkanContext::HostAccess::Write);
+        slot.debugVertices = ctx_.createBuffer(sizeof(DebugVertex) * 2 * kMaxDebugLines, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VulkanContext::HostAccess::Write);
         if (slot.frameUbo.mapped == nullptr || slot.debugVertices.mapped == nullptr) {
             return false;
         }
@@ -479,8 +482,8 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
     ZoneScoped;
     vkDeviceWaitIdle(ctx_.device());
     destroyBundle();
-    if (bundle.materials.size() > kMaxMaterials) {
-        logf(LogLevel::Error, "bundle has {} materials, the renderer holds {}", bundle.materials.size(), kMaxMaterials);
+    if (bundle.materials.empty() || bundle.materials.size() > kMaxMaterials) {
+        logf(LogLevel::Error, "bundle has {} materials, the renderer needs 1 to {}", bundle.materials.size(), kMaxMaterials);
         return false;
     }
 
@@ -488,10 +491,11 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         const VkFormat format = texture.format == TextureFormat::Rgba8Srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
         GpuImage image = ctx_.createImage({texture.width, texture.height}, format,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT, texture.mipCount);
-        if (image.image == VK_NULL_HANDLE || !ctx_.uploadTexture(image, texture)) {
+        textures_.push_back(image);
+        if (image.image == VK_NULL_HANDLE || !ctx_.uploadTexture(textures_.back(), texture)) {
+            destroyBundle();
             return false;
         }
-        textures_.push_back(image);
     }
 
     const auto view = [&](std::uint32_t index, const GpuImage& fallback) {
@@ -504,6 +508,7 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         allocInfo.pSetLayouts = &materialLayout_;
         VkDescriptorSet set = VK_NULL_HANDLE;
         if (!vkCheck(vkAllocateDescriptorSets(ctx_.device(), &allocInfo, &set), "vkAllocateDescriptorSets")) {
+            destroyBundle();
             return false;
         }
         const std::array<VkDescriptorImageInfo, 3> images{{
@@ -532,15 +537,17 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         GpuMesh gpu;
         const VkDeviceSize vertexBytes = mesh.vertices.size() * sizeof(Vertex);
         const VkDeviceSize indexBytes = mesh.indices.size() * sizeof(std::uint32_t);
-        gpu.vertices = ctx_.createBuffer(vertexBytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, false);
-        gpu.indices = ctx_.createBuffer(indexBytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, false);
-        if (!ctx_.uploadBuffer(gpu.vertices, mesh.vertices.data(), vertexBytes) || !ctx_.uploadBuffer(gpu.indices, mesh.indices.data(), indexBytes)) {
-            return false;
-        }
+        gpu.vertices = ctx_.createBuffer(vertexBytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VulkanContext::HostAccess::None);
+        gpu.indices = ctx_.createBuffer(indexBytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VulkanContext::HostAccess::None);
         for (const Submesh& sub : mesh.submeshes) {
             gpu.submeshes.push_back({sub.firstIndex, sub.indexCount, std::min<std::uint32_t>(sub.material, static_cast<std::uint32_t>(materials_.size()) - 1)});
         }
         meshes_.push_back(std::move(gpu));
+        GpuMesh& stored = meshes_.back();
+        if (!ctx_.uploadBuffer(stored.vertices, mesh.vertices.data(), vertexBytes) || !ctx_.uploadBuffer(stored.indices, mesh.indices.data(), indexBytes)) {
+            destroyBundle();
+            return false;
+        }
     }
     logf(LogLevel::Info, "uploaded bundle: {} meshes, {} materials, {} textures", meshes_.size(), materials_.size(), textures_.size());
     return true;
@@ -565,6 +572,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.ambient = glm::vec4(view.ambient, 0.0f);
     data.shadowParams = glm::vec4(1.0f / static_cast<float>(kShadowSize), 0.0008f, 0.02f, 0.0f);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
+    vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 
     const std::uint32_t lineCount = static_cast<std::uint32_t>(std::min<std::size_t>(view.lines.size(), kMaxDebugLines));
     auto* debugVertices = static_cast<DebugVertex*>(frame.debugVertices.mapped);
@@ -573,6 +581,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         debugVertices[i * 2] = {glm::vec3(line.a - view.camera.position), line.color};
         debugVertices[i * 2 + 1] = {glm::vec3(line.b - view.camera.position), line.color};
     }
+    vmaFlushAllocation(ctx_.allocator(), frame.debugVertices.allocation, 0, sizeof(DebugVertex) * 2 * lineCount);
 
     const auto drawInstances = [&](bool shadowPass, std::uint32_t cascade) {
         for (const RenderInstance& instance : view.instances) {
