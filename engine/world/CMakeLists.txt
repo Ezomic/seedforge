@@ -7,4 +7,6 @@ add_library(ichor_world
 )
 target_include_directories(ichor_world PUBLIC include)
 find_package(recastnavigation CONFIG REQUIRED)
+find_package(meshoptimizer CONFIG REQUIRED)
 target_link_libraries(ichor_world PUBLIC ichor_core ichor_assets RecastNavigation::Recast RecastNavigation::Detour)
+target_link_libraries(ichor_world PRIVATE meshoptimizer::meshoptimizer)

@@ -127,8 +127,19 @@ TEST_CASE("a cell builds three levels of detail with skirts and valid indices")
     WorldStreamer::buildPayload(field, {1, 2}, StreamerConfig{}, payload);
     REQUIRE(payload.lods.size() == 3);
     REQUIRE(payload.lods[0].vertices.size() == 33u * 33u + 33u * 4u);
-    REQUIRE(payload.lods[1].vertices.size() == 9u * 9u + 9u * 4u);
-    REQUIRE(payload.lods[2].vertices.size() == 3u * 3u + 3u * 4u);
+    REQUIRE(payload.lods[1].indices.size() < payload.lods[0].indices.size() / 2);
+    REQUIRE(payload.lods[2].indices.size() <= payload.lods[1].indices.size());
+    REQUIRE(payload.lods[2].indices.size() >= 3);
+    // The border survives every level, so neighbours meet whatever they draw.
+    const auto onEdge = [](const Mesh& mesh) {
+        std::size_t edge = 0;
+        for (const Vertex& v : mesh.vertices) {
+            edge += (v.position.x < 0.01f || v.position.z < 0.01f || v.position.x > 255.99f || v.position.z > 255.99f) ? 1 : 0;
+        }
+        return edge;
+    };
+    REQUIRE(onEdge(payload.lods[1]) == onEdge(payload.lods[0]));
+    REQUIRE(onEdge(payload.lods[2]) == onEdge(payload.lods[0]));
     for (const Mesh& lod : payload.lods) {
         REQUIRE(lod.indices.size() % 3 == 0);
         for (std::uint32_t index : lod.indices) {
