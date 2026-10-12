@@ -161,6 +161,34 @@ TEST_CASE("a snapshot restores bodies and the simulation continues identically")
     REQUIRE(loaded.registry().all_of<StaticBox>(loaded.find(StableId::of("wall"))));
 }
 
+TEST_CASE("restore order does not matter: a character restored before its floor still stands")
+{
+    // "zzz" sorts after "aaa" by name but ids are hashes; spawn both orders
+    // through a snapshot and require the same ground state either way.
+    for (const char* floorName : {"aaa", "zzz"}) {
+        Scene scene(4);
+        SpawnCommand floor = ground();
+        floor.id = StableId::of(floorName);
+        floor.name.value = floorName;
+        scene.enqueue(floor);
+        scene.enqueue(hero({0.0, 0.0, 0.0}));
+        for (int i = 0; i < 60; ++i) {
+            scene.tick(kDt);
+        }
+        REQUIRE(heroBody(scene).onGround);
+        const auto path = std::filesystem::temp_directory_path() / "ichor_order.isav";
+        REQUIRE(saveScene(path, scene));
+        Scene loaded(4);
+        REQUIRE(loadScene(path, loaded));
+        std::filesystem::remove(path);
+        loaded.tick(kDt);
+        scene.tick(kDt);
+        REQUIRE(heroBody(loaded).onGround);
+        REQUIRE(heroBody(loaded).fallSpeed == heroBody(scene).fallSpeed);
+        REQUIRE(std::abs(heroTransform(loaded).position.y - heroTransform(scene).position.y) < 1e-6);
+    }
+}
+
 TEST_CASE("a teleport moves the character body too")
 {
     Scene scene(2);
@@ -173,6 +201,7 @@ TEST_CASE("a teleport moves the character body too")
     }
     REQUIRE(std::abs(heroTransform(scene).position.x - 5.0) < 0.05);
     REQUIRE(std::abs(heroTransform(scene).position.z + 2.0) < 0.05);
+    REQUIRE(heroBody(scene).onGround);
 }
 
 TEST_CASE("previous transforms lag one tick for interpolation")

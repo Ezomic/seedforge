@@ -172,7 +172,7 @@ The engine is built to be tested, and the tests are built with the engine, not a
 | **Unit** | math, serialisation round-trips, ECS queries, allocators, parsers, every gameplay rule | every push |
 | **Headless** | load a scene with null backends, tick N fixed steps, assert on state | every push |
 | **Replay** | recorded input stream through a scene, assert the final world state hash | every push |
-| **Save/load round-trip** | mutate the ledger, save, load, compare. **The one game-side test worth insisting on** | every push |
+| **Save/load round-trip** | mutate the ledger, save, load, compare. **The one game-side test worth insisting on.** The restored state is bit-exact; a physics run *continued* from a snapshot tracks the original closely rather than bit for bit, because Jolt's character keeps transient contact state no snapshot carries | every push |
 | **Determinism** | same seed twice, byte-identical forge output and byte-identical replay | every push |
 | **Golden image** | render reference scenes offscreen, diff against stored images with tolerance | nightly, main |
 | **Performance** | reference walk through the densest cell; fail on frame time or hitch budget | nightly, main |
@@ -233,3 +233,4 @@ deliberately: it is the earliest point at which a fight can be measured honestly
 - Repositories root: `E:\Repositories`
 - Node 22 available natively for `viewer/` and `tools/`
 - Python 3 for the NumPy prototype and cooking scripts
+- An **AVX2** CPU: the vcpkg build of Jolt enables it and the engine compiles its physics unit to match

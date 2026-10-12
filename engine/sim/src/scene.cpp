@@ -98,6 +98,8 @@ void Scene::apply(const Command& command)
             if (entity != entt::null) {
                 Transform& transform = registry_.get<Transform>(entity);
                 transform.position += c.delta;
+                // A teleport must not be interpolated across.
+                registry_.get<PreviousTransform>(entity).position = transform.position;
                 if (registry_.all_of<CharacterBody>(entity)) {
                     physics_->setCharacterPosition(c.id, transform.position);
                 }
@@ -161,6 +163,7 @@ void Scene::physicsSystem(double dt)
         if (physics_->character(id, state)) {
             transform.position = state.position;
             body.velocity = state.velocity;
+            body.fallSpeed = state.fallSpeed;
             body.onGround = state.onGround;
         }
     }

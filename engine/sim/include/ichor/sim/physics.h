@@ -34,11 +34,16 @@ public:
     void setCharacterIntent(StableId id, glm::vec3 horizontalVelocity);
     void setCharacterPosition(StableId id, glm::dvec3 position);
 
+    // Re-evaluates every character's contacts against the bodies that exist
+    // now. A restore calls this once after all bodies are back.
+    void refreshCharacters();
+
     void step(double dt);
 
     struct CharacterState {
         glm::dvec3 position{0.0};
         glm::vec3 velocity{0.0f};
+        float fallSpeed = 0.0f;
         bool onGround = false;
     };
     bool character(StableId id, CharacterState& out) const;

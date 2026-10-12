@@ -163,8 +163,12 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
     for (const RngState& state : rngs) {
         scene.restoreRng(state.system, Rng::fromState(state.seed, state.state, state.inc));
     }
+    // Static bodies first, so characters find their ground whatever the id order.
     for (const SpawnCommand& spawn : spawns) {
-        scene.restore(spawn);
+        if (spawn.staticBox) scene.restore(spawn);
+    }
+    for (const SpawnCommand& spawn : spawns) {
+        if (!spawn.staticBox) scene.restore(spawn);
     }
     return true;
 }

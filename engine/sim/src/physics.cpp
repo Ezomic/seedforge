@@ -68,6 +68,8 @@ public:
     }
 };
 
+// Jolt runs in single precision here. Fine for the 20 m arena; the open world
+// at E5 adds a floating origin so bodies stay near zero (doc 17, rule 8).
 JPH::Vec3 toJolt(glm::vec3 v) { return {v.x, v.y, v.z}; }
 JPH::RVec3 toJoltPosition(glm::dvec3 v) { return {static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
 JPH::Quat toJolt(glm::quat q) { return {q.x, q.y, q.z, q.w}; }
@@ -150,6 +152,10 @@ void PhysicsWorld::addStaticBox(StableId id, const StaticBox& box, const Transfo
     JPH::BodyCreationSettings settings(new JPH::BoxShape(toJolt(box.halfExtents)), toJoltPosition(transform.position),
         toJolt(transform.rotation), JPH::EMotionType::Static, Layers::NonMoving);
     const JPH::BodyID body = bodies.CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+    if (body.IsInvalid()) {
+        log(LogLevel::Error, "physics: body limit reached, static box dropped");
+        return;
+    }
     impl_->statics.emplace(id.value, Impl::StaticEntry{body, box.halfExtents});
 }
 
@@ -167,14 +173,22 @@ void PhysicsWorld::addCharacter(StableId id, const CharacterBody& body, const Tr
     entry.radius = body.radius;
     entry.halfHeight = body.halfHeight;
     entry.intent = body.intent;
-    entry.verticalVelocity = body.velocity.y;
+    entry.verticalVelocity = body.fallSpeed;
     entry.onGround = body.onGround;
-    // A new character reports "in air" until it has looked for contacts;
-    // without this a restored character takes one tick of gravity.
     entry.character->SetLinearVelocity(toJolt(body.velocity));
-    entry.character->RefreshContacts(impl_->system.GetDefaultBroadPhaseLayerFilter(Layers::Moving),
-        impl_->system.GetDefaultLayerFilter(Layers::Moving), {}, {}, impl_->temp);
     impl_->characters.emplace(id.value, std::move(entry));
+    refreshCharacters();
+}
+
+void PhysicsWorld::refreshCharacters()
+{
+    // A character reports "in air" until it has looked for contacts; without
+    // this a restored or teleported character takes one tick of gravity.
+    for (auto& [id, entry] : impl_->characters) {
+        entry.character->RefreshContacts(impl_->system.GetDefaultBroadPhaseLayerFilter(Layers::Moving),
+            impl_->system.GetDefaultLayerFilter(Layers::Moving), {}, {}, impl_->temp);
+        entry.onGround = entry.character->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
+    }
 }
 
 void PhysicsWorld::remove(StableId id)
@@ -207,6 +221,7 @@ void PhysicsWorld::setCharacterPosition(StableId id, glm::dvec3 position)
     if (auto found = impl_->characters.find(id.value); found != impl_->characters.end()) {
         found->second.character->SetPosition(toJoltPosition(position));
         found->second.verticalVelocity = 0.0f;
+        refreshCharacters();
     }
 }
 
@@ -237,6 +252,7 @@ bool PhysicsWorld::character(StableId id, CharacterState& out) const
     const Impl::CharacterEntry& entry = found->second;
     out.position = fromJoltPosition(entry.character->GetPosition());
     out.velocity = fromJolt(entry.character->GetLinearVelocity());
+    out.fallSpeed = entry.verticalVelocity;
     out.onGround = entry.character->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
     return true;
 }

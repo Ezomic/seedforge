@@ -66,7 +66,8 @@ struct CharacterBody {
     float radius = 0.3f;
     float halfHeight = 0.6f;
     glm::vec3 intent{0.0f};
-    glm::vec3 velocity{0.0f};
+    glm::vec3 velocity{0.0f}; // what the controller reported after the step
+    float fallSpeed = 0.0f;   // the controller's own accumulated vertical velocity
     bool onGround = false;
 };
 
@@ -106,7 +107,8 @@ struct Reflect<CharacterBody> {
     static constexpr auto fields()
     {
         return std::make_tuple(field("radius", &CharacterBody::radius), field("halfHeight", &CharacterBody::halfHeight),
-            field("intent", &CharacterBody::intent), field("velocity", &CharacterBody::velocity), field("onGround", &CharacterBody::onGround));
+            field("intent", &CharacterBody::intent), field("velocity", &CharacterBody::velocity), field("fallSpeed", &CharacterBody::fallSpeed),
+            field("onGround", &CharacterBody::onGround));
     }
 };
 
