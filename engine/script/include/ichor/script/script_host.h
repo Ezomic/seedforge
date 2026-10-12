@@ -45,6 +45,13 @@ public:
     bool has(std::string_view function) const;
     bool call(std::string_view function, const std::vector<ScriptValue>& args = {}, ScriptValue* result = nullptr);
 
+    // A native function scripts can call as ichor.<name>. Arguments arrive as
+    // plain values (tables and functions become empty), and whatever the
+    // function throws becomes a Lua error naming it. It runs under the
+    // calling script's instruction budget.
+    using NativeFunction = std::function<ScriptValue(const std::vector<ScriptValue>&)>;
+    void bind(std::string_view name, NativeFunction function);
+
     const std::string& lastError() const { return error_; }
 
     // Where ichor.log and ichor.warn go; the engine log by default.
