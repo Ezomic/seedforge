@@ -4,8 +4,9 @@
 
 namespace ichor {
 
-// No window, no input, no clock the simulation can see. The headless build
-// and every test run on this.
+// No window, no input, and a clock that advances one fixed tick per pump,
+// so nothing headless can pick up wall time. The headless build and every
+// test run on this.
 class NullPlatform final : public Platform {
 public:
     bool init(const WindowDesc& desc) override;
@@ -16,6 +17,8 @@ public:
 
     void requestQuit() { quit_ = true; }
     unsigned pumpCount() const { return pumps_; }
+
+    static constexpr double kTick = 1.0 / 60.0;
 
 private:
     bool quit_ = false;

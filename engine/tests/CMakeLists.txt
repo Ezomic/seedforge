@@ -5,6 +5,7 @@ add_executable(ichor_tests
     test_rng.cpp
     test_fixed_step.cpp
     test_headless_boot.cpp
+    test_golden.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
     ichor_loop ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain

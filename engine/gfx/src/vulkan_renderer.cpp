@@ -88,6 +88,7 @@ struct VulkanRenderer::Impl {
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline pipeline = VK_NULL_HANDLE;
     VkDescriptorPool imguiPool = VK_NULL_HANDLE;
+    bool imguiContext = false;
     bool imguiReady = false;
 
     explicit Impl(SdlPlatform& p)
@@ -178,6 +179,9 @@ bool VulkanRenderer::Impl::createInstanceAndDevice()
 bool VulkanRenderer::Impl::createSwapchain()
 {
     const Extent size = platform.drawableSize();
+    if (size.width <= 0 || size.height <= 0) {
+        return false;
+    }
     vkb::SwapchainBuilder builder{device};
     auto result = builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
                       .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
@@ -188,6 +192,7 @@ bool VulkanRenderer::Impl::createSwapchain()
         logf(LogLevel::Error, "vulkan swapchain: {}", result.error().message());
         return false;
     }
+    destroySwapchain();
     vkb::destroy_swapchain(swapchain);
     swapchain = result.value();
     swapchainImages = swapchain.get_images().value();
@@ -217,7 +222,6 @@ void VulkanRenderer::Impl::destroySwapchain()
 bool VulkanRenderer::Impl::recreateSwapchain()
 {
     vkDeviceWaitIdle(device.device);
-    destroySwapchain();
     return createSwapchain();
 }
 
@@ -267,12 +271,18 @@ bool VulkanRenderer::Impl::createPipeline()
     };
     VkShaderModule vert = VK_NULL_HANDLE;
     VkShaderModule frag = VK_NULL_HANDLE;
+    const auto destroyModules = [&] {
+        vkDestroyShaderModule(device.device, vert, nullptr);
+        vkDestroyShaderModule(device.device, frag, nullptr);
+    };
     if (!makeModule(vertCode, vert) || !makeModule(fragCode, frag)) {
+        destroyModules();
         return false;
     }
 
     VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     if (!check(vkCreatePipelineLayout(device.device, &layoutInfo, nullptr, &pipelineLayout), "vkCreatePipelineLayout")) {
+        destroyModules();
         return false;
     }
 
@@ -327,8 +337,7 @@ bool VulkanRenderer::Impl::createPipeline()
     pipelineInfo.layout = pipelineLayout;
 
     const bool ok = check(vkCreateGraphicsPipelines(device.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline), "vkCreateGraphicsPipelines");
-    vkDestroyShaderModule(device.device, vert, nullptr);
-    vkDestroyShaderModule(device.device, frag, nullptr);
+    destroyModules();
     return ok;
 }
 
@@ -338,6 +347,7 @@ bool VulkanRenderer::Impl::createImgui()
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr;
     ImGui_ImplSDL3_InitForVulkan(platform.window());
+    imguiContext = true;
 
     VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16};
     VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
@@ -378,6 +388,8 @@ void VulkanRenderer::Impl::destroyAll()
     }
     if (imguiReady) {
         ImGui_ImplVulkan_Shutdown();
+    }
+    if (imguiContext) {
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
     }
@@ -448,12 +460,22 @@ void VulkanRenderer::beginFrame()
     lines_.clear();
     v.frameOpen = false;
 
-    vkWaitForFences(v.device.device, 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX);
+    const Extent size = v.platform.drawableSize();
+    if (size.width <= 0 || size.height <= 0) {
+        SDL_Delay(16);
+        return;
+    }
+
+    if (!check(vkWaitForFences(v.device.device, 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX), "vkWaitForFences")) {
+        return;
+    }
 
     const VkResult acquire = vkAcquireNextImageKHR(v.device.device, v.swapchain.swapchain, UINT64_MAX,
         v.imageAvailable[v.frame], VK_NULL_HANDLE, &v.imageIndex);
     if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
-        v.recreateSwapchain();
+        if (!v.recreateSwapchain()) {
+            log(LogLevel::Warn, "vulkan: swapchain recreation failed, skipping frame");
+        }
         return;
     }
     if (acquire != VK_SUCCESS && acquire != VK_SUBOPTIMAL_KHR) {
@@ -497,7 +519,7 @@ void VulkanRenderer::endFrame()
 
     VkImage image = v.swapchainImages[v.imageIndex];
     v.transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
 
     VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
@@ -525,7 +547,7 @@ void VulkanRenderer::endFrame()
     vkCmdEndRendering(cmd);
     v.transition(cmd, image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0);
+        VK_PIPELINE_STAGE_2_NONE, 0);
     vkEndCommandBuffer(cmd);
 
     const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -537,7 +559,15 @@ void VulkanRenderer::endFrame()
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &v.renderFinished[v.imageIndex];
-    check(vkQueueSubmit(v.graphicsQueue, 1, &submit, v.inFlight[v.frame]), "vkQueueSubmit");
+    if (!check(vkQueueSubmit(v.graphicsQueue, 1, &submit, v.inFlight[v.frame]), "vkQueueSubmit")) {
+        // The fence would never signal; put it back so the next wait returns.
+        VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        vkDestroyFence(v.device.device, v.inFlight[v.frame], nullptr);
+        check(vkCreateFence(v.device.device, &fenceInfo, nullptr, &v.inFlight[v.frame]), "vkCreateFence");
+        v.frame = (v.frame + 1) % kFramesInFlight;
+        return;
+    }
 
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1;
@@ -547,7 +577,9 @@ void VulkanRenderer::endFrame()
     present.pImageIndices = &v.imageIndex;
     const VkResult presented = vkQueuePresentKHR(v.graphicsQueue, &present);
     if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR) {
-        v.recreateSwapchain();
+        if (!v.recreateSwapchain()) {
+            log(LogLevel::Warn, "vulkan: swapchain recreation failed after present");
+        }
     } else {
         check(presented, "vkQueuePresentKHR");
     }

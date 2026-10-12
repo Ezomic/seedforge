@@ -39,7 +39,11 @@ public:
 
     std::uint64_t nextU64()
     {
-        return (static_cast<std::uint64_t>(nextU32()) << 32) | nextU32();
+        // Two statements: operand order of | is unspecified and this must
+        // draw identically on every compiler.
+        const std::uint64_t hi = nextU32();
+        const std::uint64_t lo = nextU32();
+        return (hi << 32) | lo;
     }
 
     // [0, 1)
@@ -52,6 +56,9 @@ public:
     std::uint32_t range(std::uint32_t min, std::uint32_t max)
     {
         const std::uint32_t span = max - min + 1;
+        if (span == 0) {
+            return nextU32();
+        }
         const std::uint32_t threshold = (0u - span) % span;
         for (;;) {
             const std::uint32_t r = nextU32();
