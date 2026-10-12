@@ -155,7 +155,7 @@ SceneRenderer::~SceneRenderer()
         ctx_.destroyBuffer(slot.jointPalette);
     }
     vkDestroyDescriptorPool(device, pool_, nullptr);
-    for (VkPipeline pipeline : {pbrPipeline_, pbrSkinnedPipeline_, terrainPipeline_, skyPipeline_, pbrInstancedPipeline_, shadowPipeline_, shadowSkinnedPipeline_, debugPipeline_}) {
+    for (VkPipeline pipeline : {pbrPipeline_, pbrSkinnedPipeline_, terrainPipeline_, skyPipeline_, pbrInstancedPipeline_, shadowInstancedPipeline_, shadowPipeline_, shadowSkinnedPipeline_, debugPipeline_}) {
         vkDestroyPipeline(device, pipeline, nullptr);
     }
     vkDestroyPipelineLayout(device, pipelineLayout_, nullptr);
@@ -279,14 +279,15 @@ bool SceneRenderer::createPipelines()
     VkShaderModule debugFrag = ctx_.loadShader("debug.frag.spv");
     VkShaderModule skyVert = ctx_.loadShader("sky.vert.spv");
     VkShaderModule instancedVert = ctx_.loadShader("pbr_instanced.vert.spv");
+    VkShaderModule shadowInstancedVert = ctx_.loadShader("shadow_instanced.vert.spv");
     VkShaderModule skyFrag = ctx_.loadShader("sky.frag.spv");
     const auto destroyModules = [&] {
-        for (VkShaderModule m : {pbrVert, pbrSkinnedVert, pbrFrag, terrainFrag, shadowVert, shadowSkinnedVert, debugVert, debugFrag, skyVert, skyFrag, instancedVert}) {
+        for (VkShaderModule m : {pbrVert, pbrSkinnedVert, pbrFrag, terrainFrag, shadowVert, shadowSkinnedVert, debugVert, debugFrag, skyVert, skyFrag, instancedVert, shadowInstancedVert}) {
             vkDestroyShaderModule(ctx_.device(), m, nullptr);
         }
     };
     if (pbrVert == VK_NULL_HANDLE || pbrSkinnedVert == VK_NULL_HANDLE || pbrFrag == VK_NULL_HANDLE || terrainFrag == VK_NULL_HANDLE || shadowVert == VK_NULL_HANDLE
-        || shadowSkinnedVert == VK_NULL_HANDLE || debugVert == VK_NULL_HANDLE || debugFrag == VK_NULL_HANDLE || skyVert == VK_NULL_HANDLE || skyFrag == VK_NULL_HANDLE || instancedVert == VK_NULL_HANDLE) {
+        || shadowSkinnedVert == VK_NULL_HANDLE || debugVert == VK_NULL_HANDLE || debugFrag == VK_NULL_HANDLE || skyVert == VK_NULL_HANDLE || skyFrag == VK_NULL_HANDLE || instancedVert == VK_NULL_HANDLE || shadowInstancedVert == VK_NULL_HANDLE) {
         destroyModules();
         return false;
     }
@@ -452,6 +453,48 @@ bool SceneRenderer::createPipelines()
         ok = ok && vkCheck(vkCreateGraphicsPipelines(ctx_.device(), VK_NULL_HANDLE, 1, &info, nullptr, &pbrInstancedPipeline_), "instanced pipeline");
     }
 
+    // The same instancing into the shadow cascades: depth only, biased, no fragment stage.
+    {
+        const std::array stages{stage(VK_SHADER_STAGE_VERTEX_BIT, shadowInstancedVert)};
+        const std::array<VkVertexInputBindingDescription, 2> bindings{{meshBinding, {1, sizeof(InstanceGpu), VK_VERTEX_INPUT_RATE_INSTANCE}}};
+        const std::array<VkVertexInputAttributeDescription, 3> attributes{{
+            meshAttributes[0],
+            {6, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceGpu, positionScale)},
+            {7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceGpu, rotation)},
+        }};
+        VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+        vertexInput.vertexBindingDescriptionCount = static_cast<std::uint32_t>(bindings.size());
+        vertexInput.pVertexBindingDescriptions = bindings.data();
+        vertexInput.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(attributes.size());
+        vertexInput.pVertexAttributeDescriptions = attributes.data();
+        VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+        assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        VkPipelineRasterizationStateCreateInfo raster{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+        raster.polygonMode = VK_POLYGON_MODE_FILL;
+        raster.cullMode = VK_CULL_MODE_NONE;
+        raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        raster.depthBiasEnable = VK_TRUE;
+        raster.depthBiasConstantFactor = 1.5f;
+        raster.depthBiasSlopeFactor = 2.0f;
+        raster.lineWidth = 1.0f;
+        VkPipelineColorBlendStateCreateInfo noBlend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+
+        VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+        info.pNext = &shadowRendering;
+        info.stageCount = static_cast<std::uint32_t>(stages.size());
+        info.pStages = stages.data();
+        info.pVertexInputState = &vertexInput;
+        info.pInputAssemblyState = &assembly;
+        info.pViewportState = &viewport;
+        info.pRasterizationState = &raster;
+        info.pMultisampleState = &multisample;
+        info.pDepthStencilState = &depth;
+        info.pColorBlendState = &noBlend;
+        info.pDynamicState = &dynamic;
+        info.layout = pipelineLayout_;
+        ok = ok && vkCheck(vkCreateGraphicsPipelines(ctx_.device(), VK_NULL_HANDLE, 1, &info, nullptr, &shadowInstancedPipeline_), "instanced shadow pipeline");
+    }
+
     // Sky: a screen-covering triangle behind everything, no depth.
     {
         const std::array stages{stage(VK_SHADER_STAGE_VERTEX_BIT, skyVert), stage(VK_SHADER_STAGE_FRAGMENT_BIT, skyFrag)};
@@ -522,7 +565,7 @@ bool SceneRenderer::createPipelines()
 bool SceneRenderer::reloadPipelines()
 {
     vkDeviceWaitIdle(ctx_.device());
-    for (VkPipeline* pipeline : {&pbrPipeline_, &pbrSkinnedPipeline_, &terrainPipeline_, &skyPipeline_, &pbrInstancedPipeline_, &shadowPipeline_, &shadowSkinnedPipeline_, &debugPipeline_}) {
+    for (VkPipeline* pipeline : {&pbrPipeline_, &pbrSkinnedPipeline_, &terrainPipeline_, &skyPipeline_, &pbrInstancedPipeline_, &shadowInstancedPipeline_, &shadowPipeline_, &shadowSkinnedPipeline_, &debugPipeline_}) {
         vkDestroyPipeline(ctx_.device(), *pipeline, nullptr);
         *pipeline = VK_NULL_HANDLE;
     }
@@ -944,6 +987,44 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         }
     };
 
+    const auto drawVegetation = [&](bool shadowPass, std::uint32_t cascade) {
+        const VkPipeline wanted = shadowPass ? shadowInstancedPipeline_ : pbrInstancedPipeline_;
+        if (view.vegetation.empty() || wanted == VK_NULL_HANDLE) {
+            return;
+        }
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, wanted);
+        for (const VegetationDraw& draw : view.vegetation) {
+            const auto found = vegetationCells_.find(draw.cell);
+            if (found == vegetationCells_.end()) {
+                continue;
+            }
+            const VegetationCell& cell = found->second;
+            PushData push{};
+            push.model = glm::mat4(1.0f);
+            push.model[3] = glm::vec4(glm::vec3(draw.origin - view.camera.position), 1.0f);
+            for (std::uint32_t kind = 0; kind < vegetationKinds_; ++kind) {
+                if (cell.count[kind] == 0 || vegetationBase_ + kind >= meshes_.size()) {
+                    continue;
+                }
+                const GpuMesh& mesh = meshes_[vegetationBase_ + kind];
+                const std::array<VkBuffer, 2> buffers{mesh.vertices.buffer, cell.buffer.buffer};
+                const std::array<VkDeviceSize, 2> offsets{0, static_cast<VkDeviceSize>(cell.first[kind]) * sizeof(InstanceGpu)};
+                vkCmdBindVertexBuffers(cmd, 0, 2, buffers.data(), offsets.data());
+                vkCmdBindIndexBuffer(cmd, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+                for (const auto& sub : mesh.submeshes) {
+                    const MaterialConstants& material = materials_[sub[2]];
+                    push.baseColorFactor = material.baseColorFactor;
+                    push.params = glm::vec4(material.metallic, material.roughness, material.hasNormalMap ? 1.0f : 0.0f, static_cast<float>(cascade));
+                    if (!shadowPass) {
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1, &materialSets_[sub[2]], 0, nullptr);
+                    }
+                    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushData), &push);
+                    vkCmdDrawIndexed(cmd, sub[1], cell.count[kind], sub[0], 0, 0);
+                }
+            }
+        }
+    };
+
     const auto drawInstances = [&](bool shadowPass, std::uint32_t cascade) {
         VkPipeline bound = VK_NULL_HANDLE;
         for (const RenderInstance& instance : view.instances) {
@@ -1007,6 +1088,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         vkCmdSetScissor(cmd, 0, 1, &scissor);
         drawInstances(true, c);
         drawTerrain(true, c);
+        drawVegetation(true, c);
         vkCmdEndRendering(cmd);
     }
     transitionImage(cmd, shadowMap_.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
@@ -1047,37 +1129,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     drawInstances(false, 0);
     drawTerrain(false, 0);
 
-    if (!view.vegetation.empty() && pbrInstancedPipeline_ != VK_NULL_HANDLE) {
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pbrInstancedPipeline_);
-        for (const VegetationDraw& draw : view.vegetation) {
-            const auto found = vegetationCells_.find(draw.cell);
-            if (found == vegetationCells_.end()) {
-                continue;
-            }
-            const VegetationCell& cell = found->second;
-            PushData push{};
-            push.model = glm::mat4(1.0f);
-            push.model[3] = glm::vec4(glm::vec3(draw.origin - view.camera.position), 1.0f);
-            for (std::uint32_t kind = 0; kind < vegetationKinds_; ++kind) {
-                if (cell.count[kind] == 0 || vegetationBase_ + kind >= meshes_.size()) {
-                    continue;
-                }
-                const GpuMesh& mesh = meshes_[vegetationBase_ + kind];
-                const std::array<VkBuffer, 2> buffers{mesh.vertices.buffer, cell.buffer.buffer};
-                const std::array<VkDeviceSize, 2> offsets{0, static_cast<VkDeviceSize>(cell.first[kind]) * sizeof(InstanceGpu)};
-                vkCmdBindVertexBuffers(cmd, 0, 2, buffers.data(), offsets.data());
-                vkCmdBindIndexBuffer(cmd, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
-                for (const auto& sub : mesh.submeshes) {
-                    const MaterialConstants& material = materials_[sub[2]];
-                    push.baseColorFactor = material.baseColorFactor;
-                    push.params = glm::vec4(material.metallic, material.roughness, material.hasNormalMap ? 1.0f : 0.0f, 0.0f);
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1, &materialSets_[sub[2]], 0, nullptr);
-                    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushData), &push);
-                    vkCmdDrawIndexed(cmd, sub[1], cell.count[kind], sub[0], 0, 0);
-                }
-            }
-        }
-    }
+    drawVegetation(false, 0);
 
     if (lineCount > 0 && debugPipeline_ != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, debugPipeline_);
