@@ -13,6 +13,7 @@
 #include <Jolt/Physics/Collision/ObjectLayer.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
@@ -71,10 +72,8 @@ public:
 // Jolt runs in single precision here. Fine for the 20 m arena; the open world
 // at E5 adds a floating origin so bodies stay near zero (doc 17, rule 8).
 JPH::Vec3 toJolt(glm::vec3 v) { return {v.x, v.y, v.z}; }
-JPH::RVec3 toJoltPosition(glm::dvec3 v) { return {static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
 JPH::Quat toJolt(glm::quat q) { return {q.x, q.y, q.z, q.w}; }
 glm::vec3 fromJolt(JPH::Vec3Arg v) { return {v.GetX(), v.GetY(), v.GetZ()}; }
-glm::dvec3 fromJoltPosition(JPH::RVec3Arg v) { return {v.GetX(), v.GetY(), v.GetZ()}; }
 
 void registerJoltOnce()
 {
@@ -107,7 +106,13 @@ struct PhysicsWorld::Impl {
 
     struct StaticEntry {
         JPH::BodyID body;
-        glm::vec3 halfExtents;
+        JPH::ShapeRefC shape;
+        glm::dvec3 worldPosition{0.0};
+        glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        glm::vec3 halfExtents{0.0f}; // boxes only, for debug lines
+        bool heightField = false;
+        std::uint32_t sampleCount = 0;
+        float spacing = 0.0f;
     };
     struct CharacterEntry {
         JPH::Ref<JPH::CharacterVirtual> character;
@@ -120,6 +125,24 @@ struct PhysicsWorld::Impl {
     // Ordered by id so iteration order, and therefore the step, is deterministic.
     std::map<std::uint64_t, StaticEntry> statics;
     std::map<std::uint64_t, CharacterEntry> characters;
+    glm::dvec3 origin{0.0};
+
+    JPH::RVec3 toLocal(glm::dvec3 world) const
+    {
+        const glm::dvec3 local = world - origin;
+        return {static_cast<float>(local.x), static_cast<float>(local.y), static_cast<float>(local.z)};
+    }
+    glm::dvec3 toWorld(JPH::RVec3Arg local) const
+    {
+        return origin + glm::dvec3(local.GetX(), local.GetY(), local.GetZ());
+    }
+
+    void createStatic(StaticEntry& entry)
+    {
+        JPH::BodyInterface& bodies = system.GetBodyInterface();
+        JPH::BodyCreationSettings settings(entry.shape, toLocal(entry.worldPosition), toJolt(entry.rotation), JPH::EMotionType::Static, Layers::NonMoving);
+        entry.body = bodies.CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+    }
 
     Impl()
     {
@@ -129,9 +152,13 @@ struct PhysicsWorld::Impl {
 
     void removeStatic(StaticEntry& entry)
     {
+        if (entry.body.IsInvalid()) {
+            return;
+        }
         JPH::BodyInterface& bodies = system.GetBodyInterface();
         bodies.RemoveBody(entry.body);
         bodies.DestroyBody(entry.body);
+        entry.body = JPH::BodyID();
     }
 };
 
@@ -148,15 +175,42 @@ PhysicsWorld::~PhysicsWorld()
 void PhysicsWorld::addStaticBox(StableId id, const StaticBox& box, const Transform& transform)
 {
     remove(id);
-    JPH::BodyInterface& bodies = impl_->system.GetBodyInterface();
-    JPH::BodyCreationSettings settings(new JPH::BoxShape(toJolt(box.halfExtents)), toJoltPosition(transform.position),
-        toJolt(transform.rotation), JPH::EMotionType::Static, Layers::NonMoving);
-    const JPH::BodyID body = bodies.CreateAndAddBody(settings, JPH::EActivation::DontActivate);
-    if (body.IsInvalid()) {
+    Impl::StaticEntry entry;
+    entry.shape = new JPH::BoxShape(toJolt(box.halfExtents));
+    entry.worldPosition = transform.position;
+    entry.rotation = transform.rotation;
+    entry.halfExtents = box.halfExtents;
+    impl_->createStatic(entry);
+    if (entry.body.IsInvalid()) {
         log(LogLevel::Error, "physics: body limit reached, static box dropped");
         return;
     }
-    impl_->statics.emplace(id.value, Impl::StaticEntry{body, box.halfExtents});
+    impl_->statics.emplace(id.value, std::move(entry));
+}
+
+void PhysicsWorld::addHeightField(StableId id, const float* heights, std::uint32_t sampleCount, glm::dvec3 origin, float spacing)
+{
+    remove(id);
+    JPH::HeightFieldShapeSettings settings(heights, JPH::Vec3::sZero(), JPH::Vec3(spacing, 1.0f, spacing), sampleCount);
+    settings.mBlockSize = 4;
+    settings.mBitsPerSample = 16;
+    auto shape = settings.Create();
+    if (shape.HasError()) {
+        logf(LogLevel::Error, "physics: height field rejected: {}", shape.GetError().c_str());
+        return;
+    }
+    Impl::StaticEntry entry;
+    entry.shape = shape.Get();
+    entry.worldPosition = origin;
+    entry.heightField = true;
+    entry.sampleCount = sampleCount;
+    entry.spacing = spacing;
+    impl_->createStatic(entry);
+    if (entry.body.IsInvalid()) {
+        log(LogLevel::Error, "physics: body limit reached, height field dropped");
+        return;
+    }
+    impl_->statics.emplace(id.value, std::move(entry));
 }
 
 void PhysicsWorld::addCharacter(StableId id, const CharacterBody& body, const Transform& transform)
@@ -169,7 +223,7 @@ void PhysicsWorld::addCharacter(StableId id, const CharacterBody& body, const Tr
     settings->mSupportingVolume = JPH::Plane(JPH::Vec3::sAxisY(), -body.radius);
 
     Impl::CharacterEntry entry;
-    entry.character = new JPH::CharacterVirtual(settings, toJoltPosition(transform.position), JPH::Quat::sIdentity(), 0, &impl_->system);
+    entry.character = new JPH::CharacterVirtual(settings, impl_->toLocal(transform.position), JPH::Quat::sIdentity(), 0, &impl_->system);
     entry.radius = body.radius;
     entry.halfHeight = body.halfHeight;
     entry.intent = body.intent;
@@ -178,6 +232,37 @@ void PhysicsWorld::addCharacter(StableId id, const CharacterBody& body, const Tr
     entry.character->SetLinearVelocity(toJolt(body.velocity));
     impl_->characters.emplace(id.value, std::move(entry));
     refreshCharacters();
+}
+
+void PhysicsWorld::setOrigin(glm::dvec3 origin)
+{
+    if (origin == impl_->origin) {
+        return;
+    }
+    // Characters keep their world position; their local one moves with the origin.
+    std::map<std::uint64_t, glm::dvec3> worldPositions;
+    for (auto& [id, entry] : impl_->characters) {
+        worldPositions[id] = impl_->toWorld(entry.character->GetPosition());
+    }
+    impl_->origin = origin;
+    for (auto& [id, entry] : impl_->statics) {
+        impl_->removeStatic(entry);
+        impl_->createStatic(entry);
+    }
+    for (auto& [id, entry] : impl_->characters) {
+        entry.character->SetPosition(impl_->toLocal(worldPositions[id]));
+    }
+    refreshCharacters();
+}
+
+glm::dvec3 PhysicsWorld::origin() const
+{
+    return impl_->origin;
+}
+
+bool PhysicsWorld::hasBody(StableId id) const
+{
+    return impl_->statics.contains(id.value) || impl_->characters.contains(id.value);
 }
 
 void PhysicsWorld::refreshCharacters()
@@ -219,7 +304,7 @@ void PhysicsWorld::setCharacterIntent(StableId id, glm::vec3 horizontalVelocity)
 void PhysicsWorld::setCharacterPosition(StableId id, glm::dvec3 position)
 {
     if (auto found = impl_->characters.find(id.value); found != impl_->characters.end()) {
-        found->second.character->SetPosition(toJoltPosition(position));
+        found->second.character->SetPosition(impl_->toLocal(position));
         found->second.verticalVelocity = 0.0f;
         refreshCharacters();
     }
@@ -250,7 +335,7 @@ bool PhysicsWorld::character(StableId id, CharacterState& out) const
         return false;
     }
     const Impl::CharacterEntry& entry = found->second;
-    out.position = fromJoltPosition(entry.character->GetPosition());
+    out.position = impl_->toWorld(entry.character->GetPosition());
     out.velocity = fromJolt(entry.character->GetLinearVelocity());
     out.fallSpeed = entry.verticalVelocity;
     out.onGround = entry.character->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
@@ -259,10 +344,20 @@ bool PhysicsWorld::character(StableId id, CharacterState& out) const
 
 void PhysicsWorld::debugLines(std::vector<LineSegment>& out) const
 {
-    const JPH::BodyInterface& bodies = impl_->system.GetBodyInterface();
     for (const auto& [id, entry] : impl_->statics) {
-        const glm::dvec3 center = fromJoltPosition(bodies.GetPosition(entry.body));
-        const JPH::Quat rotation = bodies.GetRotation(entry.body);
+        if (entry.heightField) {
+            // The cell outline at its base; the terrain mesh shows the rest.
+            const double side = static_cast<double>(entry.sampleCount - 1) * entry.spacing;
+            const glm::dvec3 o = entry.worldPosition;
+            const glm::vec3 color(0.2f, 0.7f, 0.9f);
+            out.push_back({o, o + glm::dvec3(side, 0.0, 0.0), color});
+            out.push_back({o, o + glm::dvec3(0.0, 0.0, side), color});
+            out.push_back({o + glm::dvec3(side, 0.0, 0.0), o + glm::dvec3(side, 0.0, side), color});
+            out.push_back({o + glm::dvec3(0.0, 0.0, side), o + glm::dvec3(side, 0.0, side), color});
+            continue;
+        }
+        const glm::dvec3 center = entry.worldPosition;
+        const JPH::Quat rotation = toJolt(entry.rotation);
         const glm::vec3 h = entry.halfExtents;
         glm::dvec3 corners[8];
         for (int i = 0; i < 8; ++i) {
@@ -279,7 +374,7 @@ void PhysicsWorld::debugLines(std::vector<LineSegment>& out) const
         }
     }
     for (const auto& [id, entry] : impl_->characters) {
-        const glm::dvec3 base = fromJoltPosition(entry.character->GetPosition());
+        const glm::dvec3 base = impl_->toWorld(entry.character->GetPosition());
         const glm::vec3 color = entry.onGround ? glm::vec3(0.3f, 0.9f, 0.4f) : glm::vec3(0.9f, 0.3f, 0.3f);
         const double r = entry.radius;
         const double top = entry.radius * 2.0 + entry.halfHeight * 2.0;

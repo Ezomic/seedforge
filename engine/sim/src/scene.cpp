@@ -276,6 +276,16 @@ void Scene::animationSystem(double dt)
 
 void Scene::physicsSystem(double dt)
 {
+    // Keep the floating origin near the player, in whole kilometres so it
+    // moves rarely and lands on the same values whatever path led here.
+    for (auto [entity, transform, player, body] : registry_.view<const Transform, const Player, const CharacterBody>().each()) {
+        constexpr double kRebase = 1024.0;
+        const glm::dvec3 wanted(std::floor(transform.position.x / kRebase) * kRebase, 0.0, std::floor(transform.position.z / kRebase) * kRebase);
+        if (wanted != physics_->origin()) {
+            physics_->setOrigin(wanted);
+        }
+        break;
+    }
     // The component is the source of truth for intent; whatever system set it last wins.
     for (auto [entity, id, body] : registry_.view<const StableId, const CharacterBody>().each()) {
         physics_->setCharacterIntent(id, body.intent);

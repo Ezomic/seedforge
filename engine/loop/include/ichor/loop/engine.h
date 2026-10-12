@@ -30,6 +30,7 @@ class Engine {
 public:
     using ViewBuilder = std::function<void(const Scene& scene, double alpha, RenderView& view)>;
     using OverlayBuilder = std::function<void(const Scene& scene, std::vector<std::string>& lines)>;
+    using TickGate = std::function<bool(const Scene& scene)>;
 
     Engine(Platform& platform, Renderer& renderer, const EngineConfig& config);
 
@@ -37,6 +38,12 @@ public:
     // the interpolation alpha for rendering between two fixed steps.
     void setViewBuilder(ViewBuilder builder) { viewBuilder_ = std::move(builder); }
     void setOverlayBuilder(OverlayBuilder builder) { overlayBuilder_ = std::move(builder); }
+
+    // While the gate says no, no simulation tick runs and no time is owed
+    // afterwards; rendering continues. Streaming holds the world here until
+    // the cells the player needs are resident.
+    void setTickGate(TickGate gate) { tickGate_ = std::move(gate); }
+    bool gated() const { return gated_; }
 
     // Optional: receives the scene's sound events each tick and the camera as listener.
     void setAudio(AudioHost* audio) { audio_ = audio; }
@@ -68,6 +75,8 @@ private:
     RenderView view_;
     ViewBuilder viewBuilder_;
     OverlayBuilder overlayBuilder_;
+    TickGate tickGate_;
+    bool gated_ = false;
     std::vector<std::string> overlay_;
     InputStream recorded_;
     InputStream replay_;

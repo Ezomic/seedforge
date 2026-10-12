@@ -27,12 +27,22 @@ public:
     PhysicsWorld& operator=(const PhysicsWorld&) = delete;
 
     void addStaticBox(StableId id, const StaticBox& box, const Transform& transform);
+    // A square heightfield of sampleCount^2 heights (metres), row major, whose
+    // first sample sits at `origin` and whose samples are `spacing` apart.
+    void addHeightField(StableId id, const float* heights, std::uint32_t sampleCount, glm::dvec3 origin, float spacing);
     void addCharacter(StableId id, const CharacterBody& body, const Transform& transform);
     void remove(StableId id);
     void clear();
 
     void setCharacterIntent(StableId id, glm::vec3 horizontalVelocity);
     void setCharacterPosition(StableId id, glm::dvec3 position);
+
+    // Floating origin: Jolt works in floats, so every body sits relative to
+    // this world position. Moving it recreates the statics and shifts the
+    // characters; nothing in world coordinates changes.
+    void setOrigin(glm::dvec3 origin);
+    glm::dvec3 origin() const;
+    bool hasBody(StableId id) const;
 
     // Re-evaluates every character's contacts against the bodies that exist
     // now. A restore calls this once after all bodies are back.

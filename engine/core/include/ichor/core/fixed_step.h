@@ -30,6 +30,8 @@ public:
 
     double dt() const { return dt_; }
     double alpha() const { return accumulator_ / dt_; }
+    // Drops time owed, for when the simulation deliberately stood still.
+    void reset() { accumulator_ = 0.0; }
 
 private:
     double dt_;
