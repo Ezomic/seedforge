@@ -1,6 +1,7 @@
 #include "ichor/sim/scene_io.h"
 
 #include "ichor/core/binary.h"
+#include "ichor/core/file_io.h"
 #include "ichor/core/log.h"
 #include "ichor/sim/scene.h"
 
@@ -80,13 +81,7 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
         if (player) w.write(*player);
     }
 
-    std::ofstream out(path, std::ios::binary);
-    if (!out) {
-        logf(LogLevel::Error, "cannot write {}", path.string());
-        return false;
-    }
-    out.write(reinterpret_cast<const char*>(w.bytes().data()), static_cast<std::streamsize>(w.bytes().size()));
-    return out.good();
+    return writeFileAtomically(path, w.bytes());
 }
 
 bool loadScene(const std::filesystem::path& path, Scene& scene)
@@ -116,10 +111,12 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
 
     std::uint32_t count = 0;
     if (!r.read(count) || count > r.remaining()) return bad("bad entity count");
+    for (const RngState& state : rngs) {
+        if ((state.inc & 1u) == 0) return bad("generator increment must be odd");
+    }
 
     // Everything is parsed before the scene is touched, so a bad file leaves it intact.
     std::vector<SpawnCommand> spawns;
-    spawns.reserve(count);
     for (std::uint32_t i = 0; i < count; ++i) {
         SpawnCommand spawn;
         std::uint32_t bits = 0;
@@ -143,7 +140,7 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
     }
     if (!r.atEnd()) return bad("trailing bytes");
 
-    scene.clearEntities();
+    scene.clearForRestore();
     scene.restoreClock(clock);
     for (const RngState& state : rngs) {
         scene.restoreRng(state.system, Rng::fromState(state.seed, state.state, state.inc));

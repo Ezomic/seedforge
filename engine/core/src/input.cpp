@@ -1,6 +1,7 @@
 #include "ichor/core/input.h"
 
 #include "ichor/core/binary.h"
+#include "ichor/core/file_io.h"
 #include "ichor/core/log.h"
 
 #include <array>
@@ -22,13 +23,7 @@ bool InputStream::save(const std::filesystem::path& path) const
     w.write(kMagic);
     w.write(kVersion);
     w.write(frames);
-    std::ofstream out(path, std::ios::binary);
-    if (!out) {
-        logf(LogLevel::Error, "cannot write {}", path.string());
-        return false;
-    }
-    out.write(reinterpret_cast<const char*>(w.bytes().data()), static_cast<std::streamsize>(w.bytes().size()));
-    return out.good();
+    return writeFileAtomically(path, w.bytes());
 }
 
 bool InputStream::load(const std::filesystem::path& path)

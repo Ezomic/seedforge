@@ -11,6 +11,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace ichor {
@@ -49,7 +50,9 @@ public:
     void restoreClock(Clock clock);
     const std::map<std::string, Rng, std::less<>>& rngs() const { return rngs_; }
     void restoreRng(const std::string& system, const Rng& rng);
-    void clearEntities();
+    // Drops entities, generators, pending commands and the log: a restore
+    // starts a new timeline.
+    void clearForRestore();
     // Spawns without logging a command; snapshots are restored, not replayed.
     void restore(const SpawnCommand& spawn) { apply(spawn); }
 
@@ -60,6 +63,7 @@ private:
 
     std::uint64_t seed_;
     entt::registry registry_;
+    std::unordered_map<std::uint64_t, entt::entity> index_;
     std::map<std::string, Rng, std::less<>> rngs_;
     std::vector<Command> pending_;
     CommandLog log_;

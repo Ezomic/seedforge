@@ -46,7 +46,7 @@ bool Engine::frame(double frameSeconds)
     }
 
     const int steps = step_.advance(frameSeconds);
-    for (int i = 0; i < steps; ++i) {
+    for (int i = 0; i < steps && !replayFinished(); ++i) {
         scene_.tick(step_.dt(), nextInput());
     }
 

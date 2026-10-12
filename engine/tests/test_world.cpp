@@ -4,7 +4,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <bit>
+#include <cmath>
 #include <filesystem>
+#include <format>
+#include <limits>
 
 using namespace ichor;
 
@@ -210,6 +214,67 @@ TEST_CASE("a snapshot from another seed or a truncated file is refused")
     REQUIRE_FALSE(loadScene(path, target));
     REQUIRE(target.stateHash() == untouched);
     std::filesystem::remove(path);
+}
+
+TEST_CASE("restoring a snapshot drops live generators, pending commands and the log")
+{
+    Scene scene(8);
+    populate(scene);
+    scene.tick(kDt);
+    const auto path = std::filesystem::temp_directory_path() / "ichor_reset.isav";
+    REQUIRE(saveScene(path, scene));
+    const std::uint64_t saved = scene.stateHash();
+
+    Scene target(8);
+    target.rng("live-only").nextU32();
+    target.enqueue(piece("pending", 5, {0.0, 0.0, 0.0}));
+    REQUIRE(loadScene(path, target));
+    std::filesystem::remove(path);
+    REQUIRE(target.stateHash() == saved);
+    REQUIRE(target.log().entries.empty());
+    target.tick(kDt);
+    REQUIRE((target.find(StableId::of("pending", 5)) == entt::null));
+}
+
+TEST_CASE("diagonal input is no faster than straight input")
+{
+    Scene straight(1);
+    straight.enqueue(player());
+    straight.tick(kDt);
+    Scene diagonal(1);
+    diagonal.enqueue(player());
+    diagonal.tick(kDt);
+    InputFrame s;
+    s.moveY = 1.0f;
+    InputFrame d;
+    d.moveX = 1.0f;
+    d.moveY = 1.0f;
+    for (int i = 0; i < 30; ++i) {
+        straight.tick(kDt, s);
+        diagonal.tick(kDt, d);
+    }
+    const auto a = straight.registry().get<Transform>(straight.find(StableId::of("player"))).position;
+    const auto b = diagonal.registry().get<Transform>(diagonal.find(StableId::of("player"))).position;
+    REQUIRE(std::abs(glm::length(a) - glm::length(b)) < 1e-9);
+
+    InputFrame poison;
+    poison.moveX = std::numeric_limits<float>::quiet_NaN();
+    diagonal.tick(kDt, poison);
+    REQUIRE(std::isfinite(diagonal.registry().get<Transform>(diagonal.find(StableId::of("player"))).position.x));
+}
+
+TEST_CASE("golden: the spin system is bit-exact")
+{
+    // Pinned so a libm or compiler change in the rotation maths shows up here.
+    Scene scene(2);
+    scene.enqueue(piece("spinner", 0, {0.0, 0.0, 0.0}));
+    for (int i = 0; i < 1000; ++i) {
+        scene.tick(kDt);
+    }
+    const glm::quat q = scene.registry().get<Transform>(scene.find(StableId::of("spinner", 0))).rotation;
+    INFO(std::format("{:08x} {:08x} {:08x} {:08x}", std::bit_cast<std::uint32_t>(q.w), std::bit_cast<std::uint32_t>(q.x), std::bit_cast<std::uint32_t>(q.y), std::bit_cast<std::uint32_t>(q.z)));
+    CHECK(std::bit_cast<std::uint32_t>(q.w) == 0xbeec22fcu);
+    CHECK(std::bit_cast<std::uint32_t>(q.y) == 0x3f6325b3u);
 }
 
 TEST_CASE("per-system generators are independent and seeded by name")

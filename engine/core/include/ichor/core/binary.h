@@ -2,6 +2,7 @@
 
 #include "ichor/core/reflect.h"
 
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -11,10 +12,12 @@
 
 namespace ichor {
 
-// Little-endian binary encoding of arithmetic values, enums, strings,
-// vectors, any type that exposes `data()`/`size()` of trivially copyable
-// elements of fixed length (glm vectors and quaternions), and reflected
-// structs. The reader never trusts a length it has not checked.
+// Native-endian binary encoding of arithmetic values, enums, strings,
+// vectors, trivially copyable fixed-size types (glm vectors, quaternions,
+// arrays) and reflected structs. The engine only targets little-endian
+// hosts and says so below. The reader never trusts a length it has not
+// checked against the bytes left.
+static_assert(std::endian::native == std::endian::little, "the binary format assumes a little-endian host");
 
 class BinaryWriter {
 public:
@@ -80,8 +83,11 @@ public:
             forEachField(value, [&](std::string_view, auto& member) { ok = ok && read(member); });
             return ok;
         } else if constexpr (IsVector<T>::value) {
+            using Element = typename T::value_type;
+            // Reflected and string elements encode to at least one byte; trivial ones to exactly sizeof.
+            constexpr std::size_t minBytes = std::is_trivially_copyable_v<Element> && !isReflected<Element> ? sizeof(Element) : 1;
             std::uint32_t size = 0;
-            if (!read(size) || size > remaining()) return false;
+            if (!read(size) || size > remaining() / minBytes) return false;
             value.resize(size);
             for (auto& element : value) {
                 if (!read(element)) return false;
