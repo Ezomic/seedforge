@@ -60,6 +60,12 @@ void Mixer::setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right)
     listenerRight_ = right;
 }
 
+void Mixer::setReverb(const ReverbSettings& settings)
+{
+    const std::lock_guard lock(mutex_);
+    reverb_.setSettings(settings);
+}
+
 void Mixer::mix(float* interleaved, std::uint32_t frames)
 {
     const std::lock_guard lock(mutex_);
@@ -100,6 +106,7 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
     }
 
     std::erase_if(voices_, [&](const Voice& voice) { return voice.cursor >= static_cast<double>(clips_[voice.clip].samples.size()); });
+    reverb_.process(interleaved, frames);
     for (std::uint32_t i = 0; i < frames * kChannels; ++i) {
         interleaved[i] = std::clamp(interleaved[i], -1.0f, 1.0f);
     }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/audio/reverb.h"
+
 #include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 
@@ -22,6 +24,7 @@ public:
 
     virtual void play(std::uint32_t sound, glm::dvec3 position, bool spatial) = 0;
     virtual void setListener(glm::dvec3 position, glm::quat rotation) = 0;
+    virtual void setReverb(const ReverbSettings& settings) = 0;
 };
 
 }

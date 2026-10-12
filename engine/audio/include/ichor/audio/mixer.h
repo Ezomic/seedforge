@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/assets/bundle.h"
+#include "ichor/audio/reverb.h"
 
 #include <glm/vec3.hpp>
 
@@ -30,6 +31,7 @@ public:
     // far from the origin the panning does not jitter.
     void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial);
     void setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right);
+    void setReverb(const ReverbSettings& settings);
 
     // Renders `frames` stereo frames, advancing every voice. Safe to call from
     // a device thread; play() and setListener() take the same lock.
@@ -54,6 +56,7 @@ private:
     mutable std::mutex mutex_;
     std::vector<Clip> clips_;
     std::vector<Voice> voices_;
+    Reverb reverb_;
     glm::dvec3 listenerPosition_{0.0};
     glm::vec3 listenerForward_{0.0f, 0.0f, -1.0f};
     glm::vec3 listenerRight_{1.0f, 0.0f, 0.0f};
