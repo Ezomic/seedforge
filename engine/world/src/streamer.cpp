@@ -90,20 +90,27 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
 // A coarser copy of a full-resolution cell mesh that spends its triangles where
 // the ground is rough. The cell's edge, and the skirts hanging from it, stay
 // exactly as they are, so neighbours at different levels still meet.
-Mesh simplifyLod(const Mesh& full, float cellMetres, std::size_t reduction)
+Mesh simplifyLod(const Mesh& full, float spacing, std::size_t reduction)
 {
     constexpr float kEdge = 0.01f;
     std::vector<unsigned char> lock(full.vertices.size(), 0);
     for (std::size_t i = 0; i < full.vertices.size(); ++i) {
         const glm::vec3& p = full.vertices[i].position;
-        const bool edge = p.x < kEdge || p.z < kEdge || p.x > cellMetres - kEdge || p.z > cellMetres - kEdge;
+        const bool edge = p.x < kEdge || p.z < kEdge || p.x > full.boundsMax.x - kEdge || p.z > full.boundsMax.z - kEdge;
         lock[i] = edge ? 1 : 0;
     }
-    Mesh mesh = full;
+    Mesh mesh;
+    mesh.name = full.name;
+    mesh.boundsMin = full.boundsMin;
+    mesh.boundsMax = full.boundsMax;
+    mesh.vertices.resize(full.vertices.size());
     std::vector<std::uint32_t> indices(full.indices.size());
+    // An absolute error in metres, growing with the level, so a flat cell collapses
+    // as far as its triangle target asks and a rough one stops where it would show.
+    const float maxError = 0.3f * spacing * std::sqrt(static_cast<float>(reduction));
     float error = 0.0f;
     const std::size_t kept = meshopt_simplifyWithAttributes(indices.data(), full.indices.data(), full.indices.size(), &full.vertices[0].position.x,
-        full.vertices.size(), sizeof(Vertex), nullptr, 0, nullptr, 0, lock.data(), std::max<std::size_t>(full.indices.size() / reduction, 3), 0.05f, 0, &error);
+        full.vertices.size(), sizeof(Vertex), nullptr, 0, nullptr, 0, lock.data(), std::max<std::size_t>(full.indices.size() / reduction, 3), maxError, meshopt_SimplifyErrorAbsolute, &error);
     indices.resize(kept);
     mesh.indices = std::move(indices);
     const std::size_t unique = meshopt_optimizeVertexFetch(mesh.vertices.data(), mesh.indices.data(), mesh.indices.size(), full.vertices.data(), full.vertices.size(), sizeof(Vertex));
@@ -127,7 +134,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     std::size_t reduction = 1;
     for (std::uint32_t lod = 1; lod < lodCount; ++lod) {
         reduction *= 4;
-        out.lods.push_back(simplifyLod(out.lods[0], static_cast<float>(heightfield.desc().cellMetres), reduction));
+        out.lods.push_back(simplifyLod(out.lods[0], static_cast<float>(heightfield.desc().metresPerSample), reduction));
     }
     if (config.navmesh && !buildNavTile(heightfield, id, config.nav, out.nav)) {
         logf(LogLevel::Warn, "navmesh: cell {},{} failed to build", id.x, id.z);

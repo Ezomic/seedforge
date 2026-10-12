@@ -128,7 +128,7 @@ TEST_CASE("a cell builds three levels of detail with skirts and valid indices")
     REQUIRE(payload.lods.size() == 3);
     REQUIRE(payload.lods[0].vertices.size() == 33u * 33u + 33u * 4u);
     REQUIRE(payload.lods[1].indices.size() < payload.lods[0].indices.size() / 2);
-    REQUIRE(payload.lods[2].indices.size() < payload.lods[1].indices.size());
+    REQUIRE(payload.lods[2].indices.size() <= payload.lods[1].indices.size());
     REQUIRE(payload.lods[2].indices.size() >= 3);
     // The border survives every level, so neighbours meet whatever they draw.
     const auto onEdge = [](const Mesh& mesh) {
