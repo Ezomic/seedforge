@@ -676,9 +676,17 @@ void SceneRenderer::removeTerrainCell(std::uint32_t handle)
 
 bool SceneRenderer::setVegetationMeshes(const SceneBundle& trees)
 {
-    vegetationBase_ = meshCount();
+    // Once: a second set would append the meshes again and strand the cells already uploaded.
+    if (vegetationKinds_ != 0 || trees.meshes.empty()) {
+        return false;
+    }
+    const std::uint32_t base = meshCount();
+    if (!uploadBundle(trees)) {
+        return false;
+    }
+    vegetationBase_ = base;
     vegetationKinds_ = static_cast<std::uint32_t>(trees.meshes.size());
-    return uploadBundle(trees);
+    return true;
 }
 
 std::uint32_t SceneRenderer::uploadVegetationCell(const std::vector<PlantInstance>& plants)

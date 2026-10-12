@@ -19,8 +19,8 @@ constexpr float kTwoPi = 6.28318530718f;
 // distance, so the density has no grid in it. Deterministic through dmath.
 float forestDensity(double x, double z, float scale)
 {
-    const auto fx = static_cast<float>(std::fmod(x, 1.0e6) / scale);
-    const auto fz = static_cast<float>(std::fmod(z, 1.0e6) / scale);
+    const auto fx = static_cast<float>(x / scale);
+    const auto fz = static_cast<float>(z / scale);
     const float a = dmath::sin(fx * 1.7f + 0.3f) * dmath::sin(fz * 1.3f + 1.1f);
     const float b = dmath::sin(fx * 3.1f + fz * 2.3f + 2.0f);
     const float value = 0.5f + 0.35f * a + 0.15f * b;
