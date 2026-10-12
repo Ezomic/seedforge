@@ -19,6 +19,7 @@
 #include "ichor/sim/scene_io.h"
 #include "ichor/world/atmosphere.h"
 #include "ichor/world/navmesh.h"
+#include "ichor/world/vegetation.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
@@ -211,6 +212,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!ichor::readWorld(options.world, heightfield) || !ichor::readBundle(options.world / "terrain.iscene", layers) || !renderer.setTerrainMaterials(layers)) {
             return 1;
         }
+        // Trees are decoration: without them the world is bare, not broken.
+        if (!renderer.setVegetationMeshes(ichor::treeBundle())) {
+            ichor::log(ichor::LogLevel::Warn, "the tree meshes could not be uploaded; the world has no trees");
+        }
         const double centre = heightfield.desc().sizeMetres * 0.5;
         float plateau = -1e30f;
         for (int z = -12; z <= 12; z += 2) {
@@ -223,6 +228,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::StreamerConfig streaming;
     streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
+    streaming.vegetation = !options.headless;
     const auto ringSide = static_cast<std::uint32_t>(2 * (streaming.radiusCells + streaming.hysteresisCells) + 1);
     ichor::NavWorld navigation;
     if (!heightfield.empty() && !navigation.init(heightfield.desc(), ringSide * ringSide)) {
@@ -283,6 +289,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     struct ResidentCell {
         std::uint32_t handle = ichor::Renderer::kNoHandle;
+        std::uint32_t grove = ichor::Renderer::kNoHandle; // the cell's trees
         glm::dvec3 origin{0.0};
     };
     std::map<ichor::CellId, ResidentCell> cells;
@@ -290,6 +297,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         ResidentCell cell;
         cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
         cell.handle = renderer.uploadTerrainCell(payload.lods);
+        if (!payload.plants.empty()) {
+            cell.grove = renderer.uploadVegetationCell(payload.plants);
+        }
         engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
@@ -301,6 +311,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     streamer.onUnloaded([&](ichor::CellId id) {
         if (const auto found = cells.find(id); found != cells.end()) {
             renderer.removeTerrainCell(found->second.handle);
+            if (found->second.grove != ichor::Renderer::kNoHandle) {
+                renderer.removeVegetationCell(found->second.grove);
+            }
             cells.erase(found);
         }
         engine.scene().physics().remove(ichor::StableId::of("cell", ichor::cellKey(id)));
@@ -428,6 +441,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             const double distance = glm::length(glm::dvec2(centre.x - view.camera.position.x, centre.z - view.camera.position.z)) / cellMetres;
             const std::uint32_t lod = distance < 1.2 ? 0u : distance < 2.2 ? 1u : 2u;
             view.terrain.push_back({cell.handle, cell.origin, lod});
+            if (cell.grove != ichor::Renderer::kNoHandle && distance < 2.2) {
+                view.vegetation.push_back({cell.grove, cell.origin});
+            }
         }
         std::vector<ichor::LineSegment> colliders;
         scene.physics().debugLines(colliders);

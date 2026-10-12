@@ -7,6 +7,7 @@
 #include "ichor/gfx/vulkan_ui.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/world/atmosphere.h"
+#include "ichor/world/vegetation.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
@@ -308,7 +309,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -322,6 +323,9 @@ void checkTerrainAtHour(float hour, const char* name)
     REQUIRE(renderer.setTerrainMaterials(layers));
 
     RenderView view;
+    if (vegetation) {
+        REQUIRE(renderer.setVegetationMeshes(treeBundle()));
+    }
     const double centre = heightfield.desc().sizeMetres * 0.5;
     const CellId home = heightfield.cellAt(centre, centre);
     for (int dz = -2; dz <= 2; ++dz) {
@@ -334,6 +338,14 @@ void checkTerrainAtHour(float hour, const char* name)
             REQUIRE(handle != Renderer::kNoHandle);
             const int ring = std::max(std::abs(dx), std::abs(dz));
             view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, static_cast<std::uint32_t>(std::min(ring, 2))});
+            if (vegetation) {
+                std::vector<PlantInstance> plants;
+                scatterVegetation(heightfield, id, VegetationParams{}, plants);
+                const std::uint32_t grove = renderer.uploadVegetationCell(plants);
+                if (grove != Renderer::kNoHandle) {
+                    view.vegetation.push_back({grove, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}});
+                }
+            }
         }
     }
     applyAtmosphere(atmosphereAt(hour), view);
@@ -383,4 +395,9 @@ TEST_CASE("golden image: the terrain at dusk")
 TEST_CASE("golden image: the terrain at night")
 {
     checkTerrainAtHour(1.0f, "terrain_night");
+}
+
+TEST_CASE("golden image: the forested terrain")
+{
+    checkTerrainAtHour(15.0f, "terrain_forest", true);
 }

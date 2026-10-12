@@ -3,6 +3,7 @@
 #include "ichor/assets/bundle.h"
 #include "ichor/world/heightfield.h"
 #include "ichor/world/navmesh.h"
+#include "ichor/world/vegetation.h"
 
 #include <glm/vec3.hpp>
 
@@ -25,6 +26,7 @@ struct CellPayload {
     Heightfield::Cell cell;
     std::vector<Mesh> lods; // 0 is full resolution
     NavTile nav;            // empty when navmeshes are off or the cell has nothing to walk on
+    std::vector<VegetationInstance> plants; // empty when vegetation is off
 };
 
 struct StreamerConfig {
@@ -36,6 +38,8 @@ struct StreamerConfig {
     std::uint32_t lodCount = 3;
     bool navmesh = false; // build a Detour tile per cell beside its meshes
     NavParams nav;
+    bool vegetation = false; // scatter trees per cell beside its meshes
+    VegetationParams plants;
 };
 
 // Keeps the cells around the player resident, building them on a worker
