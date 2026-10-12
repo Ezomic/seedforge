@@ -18,6 +18,7 @@ struct FrameData {
     float4 skyHorizon;      // rgb linear
     float4 fogColor;        // rgb linear, w density per metre
     float4 skyParams;       // x tan(fov/2) * aspect, y tan(fov/2), z time in seconds, w rain intensity
+    float4 wind;            // xy direction on the ground plane, z strength, w fog height falloff per metre
 };
 
 struct PushData {
@@ -35,6 +36,22 @@ float4 toneMap(float3 color)
 {
     color = color / (color + 1.0);
     return float4(pow(color, 1.0 / 2.2), 1.0);
+}
+
+// How far the wind pushes a point of a tree sideways, on the ground plane. Bends more
+// towards the crown, leans with the gusts that sweep across the land, and sways with a
+// phase of its own. `height` is the vertex's height over the tree's foot before scaling,
+// `anchor` the tree's position in its cell, which keeps the phase steady as the camera moves.
+float2 windOffset(float height, float3 anchor, float scale)
+{
+    const float time = frame.skyParams.z;
+    const float phase = anchor.x * 0.21 + anchor.z * 0.17;
+    float bend = saturate(height / 7.0);
+    bend *= bend;
+    const float gust = 0.5 + 0.5 * sin(time * 0.35 + anchor.x * 0.01 + anchor.z * 0.013);
+    const float sway = sin(time * 1.7 + phase) + 0.45 * sin(time * 3.3 + phase * 1.9);
+    const float lean = 0.35 + 0.65 * gust;
+    return frame.wind.xy * frame.wind.z * scale * bend * lean * (0.9 + 0.35 * sway);
 }
 
 // Blends the four joint matrices of a skinned vertex.

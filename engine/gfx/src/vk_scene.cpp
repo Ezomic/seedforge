@@ -38,6 +38,7 @@ struct FrameData {
     glm::vec4 skyHorizon;
     glm::vec4 fogColor;
     glm::vec4 skyParams;
+    glm::vec4 wind;
 };
 
 struct InstanceGpu {
@@ -975,6 +976,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.fogColor = glm::vec4(view.fogColor, view.fogDensity);
     const float tanHalf = std::tan(view.camera.fovY * 0.5f);
     data.skyParams = glm::vec4(tanHalf * aspect, tanHalf, view.time, view.rainIntensity);
+    data.wind = glm::vec4(view.windDirection, view.windStrength, view.fogHeightFalloff);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
     vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 

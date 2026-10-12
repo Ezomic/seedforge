@@ -14,5 +14,7 @@ float4 main(VSIn i) : SV_Position
     const float3 local = i.position * i.positionScale.w;
     const float3 turned = float3(c * local.x + s * local.z, local.y, -s * local.x + c * local.z);
     const float3 cellOrigin = mul(push.model, float4(0.0, 0.0, 0.0, 1.0)).xyz;
-    return mul(frame.cascadeViewProj[(int)push.params.w], float4(turned + i.positionScale.xyz + cellOrigin, 1.0));
+    float3 world = turned + i.positionScale.xyz + cellOrigin;
+    world.xz += windOffset(i.position.y, i.positionScale.xyz, i.positionScale.w);
+    return mul(frame.cascadeViewProj[(int)push.params.w], float4(world, 1.0));
 }
