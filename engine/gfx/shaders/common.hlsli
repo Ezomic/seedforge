@@ -17,7 +17,7 @@ struct FrameData {
     float4 skyZenith;       // rgb linear
     float4 skyHorizon;      // rgb linear
     float4 fogColor;        // rgb linear, w density per metre
-    float4 skyParams;       // x tan(fov/2) * aspect, y tan(fov/2)
+    float4 skyParams;       // x tan(fov/2) * aspect, y tan(fov/2), z time in seconds, w rain intensity
 };
 
 struct PushData {

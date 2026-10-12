@@ -17,7 +17,7 @@ if(ENGINE_RUNTIME)
     set(ICHOR_SHADER_DIR ${CMAKE_BINARY_DIR}/shaders)
     file(MAKE_DIRECTORY ${ICHOR_SHADER_DIR})
 
-    set(shaders pbr.vert pbr_skinned.vert pbr_instanced.vert pbr.frag terrain.frag shadow.vert shadow_skinned.vert shadow_instanced.vert debug.vert debug.frag ui.vert ui.frag sky.vert sky.frag)
+    set(shaders pbr.vert pbr_skinned.vert pbr_instanced.vert pbr.frag terrain.frag shadow.vert shadow_skinned.vert shadow_instanced.vert debug.vert debug.frag ui.vert ui.frag sky.vert sky.frag rain.frag)
     set(shader_outputs)
     foreach(shader ${shaders})
         if(shader MATCHES "\.vert$")
