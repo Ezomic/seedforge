@@ -12,6 +12,7 @@
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/save/save_slots.h"
+#include "ichor/script/chronicle_bindings.h"
 #include "ichor/script/data_bindings.h"
 #include "ichor/script/scene_bindings.h"
 #include "ichor/script/script_host.h"
@@ -27,6 +28,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <format>
 #include <map>
 #include <memory>
@@ -48,6 +50,7 @@ struct Options {
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
+    std::filesystem::path exportChronicle; // written at exit when set
     std::string loadSlot;
     bool ironman = false;
     double autosaveSeconds = 0.0; // 0 is off
@@ -89,6 +92,8 @@ bool parse(int argc, char** argv, Options& options)
             options.data = argv[++i];
         } else if (arg == "--saves" && hasValue) {
             options.saves = argv[++i];
+        } else if (arg == "--export-chronicle" && hasValue) {
+            options.exportChronicle = argv[++i];
         } else if (arg == "--load-slot" && hasValue) {
             options.loadSlot = argv[++i];
         } else if (arg == "--ironman") {
@@ -245,6 +250,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
     // Ironman keeps its own directory, so a normal run can never load its rolling slot.
     ichor::SaveSlots slots(options.saves / ((options.ironman ? "ironman-" : "campaign-") + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
+    ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
 
@@ -253,6 +259,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (loaded.status != ichor::LoadStatus::Loaded) {
             ichor::logf(ichor::LogLevel::Error, "slot '{}' did not load (status {})", options.loadSlot, static_cast<int>(loaded.status));
             return 1;
+        }
+        chronicle = loaded.chronicle;
+        if (loaded.chronicleDamaged) {
+            ichor::log(ichor::LogLevel::Warn, "the slot's chronicle was unreadable and starts empty");
         }
         ichor::logf(ichor::LogLevel::Info, "slot '{}' loaded at tick {}{}{}", options.loadSlot, loaded.info.tick, loaded.fromBackup ? ", from a backup" : "",
             loaded.dataChanged ? ", data has changed since it was saved" : "");
@@ -329,6 +339,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::ScriptHost scripts(options.seed);
     ichor::bindScene(scripts, engine.scene());
     ichor::bindData(scripts, data);
+    ichor::bindChronicle(scripts, chronicle, engine.scene());
     const auto loadScript = [&] {
         if (!scripts.runFile(options.script)) {
             ichor::logf(ichor::LogLevel::Warn, "script: {}", scripts.lastError());
@@ -439,7 +450,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
         // Saving over the player's quicksave while a replay drives the run would be a surprise.
         if (quickSave && !quickSaveHeld && options.replay.empty()) {
-            if (slots.save(quickSlot, engine.scene(), saveContext())) {
+            if (slots.save(quickSlot, engine.scene(), saveContext(), chronicle)) {
                 ichor::logf(ichor::LogLevel::Info, "saved '{}' at tick {}", quickSlot, engine.scene().tickCount());
             } else {
                 ichor::logf(ichor::LogLevel::Warn, "save failed: {}", slots.lastError());
@@ -452,6 +463,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (loaded.status == ichor::LoadStatus::Loaded) {
                 // The restore cleared the physics world, terrain collision included, so the streamer starts over.
                 streamer.clear();
+                chronicle = loaded.chronicle;
                 lastAutosave = engine.scene().tickCount(); // the clock just moved, usually backwards
                 ichor::logf(ichor::LogLevel::Info, "loaded '{}' at tick {}", quickSlot, loaded.info.tick);
             } else {
@@ -463,7 +475,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const std::uint64_t tickNow = engine.scene().tickCount();
         if (autosaveTicks > 0 && (tickNow < lastAutosave || tickNow - lastAutosave >= autosaveTicks)) {
             lastAutosave = engine.scene().tickCount();
-            if (!slots.save(autoSlot, engine.scene(), saveContext())) {
+            if (!slots.save(autoSlot, engine.scene(), saveContext(), chronicle)) {
                 ichor::logf(ichor::LogLevel::Warn, "autosave failed: {}", slots.lastError());
             }
         }
@@ -516,6 +528,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     if (!options.save.empty() && !ichor::saveScene(options.save, engine.scene())) {
         return 1;
+    }
+    if (!options.exportChronicle.empty()) {
+        const std::string text = chronicle.exportText(config.fixedDt);
+        std::ofstream out(options.exportChronicle, std::ios::binary | std::ios::trunc);
+        out << text;
+        if (!out) {
+            ichor::logf(ichor::LogLevel::Error, "could not write the chronicle to {}", options.exportChronicle.string());
+            return 1;
+        }
     }
     ichor::logf(ichor::LogLevel::Info, "exit after {} frames, {} ticks, state {:016x}",
         engine.frameCount(), engine.scene().tickCount(), engine.scene().stateHash());
