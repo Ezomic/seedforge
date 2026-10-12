@@ -92,6 +92,10 @@ TEST_CASE("a missing slot and a bad name are refused")
     REQUIRE_FALSE(slots.save("../escape", scene, kContext));
     REQUIRE_FALSE(slots.save("", scene, kContext));
     REQUIRE_FALSE(slots.save("has space", scene, kContext));
+    REQUIRE_FALSE(slots.save("Mixed", scene, kContext));
+    REQUIRE_FALSE(slots.save("con", scene, kContext));
+    REQUIRE_FALSE(slots.save("lpt1", scene, kContext));
+    REQUIRE_FALSE(slots.save("name.with.dots", scene, kContext));
     REQUIRE(slots.list().empty());
 }
 
@@ -131,7 +135,7 @@ TEST_CASE("a corrupt newest file falls back to the newest good backup")
     REQUIRE(result.status == LoadStatus::Loaded);
     REQUIRE(result.fromBackup);
     REQUIRE(restored.stateHash() == firstHash);
-    REQUIRE(slots.list().empty()); // the damaged newest file no longer counts as a slot
+    REQUIRE(slots.list().size() == 1); // the slot still shows, by its newest good copy
 }
 
 TEST_CASE("a truncated or foreign file is corrupt, and so is a slot whose every copy is")
@@ -195,4 +199,64 @@ TEST_CASE("slots are listed by name with their ticks")
     REQUIRE(listed[0].tick == 6);
     REQUIRE(listed[1].name == "quicksave");
     REQUIRE(listed[1].tick == 5);
+}
+
+TEST_CASE("a flipped bit in the header makes the copy corrupt, not wrong-world")
+{
+    const Dir dir;
+    Scene scene(5);
+    populate(scene, 6);
+    SaveSlots slots(dir.path());
+    REQUIRE(slots.save("auto", scene, kContext));
+    const std::uint64_t firstHash = scene.stateHash();
+    scene.tick(kDt);
+    REQUIRE(slots.save("auto", scene, kContext));
+
+    flipByte(dir.path() / "auto.sav", 8); // inside the world seed
+    Scene restored(5);
+    const LoadResult result = slots.load("auto", restored, kContext);
+    REQUIRE(result.status == LoadStatus::Loaded);
+    REQUIRE(result.fromBackup);
+    REQUIRE(restored.stateHash() == firstHash);
+
+    flipByte(dir.path() / "auto.bak1", 4); // inside the format number
+    REQUIRE(slots.load("auto", restored, kContext).status == LoadStatus::Corrupt);
+}
+
+TEST_CASE("a lost newest file is recovered from the backup, and a corrupt one never replaces a good backup")
+{
+    const Dir dir;
+    Scene scene(5);
+    populate(scene, 4);
+    SaveSlots slots(dir.path());
+    REQUIRE(slots.save("auto", scene, kContext));
+    scene.tick(kDt);
+    REQUIRE(slots.save("auto", scene, kContext)); // auto.sav is the newer, auto.bak1 the older
+    const std::uint64_t olderHash = [&] {
+        Scene probe(5);
+        REQUIRE(slots.load("auto", probe, kContext).status == LoadStatus::Loaded);
+        return probe.stateHash();
+    }();
+    (void)olderHash;
+
+    std::filesystem::remove(dir.path() / "auto.sav"); // the crash window: rotated, not yet replaced
+    Scene restored(5);
+    const LoadResult recovered = slots.load("auto", restored, kContext);
+    REQUIRE(recovered.status == LoadStatus::Loaded);
+    REQUIRE(recovered.fromBackup);
+    REQUIRE(slots.list().size() == 1);
+
+    // A corrupt current file does not get rotated over the good backup: the
+    // good copy moves up the history and stays loadable.
+    REQUIRE(slots.save("auto", scene, kContext));
+    scene.tick(kDt);
+    REQUIRE(slots.save("auto", scene, kContext));
+    const auto goodBackup = std::filesystem::file_size(dir.path() / "auto.bak1");
+    flipByte(dir.path() / "auto.sav", std::filesystem::file_size(dir.path() / "auto.sav") - 3);
+    scene.tick(kDt);
+    REQUIRE(slots.save("auto", scene, kContext));
+    Scene check(5);
+    REQUIRE(slots.load("auto", check, kContext).status == LoadStatus::Loaded);
+    REQUIRE_FALSE(slots.load("auto", check, kContext).fromBackup);
+    REQUIRE(std::filesystem::file_size(dir.path() / "auto.bak2") == goodBackup);
 }
