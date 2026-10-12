@@ -3,6 +3,7 @@
 #include "ichor/gfx/render_view.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,10 @@ public:
 
     // One line on the debug overlay for this frame. The null renderer drops it.
     virtual void debugText(std::string line) = 0;
+
+    // Called every frame while the debug UI is being built, so the editor can add its
+    // windows. Renderers without a UI ignore it.
+    virtual void setGuiHook(std::function<void()> hook) { (void)hook; }
 };
 
 }

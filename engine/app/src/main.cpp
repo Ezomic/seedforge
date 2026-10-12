@@ -5,6 +5,7 @@
 #include "ichor/audio/reverb.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
+#include "ichor/editor/panels.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
@@ -57,6 +58,7 @@ struct Options {
     std::filesystem::path exportChronicle; // written at exit when set
     std::string loadSlot;
     bool ironman = false;
+    bool editor = false;
     float startHour = 9.0f;      // hour of the day when play starts
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
@@ -106,6 +108,8 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
+        } else if (arg == "--editor") {
+            options.editor = true;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -404,6 +408,19 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // A reload mid-replay or mid-recording would change what the script asks
     // for from that tick on, and the recording keeps no record of the version.
     const bool reloadAllowed = options.replay.empty() && options.record.empty();
+
+    // The editor's edits are scene commands: they would diverge from a recording, and a
+    // headless run has no window to show them in.
+    const bool editing = options.editor && !options.headless && options.replay.empty() && options.record.empty();
+    if (options.editor && !editing) {
+        ichor::log(ichor::LogLevel::Warn, "the editor needs a window and neither recording nor replaying; it is off");
+    }
+    ichor::EditorSession editorSession(engine.scene());
+    ichor::EditorEnvironment editorEnvironment;
+    ichor::EditorPanels editorPanels(editorSession, editorEnvironment);
+    if (editing) {
+        renderer.setGuiHook([&] { editorPanels.draw(); });
+    }
     if (!reloadAllowed) {
         ichor::log(ichor::LogLevel::Info, "hot reload of scripts and data is off while recording or replaying");
     }
@@ -417,8 +434,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.camera.farPlane = 2500.0f;
             // Time of day follows the tick, so it needs no saved state and a replay sees the same sky.
             // Weather follows the hours since the world began, so it needs no saved state either.
-            ichor::Atmosphere atmosphere = ichor::atmosphereAt(ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour));
-            ichor::applyWeather(ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
+            // The editor can pin either one.
+            const float hour = editing && editorEnvironment.overrideTime ? editorEnvironment.hour : ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
+            ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
+            ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
         }
@@ -502,6 +521,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (loaded.status == ichor::LoadStatus::Loaded) {
                 // The restore cleared the physics world, terrain collision included, so the streamer starts over.
                 streamer.clear();
+                editorSession.reset(); // its history describes a scene that was just replaced
                 chronicle = loaded.chronicle;
                 lastAutosave = engine.scene().tickCount(); // the clock just moved, usually backwards
                 ichor::logf(ichor::LogLevel::Info, "loaded '{}' at tick {}", quickSlot, loaded.info.tick);
@@ -527,7 +547,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         // The audio thread holds a lock while it renders, so only a change is worth taking it for.
         const ichor::ReverbSettings reverb = reverbField.at(playerPosition(engine.scene()));
         if (reverb != lastReverb) {
-            audio.setReverb(reverb);
+            if (editing) {
+            // New objects appear a few metres in front of the player.
+            editorEnvironment.spawnAt = playerPosition(engine.scene()) + glm::dvec3(0.0, 0.0, -3.0);
+        }
+        audio.setReverb(reverb);
             lastReverb = reverb;
         }
         if (options.frames != 0 && engine.frameCount() >= options.frames) {
@@ -598,7 +622,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--editor]");
         return 2;
     }
 

@@ -342,6 +342,9 @@ void VulkanRenderer::endFrame()
         ImGui::TextUnformatted(line.c_str());
     }
     ImGui::End();
+    if (guiHook_) {
+        guiHook_();
+    }
     ImGui::Render();
 
     VkCommandBuffer cmd = v.commandBuffers[v.frame];
