@@ -18,9 +18,10 @@ add_executable(ichor_tests
     test_animation_system.cpp
     test_audio.cpp
     test_terrain.cpp
+    test_script.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
-    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain
+    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain
 )
 target_compile_definitions(ichor_tests PRIVATE ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_ART_DIR="${ICHOR_ART_DIR}")
 catch_discover_tests(ichor_tests)
