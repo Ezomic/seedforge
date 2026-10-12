@@ -1,8 +1,10 @@
 #include "ichor/save/save_slots.h"
+#include "ichor/save/chronicle.h"
 #include "ichor/sim/scene.h"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -259,4 +261,110 @@ TEST_CASE("a lost newest file is recovered from the backup, and a corrupt one ne
     REQUIRE(slots.load("auto", check, kContext).status == LoadStatus::Loaded);
     REQUIRE_FALSE(slots.load("auto", check, kContext).fromBackup);
     REQUIRE(std::filesystem::file_size(dir.path() / "auto.bak2") == goodBackup);
+}
+
+TEST_CASE("the chronicle keeps its entries, cleans the text and refuses odd categories")
+{
+    Chronicle story;
+    REQUIRE(story.add(120, "quest", "The well was cleared."));
+    REQUIRE(story.add(900, "death", "Aster fell\tat the gate\nand was buried."));
+    REQUIRE_FALSE(story.add(1, "Bad Category", "x"));
+    REQUIRE_FALSE(story.add(1, "", "x"));
+    REQUIRE_FALSE(story.add(1, "has\ttab", "x"));
+    REQUIRE(story.entries().size() == 2);
+    REQUIRE(story.entries()[1].text == "Aster fell at the gate and was buried.");
+    REQUIRE(story.add(1, "long", std::string(2000, 'x')));
+    REQUIRE(story.entries().back().text.size() == Chronicle::kMaxTextBytes);
+}
+
+TEST_CASE("a chronicle survives serialising and parsing, and damaged text is refused whole")
+{
+    Chronicle story;
+    REQUIRE(story.add(0, "start", "A campaign begins."));
+    REQUIRE(story.add(3600, "quest", "Tab\tand newline\nbecome spaces."));
+    Chronicle back;
+    REQUIRE(Chronicle::parse(story.serialize(), back));
+    REQUIRE(back == story);
+
+    const std::string good = story.serialize();
+    Chronicle target;
+    REQUIRE(story.add(1, "extra", "kept"));
+    REQUIRE(Chronicle::parse(good, target));
+    REQUIRE_FALSE(Chronicle::parse(good.substr(0, good.size() - 3), target)); // truncated
+    REQUIRE_FALSE(Chronicle::parse("not a chronicle\n", target));
+    REQUIRE_FALSE(Chronicle::parse("ichor-chronicle 1\nabc\tquest\ttext\n", target));
+    REQUIRE_FALSE(Chronicle::parse("ichor-chronicle 1\n5\tBAD\ttext\n", target));
+    REQUIRE_FALSE(Chronicle::parse("ichor-chronicle 1\n5\tquest\n", target));
+    REQUIRE(target.entries().size() == 2); // a failed parse leaves it as it was
+}
+
+TEST_CASE("the chronicle exports as readable lines with play time")
+{
+    Chronicle story;
+    REQUIRE(story.add(0, "start", "A campaign begins."));
+    REQUIRE(story.add(60 * 3725, "quest", "The well was cleared."));
+    REQUIRE(story.exportText(1.0 / 60.0) == "[0:00:00] start: A campaign begins.\n[1:02:05] quest: The well was cleared.\n");
+}
+
+TEST_CASE("a slot carries the chronicle and a load restores the story")
+{
+    const Dir dir;
+    Scene scene(5);
+    populate(scene, 8);
+    Chronicle story;
+    REQUIRE(story.add(3, "quest", "The well was cleared."));
+    REQUIRE(story.add(7, "death", "A traveller fell."));
+    SaveSlots slots(dir.path());
+    REQUIRE(slots.save("s", scene, kContext, story));
+
+    Scene restored(5);
+    const LoadResult result = slots.load("s", restored, kContext);
+    REQUIRE(result.status == LoadStatus::Loaded);
+    REQUIRE(result.chronicle == story);
+    REQUIRE(restored.stateHash() == scene.stateHash());
+
+    // Saving without one gives an empty story, not an error.
+    REQUIRE(slots.save("plain", scene, kContext));
+    REQUIRE(slots.load("plain", restored, kContext).chronicle.empty());
+}
+
+TEST_CASE("chronicle text is cut on a character boundary and export survives odd inputs")
+{
+    Chronicle story;
+    std::string text(Chronicle::kMaxTextBytes - 1, 'x');
+    text += "\xE2\x82\xAC"; // a three-byte character straddling the limit
+    REQUIRE(story.add(1, "money", text));
+    const std::string& kept = story.entries()[0].text;
+    REQUIRE(kept.size() == Chronicle::kMaxTextBytes - 1);
+    REQUIRE((static_cast<unsigned char>(kept.back()) & 0xC0) != 0x80);
+
+    REQUIRE(story.add(UINT64_MAX, "late", "far future"));
+    REQUIRE_NOTHROW(story.exportText(1.0 / 60.0));
+    REQUIRE_NOTHROW(story.exportText(-1.0));
+    REQUIRE_NOTHROW(story.exportText(std::nan("")));
+}
+
+TEST_CASE("a chronicle with Windows line endings parses")
+{
+    Chronicle back;
+    REQUIRE(Chronicle::parse("ichor-chronicle 1\r\n5\tquest\tdone\r\n", back));
+    REQUIRE(back.entries().size() == 1);
+    REQUIRE(back.entries()[0].text == "done");
+}
+
+TEST_CASE("a slot says when its chronicle was damaged")
+{
+    const Dir dir;
+    Scene scene(5);
+    populate(scene, 2);
+    Chronicle story;
+    REQUIRE(story.add(1, "quest", "something"));
+    SaveSlots slots(dir.path());
+    REQUIRE(slots.save("s", scene, kContext, story));
+    Scene restored(5);
+    const LoadResult clean = slots.load("s", restored, kContext);
+    REQUIRE_FALSE(clean.chronicleDamaged);
+
+    REQUIRE(slots.save("none", scene, kContext));
+    REQUIRE_FALSE(slots.load("none", restored, kContext).chronicleDamaged);
 }

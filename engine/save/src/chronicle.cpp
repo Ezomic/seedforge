@@ -1,0 +1,112 @@
+#include "ichor/save/chronicle.h"
+
+#include <algorithm>
+#include <charconv>
+#include <format>
+
+namespace ichor {
+
+namespace {
+
+constexpr std::string_view kHeader = "ichor-chronicle 1";
+
+bool plainCategory(std::string_view category)
+{
+    return !category.empty() && category.size() <= 32
+        && std::all_of(category.begin(), category.end(), [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'; });
+}
+
+}
+
+bool Chronicle::add(std::uint64_t tick, std::string_view category, std::string_view text)
+{
+    if (!plainCategory(category) || entries_.size() >= kMaxEntries) {
+        return false;
+    }
+    ChronicleEntry entry;
+    entry.tick = tick;
+    entry.category = std::string(category);
+    // Cut on a character boundary, so a multi-byte character is never split.
+    std::size_t length = std::min(text.size(), kMaxTextBytes);
+    if (length < text.size()) {
+        while (length > 0 && (static_cast<unsigned char>(text[length]) & 0xC0) == 0x80) {
+            --length;
+        }
+    }
+    entry.text = std::string(text.substr(0, length));
+    for (char& c : entry.text) {
+        if (c == '\t' || c == '\n' || c == '\r') {
+            c = ' ';
+        }
+    }
+    entries_.push_back(std::move(entry));
+    return true;
+}
+
+std::string Chronicle::serialize() const
+{
+    std::string out(kHeader);
+    out += '\n';
+    for (const ChronicleEntry& entry : entries_) {
+        out += std::to_string(entry.tick);
+        out += '\t';
+        out += entry.category;
+        out += '\t';
+        out += entry.text;
+        out += '\n';
+    }
+    return out;
+}
+
+bool Chronicle::parse(std::string_view bytes, Chronicle& out)
+{
+    Chronicle parsed;
+    std::size_t position = bytes.find('\n');
+    if (position == std::string_view::npos) {
+        return false;
+    }
+    // A file saved with Windows line endings is read the same.
+    const auto withoutReturn = [](std::string_view line) { return !line.empty() && line.back() == '\r' ? line.substr(0, line.size() - 1) : line; };
+    if (withoutReturn(bytes.substr(0, position)) != kHeader) {
+        return false;
+    }
+    ++position;
+    while (position < bytes.size()) {
+        std::size_t end = bytes.find('\n', position);
+        if (end == std::string_view::npos) {
+            return false; // a final line without its break is a truncated file
+        }
+        const std::string_view line = withoutReturn(bytes.substr(position, end - position));
+        position = end + 1;
+        const std::size_t first = line.find('\t');
+        const std::size_t second = first == std::string_view::npos ? first : line.find('\t', first + 1);
+        if (second == std::string_view::npos) {
+            return false;
+        }
+        std::uint64_t tick = 0;
+        const std::string_view tickText = line.substr(0, first);
+        const auto [rest, error] = std::from_chars(tickText.data(), tickText.data() + tickText.size(), tick);
+        if (error != std::errc{} || rest != tickText.data() + tickText.size()) {
+            return false;
+        }
+        if (!parsed.add(tick, line.substr(first + 1, second - first - 1), line.substr(second + 1))) {
+            return false;
+        }
+    }
+    out = std::move(parsed);
+    return true;
+}
+
+std::string Chronicle::exportText(double secondsPerTick) const
+{
+    std::string out;
+    for (const ChronicleEntry& entry : entries_) {
+        // NaN, a negative rate and absurd ticks all fall to zero instead of an undefined conversion.
+        const double elapsed = static_cast<double>(entry.tick) * secondsPerTick;
+        const std::uint64_t seconds = elapsed >= 0.0 && elapsed < 1.8e19 ? static_cast<std::uint64_t>(elapsed) : 0;
+        out += std::format("[{}:{:02}:{:02}] {}: {}\n", seconds / 3600, seconds / 60 % 60, seconds % 60, entry.category, entry.text);
+    }
+    return out;
+}
+
+}

@@ -20,7 +20,7 @@ namespace {
 static_assert(std::endian::native == std::endian::little, "slot files are little-endian");
 
 constexpr char kMagic[4] = {'I', 'S', 'L', 'T'};
-constexpr std::uint32_t kFormat = 1;
+constexpr std::uint32_t kFormat = 2;
 constexpr std::uintmax_t kMaxSlotBytes = 512ull * 1024 * 1024;
 
 struct Header {
@@ -31,10 +31,11 @@ struct Header {
     std::uint32_t reserved;
     std::uint64_t dataDigest;
     std::uint64_t tick;
-    std::uint64_t payloadSize;
-    std::uint64_t checksum; // of the payload
+    std::uint64_t payloadSize;  // the snapshot, then the chronicle
+    std::uint64_t snapshotSize; // how much of the payload is the snapshot
+    std::uint64_t checksum;     // of the header and the payload
 };
-static_assert(sizeof(Header) == 56);
+static_assert(sizeof(Header) == 64);
 
 // Covers the header, with its own checksum field zeroed, and the payload, so a
 // flipped bit anywhere makes the copy corrupt rather than wrong-world or
@@ -78,7 +79,7 @@ SlotRead readSlot(const std::filesystem::path& path, Header& header, std::vector
     if (std::memcmp(header.magic, kMagic, sizeof(kMagic)) != 0) {
         return SlotRead::Corrupt;
     }
-    if (header.payloadSize != bytes.size() - sizeof(Header)) {
+    if (header.payloadSize != bytes.size() - sizeof(Header) || header.snapshotSize > header.payloadSize) {
         return SlotRead::Corrupt;
     }
     payload.assign(bytes.begin() + static_cast<std::ptrdiff_t>(sizeof(Header)), bytes.end());
@@ -127,7 +128,7 @@ std::filesystem::path SaveSlots::pathOf(std::string_view name, std::uint32_t bac
     return directory_ / file;
 }
 
-bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContext& context)
+bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContext& context, const Chronicle& chronicle)
 {
     error_.clear();
     if (!validName(name)) {
@@ -156,6 +157,10 @@ bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContex
         return false;
     }
 
+    const std::size_t snapshotSize = payload.size();
+    const std::string story = chronicle.serialize();
+    payload.insert(payload.end(), story.begin(), story.end());
+
     Header header{};
     std::memcpy(header.magic, kMagic, sizeof(kMagic));
     header.format = kFormat;
@@ -164,6 +169,7 @@ bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContex
     header.dataDigest = context.dataDigest;
     header.tick = scene.tickCount();
     header.payloadSize = payload.size();
+    header.snapshotSize = snapshotSize;
     header.checksum = checksum(header, payload);
     std::vector<std::uint8_t> bytes(sizeof(Header) + payload.size());
     std::memcpy(bytes.data(), &header, sizeof(Header));
@@ -232,7 +238,7 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
         bool restored = false;
         {
             std::ofstream out(scratch, std::ios::binary | std::ios::trunc);
-            out.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size()));
+            out.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(header.snapshotSize));
             if (!out) {
                 error_ = "the scratch file for the snapshot could not be written";
             } else {
@@ -249,6 +255,9 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
             result.status = LoadStatus::RestoreFailed;
             continue;
         }
+        // The story is read after the scene is back; a damaged one costs the journal, not the save.
+        const std::string_view story(reinterpret_cast<const char*>(payload.data()) + header.snapshotSize, payload.size() - header.snapshotSize);
+        result.chronicleDamaged = !story.empty() && !Chronicle::parse(story, result.chronicle);
         result.status = LoadStatus::Loaded;
         result.fromBackup = backup > 0;
         result.dataChanged = header.dataDigest != expected.dataDigest;
