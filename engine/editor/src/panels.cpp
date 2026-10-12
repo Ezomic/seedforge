@@ -99,7 +99,10 @@ void EditorPanels::outliner()
             if (ImGui::Selectable(label.c_str(), entry.selected)) {
                 session_.select(entry.id);
             }
-            remember(entry.name);
+            remember(label);
+            if (!centres_.contains(entry.name)) {
+                centres_[entry.name] = centres_[label];
+            }
         }
     }
     ImGui::EndChild();
@@ -111,8 +114,17 @@ void EditorPanels::inspector()
     const auto selected = session_.selection();
     const auto current = selected ? session_.transformOf(*selected) : std::nullopt;
     if (!selected || !current) {
+        // A drag that lost its entity mid-way would leave the step open for ever.
+        if (dragged_) {
+            session_.endTransaction();
+            dragged_.reset();
+        }
         ImGui::TextDisabled("nothing selected");
         return;
+    }
+    if (dragged_ && *dragged_ != *selected) {
+        session_.endTransaction();
+        dragged_.reset();
     }
 
     // Dragging a field sends a transform per frame; the drag as a whole is one undo step.
@@ -122,12 +134,14 @@ void EditorPanels::inspector()
         remember(label);
         if (ImGui::IsItemActivated()) {
             session_.beginTransaction();
+            dragged_ = selected;
         }
         if (modified) {
             session_.setTransform(*selected, edited);
         }
         if (ImGui::IsItemDeactivated()) {
             session_.endTransaction();
+            dragged_.reset();
         }
     };
 

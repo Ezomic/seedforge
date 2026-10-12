@@ -5,6 +5,9 @@
 
 #include <imgui.h>
 
+#include <glm/vec3.hpp>
+
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -32,7 +35,9 @@ public:
     void draw();
 
     // Where the last frame put the control with this label, in screen pixels.
-    // The tests click there.
+    // The tests click there. An outliner row is found by its name, or, when several
+    // share one, by `name##id` with the entity's id in decimal; the first of equals
+    // wins the plain name.
     std::optional<ImVec2> centreOf(const std::string& label) const;
 
 private:
@@ -46,6 +51,7 @@ private:
     EditorEnvironment& environment_;
     std::map<std::string, ImVec2> centres_;
     std::uint32_t spawned_ = 0;
+    std::optional<StableId> dragged_; // the entity whose inspector field is held, while one is
 };
 
 }

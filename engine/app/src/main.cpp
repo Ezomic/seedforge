@@ -547,12 +547,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         // The audio thread holds a lock while it renders, so only a change is worth taking it for.
         const ichor::ReverbSettings reverb = reverbField.at(playerPosition(engine.scene()));
         if (reverb != lastReverb) {
-            if (editing) {
+            audio.setReverb(reverb);
+            lastReverb = reverb;
+        }
+        if (editing) {
             // New objects appear a few metres in front of the player.
             editorEnvironment.spawnAt = playerPosition(engine.scene()) + glm::dvec3(0.0, 0.0, -3.0);
-        }
-        audio.setReverb(reverb);
-            lastReverb = reverb;
         }
         if (options.frames != 0 && engine.frameCount() >= options.frames) {
             break;
@@ -596,6 +596,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
     }
 
+    renderer.setGuiHook({}); // the panels are about to go out of scope
     if (!options.record.empty() && !engine.recordedInputs().save(options.record)) {
         return 1;
     }
