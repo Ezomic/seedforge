@@ -16,6 +16,6 @@ add_library(ichor_audio
 )
 target_include_directories(ichor_audio PUBLIC include)
 target_link_libraries(ichor_audio
-    PUBLIC ichor_core ichor_assets ichor_data
-    PRIVATE ichor_miniaudio
+    PUBLIC ichor_core ichor_assets
+    PRIVATE ichor_miniaudio ichor_data
 )

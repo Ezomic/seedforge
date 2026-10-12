@@ -30,6 +30,13 @@ float smooth(float edge0, float edge1, float x)
     return t * t * (3.0f - 2.0f * t);
 }
 
+// A tail left to die in silence reaches the denormal range, where arithmetic is
+// many times slower; below audibility by a wide margin it becomes a true zero.
+float flush(float value)
+{
+    return std::fabs(value) < 1e-18f ? 0.0f : value;
+}
+
 float approach(float value, float target)
 {
     return value < target ? std::min(value + kRampPerFrame, target) : std::max(value - kRampPerFrame, target);
@@ -52,6 +59,10 @@ Reverb::Reverb()
 
 void Reverb::setSettings(const ReverbSettings& settings)
 {
+    // A NaN would never settle: the ramp would drift for ever. Ignore it and keep what we have.
+    if (!std::isfinite(settings.wet) || !std::isfinite(settings.roomSize) || !std::isfinite(settings.damping)) {
+        return;
+    }
     target_.wet = std::clamp(settings.wet, 0.0f, 1.0f);
     target_.roomSize = std::clamp(settings.roomSize, 0.0f, 1.0f);
     target_.damping = std::clamp(settings.damping, 0.0f, 1.0f);
@@ -64,14 +75,14 @@ float Reverb::tick(Channel& channel, float input) const
     float out = 0.0f;
     for (Comb& comb : channel.combs) {
         const float held = comb.buffer[comb.position];
-        comb.store = held * (1.0f - damp) + comb.store * damp;
-        comb.buffer[comb.position] = input + comb.store * feedback;
+        comb.store = flush(held * (1.0f - damp) + comb.store * damp);
+        comb.buffer[comb.position] = flush(input + comb.store * feedback);
         comb.position = comb.position + 1 == comb.buffer.size() ? 0 : comb.position + 1;
         out += held;
     }
     for (Allpass& allpass : channel.allpasses) {
         const float held = allpass.buffer[allpass.position];
-        allpass.buffer[allpass.position] = out + held * 0.5f;
+        allpass.buffer[allpass.position] = flush(out + held * 0.5f);
         allpass.position = allpass.position + 1 == allpass.buffer.size() ? 0 : allpass.position + 1;
         out = -out + held;
     }
@@ -82,6 +93,11 @@ void Reverb::process(float* interleaved, std::uint32_t frames)
 {
     if (current_.wet == 0.0f && target_.wet == 0.0f) {
         // Dry and settled: leave the buffer alone, and let the tail go so the next room starts clean.
+        // The buffers are only cleared if anything ran since the last clear.
+        if (!dirty_) {
+            return;
+        }
+        dirty_ = false;
         for (Channel& channel : channels_) {
             for (Comb& comb : channel.combs) {
                 std::fill(comb.buffer.begin(), comb.buffer.end(), 0.0f);
@@ -94,6 +110,7 @@ void Reverb::process(float* interleaved, std::uint32_t frames)
         current_ = target_;
         return;
     }
+    dirty_ = true;
     for (std::uint32_t f = 0; f < frames; ++f) {
         current_.wet = approach(current_.wet, target_.wet);
         current_.roomSize = approach(current_.roomSize, target_.roomSize);
@@ -115,7 +132,7 @@ ReverbSettings ReverbField::at(glm::dvec3 position) const
     for (const ReverbStamp& stamp : stamps_) {
         const auto distance = static_cast<float>(glm::length(position - stamp.centre));
         const float weight = 1.0f - smooth(stamp.radius * 0.6f, stamp.radius, distance);
-        if (weight <= 0.0f) {
+        if (!(weight > 0.0f)) { // false for NaN as well, so a bad position adds nothing
             continue;
         }
         total += weight;
@@ -150,12 +167,13 @@ bool loadReverbStamps(const DataSet& data, ReverbField& field)
         if (!number("x", x) || !number("y", y) || !number("z", z) || !number("radius", radius) || !number("wet", wet) || !number("room", room) || !number("damping", damping)) {
             return false;
         }
-        if (radius <= 0.0 || wet < 0.0 || wet > 1.0 || room < 0.0 || room > 1.0 || damping < 0.0 || damping > 1.0) {
+        const auto narrowed = static_cast<float>(radius);
+        if (!(narrowed > 0.0f) || !std::isfinite(narrowed) || wet < 0.0 || wet > 1.0 || room < 0.0 || room > 1.0 || damping < 0.0 || damping > 1.0) {
             return false;
         }
         ReverbStamp stamp;
         stamp.centre = {x, y, z};
-        stamp.radius = static_cast<float>(radius);
+        stamp.radius = narrowed;
         stamp.settings = {static_cast<float>(wet), static_cast<float>(room), static_cast<float>(damping)};
         loaded.push_back(stamp);
     }
