@@ -32,6 +32,12 @@ public:
     virtual std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) = 0;
     virtual void removeTerrainCell(std::uint32_t cell) = 0;
 
+    // Vegetation: the meshes of the kinds once (mesh i is kind i), then one set of
+    // instances per cell, drawn instanced with one buffer per cell.
+    virtual bool setVegetationMeshes(const SceneBundle& trees) = 0;
+    virtual std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) = 0;
+    virtual void removeVegetationCell(std::uint32_t cell) = 0;
+
     // Rebuilds pipelines from the shader files on disk. Hot reload calls this
     // when a compiled shader changes; a renderer without shaders does nothing.
     virtual bool reloadShaders() { return true; }

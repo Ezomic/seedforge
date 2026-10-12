@@ -23,6 +23,9 @@ public:
     bool setTerrainMaterials(const SceneBundle& layers) override;
     std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) override;
     void removeTerrainCell(std::uint32_t cell) override;
+    bool setVegetationMeshes(const SceneBundle& trees) override;
+    std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) override;
+    void removeVegetationCell(std::uint32_t cell) override;
     bool reloadShaders() override;
     void beginFrame() override;
     void submit(const RenderView& view) override;

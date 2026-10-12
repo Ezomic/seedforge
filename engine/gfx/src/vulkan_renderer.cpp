@@ -260,6 +260,21 @@ void VulkanRenderer::removeTerrainCell(std::uint32_t cell)
     impl_->scene->removeTerrainCell(cell);
 }
 
+bool VulkanRenderer::setVegetationMeshes(const SceneBundle& trees)
+{
+    return impl_->scene->setVegetationMeshes(trees);
+}
+
+std::uint32_t VulkanRenderer::uploadVegetationCell(const std::vector<PlantInstance>& plants)
+{
+    return impl_->scene->uploadVegetationCell(plants);
+}
+
+void VulkanRenderer::removeVegetationCell(std::uint32_t cell)
+{
+    impl_->scene->removeVegetationCell(cell);
+}
+
 bool VulkanRenderer::reloadShaders()
 {
     return impl_->scene->reloadPipelines();

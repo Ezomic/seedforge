@@ -5,6 +5,7 @@ add_library(ichor_world
     src/navmesh.cpp
     src/world_io.cpp
     src/streamer.cpp
+    src/vegetation.cpp
 )
 target_include_directories(ichor_world PUBLIC include)
 find_package(recastnavigation CONFIG REQUIRED)

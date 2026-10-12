@@ -31,6 +31,9 @@ public:
     std::uint32_t meshCount() const { return static_cast<std::uint32_t>(meshes_.size()); }
 
     bool setTerrainMaterials(const SceneBundle& layers);
+    bool setVegetationMeshes(const SceneBundle& trees);
+    std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants);
+    void removeVegetationCell(std::uint32_t cell);
     std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods);
     void removeTerrainCell(std::uint32_t cell);
 
@@ -82,6 +85,7 @@ private:
     VkPipeline pbrSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline terrainPipeline_ = VK_NULL_HANDLE;
     VkPipeline skyPipeline_ = VK_NULL_HANDLE;
+    VkPipeline pbrInstancedPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline debugPipeline_ = VK_NULL_HANDLE;
@@ -116,6 +120,23 @@ private:
         GpuMesh mesh;
     };
     std::vector<RetiredMesh> retired_;
+
+    // Vegetation: its meshes sit after the bundle meshes, and each cell holds one
+    // instance buffer with the plants grouped by kind.
+    struct VegetationCell {
+        GpuBuffer buffer;
+        std::vector<std::uint32_t> first; // per kind, in instances
+        std::vector<std::uint32_t> count;
+    };
+    std::map<std::uint32_t, VegetationCell> vegetationCells_;
+    std::uint32_t nextVegetationCell_ = 0;
+    std::uint32_t vegetationBase_ = 0;
+    std::uint32_t vegetationKinds_ = 0;
+    struct RetiredBuffer {
+        std::uint64_t frame = 0;
+        GpuBuffer buffer;
+    };
+    std::vector<RetiredBuffer> retiredBuffers_;
     std::uint64_t renderedFrames_ = 0;
     void destroyRetired(bool all);
     GpuMesh makeGpuMesh(const Mesh& mesh, std::uint32_t material);

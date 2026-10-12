@@ -128,6 +128,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     heightfield.cell(id, out.cell);
     out.lods.clear();
     out.nav.data.clear();
+    out.plants.clear();
     if (lodCount > 0) {
         out.lods.push_back(buildLod(heightfield, out.cell, 1));
     }
@@ -135,6 +136,9 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     for (std::uint32_t lod = 1; lod < lodCount; ++lod) {
         reduction *= 4;
         out.lods.push_back(simplifyLod(out.lods[0], static_cast<float>(heightfield.desc().metresPerSample), reduction));
+    }
+    if (config.vegetation) {
+        scatterVegetation(heightfield, id, config.plants, out.plants);
     }
     if (config.navmesh && !buildNavTile(heightfield, id, config.nav, out.nav)) {
         logf(LogLevel::Warn, "navmesh: cell {},{} failed to build", id.x, id.z);

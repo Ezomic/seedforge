@@ -31,6 +31,20 @@ struct TerrainDraw {
     std::uint32_t lod = 0;
 };
 
+// One planted tree, relative to the origin of its cell.
+struct PlantInstance {
+    glm::vec3 position{0.0f};
+    float yaw = 0.0f; // radians about the vertical axis
+    float scale = 1.0f;
+    std::uint32_t kind = 0; // which of the vegetation meshes
+};
+
+// A resident vegetation cell: the handle the renderer gave its instances and where the cell sits.
+struct VegetationDraw {
+    std::uint32_t cell = 0;
+    glm::dvec3 origin{0.0};
+};
+
 struct RenderCamera {
     glm::dvec3 position{0.0};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f}; // looks down -Z, Y up
@@ -62,6 +76,7 @@ struct RenderView {
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;
+    std::vector<VegetationDraw> vegetation;
     std::vector<DebugLine> lines;
 };
 

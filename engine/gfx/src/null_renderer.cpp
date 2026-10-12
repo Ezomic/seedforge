@@ -30,6 +30,23 @@ void NullRenderer::removeTerrainCell(std::uint32_t cell)
     cells_.erase(cell);
 }
 
+bool NullRenderer::setVegetationMeshes(const SceneBundle& trees)
+{
+    return !trees.meshes.empty();
+}
+
+std::uint32_t NullRenderer::uploadVegetationCell(const std::vector<PlantInstance>&)
+{
+    const std::uint32_t handle = nextPlantCell_++;
+    plantCells_.insert(handle);
+    return handle;
+}
+
+void NullRenderer::removeVegetationCell(std::uint32_t cell)
+{
+    plantCells_.erase(cell);
+}
+
 void NullRenderer::beginFrame()
 {
     ++begun_;
@@ -42,6 +59,7 @@ void NullRenderer::submit(const RenderView& view)
         skinned_ += instance.jointCount > 0 ? 1 : 0;
     }
     terrainDraws_ += view.terrain.size();
+    vegetationDraws_ += view.vegetation.size();
 }
 
 void NullRenderer::endFrame()
