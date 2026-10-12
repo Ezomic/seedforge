@@ -10,7 +10,8 @@
     "stb",
     "meshoptimizer",
     "entt",
-    "joltphysics"
+    "joltphysics",
+    "ozz-animation"
   ],
   "default-features": [
     "runtime"

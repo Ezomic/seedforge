@@ -9,6 +9,9 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
+
+#include <glm/mat4x4.hpp>
 
 namespace ichor {
 
@@ -71,6 +74,31 @@ struct CharacterBody {
     bool onGround = false;
 };
 
+// Plays a clip from the AnimationSet the scene was given. With rootMotion
+// the root joint's travel becomes the character's intent instead of input.
+struct Animator {
+    std::uint32_t clip = 0;
+    float time = 0.0f;
+    float speed = 1.0f;
+    bool loop = true;
+    bool rootMotion = false;
+};
+
+// A committed action in progress: the clip and its windows, and where it is.
+struct MontagePlayer {
+    std::uint32_t clip = 0;
+    float activeStart = 0.0f;
+    float activeEnd = 0.0f;
+    float recoveryEnd = 0.0f;
+    float time = 0.0f;
+    std::uint8_t phase = 0; // MontagePhase
+};
+
+// Skinning matrices for rendering, rebuilt every tick; never saved.
+struct SkinPose {
+    std::vector<glm::mat4> matrices;
+};
+
 template <>
 struct Reflect<StableId> {
     static constexpr auto fields() { return std::make_tuple(field("value", &StableId::value)); }
@@ -97,6 +125,23 @@ struct Reflect<Spin> {
 template <>
 struct Reflect<Player> {
     static constexpr auto fields() { return std::make_tuple(field("metresPerSecond", &Player::metresPerSecond)); }
+};
+template <>
+struct Reflect<Animator> {
+    static constexpr auto fields()
+    {
+        return std::make_tuple(field("clip", &Animator::clip), field("time", &Animator::time), field("speed", &Animator::speed),
+            field("loop", &Animator::loop), field("rootMotion", &Animator::rootMotion));
+    }
+};
+template <>
+struct Reflect<MontagePlayer> {
+    static constexpr auto fields()
+    {
+        return std::make_tuple(field("clip", &MontagePlayer::clip), field("activeStart", &MontagePlayer::activeStart),
+            field("activeEnd", &MontagePlayer::activeEnd), field("recoveryEnd", &MontagePlayer::recoveryEnd),
+            field("time", &MontagePlayer::time), field("phase", &MontagePlayer::phase));
+    }
 };
 template <>
 struct Reflect<StaticBox> {

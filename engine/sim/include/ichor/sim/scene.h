@@ -4,6 +4,7 @@
 #include "ichor/core/rng.h"
 #include "ichor/sim/commands.h"
 #include "ichor/sim/components.h"
+#include "ichor/anim/animation.h"
 #include "ichor/sim/physics.h"
 
 #include <entt/entity/registry.hpp>
@@ -11,6 +12,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -47,6 +49,11 @@ public:
     const CommandLog& log() const { return log_; }
     const PhysicsWorld& physics() const { return *physics_; }
 
+    // The clips Animator components refer to. The scene does not own it; the
+    // app or test keeps it alive and loads bundles into it.
+    void setAnimations(const AnimationSet* animations) { animations_ = animations; }
+    const AnimationSet* animations() const { return animations_; }
+
     // Snapshot support: scene_io writes and restores these directly.
     struct Clock {
         std::uint64_t tick = 0;
@@ -60,19 +67,27 @@ public:
     // restore starts a new timeline.
     void clearForRestore();
     // Spawns without logging a command; snapshots are restored, not replayed.
-    void restore(const SpawnCommand& spawn) { apply(spawn); }
+    void restore(const SpawnCommand& spawn, const std::optional<MontagePlayer>& montage = {})
+    {
+        apply(spawn);
+        if (montage) {
+            registry_.emplace_or_replace<MontagePlayer>(find(spawn.id), *montage);
+        }
+    }
 
 private:
     void apply(const Command& command);
     void applyInput(const InputFrame& input, double dt);
     void rememberPreviousTransforms();
     void spinSystem(double dt);
+    void animationSystem(double dt);
     void physicsSystem(double dt);
 
     std::uint64_t seed_;
     entt::registry registry_;
     std::unordered_map<std::uint64_t, entt::entity> index_;
     std::unique_ptr<PhysicsWorld> physics_;
+    const AnimationSet* animations_ = nullptr;
     std::map<std::string, Rng, std::less<>> rngs_;
     std::vector<Command> pending_;
     CommandLog log_;

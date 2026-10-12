@@ -240,6 +240,11 @@ bool VulkanRenderer::uploadBundle(const SceneBundle& bundle)
     return impl_->scene->uploadBundle(bundle);
 }
 
+std::uint32_t VulkanRenderer::meshCount() const
+{
+    return impl_->scene ? impl_->scene->meshCount() : 0;
+}
+
 bool VulkanRenderer::reloadShaders()
 {
     return impl_->scene->reloadPipelines();

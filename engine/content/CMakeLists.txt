@@ -3,7 +3,7 @@
 set(ICHOR_CONTENT_DIR ${CMAKE_BINARY_DIR}/content CACHE INTERNAL "cooked content output")
 file(MAKE_DIRECTORY ${ICHOR_CONTENT_DIR})
 
-set(sources ${CMAKE_SOURCE_DIR}/tests/data/kit.glb)
+set(sources ${CMAKE_SOURCE_DIR}/tests/data/kit.glb ${CMAKE_SOURCE_DIR}/tests/data/arm.glb)
 set(outputs)
 foreach(src ${sources})
     get_filename_component(stem ${src} NAME_WE)

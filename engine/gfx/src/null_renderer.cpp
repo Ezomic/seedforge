@@ -18,6 +18,9 @@ void NullRenderer::beginFrame()
 void NullRenderer::submit(const RenderView& view)
 {
     instances_ += view.instances.size();
+    for (const RenderInstance& instance : view.instances) {
+        skinned_ += instance.jointCount > 0 ? 1 : 0;
+    }
 }
 
 void NullRenderer::endFrame()

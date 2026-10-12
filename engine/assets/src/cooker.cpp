@@ -1,6 +1,7 @@
 #include "ichor/assets/cooker.h"
 
 #include "ichor/assets/image.h"
+#include "ichor/assets/skeleton_cook.h"
 #include "ichor/core/log.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -35,6 +36,20 @@ bool readAccessor(const cgltf_accessor* accessor, cgltf_size components, std::ve
     out.resize(accessor->count * components);
     for (cgltf_size i = 0; i < accessor->count; ++i) {
         if (!cgltf_accessor_read_float(accessor, i, out.data() + i * components, components)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool readJoints(const cgltf_accessor* accessor, std::vector<std::uint32_t>& out)
+{
+    if (accessor == nullptr) {
+        return false;
+    }
+    out.resize(accessor->count * 4);
+    for (cgltf_size i = 0; i < accessor->count; ++i) {
+        if (!cgltf_accessor_read_uint(accessor, i, out.data() + i * 4, 4)) {
             return false;
         }
     }
@@ -106,7 +121,8 @@ void optimizeMesh(Mesh& mesh, CookStats& stats)
     stats.triangles += static_cast<std::uint32_t>(mesh.indices.size() / 3);
 }
 
-bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, CookStats& stats)
+// `jointRemap` maps glTF skin joint slots (what JOINTS_0 indexes) to ozz joint indices.
+bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vector<std::uint16_t>* jointRemap, Mesh& mesh, CookStats& stats)
 {
     mesh.name = source.name != nullptr ? source.name : "";
     mesh.boundsMin = glm::vec3(std::numeric_limits<float>::max());
@@ -116,10 +132,14 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, Cook
     std::vector<float> normals;
     std::vector<float> tangents;
     std::vector<float> uvs;
+    std::vector<float> weights;
+    std::vector<std::uint32_t> joints;
     bool needTangents = false;
 
     for (cgltf_size p = 0; p < source.primitives_count; ++p) {
         const cgltf_primitive& prim = source.primitives[p];
+        joints.clear();
+        weights.clear();
         if (prim.type != cgltf_primitive_type_triangles || prim.indices == nullptr) {
             logf(LogLevel::Warn, "mesh {}: skipping non-indexed or non-triangle primitive", mesh.name);
             continue;
@@ -128,12 +148,16 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, Cook
         const cgltf_accessor* normAcc = nullptr;
         const cgltf_accessor* tanAcc = nullptr;
         const cgltf_accessor* uvAcc = nullptr;
+        const cgltf_accessor* jointAcc = nullptr;
+        const cgltf_accessor* weightAcc = nullptr;
         for (cgltf_size a = 0; a < prim.attributes_count; ++a) {
             const cgltf_attribute& attr = prim.attributes[a];
             if (attr.type == cgltf_attribute_type_position) posAcc = attr.data;
             if (attr.type == cgltf_attribute_type_normal) normAcc = attr.data;
             if (attr.type == cgltf_attribute_type_tangent) tanAcc = attr.data;
             if (attr.type == cgltf_attribute_type_texcoord && attr.index == 0) uvAcc = attr.data;
+            if (attr.type == cgltf_attribute_type_joints && attr.index == 0) jointAcc = attr.data;
+            if (attr.type == cgltf_attribute_type_weights && attr.index == 0) weightAcc = attr.data;
         }
         if (!readAccessor(posAcc, 3, positions) || !readAccessor(normAcc, 3, normals)) {
             logf(LogLevel::Error, "mesh {}: primitive without positions or normals", mesh.name);
@@ -141,7 +165,9 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, Cook
         }
         const bool hasUv = readAccessor(uvAcc, 2, uvs);
         const bool hasTangents = readAccessor(tanAcc, 4, tangents);
-        if (normAcc->count != posAcc->count || (hasUv && uvAcc->count != posAcc->count) || (hasTangents && tanAcc->count != posAcc->count)) {
+        const bool hasSkin = jointRemap != nullptr && readJoints(jointAcc, joints) && readAccessor(weightAcc, 4, weights);
+        if (normAcc->count != posAcc->count || (hasUv && uvAcc->count != posAcc->count) || (hasTangents && tanAcc->count != posAcc->count)
+            || (hasSkin && (jointAcc->count != posAcc->count || weightAcc->count != posAcc->count))) {
             logf(LogLevel::Error, "mesh {}: attribute counts disagree", mesh.name);
             return false;
         }
@@ -154,6 +180,32 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, Mesh& mesh, Cook
             vertex.normal = glm::make_vec3(normals.data() + v * 3);
             vertex.tangent = hasTangents ? glm::make_vec4(tangents.data() + v * 4) : glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
             vertex.uv = hasUv ? glm::make_vec2(uvs.data() + v * 2) : glm::vec2(0.0f);
+            vertex.weights[0] = 65535;
+            float sum = 0.0f;
+            if (hasSkin) {
+                for (int k = 0; k < 4; ++k) {
+                    sum += weights[v * 4 + k];
+                }
+            }
+            // An unweighted vertex rides the first joint rigidly rather than collapsing to the origin.
+            if (hasSkin && sum > 0.0f) {
+                const float scale = 65535.0f / sum;
+                std::uint32_t total = 0;
+                int largest = 0;
+                for (int k = 0; k < 4; ++k) {
+                    const std::uint32_t slot = joints[v * 4 + k];
+                    if (slot >= jointRemap->size()) {
+                        logf(LogLevel::Error, "mesh {}: joint index {} outside the skin", mesh.name, slot);
+                        return false;
+                    }
+                    vertex.joints[k] = (*jointRemap)[slot];
+                    vertex.weights[k] = static_cast<std::uint16_t>(std::lround(weights[v * 4 + k] * scale));
+                    total += vertex.weights[k];
+                    if (vertex.weights[k] > vertex.weights[largest]) largest = k;
+                }
+                // Rounding leaves the four a unit or two short of one; the largest absorbs it.
+                vertex.weights[largest] = static_cast<std::uint16_t>(vertex.weights[largest] + (65535 - static_cast<int>(total)));
+            }
             mesh.boundsMin = glm::min(mesh.boundsMin, vertex.position);
             mesh.boundsMax = glm::max(mesh.boundsMax, vertex.position);
             mesh.vertices.push_back(vertex);
@@ -247,15 +299,47 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
         bundle.materials.push_back(Material{.name = "default"});
     }
 
+    // Skins become skeletons; each remembers how its glTF joint slots map to ozz joints.
+    std::vector<std::vector<std::uint16_t>> jointRemaps(data->skins_count);
+    for (cgltf_size s = 0; s < data->skins_count && ok; ++s) {
+        Skeleton skeleton;
+        ok = cookSkeleton(*data, data->skins[s], skeleton, jointRemaps[s]);
+        if (ok) {
+            bundle.skeletons.push_back(std::move(skeleton));
+        }
+    }
+    for (cgltf_size a = 0; a < data->animations_count && ok; ++a) {
+        for (cgltf_size s = 0; s < data->skins_count; ++s) {
+            AnimationClip clip;
+            if (cookClip(*data, data->animations[a], data->skins[s], bundle.skeletons[s], static_cast<std::uint32_t>(s), clip)) {
+                bundle.clips.push_back(std::move(clip));
+                stats.clips += 1;
+            }
+        }
+    }
+
+    // Meshes are cooked once per glTF mesh; skinning data comes from the first
+    // node's skin, which is how exporters pair them.
     std::unordered_map<const cgltf_mesh*, std::uint32_t> meshIndex;
-    for (cgltf_size m = 0; m < data->meshes_count && ok; ++m) {
+    for (cgltf_size n = 0; n < data->nodes_count && ok; ++n) {
+        const cgltf_node& src = data->nodes[n];
+        if (src.mesh == nullptr || meshIndex.contains(src.mesh)) {
+            continue;
+        }
         Mesh mesh;
-        if (!cookMesh(*data, data->meshes[m], mesh, stats)) {
+        const std::vector<std::uint16_t>* remap = src.skin != nullptr ? &jointRemaps[src.skin - data->skins] : nullptr;
+        if (!cookMesh(*data, *src.mesh, remap, mesh, stats)) {
             ok = false;
             break;
         }
-        meshIndex[&data->meshes[m]] = static_cast<std::uint32_t>(bundle.meshes.size());
+        mesh.skeleton = src.skin != nullptr ? static_cast<std::uint32_t>(src.skin - data->skins) : kNoSkeleton;
+        meshIndex[src.mesh] = static_cast<std::uint32_t>(bundle.meshes.size());
         bundle.meshes.push_back(std::move(mesh));
+    }
+    for (cgltf_size m = 0; m < data->meshes_count; ++m) {
+        if (!meshIndex.contains(&data->meshes[m])) {
+            logf(LogLevel::Warn, "mesh {}: no node references it, dropped", data->meshes[m].name != nullptr ? data->meshes[m].name : "");
+        }
     }
 
     for (cgltf_size n = 0; n < data->nodes_count && ok; ++n) {

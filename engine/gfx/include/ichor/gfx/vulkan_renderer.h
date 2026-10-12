@@ -19,6 +19,7 @@ public:
 
     bool init() override;
     bool uploadBundle(const SceneBundle& bundle) override;
+    std::uint32_t meshCount() const override;
     bool reloadShaders() override;
     void beginFrame() override;
     void submit(const RenderView& view) override;

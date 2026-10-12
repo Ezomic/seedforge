@@ -23,6 +23,8 @@ enum ComponentBits : std::uint32_t {
     HasPlayer = 1u << 2,
     HasStaticBox = 1u << 3,
     HasCharacter = 1u << 4,
+    HasAnimator = 1u << 5,
+    HasMontage = 1u << 6,
 };
 
 struct RngState {
@@ -73,6 +75,10 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
         const auto* player = registry.try_get<Player>(entity);
         const auto* box = registry.try_get<StaticBox>(entity);
         const auto* body = registry.try_get<CharacterBody>(entity);
+        const auto* animator = registry.try_get<Animator>(entity);
+        const auto* montage = registry.try_get<MontagePlayer>(entity);
+        if (animator) bits |= HasAnimator;
+        if (montage) bits |= HasMontage;
         if (mesh) bits |= HasMesh;
         if (spin) bits |= HasSpin;
         if (player) bits |= HasPlayer;
@@ -87,6 +93,8 @@ bool saveScene(const std::filesystem::path& path, const Scene& scene)
         if (player) w.write(*player);
         if (box) w.write(*box);
         if (body) w.write(*body);
+        if (animator) w.write(*animator);
+        if (montage) w.write(*montage);
     }
 
     return writeFileAtomically(path, w.bytes());
@@ -125,6 +133,7 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
 
     // Everything is parsed before the scene is touched, so a bad file leaves it intact.
     std::vector<SpawnCommand> spawns;
+    std::vector<std::optional<MontagePlayer>> montages;
     for (std::uint32_t i = 0; i < count; ++i) {
         SpawnCommand spawn;
         std::uint32_t bits = 0;
@@ -154,7 +163,19 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
             if (!r.read(body)) return bad("truncated character");
             spawn.character = body;
         }
+        if ((bits & HasAnimator) != 0) {
+            Animator animator;
+            if (!r.read(animator)) return bad("truncated animator");
+            spawn.animator = animator;
+        }
+        std::optional<MontagePlayer> montage;
+        if ((bits & HasMontage) != 0) {
+            MontagePlayer player;
+            if (!r.read(player)) return bad("truncated montage");
+            montage = player;
+        }
         spawns.push_back(std::move(spawn));
+        montages.push_back(montage);
     }
     if (!r.atEnd()) return bad("trailing bytes");
 
@@ -167,8 +188,8 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
     for (const SpawnCommand& spawn : spawns) {
         if (spawn.staticBox) scene.restore(spawn);
     }
-    for (const SpawnCommand& spawn : spawns) {
-        if (!spawn.staticBox) scene.restore(spawn);
+    for (std::size_t i = 0; i < spawns.size(); ++i) {
+        if (!spawns[i].staticBox) scene.restore(spawns[i], montages[i]);
     }
     return true;
 }

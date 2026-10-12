@@ -8,7 +8,7 @@ add_library(ichor_sim
     src/physics.cpp
 )
 target_include_directories(ichor_sim PUBLIC include)
-target_link_libraries(ichor_sim PUBLIC ichor_core EnTT::EnTT glm::glm-header-only PRIVATE Jolt::Jolt)
+target_link_libraries(ichor_sim PUBLIC ichor_core ichor_anim EnTT::EnTT glm::glm-header-only PRIVATE Jolt::Jolt)
 target_compile_definitions(ichor_sim PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_ENABLE_EXPERIMENTAL)
 
 # Jolt selects its SIMD paths from compiler macros, and the vcpkg build of the
