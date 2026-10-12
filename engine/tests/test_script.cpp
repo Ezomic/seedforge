@@ -329,3 +329,35 @@ TEST_CASE("scripted worlds are deterministic and a different script gives a diff
     REQUIRE(first != populate(7, 100, code));
     REQUIRE(first != populate(7, 99, "ichor.spawn('lonely', 0, 0, 0)"));
 }
+
+TEST_CASE("scripts cannot put non-finite or absurd numbers into the world")
+{
+    Scene scene(1);
+    ScriptHost host(1);
+    bindScene(host, scene);
+    REQUIRE_FALSE(host.run("nan", "ichor.spawn('a', 0/0, 0, 0)"));
+    REQUIRE_FALSE(host.run("inf", "ichor.spawn('a', math.huge, 0, 0)"));
+    REQUIRE_FALSE(host.run("big", "ichor.spawn('a', 1e300, 0, 0)"));
+    REQUIRE_FALSE(host.run("mesh-nan", "ichor.spawn('a', 0, 0, 0, 0/0)"));
+    REQUIRE_FALSE(host.run("mesh-big", "ichor.spawn('a', 0, 0, 0, 2^40)"));
+    REQUIRE_FALSE(host.run("mesh-frac", "ichor.spawn('a', 0, 0, 0, 1.5)"));
+    scene.tick(kDt);
+    REQUIRE_FALSE(isPresent(scene, "a"));
+}
+
+TEST_CASE("spawning a name twice, or touching one that is not there, is an error")
+{
+    Scene scene(1);
+    ScriptHost host(1);
+    bindScene(host, scene);
+    REQUIRE(host.run("first", "ichor.spawn('well', 0, 0, 0)"));
+    scene.tick(kDt);
+    REQUIRE_FALSE(host.run("dup", "ichor.spawn('well', 1, 1, 1)"));
+    REQUIRE(host.lastError().find("already exists") != std::string::npos);
+    REQUIRE_FALSE(host.run("ghost-move", "ichor.move('ghost', 1, 0, 0)"));
+    REQUIRE_FALSE(host.run("ghost-destroy", "ichor.destroy('ghost')"));
+    ScriptValue result;
+    REQUIRE(host.run("q", "function known(n) return ichor.exists(n) end"));
+    REQUIRE(host.call("known", {std::string("ghost")}, &result));
+    REQUIRE(std::get<bool>(result) == false);
+}

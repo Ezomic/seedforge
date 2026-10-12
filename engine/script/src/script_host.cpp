@@ -198,18 +198,22 @@ void ScriptHost::bind(std::string_view name, NativeFunction function)
 {
     sol::table api = impl_->lua["ichor"];
     api[std::string(name)] = [function = std::move(function)](sol::variadic_args args, sol::this_state state) -> sol::object {
-        std::vector<ScriptValue> values;
-        values.reserve(args.size());
-        for (const auto& arg : args) {
-            const sol::object object = arg;
-            switch (object.get_type()) {
-            case sol::type::boolean: values.emplace_back(object.as<bool>()); break;
-            case sol::type::number: values.emplace_back(object.as<double>()); break;
-            case sol::type::string: values.emplace_back(object.as<std::string>()); break;
-            default: values.emplace_back(std::monostate{}); break;
+        // Lua is a C build, so a memory error longjmps over C++ frames. The
+        // argument vector therefore dies before anything that can allocate in
+        // Lua runs, and arguments are read straight off the stack.
+        const ScriptValue result = [&] {
+            std::vector<ScriptValue> values;
+            values.reserve(args.size());
+            for (const auto& arg : args) {
+                switch (arg.get_type()) {
+                case sol::type::boolean: values.emplace_back(arg.get<bool>()); break;
+                case sol::type::number: values.emplace_back(arg.get<double>()); break;
+                case sol::type::string: values.emplace_back(arg.get<std::string>()); break;
+                default: values.emplace_back(std::monostate{}); break;
+                }
             }
-        }
-        const ScriptValue result = function(values);
+            return function(values);
+        }();
         return std::visit(
             [&](const auto& value) -> sol::object {
                 using T = std::decay_t<decltype(value)>;
