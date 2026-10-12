@@ -14,6 +14,7 @@
     "recastnavigation",
     "sol2",
     "nlohmann-json",
+    "rmlui",
     "lua",
     "ozz-animation",
     "miniaudio"
