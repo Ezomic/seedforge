@@ -28,8 +28,9 @@ struct DataTable {
 // into id-keyed tables. A file is a JSON array of objects, each with a string
 // "id" and fields that are booleans, numbers, strings or lists of strings.
 // The file's directory names the table; ids are unique within a table across
-// all its files. Loading is all or nothing: any error leaves the set empty
-// and names the file.
+// all its files. Loading is all or nothing: any error names the file and
+// leaves whatever was loaded before untouched, so a half-edited file during
+// a reload keeps the last good data.
 class DataSet {
 public:
     bool loadDirectory(const std::filesystem::path& root);

@@ -61,7 +61,8 @@ std::uint64_t hashValue(std::uint64_t seed, const DataValue& value)
 
 bool DataSet::loadDirectory(const std::filesystem::path& root)
 {
-    tables_.clear();
+    // Built aside and swapped in on success, so a half-edited file keeps the last good data.
+    std::map<std::string, DataTable, std::less<>> tables;
     error_.clear();
     std::error_code code;
     if (!std::filesystem::is_directory(root, code)) {
@@ -70,10 +71,14 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
     }
     // Sorted so the same files always load in the same order and errors are reproducible.
     std::vector<std::filesystem::path> files;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".json") {
-            files.push_back(entry.path());
+    for (std::filesystem::recursive_directory_iterator it(root, code), end; !code && it != end; it.increment(code)) {
+        if (it->is_regular_file(code) && it->path().extension() == ".json") {
+            files.push_back(it->path());
         }
+    }
+    if (code) {
+        error_ = "cannot read " + root.string() + ": " + code.message();
+        return false;
     }
     std::sort(files.begin(), files.end());
 
@@ -81,7 +86,6 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
         const std::filesystem::path relative = std::filesystem::relative(file, root);
         const auto fail = [&](const std::string& message) {
             error_ = relative.generic_string() + ": " + message;
-            tables_.clear();
             return false;
         };
         const std::string tableName = relative.has_parent_path() ? relative.begin()->generic_string() : relative.stem().generic_string();
@@ -94,7 +98,7 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
         if (!json.is_array()) {
             return fail("expected an array of records");
         }
-        DataTable& table = tables_[tableName];
+        DataTable& table = tables[tableName];
         table.name = tableName;
         for (std::size_t index = 0; index < json.size(); ++index) {
             const nlohmann::json& item = json[index];
@@ -120,6 +124,7 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
             table.records.emplace(record.id, std::move(record));
         }
     }
+    tables_ = std::move(tables);
     return true;
 }
 
