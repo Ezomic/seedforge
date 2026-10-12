@@ -5,12 +5,15 @@
 #include "ichor/sim/commands.h"
 #include "ichor/sim/components.h"
 #include "ichor/anim/animation.h"
+#include "ichor/core/binary.h"
 #include "ichor/sim/physics.h"
 #include "ichor/sim/sound_event.h"
 
 #include <entt/entity/registry.hpp>
 
+#include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -57,6 +60,49 @@ public:
 
     // What became audible during the last tick, cleared at the start of the next.
     const std::vector<SoundEvent>& soundEvents() const { return soundEvents_; }
+    void emitSound(const SoundEvent& event) { soundEvents_.push_back(event); }
+
+    // Game systems run every tick after input and before the engine's own
+    // systems, in the order they were added.
+    using System = std::function<void(Scene& scene, double dt, const InputFrame& input)>;
+    void addSystem(std::string name, System system);
+
+    // A reflected game component the scene hashes and snapshots beside its own.
+    // Register before any snapshot is loaded; names are part of the file.
+    template <class T>
+    void registerComponent(std::string name)
+    {
+        for (const ComponentHooks& existing : hooks_) {
+            if (existing.name == name) {
+                return;
+            }
+        }
+        ComponentHooks hooks;
+        hooks.name = std::move(name);
+        hooks.has = [this](entt::entity e) { return registry_.all_of<T>(e); };
+        hooks.write = [this](entt::entity e, BinaryWriter& w) { w.write(registry_.get<T>(e)); };
+        hooks.read = [this](entt::entity e, BinaryReader& r) {
+            T value;
+            if (!r.read(value)) return false;
+            registry_.emplace_or_replace<T>(e, value);
+            return true;
+        };
+        hooks.skip = [](BinaryReader& r) {
+            T value;
+            return r.read(value);
+        };
+        hooks_.push_back(std::move(hooks));
+        std::sort(hooks_.begin(), hooks_.end(), [](const ComponentHooks& a, const ComponentHooks& b) { return a.name < b.name; });
+    }
+
+    struct ComponentHooks {
+        std::string name;
+        std::function<bool(entt::entity)> has;
+        std::function<void(entt::entity, BinaryWriter&)> write;
+        std::function<bool(entt::entity, BinaryReader&)> read;
+        std::function<bool(BinaryReader&)> skip;
+    };
+    const std::vector<ComponentHooks>& componentHooks() const { return hooks_; }
 
     // Snapshot support: scene_io writes and restores these directly.
     struct Clock {
@@ -83,6 +129,7 @@ private:
     void apply(const Command& command);
     void applyInput(const InputFrame& input, double dt);
     void rememberPreviousTransforms();
+    void gameSystems(double dt, const InputFrame& input);
     void spinSystem(double dt);
     void animationSystem(double dt);
     void physicsSystem(double dt);
@@ -95,6 +142,8 @@ private:
     std::map<std::string, Rng, std::less<>> rngs_;
     std::vector<Command> pending_;
     std::vector<SoundEvent> soundEvents_;
+    std::vector<std::pair<std::string, System>> systems_;
+    std::vector<ComponentHooks> hooks_;
     CommandLog log_;
     std::uint64_t tickCount_ = 0;
     double time_ = 0.0;

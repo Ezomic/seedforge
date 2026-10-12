@@ -163,6 +163,18 @@ void Scene::applyInput(const InputFrame& input, double dt)
     }
 }
 
+void Scene::addSystem(std::string name, System system)
+{
+    systems_.emplace_back(std::move(name), std::move(system));
+}
+
+void Scene::gameSystems(double dt, const InputFrame& input)
+{
+    for (auto& [name, system] : systems_) {
+        system(*this, dt, input);
+    }
+}
+
 void Scene::rememberPreviousTransforms()
 {
     for (auto [entity, transform, previous] : registry_.view<const Transform, PreviousTransform>().each()) {
@@ -264,6 +276,10 @@ void Scene::animationSystem(double dt)
 
 void Scene::physicsSystem(double dt)
 {
+    // The component is the source of truth for intent; whatever system set it last wins.
+    for (auto [entity, id, body] : registry_.view<const StableId, const CharacterBody>().each()) {
+        physics_->setCharacterIntent(id, body.intent);
+    }
     physics_->step(dt);
     for (auto [entity, id, transform, body] : registry_.view<const StableId, Transform, CharacterBody>().each()) {
         PhysicsWorld::CharacterState state;
@@ -287,6 +303,7 @@ void Scene::tick(double dt, const InputFrame& input)
     pending_.clear();
 
     applyInput(input, dt);
+    gameSystems(dt, input);
     spinSystem(dt);
     animationSystem(dt);
     physicsSystem(dt);
@@ -333,6 +350,11 @@ std::uint64_t Scene::stateHash() const
         if (body) w.write(*body);
         if (animator) w.write(*animator);
         if (montage) w.write(*montage);
+        for (const ComponentHooks& hooks : hooks_) {
+            const bool has = hooks.has(entity);
+            w.write(static_cast<std::uint8_t>(has ? 1 : 0));
+            if (has) hooks.write(entity, w);
+        }
     }
     const auto& bytes = w.bytes();
     return hashCombine(h, hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size())));

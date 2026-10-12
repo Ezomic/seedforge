@@ -68,16 +68,16 @@ seedforge/
     axioms/  synergies/  catalogue/  kits/  grammars/
   viewer/               local web map viewer (Node)
   game/                 Ichor itself: gameplay, quests, ledger, AI, UI screens
-    src/                links engine/ and libworldforge/
+    stage0/             the doc 18 combat experiment, first code on the engine
     content/            cooked assets, kits, Lua
   tools/                data validation, asset cooking scripts
   art/                  Blender sources, generated textures and audio
   tracker/              the backlog, as JSON
 ```
 
-`game/` held the Unreal project until the Stage 0 gate moved to the engine. The Unreal
-tree is deleted once the engine reaches milestone E4 and Stage 0 runs there; until then it
-stays on disk for reference and is not built.
+`game/` held the Unreal project until Stage 0 ran on the engine; that tree was deleted on
+2026-10-12 at the end of milestone E4 and lives on in git history. `game/stage0/` is the
+experiment itself, built with the engine.
 
 **`data/` being shared is the important bit.** Axioms are read by *both* the generator and
 the game; two copies will diverge within a month.

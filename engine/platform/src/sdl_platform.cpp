@@ -48,9 +48,13 @@ void SdlPlatform::pumpEvents()
     InputFrame frame;
     frame.moveX = (down(SDL_SCANCODE_D, SDL_SCANCODE_RIGHT) ? 1.0f : 0.0f) - (down(SDL_SCANCODE_A, SDL_SCANCODE_LEFT) ? 1.0f : 0.0f);
     frame.moveY = (down(SDL_SCANCODE_W, SDL_SCANCODE_UP) ? 1.0f : 0.0f) - (down(SDL_SCANCODE_S, SDL_SCANCODE_DOWN) ? 1.0f : 0.0f);
-    if (keys[SDL_SCANCODE_SPACE]) frame.buttons |= InputFrame::Confirm;
+    if (down(SDL_SCANCODE_RETURN, SDL_SCANCODE_KP_ENTER)) frame.buttons |= InputFrame::Confirm;
     if (keys[SDL_SCANCODE_Q]) frame.buttons |= InputFrame::Cancel;
     if (down(SDL_SCANCODE_LSHIFT, SDL_SCANCODE_RSHIFT)) frame.buttons |= InputFrame::Sprint;
+    if (keys[SDL_SCANCODE_J]) frame.buttons |= InputFrame::Attack;
+    if (keys[SDL_SCANCODE_K]) frame.buttons |= InputFrame::Heavy;
+    if (keys[SDL_SCANCODE_L]) frame.buttons |= InputFrame::Block;
+    if (keys[SDL_SCANCODE_SPACE]) frame.buttons |= InputFrame::Dodge;
     input_ = frame;
 }
 

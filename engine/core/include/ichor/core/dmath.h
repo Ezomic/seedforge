@@ -4,10 +4,10 @@
 
 namespace ichor {
 
-// Sine and cosine built from additions, multiplications and one correctly
-// rounded floor, so every IEEE 754 platform agrees bit for bit. The libm
-// versions do not, and the state hash walks rotations produced by these.
-// Accuracy is about 1e-7 over the full range, which is float precision.
+// Sine, cosine and atan2 built from additions, multiplications, divisions
+// and one correctly rounded floor, so every IEEE 754 platform agrees bit for
+// bit. The libm versions do not, and the state hash walks rotations and
+// facings produced by these. Accuracy is about 1e-6, which is float precision.
 namespace dmath {
 
 constexpr float kPi = 3.14159265358979323846f;
@@ -35,6 +35,17 @@ inline float cosKernel(float y)
     p = p * z - 1.388731625493765e-3f;
     p = p * z + 4.166664568298827e-2f;
     return 1.0f - 0.5f * z + z * z * p;
+}
+
+// atan on [0, 1], about 1e-6 absolute (Cephes-style minimax).
+inline float atanKernel(float x)
+{
+    const float z = x * x;
+    float p = 8.05374526095e-2f;
+    p = p * z - 1.38776856032e-1f;
+    p = p * z + 1.99777106478e-1f;
+    p = p * z - 3.33329491539e-1f;
+    return x + x * z * p;
 }
 
 // Folds x into y in [0, pi/2] with the sign of sin(x) and cos(x).
@@ -70,6 +81,23 @@ inline float cos(float x)
     const detail::Fold f = detail::fold(x);
     const float v = f.y <= kQuarterPi ? detail::cosKernel(f.y) : detail::sinKernel(kHalfPi - f.y);
     return f.cosSign * v;
+}
+
+// Same contract as std::atan2, built from the kernel and one division.
+inline float atan2(float y, float x)
+{
+    const float ax = x < 0.0f ? -x : x;
+    const float ay = y < 0.0f ? -y : y;
+    if (ax == 0.0f && ay == 0.0f) {
+        return 0.0f;
+    }
+    // Fold to a ratio no larger than one, then once more to tan(pi/8), where the kernel is accurate.
+    const bool swap = ay > ax;
+    const float ratio = swap ? ax / ay : ay / ax;
+    float a = ratio > 0.41421356f ? kQuarterPi + detail::atanKernel((ratio - 1.0f) / (ratio + 1.0f)) : detail::atanKernel(ratio);
+    if (swap) a = kHalfPi - a;
+    if (x < 0.0f) a = kPi - a;
+    return y < 0.0f ? -a : a;
 }
 
 }

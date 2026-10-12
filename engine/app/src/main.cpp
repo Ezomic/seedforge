@@ -230,7 +230,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool confirmHeld = false;
     for (;;) {
         ZoneScopedN("frame");
-        // Space starts the light attack on the arm, with its wind-up and tell cues.
+        // Enter starts the light attack on the arm, with its wind-up and tell cues.
         const bool confirm = (platform.input().buttons & ichor::InputFrame::Confirm) != 0;
         if (confirm && !confirmHeld) {
             engine.scene().enqueue(ichor::PlayMontageCommand{ichor::StableId::of("arm"), armClip, 0.35f, 0.5f, 0.9f, windupCue, tellCue});

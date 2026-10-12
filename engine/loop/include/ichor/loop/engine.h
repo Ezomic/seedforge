@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
+#include <vector>
 
 namespace ichor {
 
@@ -27,12 +29,14 @@ struct EngineConfig {
 class Engine {
 public:
     using ViewBuilder = std::function<void(const Scene& scene, double alpha, RenderView& view)>;
+    using OverlayBuilder = std::function<void(const Scene& scene, std::vector<std::string>& lines)>;
 
     Engine(Platform& platform, Renderer& renderer, const EngineConfig& config);
 
     // Called once per frame between the simulation steps and the submit, with
     // the interpolation alpha for rendering between two fixed steps.
     void setViewBuilder(ViewBuilder builder) { viewBuilder_ = std::move(builder); }
+    void setOverlayBuilder(OverlayBuilder builder) { overlayBuilder_ = std::move(builder); }
 
     // Optional: receives the scene's sound events each tick and the camera as listener.
     void setAudio(AudioHost* audio) { audio_ = audio; }
@@ -63,6 +67,8 @@ private:
     Scene scene_;
     RenderView view_;
     ViewBuilder viewBuilder_;
+    OverlayBuilder overlayBuilder_;
+    std::vector<std::string> overlay_;
     InputStream recorded_;
     InputStream replay_;
     std::size_t replayIndex_ = 0;

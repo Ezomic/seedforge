@@ -15,6 +15,10 @@ struct InputFrame {
         Confirm = 1u << 0,
         Cancel = 1u << 1,
         Sprint = 1u << 2,
+        Attack = 1u << 3,
+        Heavy = 1u << 4,
+        Block = 1u << 5,
+        Dodge = 1u << 6,
     };
     std::uint32_t buttons = 0;
     float moveX = 0.0f; // right positive
