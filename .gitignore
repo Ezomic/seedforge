@@ -89,3 +89,9 @@ $RECYCLE.BIN/
 
 # Blender preview renders are regenerated on every run of the art scripts.
 art/renders/
+
+# ---------------------------------------------------------------------------
+# engine/ (CMake + vcpkg)
+# ---------------------------------------------------------------------------
+CMakeUserPresets.json
+vcpkg_installed/
