@@ -13,9 +13,8 @@ intermediate artifacts, a validation gate at the end.
 ### Why forge-once
 
 - Expensive generation becomes affordable (erosion, multi-pass settlement placement)
-- Heightmaps can be baked; runtime Landscape editing in UE is largely editor-only and
-  fighting it is a tar pit
-- World Partition, HLODs, and baked navmesh all work, because the world is authored-on-disk
+- Heightmaps can be baked to disk and streamed as immutable terrain tiles
+- Cell streaming, impostors, and a baked navmesh all work, because the world is authored-on-disk
 - **Generator patches cannot break existing campaigns** — see [14](14-save-system.md#versioning)
 
 Trade-off: switching seeds means a new campaign and a re-forge. For a classic RPG that is
@@ -39,9 +38,9 @@ correct — a seed is a campaign, not a level.
 | 9 | **Politics** | Territory map, faction data, contested cells |
 | 10 | **POIs** | POI list, dungeon archetype assignment, landmarks |
 | 11 | **Binding** | Item distribution, NPC cast, quest tensions, manifest |
-| 12 | **Bake** | Landscape, PCG inputs, navmesh, WP cells, HLODs |
+| 12 | **Bake** | Terrain tiles, scatter inputs, navmesh, streaming cells, impostors |
 
-**Only Phase 12 needs Unreal.** Phases 0–11 are a standalone library — see [17](17-tech-stack.md).
+**Only Phase 12 needs the engine.** Phases 0–11 are a standalone library, see [17](17-tech-stack.md).
 
 ### Phase notes
 
@@ -94,8 +93,8 @@ dungeon archetypes; place landmark silhouettes.
 **11 — Binding.** Distribute the item catalogue, generate the named NPC cast, seed initial
 quest tensions, forge dungeon layouts, write the manifest.
 
-**12 — Bake.** Heightmap and weightmaps into Landscape, PCG biome inputs, navmesh, World
-Partition cells, HLODs.
+**12 — Bake.** Heightmap and weightmaps into the engine's terrain tiles, biome scatter
+inputs, a Recast navmesh per cell, the streaming cell manifest, impostors.
 
 ---
 
@@ -105,7 +104,7 @@ Partition cells, HLODs.
 |---|---|
 | Elevation, erosion, hydrology | **4096² at 1 m** (64 MB per float field — trivial offline) |
 | Plates, climate | **256²**, upsampled — low-frequency by nature, saves enormous time |
-| Landscape target | 4033 × 4033 at 1 m scale ≈ 4 km |
+| Terrain target | 4096 × 4096 at 1 m scale ≈ 4 km, tiled for streaming |
 
 If over performance budget, drop erosion to 2048² and upsample before Phase 3 — flow
 accumulation cares about large-scale structure, and fine detail returns from materials and
@@ -178,5 +177,5 @@ operations), get the world *looking* right, then port phase by phase to C++. The
 immutable-artifact structure makes the port incremental and verifiable: port a phase, diff
 its PNG against the reference, move on.
 
-The mistake is writing it in UE C++ from day one and paying a two-minute compile-and-launch
+The mistake is writing it inside the engine from day one and paying a two-minute compile-and-launch
 for every erosion constant. There will be hundreds of those.

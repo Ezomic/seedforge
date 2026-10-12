@@ -15,6 +15,6 @@
     { "title": "Remaining Law power sources: The Mysteries, Temenos, The Oath", "description": "Orichalcum, Hecatomb and The Last Favour land earlier. Temenos needs a spatial strength field.", "type": "feature", "priority": "medium", "estimate": "3w", "labels": ["combat", "worldgen"] },
     { "title": "Temenos spatial field and positional power", "description": "Power becomes positional; holding the sanctuary is winning. The most mechanically distinct Law, and the closest to how Greek religion actually worked.", "type": "feature", "priority": "medium", "estimate": "1w", "labels": ["combat", "worldgen"] },
     { "title": "Enemy audio identity per role", "description": "Distinct wind-up sounds per role, plus footstep material detection.", "type": "feature", "priority": "medium", "estimate": "3d", "labels": ["combat", "audio"] },
-    { "title": "Silhouette validation against dense foliage", "description": "Test every enemy shape against the most common thing the PCG pass produces.", "type": "chore", "priority": "medium", "estimate": "3d", "labels": ["combat", "art", "validation"] }
+    { "title": "Silhouette validation against dense foliage", "description": "Test every enemy shape against the most common thing the vegetation scatter pass produces.", "type": "chore", "priority": "medium", "estimate": "3d", "labels": ["combat", "art", "validation"] }
   ]
 }

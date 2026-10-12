@@ -132,11 +132,10 @@ stranger walks your continent.
 Also worth shipping: **chronicle export** as readable text. *"Here's what happened in my Age
 of Salt run"* is shareable content that costs a text serialiser.
 
-## UE notes
+## Engine notes
 
-- Use `USaveGame` for player state if convenient, but **write the ledger yourself** —
-  compressed binary, own schema. UE's reflection-based serialisation is the wrong tool for a
-  few hundred thousand small facts
-- **Never serialise actor pointers or soft references to generated actors.** Serialise IDs
-  and re-resolve on load; generated actors do not exist when the save is read
+- **Write the ledger yourself**: compressed binary, own schema. Generic reflection-based
+  serialisation is the wrong tool for a few hundred thousand small facts
+- **Never serialise entity handles or pointers to generated entities.** Serialise IDs
+  and re-resolve on load; generated entities do not exist when the save is read
 - **Save/load round-trip is the one automated test worth insisting on.** See [17](17-tech-stack.md#testing--and-the-tool-that-will-save-you-most)

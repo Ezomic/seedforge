@@ -1,6 +1,6 @@
 # Ichor — Design Document
 
-A first/third-person open-world RPG in Unreal Engine 5.8, set in an **ancient Greece that
+A first/third-person open-world RPG on its own C++ engine, set in an **ancient Greece that
 never quite happened**, where each seed generates a complete world — its geography, its
 history, its politics, and the terms on which divine power reaches it. Worlds are **forged
 once** at new-game and baked to disk, not streamed from an infinite generator.
@@ -42,7 +42,7 @@ on consecrated ground is how Greek religion actually behaved; and a Pressure tha
 | 14 | [Save System](14-save-system.md) | Campaign/slot split, deterministic IDs, versioning |
 | 15 | [Multiplayer](15-multiplayer.md) | Async social now, co-op architecture decisions now |
 | 16 | [Art Direction](16-art-direction.md) | Atmosphere over fidelity, the unification stack |
-| 17 | [Tech Stack](17-tech-stack.md) | `libworldforge`, repo layout, tooling, order of work |
+| 17 | [Tech Stack](17-tech-stack.md) | The engine, `libworldforge`, repo layout, testing, order of work |
 | 18 | [Vertical Slice](18-vertical-slice.md) | Milestone 1 — scope, success criteria, kill criteria |
 | 19 | [Patrons & Trials](19-patrons-and-trials.md) | **Proposal.** Divine patrons, trials, heralds, Prometheus as an Anomaly |
 
@@ -66,8 +66,8 @@ system needs designing.
 
 ## Status
 
-Design complete, implementation not started.
-
-The first milestone is a hand-built 500 m vertical slice with no procedural content, gated
-on *"is one ordinary fight tense?"* — see **[18-vertical-slice.md](18-vertical-slice.md)**,
-which starts with a two-to-three-week grey-box combat prototype before any of the rest.
+Design complete. A first Stage 0 combat prototype was built in Unreal in August 2026 and its
+gate was never run; on 2026-10-12 the project left Unreal for its own engine, see
+**[17-tech-stack.md](17-tech-stack.md)**. Engine milestones E1 to E4 come first, then Stage 0
+runs again on the engine, gated on *"is one ordinary fight tense?"*, see
+**[18-vertical-slice.md](18-vertical-slice.md)**.

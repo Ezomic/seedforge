@@ -87,7 +87,7 @@ region's faction and biome. One AI implementation, dozens of faces.
 
 > **Constraint: no enemy may require a specific arena.** Test every one in open field,
 > dense forest, narrow corridor, steep slope, and shallow water. Steep procedural slopes
-> and water edges are where UE navmesh and root-motion attacks reliably fail — and a
+> and water edges are where navmesh and root-motion attacks reliably fail, and a
 > generated world produces those constantly, where a hand-built level would have avoided them.
 
 ## Readability without controlled lighting
@@ -98,7 +98,7 @@ In a hand-built level a designer places light so the enemy reads. The generator 
   distinct sound. In fog, rain, dusk, or forest, audio may be all the player gets.
   → Creates an accessibility obligation: see [13](13-ui-hud.md#accessibility).
 - **Silhouette must survive clutter.** Test enemy shapes against dense foliage, the most
-  common thing the PCG pass produces.
+  common thing the vegetation scatter pass produces.
 - **Enforce a clear radius at encounter placement** — a cheap generator validation pass
   that refuses to spawn a fight inside unreadable geometry.
 

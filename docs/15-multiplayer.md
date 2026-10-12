@@ -83,7 +83,7 @@ because shared scarcity in co-op generates arguments, not drama.
 > lean: single-instance with host priority or a party roll.
 
 **Replication load.** Modest given no terrain: player transforms, combat events, in-range
-NPC state, delta events. Well within what UE handles comfortably.
+NPC state, delta events. Well within what a simple snapshot replication layer handles.
 
 ---
 

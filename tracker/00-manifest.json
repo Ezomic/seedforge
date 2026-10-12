@@ -2,7 +2,7 @@
   "project": {
     "key": "SEED",
     "name": "Seedforge",
-    "description": "Seeded open-world RPG in Unreal Engine 5.8. Design docs in docs/."
+    "description": "Seeded open-world RPG on its own C++ engine. Design docs in docs/."
   },
   "note": "Generated from docs/. One file per design document. Epics map 1:1 to docs. Import order matters only in that 18-vertical-slice is the active milestone; everything else is backlog.",
   "epics": [

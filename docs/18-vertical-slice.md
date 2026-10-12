@@ -206,10 +206,9 @@ attacks."*
 
 ### Implementation
 
-**A C++ enum and a switch statement on the pawn. Not a Behaviour Tree.** BTs earn their keep
-with many agents and designer-authored logic; for one enemy in disposable code a switch is
-faster to write, faster to change and trivially debuggable. Blackboards and task nodes are
-ceremony for something being thrown away.
+**A C++ enum and a switch statement on the entity. Not a behaviour tree.** Behaviour trees
+earn their keep with many agents and designer-authored logic; for one enemy in disposable
+code a switch is faster to write, faster to change and trivially debuggable.
 
 **Always-on debug draw**: state, desire, spacing, active timers, tracking angle. You will read
 that overlay more than the code.
@@ -283,10 +282,13 @@ what a newcomer feels.
 **Stage 0 ships nothing and survives nothing.** It is an experiment whose output is an
 answer, not a foundation.
 
-Do **not** apply the architecture constraints here — no listen-server setup, no event
-sourcing, no Gameplay Ability System. Architecting a throwaway delays the only thing you need
-to know, and GAS in particular is the right question for the slice (when abilities exist) and
-the wrong thing to learn while finding out whether the fight is fun.
+Do **not** apply the architecture constraints here beyond what the engine already enforces:
+no ability system, no quest hooks, no ledger. The engine's fixed timestep, command layer and
+replay come for free and cost nothing to use; everything above them is thrown away.
+
+> The first Stage 0 was built in Unreal in August 2026 and its gate was never run. It is
+> rebuilt on the engine at milestone E4 ([17](17-tech-stack.md#order-of-work)); the
+> hypothesis, numbers and instrumentation in [stage0-log.md](stage0-log.md) carry over unchanged.
 
 If Stage 0 passes, the loop is rebuilt properly with architecture in place — days, not weeks,
 because by then you know exactly what you are building.
@@ -309,7 +311,7 @@ abandon a good idea for the wrong reason.
 Week two will suggest every one of these. Write them down and refuse them:
 
 Second enemy type · a combo · a second weapon · making the box look nicer · starting the
-500 m map · adopting GAS · a parry · levelling.
+500 m map · adopting an ability system · a parry · levelling.
 
 ---
 
@@ -341,7 +343,7 @@ Plus a **ridge** for a vantage point, a **river** for navigation-by-water, and *
 landmark silhouettes**.
 
 > **Every enemy is validated in all five conditions.** Steep slopes and water edges are where
-> UE navmesh and root-motion attacks reliably fall apart. A hand-built level would avoid them;
+> navmesh and root-motion attacks reliably fall apart. A hand-built level would avoid them;
 > this one must not, because
 > [the generator will produce them constantly](05-combat.md#enemies-roles-not-species).
 
@@ -456,7 +458,7 @@ leaves reusable pieces behind.** Enemy roles reuse the skirmisher machine, the b
 weapon class, and merchant and trainer share one interaction pattern — so the second enemy
 costs a fraction of the first.
 
-Working assumptions: 40 h weeks, one person, reasonable UE C++ fluency, and no
+Working assumptions: 40 h weeks, one person, reasonable C++ fluency, an engine at milestone E4, and no
 already-solved-it advantage on any of it.
 
 > Vertical slices routinely take twice their estimate, mostly from step 9 onward where "just
@@ -465,5 +467,5 @@ already-solved-it advantage on any of it.
 
 ## Next
 
-On passing: [17 — Order of work](17-tech-stack.md#order-of-work), step 2 — the NumPy
-generator, which is engine-independent and can proceed in parallel.
+On passing: the slice continues on engine milestones E5 and E6 ([17](17-tech-stack.md#order-of-work)).
+The NumPy generator is engine-independent and proceeds in parallel throughout.
