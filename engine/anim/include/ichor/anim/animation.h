@@ -42,6 +42,10 @@ public:
     // Pose times inverse bind: what the vertex shader multiplies by.
     bool skinningMatrices(std::uint32_t clip, float time, std::vector<glm::mat4>& out) const;
 
+    // One sampling that yields both: the model-space pose and the skinning
+    // matrices. `rootOut` receives the root joint's translation.
+    bool sample(std::uint32_t clip, float time, std::vector<glm::mat4>& skin, glm::vec3& rootOut) const;
+
     // Root joint translation at `time`, model space. The difference between
     // two samples is the root motion the controller should apply.
     bool rootTranslation(std::uint32_t clip, float time, glm::vec3& out) const;

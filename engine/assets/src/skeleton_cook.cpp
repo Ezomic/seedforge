@@ -34,6 +34,15 @@ struct Trs {
     glm::vec3 scale{1.0f};
 };
 
+Trs decomposeMatrix(const glm::mat4& m)
+{
+    Trs trs;
+    glm::vec3 skew;
+    glm::vec4 perspective;
+    glm::decompose(m, trs.scale, trs.rotation, trs.translation, skew, perspective);
+    return trs;
+}
+
 Trs localTransform(const cgltf_node& node)
 {
     Trs trs;
@@ -102,10 +111,30 @@ void sampleChannel(const cgltf_animation_sampler& sampler, float t, float out[N]
     float b[N];
     cgltf_accessor_read_float(values, i - 1, a, N);
     cgltf_accessor_read_float(values, i, b, N);
+    if constexpr (N == 4) {
+        // Quaternions on opposite hemispheres would swing the long way round.
+        float dot = 0.0f;
+        for (int k = 0; k < 4; ++k) dot += a[k] * b[k];
+        if (dot < 0.0f) {
+            for (int k = 0; k < 4; ++k) b[k] = -b[k];
+        }
+    }
     const float u = sampler.interpolation == cgltf_interpolation_type_step ? 0.0f : (t - t0) / std::max(t1 - t0, 1e-6f);
     for (int k = 0; k < N; ++k) {
         out[k] = a[k] + (b[k] - a[k]) * u;
     }
+}
+
+float lastKeyTime(const cgltf_animation_sampler& sampler)
+{
+    if (sampler.input->has_max) {
+        return sampler.input->max[0];
+    }
+    float t = 0.0f;
+    if (sampler.input->count > 0) {
+        cgltf_accessor_read_float(sampler.input, sampler.input->count - 1, &t, 1);
+    }
+    return t;
 }
 
 }
@@ -146,6 +175,15 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
     for (const cgltf_node* root : roots) {
         raw.roots.emplace_back();
         build(root, raw.roots.back());
+        // Inverse bind matrices are world-relative, so whatever sits above the
+        // root joint (an armature node, a 0.01 scale) is folded into its local transform.
+        if (root->parent != nullptr) {
+            float parentWorld[16];
+            cgltf_node_transform_world(root->parent, parentWorld);
+            float local[16];
+            cgltf_node_transform_local(root, local);
+            raw.roots.back().transform = toOzz(decomposeMatrix(glm::make_mat4(parentWorld) * glm::make_mat4(local)));
+        }
     }
     if (!raw.Validate()) {
         logf(LogLevel::Error, "skin {}: invalid skeleton", out.name);
@@ -165,6 +203,14 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
     for (int i = 0; i < skeleton->num_joints(); ++i) {
         out.jointNames.emplace_back(names[i]);
         indexOfName[names[i]] = static_cast<std::uint16_t>(i);
+    }
+    if (indexOfName.size() != static_cast<std::size_t>(skeleton->num_joints())) {
+        logf(LogLevel::Error, "skin {}: joint names must be unique and present", out.name);
+        return false;
+    }
+    if (skin.inverse_bind_matrices != nullptr && skin.inverse_bind_matrices->count < skin.joints_count) {
+        logf(LogLevel::Error, "skin {}: fewer inverse bind matrices than joints", out.name);
+        return false;
     }
     jointRemap.resize(skin.joints_count);
     out.inverseBind.assign(skeleton->num_joints(), glm::mat4(1.0f));
@@ -223,14 +269,16 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
         if (found == jointIndex.end()) {
             continue;
         }
+        if (channel.sampler->interpolation == cgltf_interpolation_type_cubic_spline) {
+            logf(LogLevel::Error, "clip {}: cubic spline samplers are not supported, export with linear keys", out.name);
+            return false;
+        }
         any = true;
         JointChannels& jc = channels[found->second];
         if (channel.target_path == cgltf_animation_path_type_translation) jc.translation = channel.sampler;
         if (channel.target_path == cgltf_animation_path_type_rotation) jc.rotation = channel.sampler;
         if (channel.target_path == cgltf_animation_path_type_scale) jc.scale = channel.sampler;
-        if (channel.sampler->input->has_max) {
-            duration = std::max(duration, channel.sampler->input->max[0]);
-        }
+        duration = std::max(duration, lastKeyTime(*channel.sampler));
     }
     if (!any || duration <= 0.0f) {
         return false;

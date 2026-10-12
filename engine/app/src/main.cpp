@@ -146,6 +146,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
         return 1;
     }
     const std::uint32_t armClip = animations.findClip("wave");
+    if (armClip == ichor::AnimationSet::kNoClip) {
+        ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
+        return 1;
+    }
 
     ichor::EngineConfig config;
     config.seed = options.seed;
@@ -177,7 +181,6 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
             return std::pair{glm::mix(previous.position, current.position, alpha), glm::slerp(previous.rotation, current.rotation, static_cast<float>(alpha))};
         };
-        view.jointPalette.clear();
         for (auto [entity, previous, transform, mesh] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::MeshRef>().each()) {
             const auto [position, rotation] = blend(previous, transform);
             ichor::RenderInstance instance;

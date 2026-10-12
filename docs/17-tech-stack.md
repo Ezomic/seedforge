@@ -173,7 +173,7 @@ The engine is built to be tested, and the tests are built with the engine, not a
 | **Headless** | load a scene with null backends, tick N fixed steps, assert on state | every push |
 | **Replay** | recorded input stream through a scene, assert the final world state hash | every push |
 | **Save/load round-trip** | mutate the ledger, save, load, compare. **The one game-side test worth insisting on.** The restored state is bit-exact; a physics run *continued* from a snapshot tracks the original closely rather than bit for bit, because Jolt's character keeps transient contact state no snapshot carries | every push |
-| **Determinism** | same seed twice, byte-identical forge output and byte-identical replay | every push |
+| **Determinism** | same seed twice, byte-identical forge output and byte-identical replay. Pose sampling feeds root motion into the hashed state; ozz's SSE path is deterministic per machine but its reciprocal square root estimates are not promised identical across CPU vendors, so cross-machine replay of animated characters is pinned by the golden tests rather than assumed | every push |
 | **Golden image** | render reference scenes offscreen, diff against stored images with tolerance | nightly, main |
 | **Performance** | reference walk through the densest cell; fail on frame time or hitch budget | nightly, main |
 | **Fuzz** | asset cooker inputs, save file loader, network packets later | nightly |

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 
@@ -139,18 +140,28 @@ bool validate(const SceneBundle& bundle, const std::string& file)
     }
     for (const Skeleton& s : bundle.skeletons) {
         if (s.jointNames.empty() || s.jointNames.size() != s.inverseBind.size() || s.ozzBytes.empty()) return fail("skeleton shape");
+        for (const glm::mat4& m : s.inverseBind) {
+            for (int c = 0; c < 4; ++c) {
+                for (int r = 0; r < 4; ++r) {
+                    if (!std::isfinite(m[c][r])) return fail("inverse bind matrix");
+                }
+            }
+        }
     }
     for (const AnimationClip& c : bundle.clips) {
-        if (c.skeleton >= bundle.skeletons.size() || c.duration <= 0.0f || c.ozzBytes.empty()) return fail("clip shape");
+        if (c.skeleton >= bundle.skeletons.size() || !(c.duration > 0.0f) || !std::isfinite(c.duration) || c.ozzBytes.empty()) return fail("clip shape");
     }
     for (const Mesh& m : bundle.meshes) {
         if (m.vertices.empty() || m.indices.size() % 3 != 0 || m.submeshes.empty()) return fail("mesh shape");
         if (m.skeleton != kNoSkeleton && m.skeleton >= bundle.skeletons.size()) return fail("mesh skeleton index");
         const std::size_t jointCount = m.skeleton == kNoSkeleton ? 1 : bundle.skeletons[m.skeleton].jointNames.size();
         for (const Vertex& v : m.vertices) {
-            for (std::uint16_t joint : v.joints) {
-                if (joint >= jointCount) return fail("vertex joint index");
+            std::uint32_t sum = 0;
+            for (int k = 0; k < 4; ++k) {
+                if (v.joints[k] >= jointCount) return fail("vertex joint index");
+                sum += v.weights[k];
             }
+            if (sum == 0) return fail("vertex without weights");
         }
         for (std::uint32_t index : m.indices) {
             if (index >= m.vertices.size()) return fail("index out of range");

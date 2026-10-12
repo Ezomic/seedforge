@@ -86,7 +86,7 @@ void Scene::apply(const Command& command)
                 registry_.emplace<CharacterBody>(entity, *c.character);
                 physics_->addCharacter(c.id, *c.character, c.transform);
             }
-            if (c.animator) {
+            if (c.animator && (animations_ == nullptr || c.animator->clip < animations_->clipCount())) {
                 registry_.emplace<Animator>(entity, *c.animator);
                 registry_.emplace<SkinPose>(entity);
             }
@@ -96,6 +96,9 @@ void Scene::apply(const Command& command)
                 return;
             }
             if (auto* playing = registry_.try_get<MontagePlayer>(entity); playing != nullptr && playing->phase != 0) {
+                return;
+            }
+            if (animations_ != nullptr && c.clip >= animations_->clipCount()) {
                 return;
             }
             MontagePlayer player;
@@ -184,6 +187,7 @@ void Scene::animationSystem(double dt)
         std::uint32_t clip = animator.clip;
         float before = animator.time;
         float after = animator.time;
+        int wraps = 0;
 
         // A montage owns the entity while it plays; the loop clip waits.
         auto* montage = registry_.try_get<MontagePlayer>(entity);
@@ -200,10 +204,12 @@ void Scene::animationSystem(double dt)
             montage->phase = static_cast<std::uint8_t>(state.phase);
         } else {
             const float duration = animations_->clipDuration(animator.clip);
-            after = animator.time + fdt * animator.speed;
+            const float speed = std::max(0.0f, animator.speed);
+            after = animator.time + fdt * speed;
             if (duration > 0.0f) {
                 if (animator.loop) {
-                    after = std::fmod(after, duration);
+                    wraps = static_cast<int>(std::floor(after / duration));
+                    after = after - static_cast<float>(wraps) * duration;
                 } else {
                     after = std::min(after, duration);
                 }
@@ -211,20 +217,30 @@ void Scene::animationSystem(double dt)
             animator.time = after;
         }
 
+        glm::vec3 rootNow(0.0f);
+        if (!animations_->sample(clip, after, pose.matrices, rootNow)) {
+            pose.matrices.clear();
+            continue;
+        }
+
         if (animator.rootMotion) {
-            // Travel of the root joint this tick, in the entity's frame; a loop wrap adds the tail.
-            glm::vec3 a;
-            glm::vec3 b;
+            // Travel of the root joint this tick, in the entity's frame; each
+            // loop wrap adds a full clip of travel. The pose keeps the root in
+            // place so the mesh does not move twice.
+            glm::vec3 rootBefore(0.0f);
             glm::vec3 delta(0.0f);
-            if (animations_->rootTranslation(clip, before, a) && animations_->rootTranslation(clip, after, b)) {
-                delta = b - a;
-                if (after < before) {
+            if (animations_->rootTranslation(clip, before, rootBefore)) {
+                delta = rootNow - rootBefore;
+                if (wraps > 0) {
                     glm::vec3 end;
                     glm::vec3 start;
                     animations_->rootTranslation(clip, animations_->clipDuration(clip), end);
                     animations_->rootTranslation(clip, 0.0f, start);
-                    delta = (end - a) + (b - start);
+                    delta += static_cast<float>(wraps) * (end - start);
                 }
+            }
+            for (glm::mat4& m : pose.matrices) {
+                m[3] -= glm::vec4(rootNow, 0.0f);
             }
             const glm::vec3 world = transform.rotation * delta;
             if (registry_.all_of<CharacterBody>(entity)) {
@@ -235,8 +251,6 @@ void Scene::animationSystem(double dt)
                 registry_.get<Transform>(entity).position += glm::dvec3(world);
             }
         }
-
-        animations_->skinningMatrices(clip, after, pose.matrices);
     }
 }
 

@@ -462,8 +462,6 @@ bool SceneRenderer::createFrameSlots()
         if (slot.frameUbo.mapped == nullptr || slot.debugVertices.mapped == nullptr || slot.jointPalette.mapped == nullptr) {
             return false;
         }
-        // An identity at slot zero keeps rigid draws valid if a shader ever reads the palette.
-        static_cast<glm::mat4*>(slot.jointPalette.mapped)[0] = glm::mat4(1.0f);
 
         VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         allocInfo.descriptorPool = pool_;
@@ -515,6 +513,24 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
     }
     const auto textureBase = static_cast<std::uint32_t>(textures_.size());
     const auto materialBase = static_cast<std::uint32_t>(materials_.size());
+    const auto meshBase = static_cast<std::uint32_t>(meshes_.size());
+    // On failure everything this call appended is dropped and earlier bundles stay valid.
+    const auto rollback = [&] {
+        for (std::size_t i = meshBase; i < meshes_.size(); ++i) {
+            ctx_.destroyBuffer(meshes_[i].vertices);
+            ctx_.destroyBuffer(meshes_[i].indices);
+        }
+        meshes_.resize(meshBase);
+        if (materialSets_.size() > materialBase) {
+            vkFreeDescriptorSets(ctx_.device(), pool_, static_cast<std::uint32_t>(materialSets_.size() - materialBase), materialSets_.data() + materialBase);
+        }
+        materialSets_.resize(materialBase);
+        materials_.resize(materialBase);
+        for (std::size_t i = textureBase; i < textures_.size(); ++i) {
+            ctx_.destroyImage(textures_[i]);
+        }
+        textures_.resize(textureBase);
+    };
 
     for (const Texture& texture : bundle.textures) {
         const VkFormat format = texture.format == TextureFormat::Rgba8Srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
@@ -522,7 +538,7 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT, texture.mipCount);
         textures_.push_back(image);
         if (image.image == VK_NULL_HANDLE || !ctx_.uploadTexture(textures_.back(), texture)) {
-            destroyBundle();
+            rollback();
             return false;
         }
     }
@@ -537,7 +553,7 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         allocInfo.pSetLayouts = &materialLayout_;
         VkDescriptorSet set = VK_NULL_HANDLE;
         if (!vkCheck(vkAllocateDescriptorSets(ctx_.device(), &allocInfo, &set), "vkAllocateDescriptorSets")) {
-            destroyBundle();
+            rollback();
             return false;
         }
         const std::array<VkDescriptorImageInfo, 3> images{{
@@ -571,11 +587,11 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         for (const Submesh& sub : mesh.submeshes) {
             gpu.submeshes.push_back({sub.firstIndex, sub.indexCount, std::min<std::uint32_t>(materialBase + sub.material, static_cast<std::uint32_t>(materials_.size()) - 1)});
         }
-        gpu.skinned = mesh.skeleton != kNoSkeleton;
+        gpu.jointCount = mesh.skeleton != kNoSkeleton ? static_cast<std::uint32_t>(bundle.skeletons[mesh.skeleton].jointNames.size()) : 0u;
         meshes_.push_back(std::move(gpu));
         GpuMesh& stored = meshes_.back();
         if (!ctx_.uploadBuffer(stored.vertices, mesh.vertices.data(), vertexBytes) || !ctx_.uploadBuffer(stored.indices, mesh.indices.data(), indexBytes)) {
-            destroyBundle();
+            rollback();
             return false;
         }
     }
@@ -614,6 +630,10 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     vmaFlushAllocation(ctx_.allocator(), frame.debugVertices.allocation, 0, sizeof(DebugVertex) * 2 * lineCount);
 
     const std::uint32_t jointCount = static_cast<std::uint32_t>(std::min<std::size_t>(view.jointPalette.size(), kMaxJoints));
+    if (view.jointPalette.size() > kMaxJoints && !paletteOverflowLogged_) {
+        logf(LogLevel::Warn, "joint palette has {} matrices, the renderer holds {}; later skinned instances draw rigid", view.jointPalette.size(), kMaxJoints);
+        paletteOverflowLogged_ = true;
+    }
     if (jointCount > 0) {
         std::memcpy(frame.jointPalette.mapped, view.jointPalette.data(), sizeof(glm::mat4) * jointCount);
         vmaFlushAllocation(ctx_.allocator(), frame.jointPalette.allocation, 0, sizeof(glm::mat4) * jointCount);
@@ -626,7 +646,8 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
                 continue;
             }
             const GpuMesh& mesh = meshes_[instance.mesh];
-            const bool skinned = mesh.skinned && instance.jointCount > 0 && instance.jointOffset + instance.jointCount <= jointCount;
+            // A skinned draw needs exactly its mesh's joints in the palette, or it draws rigid.
+            const bool skinned = mesh.jointCount > 0 && instance.jointCount == mesh.jointCount && instance.jointOffset + instance.jointCount <= jointCount;
             const VkPipeline wanted = shadowPass ? (skinned ? shadowSkinnedPipeline_ : shadowPipeline_) : (skinned ? pbrSkinnedPipeline_ : pbrPipeline_);
             if (wanted == VK_NULL_HANDLE) {
                 continue;

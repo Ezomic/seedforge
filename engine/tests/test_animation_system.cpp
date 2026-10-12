@@ -91,6 +91,11 @@ TEST_CASE("root motion walks a character about one metre per clip")
     const glm::dvec3 end = scene.registry().get<Transform>(scene.find(StableId::of("arm"))).position;
     const glm::dvec3 travel = end - start;
     REQUIRE(std::abs(glm::length(glm::dvec2(travel.x, travel.z)) - 1.0) < 0.15);
+
+    // The travel went into the transform, so the pose keeps its root at home.
+    const auto& pose = scene.registry().get<SkinPose>(scene.find(StableId::of("arm"))).matrices;
+    REQUIRE(pose.size() == 2);
+    REQUIRE(glm::length(glm::vec3(pose[0][3])) < 0.05f);
 }
 
 TEST_CASE("a montage commits: a second play is ignored until recovery ends")

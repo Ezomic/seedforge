@@ -138,6 +138,8 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vecto
 
     for (cgltf_size p = 0; p < source.primitives_count; ++p) {
         const cgltf_primitive& prim = source.primitives[p];
+        joints.clear();
+        weights.clear();
         if (prim.type != cgltf_primitive_type_triangles || prim.indices == nullptr) {
             logf(LogLevel::Warn, "mesh {}: skipping non-indexed or non-triangle primitive", mesh.name);
             continue;
@@ -179,12 +181,17 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vecto
             vertex.tangent = hasTangents ? glm::make_vec4(tangents.data() + v * 4) : glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
             vertex.uv = hasUv ? glm::make_vec2(uvs.data() + v * 2) : glm::vec2(0.0f);
             vertex.weights[0] = 65535;
+            float sum = 0.0f;
             if (hasSkin) {
-                float sum = 0.0f;
                 for (int k = 0; k < 4; ++k) {
                     sum += weights[v * 4 + k];
                 }
-                const float scale = sum > 0.0f ? 65535.0f / sum : 0.0f;
+            }
+            // An unweighted vertex rides the first joint rigidly rather than collapsing to the origin.
+            if (hasSkin && sum > 0.0f) {
+                const float scale = 65535.0f / sum;
+                std::uint32_t total = 0;
+                int largest = 0;
                 for (int k = 0; k < 4; ++k) {
                     const std::uint32_t slot = joints[v * 4 + k];
                     if (slot >= jointRemap->size()) {
@@ -193,7 +200,11 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vecto
                     }
                     vertex.joints[k] = (*jointRemap)[slot];
                     vertex.weights[k] = static_cast<std::uint16_t>(std::lround(weights[v * 4 + k] * scale));
+                    total += vertex.weights[k];
+                    if (vertex.weights[k] > vertex.weights[largest]) largest = k;
                 }
+                // Rounding leaves the four a unit or two short of one; the largest absorbs it.
+                vertex.weights[largest] = static_cast<std::uint16_t>(vertex.weights[largest] + (65535 - static_cast<int>(total)));
             }
             mesh.boundsMin = glm::min(mesh.boundsMin, vertex.position);
             mesh.boundsMax = glm::max(mesh.boundsMax, vertex.position);
@@ -324,6 +335,11 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
         mesh.skeleton = src.skin != nullptr ? static_cast<std::uint32_t>(src.skin - data->skins) : kNoSkeleton;
         meshIndex[src.mesh] = static_cast<std::uint32_t>(bundle.meshes.size());
         bundle.meshes.push_back(std::move(mesh));
+    }
+    for (cgltf_size m = 0; m < data->meshes_count; ++m) {
+        if (!meshIndex.contains(&data->meshes[m])) {
+            logf(LogLevel::Warn, "mesh {}: no node references it, dropped", data->meshes[m].name != nullptr ? data->meshes[m].name : "");
+        }
     }
 
     for (cgltf_size n = 0; n < data->nodes_count && ok; ++n) {

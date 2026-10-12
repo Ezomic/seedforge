@@ -198,6 +198,24 @@ bool AnimationSet::skinningMatrices(std::uint32_t clip, float time, std::vector<
     return true;
 }
 
+bool AnimationSet::sample(std::uint32_t clip, float time, std::vector<glm::mat4>& skin, glm::vec3& rootOut) const
+{
+    ozz::vector<ozz::math::Float4x4> models;
+    if (!impl_->modelMatrices(clip, time, models) || models.empty()) {
+        return false;
+    }
+    const auto& inverseBind = impl_->skeletons[impl_->clips[clip].skeleton].inverseBind;
+    skin.resize(models.size());
+    for (std::size_t i = 0; i < models.size(); ++i) {
+        const glm::mat4 model = toGlm(models[i]);
+        if (i == 0) {
+            rootOut = glm::vec3(model[3]);
+        }
+        skin[i] = model * inverseBind[i];
+    }
+    return true;
+}
+
 bool AnimationSet::rootTranslation(std::uint32_t clip, float time, glm::vec3& out) const
 {
     ozz::vector<ozz::math::Float4x4> models;

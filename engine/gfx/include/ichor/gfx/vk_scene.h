@@ -45,7 +45,7 @@ private:
         GpuBuffer vertices;
         GpuBuffer indices;
         std::vector<std::array<std::uint32_t, 3>> submeshes; // firstIndex, indexCount, material
-        bool skinned = false;
+        std::uint32_t jointCount = 0; // zero for rigid meshes
     };
     struct FrameSlot {
         GpuBuffer frameUbo;
@@ -92,6 +92,7 @@ private:
     };
     std::vector<MaterialConstants> materials_;
     std::vector<GpuMesh> meshes_;
+    bool paletteOverflowLogged_ = false;
 };
 
 }
