@@ -8,6 +8,7 @@
 #include "ichor/ui/ui_context.h"
 #include "ichor/world/atmosphere.h"
 #include "ichor/world/vegetation.h"
+#include "ichor/world/weather.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
 
@@ -309,7 +310,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {})
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -348,7 +349,10 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false)
             }
         }
     }
-    applyAtmosphere(atmosphereAt(hour), view);
+    Atmosphere atmosphere = atmosphereAt(hour);
+    applyWeather(weather, atmosphere);
+    applyAtmosphere(atmosphere, view);
+    view.time = 1.25f;
     const glm::dvec3 eye(centre - 60.0, heightfield.heightAt(centre - 60.0, centre + 90.0) + 25.0, centre + 90.0);
     const glm::dvec3 west(centre - 900.0, heightfield.heightAt(centre - 900.0, centre - 100.0) + 30.0, centre - 100.0);
     view.camera.position = eye;
@@ -400,4 +404,14 @@ TEST_CASE("golden image: the terrain at night")
 TEST_CASE("golden image: the forested terrain")
 {
     checkTerrainAtHour(15.0f, "terrain_forest", true);
+}
+
+TEST_CASE("golden image: an overcast day")
+{
+    checkTerrainAtHour(15.0f, "terrain_overcast", true, {0.8f, 0.0f});
+}
+
+TEST_CASE("golden image: a downpour")
+{
+    checkTerrainAtHour(15.0f, "terrain_rain", true, {1.0f, 1.0f});
 }

@@ -23,6 +23,7 @@ add_executable(ichor_tests
     test_atmosphere.cpp
     test_vegetation.cpp
     test_reverb.cpp
+    test_weather.cpp
     test_ui.cpp
     test_save.cpp
 )

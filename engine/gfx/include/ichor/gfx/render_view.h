@@ -73,6 +73,8 @@ struct RenderView {
     glm::vec3 skyHorizon{0.55f, 0.7f, 0.85f};
     glm::vec3 fogColor{0.55f, 0.7f, 0.85f};
     float fogDensity = 0.0f; // per metre; zero is no fog
+    float rainIntensity = 0.0f; // 0 dry to 1 downpour; streaks are drawn over the picture
+    float time = 0.0f;          // seconds, for effects that move; the caller keeps it small
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;
