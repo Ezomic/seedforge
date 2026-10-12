@@ -34,8 +34,6 @@ public:
     // buffer is left untouched and the tail is dropped.
     void process(float* interleaved, std::uint32_t frames);
 
-    // False once the wet level has settled at zero, when process() does nothing.
-    bool active() const { return current_.wet > 0.0f || target_.wet > 0.0f; }
 
 private:
     static constexpr int kCombs = 8;
@@ -60,6 +58,7 @@ private:
     std::array<Channel, 2> channels_;
     ReverbSettings target_;
     ReverbSettings current_;
+    bool dirty_ = false; // the buffers hold something since they were last cleared
 };
 
 // A sphere of space with its own reverb: a cave mouth, a temple, a canyon.

@@ -16,7 +16,7 @@ namespace ichor {
 // arithmetic, so the tests render it to a buffer and check the numbers.
 class Mixer {
 public:
-    static constexpr std::uint32_t kRate = 48000;
+    static constexpr std::uint32_t kRate = Reverb::kRate;
     static constexpr std::uint32_t kChannels = 2;
     static constexpr std::uint32_t kNoSound = 0xffffffffu;
 

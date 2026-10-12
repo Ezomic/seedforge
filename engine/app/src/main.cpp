@@ -470,6 +470,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     watcher.watchTree(options.data, ".json");
 
     double last = platform.now();
+    ichor::ReverbSettings lastReverb;
     bool confirmHeld = false;
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
@@ -523,7 +524,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!engine.frame(dt)) {
             break;
         }
-        audio.setReverb(reverbField.at(playerPosition(engine.scene())));
+        // The audio thread holds a lock while it renders, so only a change is worth taking it for.
+        const ichor::ReverbSettings reverb = reverbField.at(playerPosition(engine.scene()));
+        if (reverb != lastReverb) {
+            audio.setReverb(reverb);
+            lastReverb = reverb;
+        }
         if (options.frames != 0 && engine.frameCount() >= options.frames) {
             break;
         }

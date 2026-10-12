@@ -9,6 +9,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <vector>
 
 using namespace ichor;
@@ -57,7 +58,6 @@ TEST_CASE("a dry reverb leaves the signal exactly as it was")
     const std::vector<float> before = signal;
     reverb.process(signal.data(), 4800);
     REQUIRE(signal == before);
-    REQUIRE_FALSE(reverb.active());
 }
 
 TEST_CASE("a wet reverb rings on after the sound has ended")
@@ -109,7 +109,6 @@ TEST_CASE("settings ramp in rather than jumping, and dropping to dry clears the 
     reverb.setSettings({});
     std::vector<float> after(2 * 96000, 0.0f);
     reverb.process(after.data(), 96000);
-    REQUIRE_FALSE(reverb.active());
     // Once settled at dry, a fresh signal passes through untouched.
     std::vector<float> signal = click(2000);
     const std::vector<float> before = signal;
@@ -206,4 +205,37 @@ TEST_CASE("stamps load from the data layer, and a bad one loads nothing")
     DataSet empty;
     ReverbField none;
     REQUIRE(loadReverbStamps(empty, none)); // no table is no stamps, not an error
+}
+
+TEST_CASE("non-finite settings and positions are ignored, not remembered")
+{
+    Reverb reverb;
+    reverb.setSettings({0.5f, 0.6f, 0.4f});
+    reverb.setSettings({std::nanf(""), 0.6f, 0.4f});
+    reverb.setSettings({0.5f, std::numeric_limits<float>::infinity(), 0.4f});
+    REQUIRE(reverb.settings() == ReverbSettings{0.5f, 0.6f, 0.4f});
+    std::vector<float> signal = click(4800);
+    reverb.process(signal.data(), 4800);
+    for (float sample : signal) {
+        REQUIRE(std::isfinite(sample));
+    }
+
+    ReverbField field;
+    field.add({{0.0, 0.0, 0.0}, 20.0f, {0.8f, 0.9f, 0.2f}});
+    const ReverbSettings lost = field.at({std::nan(""), 0.0, 0.0});
+    REQUIRE(lost == ReverbSettings{});
+}
+
+TEST_CASE("a stamp radius that vanishes when narrowed to float is refused")
+{
+    const auto dir = std::filesystem::temp_directory_path() / "ichor_reverb_data_radius";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "reverb");
+    std::ofstream(dir / "reverb" / "stamps.json", std::ios::binary) << R"([{"id": "tiny", "x": 0, "y": 0, "z": 0, "radius": 1e-50, "wet": 0.5, "room": 0.5, "damping": 0.5}])";
+    DataSet data;
+    REQUIRE(data.loadDirectory(dir));
+    ReverbField field;
+    REQUIRE_FALSE(loadReverbStamps(data, field));
+    REQUIRE(field.size() == 0);
+    std::filesystem::remove_all(dir);
 }
