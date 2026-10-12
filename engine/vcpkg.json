@@ -9,7 +9,8 @@
     "cgltf",
     "stb",
     "meshoptimizer",
-    "entt"
+    "entt",
+    "joltphysics"
   ],
   "default-features": [
     "runtime"

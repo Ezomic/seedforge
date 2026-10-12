@@ -20,12 +20,16 @@ struct SpawnCommand {
     std::optional<MeshRef> mesh;
     std::optional<Spin> spin;
     std::optional<Player> player;
+    std::optional<StaticBox> staticBox;
+    std::optional<CharacterBody> character;
 };
 
 struct DestroyCommand {
     StableId id;
 };
 
+// Teleports. Input-driven movement goes through the character controller
+// and is recorded by the input stream, not by commands.
 struct MoveCommand {
     StableId id;
     glm::dvec3 delta{0.0};

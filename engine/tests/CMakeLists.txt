@@ -13,6 +13,7 @@ add_executable(ichor_tests
     test_world.cpp
     test_file_watch.cpp
     test_dmath.cpp
+    test_physics.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
     ichor_loop ichor_assets ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain

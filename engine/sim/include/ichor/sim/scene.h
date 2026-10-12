@@ -1,14 +1,16 @@
 #pragma once
 
+#include "ichor/core/input.h"
 #include "ichor/core/rng.h"
 #include "ichor/sim/commands.h"
 #include "ichor/sim/components.h"
-#include "ichor/core/input.h"
+#include "ichor/sim/physics.h"
 
 #include <entt/entity/registry.hpp>
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -23,6 +25,9 @@ namespace ichor {
 class Scene {
 public:
     explicit Scene(std::uint64_t seed);
+    ~Scene();
+    Scene(const Scene&) = delete;
+    Scene& operator=(const Scene&) = delete;
 
     void enqueue(Command command);
     void tick(double dt, const InputFrame& input = {});
@@ -40,6 +45,7 @@ public:
     Rng& rng(std::string_view system);
 
     const CommandLog& log() const { return log_; }
+    const PhysicsWorld& physics() const { return *physics_; }
 
     // Snapshot support: scene_io writes and restores these directly.
     struct Clock {
@@ -50,8 +56,8 @@ public:
     void restoreClock(Clock clock);
     const std::map<std::string, Rng, std::less<>>& rngs() const { return rngs_; }
     void restoreRng(const std::string& system, const Rng& rng);
-    // Drops entities, generators, pending commands and the log: a restore
-    // starts a new timeline.
+    // Drops entities, bodies, generators, pending commands and the log: a
+    // restore starts a new timeline.
     void clearForRestore();
     // Spawns without logging a command; snapshots are restored, not replayed.
     void restore(const SpawnCommand& spawn) { apply(spawn); }
@@ -59,11 +65,14 @@ public:
 private:
     void apply(const Command& command);
     void applyInput(const InputFrame& input, double dt);
+    void rememberPreviousTransforms();
     void spinSystem(double dt);
+    void physicsSystem(double dt);
 
     std::uint64_t seed_;
     entt::registry registry_;
     std::unordered_map<std::uint64_t, entt::entity> index_;
+    std::unique_ptr<PhysicsWorld> physics_;
     std::map<std::string, Rng, std::less<>> rngs_;
     std::vector<Command> pending_;
     CommandLog log_;
