@@ -5,12 +5,12 @@ namespace ichor {
 void NullAudio::play(std::uint32_t sound, glm::dvec3 position, bool spatial)
 {
     ++plays_;
-    mixer_.play(sound, glm::vec3(position), 1.0f, spatial);
+    mixer_.play(sound, position, 1.0f, spatial);
 }
 
 void NullAudio::setListener(glm::dvec3 position, glm::quat rotation)
 {
-    mixer_.setListener(glm::vec3(position), rotation * glm::vec3(0.0f, 0.0f, -1.0f), rotation * glm::vec3(1.0f, 0.0f, 0.0f));
+    mixer_.setListener(position, rotation * glm::vec3(0.0f, 0.0f, -1.0f), rotation * glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 std::vector<float> NullAudio::render(std::uint32_t frames)

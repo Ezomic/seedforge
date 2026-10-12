@@ -96,6 +96,13 @@ TEST_CASE("spatial cues pan towards their side and fade with distance")
     audio.play(0, {0.0, 0.0, -1.0}, true);
     const auto near = audio.render(2400);
     for (int i = 0; i < 100; ++i) audio.render(4800);
+    audio.play(0, {0.0, 0.0, 0.0}, false);
+    const auto flat = audio.render(2400);
+    for (int i = 0; i < 100; ++i) audio.render(4800);
+    audio.play(0, {0.0, 0.0, 0.0}, true);
+    const auto centred = audio.render(2400);
+    REQUIRE(std::abs(energy(flat, 0) - energy(centred, 0)) < energy(flat, 0) * 0.001);
+    for (int i = 0; i < 100; ++i) audio.render(4800);
     audio.play(0, {0.0, 0.0, -12.0}, true);
     const auto far = audio.render(2400);
     REQUIRE(energy(near, 0) > energy(far, 0) * 10.0);

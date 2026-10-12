@@ -7,7 +7,8 @@ namespace ichor {
 
 namespace {
 
-constexpr float kReferenceDistance = 2.0f; // metres at which a spatial sound is at full gain
+constexpr float kReferenceDistance = 2.0f; // metres at which a spatial sound has fallen to half gain
+constexpr float kCentreGain = 1.41421356f;   // undoes the equal-power pan at centre so spatial and flat cues match
 
 }
 
@@ -36,16 +37,22 @@ std::uint32_t Mixer::findClip(std::string_view name) const
     return kNoSound;
 }
 
-void Mixer::play(std::uint32_t clip, glm::vec3 position, float gain, bool spatial)
+void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial)
 {
     const std::lock_guard lock(mutex_);
     if (clip >= clips_.size() || clips_[clip].samples.empty()) {
         return;
     }
+    if (voices_.size() >= kMaxVoices) {
+        voices_.erase(voices_.begin()); // the oldest voice makes room
+    }
+    if (voices_.capacity() < kMaxVoices) {
+        voices_.reserve(kMaxVoices);
+    }
     voices_.push_back({clip, 0.0, position, gain, spatial});
 }
 
-void Mixer::setListener(glm::vec3 position, glm::vec3 forward, glm::vec3 right)
+void Mixer::setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right)
 {
     const std::lock_guard lock(mutex_);
     listenerPosition_ = position;
@@ -63,15 +70,15 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
         float left = voice.gain;
         float right = voice.gain;
         if (voice.spatial) {
-            const glm::vec3 relative = voice.position - listenerPosition_;
+            const glm::vec3 relative(voice.position - listenerPosition_);
             const float distance = std::sqrt(relative.x * relative.x + relative.y * relative.y + relative.z * relative.z);
             const float ratio = distance / kReferenceDistance;
             const float attenuation = 1.0f / (1.0f + ratio * ratio);
             const float pan = distance > 1e-4f
                 ? std::clamp((relative.x * listenerRight_.x + relative.y * listenerRight_.y + relative.z * listenerRight_.z) / distance, -1.0f, 1.0f)
                 : 0.0f;
-            left = voice.gain * attenuation * std::sqrt(0.5f * (1.0f - pan));
-            right = voice.gain * attenuation * std::sqrt(0.5f * (1.0f + pan));
+            left = voice.gain * attenuation * kCentreGain * std::sqrt(0.5f * (1.0f - pan));
+            right = voice.gain * attenuation * kCentreGain * std::sqrt(0.5f * (1.0f + pan));
         }
 
         const double step = static_cast<double>(clip.sampleRate) / static_cast<double>(kRate);

@@ -46,6 +46,10 @@ bool Engine::frame(double frameSeconds)
         return false;
     }
 
+    if (audio_ != nullptr) {
+        // Cues raised this frame are heard from where the camera was last drawn.
+        audio_->setListener(view_.camera.position, view_.camera.rotation);
+    }
     const int steps = step_.advance(frameSeconds);
     for (int i = 0; i < steps && !replayFinished(); ++i) {
         scene_.tick(step_.dt(), nextInput());
@@ -63,9 +67,6 @@ bool Engine::frame(double frameSeconds)
         view_.jointPalette.clear();
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
-        if (audio_ != nullptr) {
-            audio_->setListener(view_.camera.position, view_.camera.rotation);
-        }
     }
     renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}", frameCount_, scene_.tickCount(), scene_.time(),
         replaying_ ? "  [replay]" : recording_ ? "  [rec]" : ""));

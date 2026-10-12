@@ -24,8 +24,12 @@ public:
     std::uint32_t clipCount() const;
     std::uint32_t findClip(std::string_view name) const;
 
-    void play(std::uint32_t clip, glm::vec3 position, float gain, bool spatial);
-    void setListener(glm::vec3 position, glm::vec3 forward, glm::vec3 right);
+    static constexpr std::size_t kMaxVoices = 64;
+
+    // Positions stay double until the listener-relative offset is formed, so
+    // far from the origin the panning does not jitter.
+    void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial);
+    void setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right);
 
     // Renders `frames` stereo frames, advancing every voice. Safe to call from
     // a device thread; play() and setListener() take the same lock.
@@ -42,7 +46,7 @@ private:
     struct Voice {
         std::uint32_t clip = 0;
         double cursor = 0.0;
-        glm::vec3 position{0.0f};
+        glm::dvec3 position{0.0};
         float gain = 1.0f;
         bool spatial = false;
     };
@@ -50,7 +54,7 @@ private:
     mutable std::mutex mutex_;
     std::vector<Clip> clips_;
     std::vector<Voice> voices_;
-    glm::vec3 listenerPosition_{0.0f};
+    glm::dvec3 listenerPosition_{0.0};
     glm::vec3 listenerForward_{0.0f, 0.0f, -1.0f};
     glm::vec3 listenerRight_{1.0f, 0.0f, 0.0f};
 };

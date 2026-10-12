@@ -134,10 +134,16 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
     scene.enqueue(player);
 }
 
-int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& audio, const Options& options)
+int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
-    if (!platform.init({}) || !renderer.init() || !audio.init()) {
+    if (!platform.init({}) || !renderer.init()) {
         return 1;
+    }
+    // No playback device is not a reason not to run; cues then go to the null host.
+    ichor::NullAudio silent;
+    ichor::AudioHost& audio = device.init() ? device : static_cast<ichor::AudioHost&>(silent);
+    if (&audio == &silent) {
+        ichor::log(ichor::LogLevel::Warn, "audio: running silent");
     }
 
     ichor::SceneBundle bundle;

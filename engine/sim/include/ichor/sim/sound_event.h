@@ -8,8 +8,6 @@
 
 namespace ichor {
 
-constexpr std::uint32_t kNoSound = 0xffffffffu;
-
 // Raised by the simulation on the tick something audible happens. The loop
 // hands them to the audio host; the scene never touches a device.
 struct SoundEvent {

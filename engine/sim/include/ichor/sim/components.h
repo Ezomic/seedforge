@@ -15,6 +15,8 @@
 
 namespace ichor {
 
+constexpr std::uint32_t kNoSound = 0xffffffffu;
+
 // Every entity carries a StableId derived from world structure, never from
 // spawn order (doc 14). Saves, commands and replays refer to entities by it.
 struct StableId {
@@ -92,8 +94,8 @@ struct MontagePlayer {
     float recoveryEnd = 0.0f;
     float time = 0.0f;
     std::uint8_t phase = 0; // MontagePhase
-    std::uint32_t windupSound = 0xffffffffu; // raised when the wind-up begins
-    std::uint32_t activeSound = 0xffffffffu; // raised when the active window opens
+    std::uint32_t windupSound = kNoSound; // raised when the wind-up begins
+    std::uint32_t activeSound = kNoSound; // raised when the active window opens
 };
 
 // Skinning matrices for rendering, rebuilt every tick; never saved.
