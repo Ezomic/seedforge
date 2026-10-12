@@ -13,6 +13,7 @@
     "joltphysics",
     "recastnavigation",
     "sol2",
+    "nlohmann-json",
     "lua",
     "ozz-animation",
     "miniaudio"
