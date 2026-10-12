@@ -9,6 +9,9 @@
 
 function on_start(loaded)
     ichor.log("scripts online")
+    if not loaded then
+        ichor.chronicle("start", "The campaign begins.")
+    end
 end
 
 function on_tick(tick)
