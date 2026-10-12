@@ -19,7 +19,9 @@ float4 main(PSIn i) : SV_Target
     const float along = dot(dir, normalize(frame.sunDirection.xyz));
     const float disc = smoothstep(0.99955, 0.99975, along);
     const float glow = pow(saturate(along), 48.0) * 0.35;
-    const float3 light = frame.sunColor.rgb * (2.5 + frame.sunColor.w * 3.0);
+    // Scaled by the light's own intensity, so the disc fades out with the light when the
+    // sun hands over to the moon and never pops at the switch.
+    const float3 light = frame.sunColor.rgb * (frame.sunColor.w * 6.0);
     color += light * (disc + glow) * smoothstep(-0.05, 0.02, up);
 
     return toneMap(color);

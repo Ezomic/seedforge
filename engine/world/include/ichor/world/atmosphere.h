@@ -19,7 +19,7 @@ struct Atmosphere {
     glm::vec3 horizon{0.0f}; // sky colour at the horizon, linear
     glm::vec3 fogColor{0.0f};
     float fogDensity = 0.0f; // per metre
-    float sunElevation = 0.0f; // sine of the sun's angle above the horizon, for tests and tuning
+    float sunElevation = 0.0f; // sine of the sun's angle along its daily circle, about its height over the horizon, for tests and tuning
 };
 
 // Hours run 0 to 24 and wrap. Sunrise is at 6 and sunset at 18.
