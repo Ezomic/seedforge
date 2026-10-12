@@ -84,6 +84,7 @@ private:
     std::condition_variable wake_;
     std::deque<CellId> queue_;
     std::map<CellId, std::unique_ptr<CellPayload>> finished_;
+    std::uint64_t generation_ = 0; // bumped by clear(); builds from before it are dropped
     bool stop_ = false;
     std::thread thread_;
 };

@@ -59,8 +59,14 @@ bool Heightfield::contains(CellId id) const
 
 CellId Heightfield::cellAt(double x, double z) const
 {
+    // Clamped well outside the world so a runaway position cannot overflow the cast.
     const double size = desc_.cellMetres;
-    return {static_cast<std::int32_t>(std::floor(x / size)), static_cast<std::int32_t>(std::floor(z / size))};
+    const double limit = static_cast<double>(desc_.cellsPerSide()) + 16.0;
+    const auto index = [&](double v) {
+        const double c = std::floor(v / size);
+        return static_cast<std::int32_t>(std::isnan(c) ? -limit : std::clamp(c, -limit, limit));
+    };
+    return {index(x), index(z)};
 }
 
 bool Heightfield::cell(CellId id, Cell& out) const

@@ -215,12 +215,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         glm::dvec3 origin{0.0};
     };
     std::map<ichor::CellId, ResidentCell> cells;
-    const auto cellBody = [](ichor::CellId id) { return ichor::StableId::of("cell", static_cast<std::uint64_t>(id.x) * 1000 + id.z); };
     streamer.onLoaded([&](const ichor::CellPayload& payload) {
         ResidentCell cell;
         cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
         cell.handle = renderer.uploadTerrainCell(payload.lods);
-        engine.scene().physics().addHeightField(cellBody(payload.cell.id), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
+        engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
     });
@@ -229,21 +228,29 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             renderer.removeTerrainCell(found->second.handle);
             cells.erase(found);
         }
-        engine.scene().physics().remove(cellBody(id));
+        engine.scene().physics().remove(ichor::StableId::of("cell", ichor::cellKey(id)));
     });
-    const auto playerPosition = [](const ichor::Scene& scene) {
-        glm::dvec3 position(0.0);
+    // Until the player exists the arena's anchor stands in, so the first
+    // tick, which spawns the player there, finds its ground resident.
+    const auto playerPosition = [anchor](const ichor::Scene& scene) {
+        glm::dvec3 position = anchor;
         for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
             position = transform.position;
         }
         return position;
     };
     if (!heightfield.empty()) {
+        // Streaming advances once per tick, so residency follows the path and
+        // the budget alone. While the gate holds no ticks run, so it advances
+        // the streamer itself until the required ring is in.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
             streamer.update(playerPosition(scene));
         });
         engine.setTickGate([&](const ichor::Scene& scene) {
             const glm::dvec3 position = playerPosition(scene);
+            if (streamer.ready(position)) {
+                return true;
+            }
             streamer.update(position);
             return streamer.ready(position);
         });

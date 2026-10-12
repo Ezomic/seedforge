@@ -1,5 +1,7 @@
 #include "ichor/gfx/vk_scene.h"
 
+#include "ichor/gfx/renderer.h"
+
 #include "ichor/assets/bundle.h"
 #include "ichor/core/log.h"
 
@@ -129,6 +131,7 @@ SceneRenderer::~SceneRenderer()
         for (GpuMesh& lod : cell.lods) destroyGpuMesh(lod);
     }
     terrainCells_.clear();
+    destroyRetired(true);
     for (GpuImage& texture : terrainTextures_) ctx_.destroyImage(texture);
     ctx_.destroyImage(whiteTexture_);
     ctx_.destroyImage(flatNormalTexture_);
@@ -559,14 +562,14 @@ bool SceneRenderer::setTerrainMaterials(const SceneBundle& layers)
 std::uint32_t SceneRenderer::uploadTerrainCell(const std::vector<Mesh>& lods)
 {
     if (lods.empty()) {
-        return 0xffffffffu;
+        return Renderer::kNoHandle;
     }
     TerrainCell cell;
     for (const Mesh& lod : lods) {
         GpuMesh gpu = makeGpuMesh(lod, 0);
         if (gpu.vertices.buffer == VK_NULL_HANDLE) {
             for (GpuMesh& made : cell.lods) destroyGpuMesh(made);
-            return 0xffffffffu;
+            return Renderer::kNoHandle;
         }
         cell.lods.push_back(std::move(gpu));
     }
@@ -581,10 +584,23 @@ void SceneRenderer::removeTerrainCell(std::uint32_t handle)
     if (found == terrainCells_.end()) {
         return;
     }
-    // The buffers may still be read by the frame in flight.
-    vkDeviceWaitIdle(ctx_.device());
-    for (GpuMesh& lod : found->second.lods) destroyGpuMesh(lod);
+    for (GpuMesh& lod : found->second.lods) {
+        retired_.push_back({renderedFrames_, std::move(lod)});
+    }
     terrainCells_.erase(found);
+}
+
+void SceneRenderer::destroyRetired(bool all)
+{
+    // A frame's fence is waited before its slot is reused, so a mesh retired
+    // during frame F is unreferenced once frame F + kFrameSlots has begun.
+    std::erase_if(retired_, [&](RetiredMesh& retired) {
+        if (!all && renderedFrames_ < retired.frame + kFrameSlots + 1) {
+            return false;
+        }
+        destroyGpuMesh(retired.mesh);
+        return true;
+    });
 }
 
 void SceneRenderer::destroyBundle()
@@ -705,6 +721,8 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     VkImageView color, VkImageView depth, VkExtent2D extent, const std::function<void(VkCommandBuffer)>& overlay)
 {
     ZoneScoped;
+    destroyRetired(false);
+    ++renderedFrames_;
     FrameSlot& frame = slots_[slot % kFrameSlots];
     const float aspect = static_cast<float>(extent.width) / static_cast<float>(std::max(1u, extent.height));
 

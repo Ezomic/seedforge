@@ -109,6 +109,14 @@ private:
     };
     std::map<std::uint32_t, TerrainCell> terrainCells_;
     std::uint32_t nextTerrainCell_ = 0;
+    // Removed cells wait here until every frame that could read them has retired.
+    struct RetiredMesh {
+        std::uint64_t frame = 0;
+        GpuMesh mesh;
+    };
+    std::vector<RetiredMesh> retired_;
+    std::uint64_t renderedFrames_ = 0;
+    void destroyRetired(bool all);
     GpuMesh makeGpuMesh(const Mesh& mesh, std::uint32_t material);
     void destroyGpuMesh(GpuMesh& mesh);
 };

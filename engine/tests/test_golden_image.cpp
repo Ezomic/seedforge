@@ -2,6 +2,7 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
 #include "ichor/gfx/reference_view.h"
+#include "ichor/gfx/renderer.h"
 #include "ichor/gfx/vk_offscreen.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
@@ -182,7 +183,7 @@ TEST_CASE("golden image: the forged terrain at the world's centre")
             CellPayload payload;
             WorldStreamer::buildPayload(heightfield, id, 3, payload);
             const std::uint32_t handle = renderer.uploadTerrainCell(payload.lods);
-            REQUIRE(handle != 0xffffffffu);
+            REQUIRE(handle != Renderer::kNoHandle);
             view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, (dx == 0 && dz == 0) ? 0u : 1u});
         }
     }

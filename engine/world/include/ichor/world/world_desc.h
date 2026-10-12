@@ -24,7 +24,7 @@ struct WorldDesc {
     bool valid() const
     {
         return sizeMetres > 0 && metresPerSample > 0 && cellMetres > 0 && sizeMetres % cellMetres == 0 && cellMetres % metresPerSample == 0
-            && heightRange > 0.0f && cellsPerSide() <= 256;
+            && heightRange > 0.0f && cellsPerSide() <= 256 && samplesPerSide() <= 8193;
     }
 };
 
@@ -43,5 +43,11 @@ struct CellId {
     bool operator==(const CellId&) const = default;
     auto operator<=>(const CellId&) const = default;
 };
+
+// A unique key per cell, for naming its collision body: x in the high half, z in the low.
+inline std::uint64_t cellKey(CellId id)
+{
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(id.x)) << 32) | static_cast<std::uint32_t>(id.z);
+}
 
 }

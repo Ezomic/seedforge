@@ -44,12 +44,11 @@ WorldDesc bigWorld()
 void attachCollision(Scene& scene, const Heightfield& heightfield, WorldStreamer& streamer)
 {
     streamer.onLoaded([&](const CellPayload& payload) {
-        const StableId id = StableId::of("cell", static_cast<std::uint64_t>(payload.cell.id.x) * 1000 + payload.cell.id.z);
-        scene.physics().addHeightField(id, payload.cell.heights.data(), payload.cell.samplesPerSide,
+        scene.physics().addHeightField(StableId::of("cell", cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide,
             {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)}, static_cast<float>(heightfield.desc().metresPerSample));
     });
     streamer.onUnloaded([&](CellId id) {
-        scene.physics().remove(StableId::of("cell", static_cast<std::uint64_t>(id.x) * 1000 + id.z));
+        scene.physics().remove(StableId::of("cell", cellKey(id)));
     });
 }
 
@@ -278,4 +277,42 @@ TEST_CASE("the tick gate holds the simulation and owes no time")
     REQUIRE(engine.frame(kDt));
     REQUIRE_FALSE(engine.gated());
     REQUIRE(engine.scene().tickCount() == 1); // not ten in a burst
+}
+
+TEST_CASE("terrain draws are rebuilt every frame, never accumulated")
+{
+    NullPlatform platform;
+    NullRenderer renderer;
+    Engine engine(platform, renderer, {});
+    engine.setViewBuilder([](const Scene&, double, RenderView& view) {
+        for (std::uint32_t cell = 0; cell < 3; ++cell) {
+            view.terrain.push_back({cell, glm::dvec3(0.0), 0});
+        }
+    });
+    for (int i = 0; i < 5; ++i) {
+        REQUIRE(engine.frame(kDt));
+    }
+    REQUIRE(renderer.terrainDrawsSubmitted() == 15);
+}
+
+TEST_CASE("the floating origin does not thrash on a boundary walk")
+{
+    Scene scene(3);
+    scene.enqueue(walker({1000.0, 5.0, 100.0}));
+    scene.tick(kDt);
+    REQUIRE(scene.physics().origin() == glm::dvec3(0.0));
+    // The rebase reads the transform the previous step wrote, so two ticks settle a move.
+    const auto moveTo = [&](double x) {
+        scene.physics().setCharacterPosition(StableId::of("walker"), {x, 5.0, 100.0});
+        scene.tick(kDt);
+        scene.tick(kDt);
+    };
+    for (double x : {1030.0, 1000.0, 1030.0, 1500.0}) {
+        moveTo(x);
+        REQUIRE(scene.physics().origin() == glm::dvec3(0.0));
+    }
+    moveTo(1600.0);
+    REQUIRE(scene.physics().origin() == glm::dvec3(1024.0, 0.0, 0.0));
+    moveTo(1000.0);
+    REQUIRE(scene.physics().origin() == glm::dvec3(1024.0, 0.0, 0.0));
 }

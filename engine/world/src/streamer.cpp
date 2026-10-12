@@ -61,7 +61,8 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
         }
     }
     // Skirts: a lowered copy of each edge, stitched to it.
-    const auto skirtEdge = [&](auto edgeIndex, auto edgeVertex) {
+    // Each skirt winds so its face points out of the cell, like the surface points up.
+    const auto skirtEdge = [&](auto edgeIndex, auto edgeVertex, bool flip) {
         const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
         for (std::uint32_t k = 0; k < verts; ++k) {
             mesh.vertices.push_back(edgeVertex(k));
@@ -69,13 +70,17 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
         for (std::uint32_t k = 0; k < quads; ++k) {
             const std::uint32_t a = edgeIndex(k);
             const std::uint32_t b = edgeIndex(k + 1);
-            mesh.indices.insert(mesh.indices.end(), {a, base + k, b, b, base + k, base + k + 1});
+            if (flip) {
+                mesh.indices.insert(mesh.indices.end(), {a, b, base + k, b, base + k + 1, base + k});
+            } else {
+                mesh.indices.insert(mesh.indices.end(), {a, base + k, b, b, base + k, base + k + 1});
+            }
         }
     };
-    skirtEdge([&](std::uint32_t k) { return k; }, [&](std::uint32_t k) { return vertexAt(k, 0, skirt); });
-    skirtEdge([&](std::uint32_t k) { return quads * verts + k; }, [&](std::uint32_t k) { return vertexAt(k, quads, skirt); });
-    skirtEdge([&](std::uint32_t k) { return k * verts; }, [&](std::uint32_t k) { return vertexAt(0, k, skirt); });
-    skirtEdge([&](std::uint32_t k) { return k * verts + quads; }, [&](std::uint32_t k) { return vertexAt(quads, k, skirt); });
+    skirtEdge([&](std::uint32_t k) { return k; }, [&](std::uint32_t k) { return vertexAt(k, 0, skirt); }, true);
+    skirtEdge([&](std::uint32_t k) { return quads * verts + k; }, [&](std::uint32_t k) { return vertexAt(k, quads, skirt); }, false);
+    skirtEdge([&](std::uint32_t k) { return k * verts; }, [&](std::uint32_t k) { return vertexAt(0, k, skirt); }, false);
+    skirtEdge([&](std::uint32_t k) { return k * verts + quads; }, [&](std::uint32_t k) { return vertexAt(quads, k, skirt); }, true);
     mesh.submeshes.push_back({0, static_cast<std::uint32_t>(mesh.indices.size()), 0});
     return mesh;
 }
@@ -118,6 +123,7 @@ void WorldStreamer::worker()
 {
     for (;;) {
         CellId id;
+        std::uint64_t generation = 0;
         {
             std::unique_lock lock(mutex_);
             wake_.wait(lock, [this] { return stop_ || !queue_.empty(); });
@@ -126,11 +132,14 @@ void WorldStreamer::worker()
             }
             id = queue_.front();
             queue_.pop_front();
+            generation = generation_;
         }
         auto payload = std::make_unique<CellPayload>();
         buildPayload(heightfield_, id, config_.lodCount, *payload);
         const std::lock_guard lock(mutex_);
-        finished_[id] = std::move(payload);
+        if (generation == generation_) {
+            finished_[id] = std::move(payload);
+        }
     }
 }
 
@@ -172,6 +181,16 @@ void WorldStreamer::update(glm::dvec3 anchor)
         const auto db = chebyshev(b, centre);
         return da != db ? da < db : a < b;
     });
+    // Forget queued builds the player has left behind, so the worker reaches
+    // the cells it needs now instead of finishing a trail of stale ones.
+    {
+        const std::lock_guard lock(mutex_);
+        std::erase_if(queue_, [&](CellId id) {
+            const bool stale = chebyshev(id, centre) > config_.radiusCells;
+            if (stale) requested_.erase(id);
+            return stale;
+        });
+    }
     for (CellId id : wanted) {
         request(id);
     }
@@ -244,8 +263,8 @@ bool WorldStreamer::ready(glm::dvec3 anchor) const
 
 std::size_t WorldStreamer::pending() const
 {
-    const std::lock_guard lock(mutex_);
-    return queue_.size() + finished_.size() + (requested_.size() > queue_.size() + finished_.size() ? 0 : 0);
+    // Everything asked for and not yet applied, including the build in progress.
+    return requested_.size();
 }
 
 void WorldStreamer::clear()
@@ -254,6 +273,7 @@ void WorldStreamer::clear()
         const std::lock_guard lock(mutex_);
         queue_.clear();
         finished_.clear();
+        ++generation_;
     }
     requested_.clear();
     for (CellId id : resident_) {
