@@ -98,7 +98,7 @@ Tuesday.
 | Physics | **Jolt** | Built for open worlds, deterministic, multi-threaded |
 | Audio | **miniaudio** | Small, embeddable, no licence tier |
 | Animation | **ozz-animation** | Skeletal sampling and blending; state machines are ours |
-| Assets in | **cgltf**, **stb_image**, **meshoptimizer**, **KTX2 + basis_universal** | glTF and PNG in, cooked binary out, LODs generated |
+| Assets in | **cgltf**, **stb_image**, **meshoptimizer** | glTF and PNG in, cooked binary out with mip chains; KTX2 + basis_universal arrive with E5 when texture volume demands compression |
 | Navigation | **Recast / Detour** | Navmesh per streaming cell, stitched at borders |
 | UI | **Dear ImGui** (tools), **RmlUi** (game) | Tools first; the game UI is minimal by design |
 | Scripting | **Lua** via **sol2** | Quests, dialogue and encounter scripts live in data |

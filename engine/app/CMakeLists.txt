@@ -1,11 +1,11 @@
-find_package(Tracy CONFIG REQUIRED)
-
 add_executable(ichor
     src/main.cpp
 )
 target_link_libraries(ichor PRIVATE
-    ichor_loop ichor_platform_sdl ichor_platform_null ichor_gfx_vulkan ichor_gfx_null Tracy::TracyClient
+    ichor_loop ichor_assets ichor_platform_sdl ichor_platform_null ichor_gfx_vulkan ichor_gfx_null ichor_profile
 )
+target_compile_definitions(ichor PRIVATE ICHOR_CONTENT_DIR="${ICHOR_CONTENT_DIR}")
+add_dependencies(ichor ichor_content)
 
 if(WIN32)
     add_custom_command(TARGET ichor POST_BUILD

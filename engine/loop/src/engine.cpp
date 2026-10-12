@@ -28,6 +28,12 @@ bool Engine::frame(double frameSeconds)
     }
 
     renderer_.beginFrame();
+    if (viewBuilder_) {
+        view_.instances.clear();
+        view_.lines.clear();
+        viewBuilder_(scene_, step_.alpha(), view_);
+        renderer_.submit(view_);
+    }
     renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s", frameCount_, scene_.tickCount(), scene_.time()));
     renderer_.debugText(std::format("seed {}  state {:016x}", scene_.seed(), scene_.stateHash()));
     renderer_.endFrame();

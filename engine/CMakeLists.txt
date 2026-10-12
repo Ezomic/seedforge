@@ -3,6 +3,7 @@ project(ichor-engine LANGUAGES CXX)
 
 option(ENGINE_RUNTIME "Build the SDL3/Vulkan runtime and the app" ON)
 option(ENGINE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(ENGINE_PROFILE "Link the Tracy client so a profiler can attach (opens a listening socket)" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,11 +25,28 @@ else()
     target_compile_options(ichor_warnings INTERFACE -Wall -Wextra -Wpedantic)
 endif()
 
+# Tracy's macros compile to nothing unless TRACY_ENABLE is defined, which the
+# client target adds. Without ENGINE_PROFILE only the headers are used, so no
+# build ever listens on a port by accident.
+if(ENGINE_RUNTIME)
+    find_package(Tracy CONFIG REQUIRED)
+    add_library(ichor_profile INTERFACE)
+    if(ENGINE_PROFILE)
+        target_link_libraries(ichor_profile INTERFACE Tracy::TracyClient)
+    else()
+        get_target_property(tracy_includes Tracy::TracyClient INTERFACE_INCLUDE_DIRECTORIES)
+        target_include_directories(ichor_profile INTERFACE ${tracy_includes})
+    endif()
+endif()
+
 add_subdirectory(core)
+add_subdirectory(assets)
 add_subdirectory(sim)
 add_subdirectory(platform)
 add_subdirectory(gfx)
 add_subdirectory(loop)
+add_subdirectory(tools)
+add_subdirectory(content)
 
 if(ENGINE_RUNTIME)
     add_subdirectory(app)

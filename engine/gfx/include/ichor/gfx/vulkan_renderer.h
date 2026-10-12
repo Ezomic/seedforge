@@ -10,15 +10,17 @@ namespace ichor {
 
 class SdlPlatform;
 
-// Vulkan 1.3 with dynamic rendering. E1 draws one triangle and the ImGui
-// debug overlay; everything else arrives with E2.
+// The presenting renderer: a swapchain on the SDL window, the scene renderer
+// drawing into it, and the ImGui overlay on top.
 class VulkanRenderer final : public Renderer {
 public:
     explicit VulkanRenderer(SdlPlatform& platform);
     ~VulkanRenderer() override;
 
     bool init() override;
+    bool uploadBundle(const SceneBundle& bundle) override;
     void beginFrame() override;
+    void submit(const RenderView& view) override;
     void endFrame() override;
     void debugText(std::string line) override;
 
@@ -26,6 +28,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     std::vector<std::string> lines_;
+    RenderView view_;
+    bool hasView_ = false;
 };
 
 }
