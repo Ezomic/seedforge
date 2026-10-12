@@ -5,14 +5,21 @@
       "name": "vcpkg",
       "hidden": true,
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_OVERLAY_PORTS": "${sourceDir}/ports"
+      }
     },
     {
       "name": "windows",
       "inherits": "vcpkg",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
     {
       "name": "linux-headless-asan",
@@ -25,17 +32,52 @@
         "ENGINE_SANITIZERS": "ON",
         "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
       },
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug" },
-    { "name": "windows-release", "configurePreset": "windows", "configuration": "Release" },
-    { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan" }
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux-headless-asan",
+      "configurePreset": "linux-headless-asan"
+    }
   ],
   "testPresets": [
-    { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug", "output": { "outputOnFailure": true } },
-    { "name": "windows-release", "configurePreset": "windows", "configuration": "Release", "output": { "outputOnFailure": true } },
-    { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true } }
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-headless-asan",
+      "configurePreset": "linux-headless-asan",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
   ]
 }

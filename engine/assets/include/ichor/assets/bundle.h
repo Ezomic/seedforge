@@ -19,14 +19,18 @@ struct Vertex {
     glm::vec3 normal;
     glm::vec4 tangent; // w is the bitangent sign
     glm::vec2 uv;
+    std::uint16_t joints[4]; // skinning; all zero with weights {1,0,0,0} for rigid meshes
+    std::uint16_t weights[4]; // normalised, 65535 is 1.0
 };
-static_assert(sizeof(Vertex) == 48);
+static_assert(sizeof(Vertex) == 64);
 
 struct Submesh {
     std::uint32_t firstIndex = 0;
     std::uint32_t indexCount = 0;
     std::uint32_t material = 0;
 };
+
+constexpr std::uint32_t kNoSkeleton = 0xffffffffu;
 
 struct Mesh {
     std::string name;
@@ -35,6 +39,7 @@ struct Mesh {
     std::vector<Submesh> submeshes;
     glm::vec3 boundsMin{0.0f};
     glm::vec3 boundsMax{0.0f};
+    std::uint32_t skeleton = kNoSkeleton;
 };
 
 enum class TextureFormat : std::uint32_t {
@@ -63,6 +68,22 @@ struct Material {
     std::uint32_t normalTexture = kNoTexture;
 };
 
+// A skeleton built by ozz at cook time and stored as its archive bytes, plus
+// what the renderer and the game need beside it.
+struct Skeleton {
+    std::string name;
+    std::vector<std::string> jointNames; // ozz joint order
+    std::vector<glm::mat4> inverseBind; // one per joint, same order
+    std::vector<std::uint8_t> ozzBytes;
+};
+
+struct AnimationClip {
+    std::string name;
+    std::uint32_t skeleton = 0;
+    float duration = 0.0f; // seconds
+    std::vector<std::uint8_t> ozzBytes;
+};
+
 struct Node {
     std::string name;
     std::uint32_t mesh = 0;
@@ -73,6 +94,8 @@ struct SceneBundle {
     std::vector<Texture> textures;
     std::vector<Material> materials;
     std::vector<Mesh> meshes;
+    std::vector<Skeleton> skeletons;
+    std::vector<AnimationClip> clips;
     std::vector<Node> nodes;
 };
 

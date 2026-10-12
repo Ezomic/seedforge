@@ -19,9 +19,9 @@ int main(int argc, char** argv)
     if (!ichor::writeBundle(argv[2], bundle)) {
         return 1;
     }
-    ichor::logf(ichor::LogLevel::Info, "cooked {}: {} meshes, {} materials, {} textures, {} nodes, {} -> {} vertices, {} triangles{}",
+    ichor::logf(ichor::LogLevel::Info, "cooked {}: {} meshes, {} materials, {} textures, {} skeletons, {} clips, {} nodes, {} -> {} vertices, {} triangles{}",
         std::filesystem::path(argv[1]).filename().string(), bundle.meshes.size(), bundle.materials.size(),
-        bundle.textures.size(), bundle.nodes.size(), stats.verticesIn, stats.verticesOut, stats.triangles,
+        bundle.textures.size(), bundle.skeletons.size(), bundle.clips.size(), bundle.nodes.size(), stats.verticesIn, stats.verticesOut, stats.triangles,
         stats.tangentsGenerated != 0 ? " (tangents generated)" : "");
     return 0;
 }

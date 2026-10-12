@@ -11,6 +11,7 @@ struct CookStats {
     std::uint32_t verticesOut = 0;
     std::uint32_t triangles = 0;
     std::uint32_t tangentsGenerated = 0;
+    std::uint32_t clips = 0;
 };
 
 // glTF or GLB in, bundle out. Meshes are deduplicated and reordered for the
