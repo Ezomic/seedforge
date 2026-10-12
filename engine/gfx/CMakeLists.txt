@@ -17,7 +17,7 @@ if(ENGINE_RUNTIME)
     set(ICHOR_SHADER_DIR ${CMAKE_BINARY_DIR}/shaders)
     file(MAKE_DIRECTORY ${ICHOR_SHADER_DIR})
 
-    set(shaders pbr.vert pbr_skinned.vert pbr.frag terrain.frag shadow.vert shadow_skinned.vert debug.vert debug.frag sky.vert sky.frag)
+    set(shaders pbr.vert pbr_skinned.vert pbr.frag terrain.frag shadow.vert shadow_skinned.vert debug.vert debug.frag ui.vert ui.frag sky.vert sky.frag)
     set(shader_outputs)
     foreach(shader ${shaders})
         if(shader MATCHES "\.vert$")
@@ -42,12 +42,13 @@ if(ENGINE_RUNTIME)
         src/vk_context.cpp
         src/vk_scene.cpp
         src/vk_offscreen.cpp
+        src/vulkan_ui.cpp
         src/vulkan_renderer.cpp
         src/vma_impl.cpp
     )
     add_dependencies(ichor_gfx_vulkan ichor_shaders)
     target_link_libraries(ichor_gfx_vulkan
-        PUBLIC ichor_gfx_api ichor_warnings ichor_platform_sdl Vulkan::Vulkan vk-bootstrap::vk-bootstrap GPUOpen::VulkanMemoryAllocator
+        PUBLIC ichor_gfx_api ichor_warnings ichor_platform_sdl ichor_ui Vulkan::Vulkan vk-bootstrap::vk-bootstrap GPUOpen::VulkanMemoryAllocator
         PRIVATE ichor_core imgui::imgui ichor_profile
     )
     target_compile_definitions(ichor_gfx_vulkan PRIVATE ICHOR_SHADER_DIR="${ICHOR_SHADER_DIR}")

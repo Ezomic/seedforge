@@ -42,7 +42,7 @@ bool OffscreenRenderer::uploadBundle(const SceneBundle& bundle)
     return scene_->uploadBundle(bundle);
 }
 
-bool OffscreenRenderer::render(const RenderView& view, std::vector<std::uint8_t>& rgba)
+bool OffscreenRenderer::render(const RenderView& view, std::vector<std::uint8_t>& rgba, const Overlay& overlay)
 {
     const bool ok = context_.immediate([&](VkCommandBuffer cmd) {
         transitionImage(cmd, color_.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -50,7 +50,11 @@ bool OffscreenRenderer::render(const RenderView& view, std::vector<std::uint8_t>
         transitionImage(cmd, depth_.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
             VK_PIPELINE_STAGE_2_NONE, 0, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
-        scene_->render(cmd, 0, view, color_.view, depth_.view, extent_);
+        std::function<void(VkCommandBuffer)> record;
+        if (overlay) {
+            record = [&](VkCommandBuffer overlayCmd) { overlay(overlayCmd, extent_); };
+        }
+        scene_->render(cmd, 0, view, color_.view, depth_.view, extent_, record);
 
         transitionImage(cmd, color_.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
