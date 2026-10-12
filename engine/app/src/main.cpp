@@ -187,9 +187,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     ichor::StreamerConfig streaming;
     streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
-    streaming.navmesh = true;
+    streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
+    const auto ringSide = static_cast<std::uint32_t>(2 * (streaming.radiusCells + streaming.hysteresisCells) + 1);
     ichor::NavWorld navigation;
-    if (!heightfield.empty() && !navigation.init(heightfield.desc(), 128)) {
+    if (!heightfield.empty() && !navigation.init(heightfield.desc(), ringSide * ringSide)) {
         return 1;
     }
     ichor::WorldStreamer streamer(heightfield, streaming);
@@ -229,8 +230,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
         ichor::NavTile tile = payload.nav;
-        if (!tile.empty()) {
-            navigation.addTile(payload.cell.id, std::move(tile));
+        if (!tile.empty() && !navigation.addTile(payload.cell.id, std::move(tile))) {
+            ichor::logf(ichor::LogLevel::Warn, "navmesh: tile {},{} was not added", payload.cell.id.x, payload.cell.id.z);
         }
     });
     streamer.onUnloaded([&](ichor::CellId id) {

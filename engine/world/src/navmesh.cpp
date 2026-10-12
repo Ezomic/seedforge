@@ -45,6 +45,9 @@ bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& pa
     const int walkableRadius = static_cast<int>(std::ceil(params.agentRadius / cs));
     const int border = walkableRadius + 3;
     const int tileSize = static_cast<int>(std::lround(desc.cellMetres / cs));
+    if (static_cast<float>(tileSize) * cs != static_cast<float>(desc.cellMetres)) {
+        return false; // tiles must hold a whole number of voxels or the seams misalign
+    }
 
     const double originX = heightfield.cellOriginX(id);
     const double originZ = heightfield.cellOriginZ(id);
@@ -73,10 +76,8 @@ bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& pa
     config.detailSampleMaxError = params.cellHeight * 4.0f;
     const float pad = static_cast<float>(border) * cs;
     config.bmin[0] = static_cast<float>(originX) - pad;
-    config.bmin[1] = cell.minHeight - 2.0f;
     config.bmin[2] = static_cast<float>(originZ) - pad;
     config.bmax[0] = static_cast<float>(originX + desc.cellMetres) + pad;
-    config.bmax[1] = cell.maxHeight + 4.0f;
     config.bmax[2] = static_cast<float>(originZ + desc.cellMetres) + pad;
 
     // The surface over the padded bounds comes straight from the heightmap, so
@@ -105,6 +106,16 @@ bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& pa
             tris.insert(tris.end(), {i00, i01, i10, i10, i01, i11});
         }
     }
+    // Vertical bounds over everything rasterised, border included, so the
+    // two tiles of a seam agree on which spans exist.
+    float lowest = verts[1];
+    float highest = verts[1];
+    for (std::size_t i = 1; i < verts.size(); i += 3) {
+        lowest = std::min(lowest, verts[i]);
+        highest = std::max(highest, verts[i]);
+    }
+    config.bmin[1] = lowest - 2.0f;
+    config.bmax[1] = highest + 4.0f;
     const int triCount = static_cast<int>(tris.size() / 3);
     const int vertCount = static_cast<int>(verts.size() / 3);
     std::vector<unsigned char> areas(static_cast<std::size_t>(triCount), 0);
@@ -281,7 +292,8 @@ bool NavWorld::findPath(glm::dvec3 from, glm::dvec3 to, std::vector<glm::dvec3>&
     constexpr int kMaxPoints = 2048;
     float points[kMaxPoints * 3];
     int pointCount = 0;
-    if (dtStatusFailed(query_->findStraightPath(startNear, endNear, polys, polyCount, points, nullptr, nullptr, &pointCount, kMaxPoints)) || pointCount == 0) {
+    const dtStatus straight = query_->findStraightPath(startNear, endNear, polys, polyCount, points, nullptr, nullptr, &pointCount, kMaxPoints);
+    if (dtStatusFailed(straight) || dtStatusDetail(straight, DT_BUFFER_TOO_SMALL) || pointCount == 0) {
         return false;
     }
     for (int i = 0; i < pointCount; ++i) {

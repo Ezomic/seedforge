@@ -333,11 +333,10 @@ TEST_CASE("navmesh tiles follow residency and a path crosses a cell border")
     REQUIRE(nav.init(field.desc(), 32));
     std::size_t withTiles = 0;
     streamer.onLoaded([&](const CellPayload& payload) {
-        CellPayload copy;
-        copy.nav = payload.nav;
-        if (!copy.nav.empty()) {
+        NavTile tile = payload.nav;
+        if (!tile.empty()) {
             ++withTiles;
-            REQUIRE(nav.addTile(payload.cell.id, std::move(copy.nav)));
+            REQUIRE(nav.addTile(payload.cell.id, std::move(tile)));
         }
     });
     streamer.onUnloaded([&](CellId id) { nav.removeTile(id); });
@@ -358,6 +357,7 @@ TEST_CASE("navmesh tiles follow residency and a path crosses a cell border")
             if (field.normalAt(x + 64.0, z).y > 0.97f) east.push_back({x + 64.0, field.heightAt(x + 64.0, z), z});
         }
     }
+    INFO("the forged world has no flat ground beside x = 512; the forge changed");
     REQUIRE_FALSE(west.empty());
     REQUIRE_FALSE(east.empty());
     bool crossed = false;
@@ -374,10 +374,16 @@ TEST_CASE("navmesh tiles follow residency and a path crosses a cell border")
         }
         if (crossed) break;
     }
+    INFO("no path across the seam between flat ground at x = 512: the tiles did not link");
     REQUIRE(crossed);
 
-    // Walking away drops the tiles that left the ring and the rest still link.
+    // Walking to cell 3,3 drops the cells beyond the ring and its hysteresis (row 0 and column 0).
     const std::size_t before = nav.tileCount();
     streamer.update({900.0, 0.0, 900.0});
-    REQUIRE(nav.tileCount() <= before);
+    REQUIRE(nav.tileCount() < before);
+    for (CellId id : streamer.resident()) {
+        REQUIRE(id.x >= 1);
+        REQUIRE(id.z >= 1);
+    }
+    REQUIRE(nav.tileCount() <= streamer.resident().size());
 }
