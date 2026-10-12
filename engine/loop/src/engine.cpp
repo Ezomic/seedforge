@@ -1,5 +1,6 @@
 #include "ichor/loop/engine.h"
 
+#include "ichor/audio/audio_host.h"
 #include "ichor/gfx/renderer.h"
 #include "ichor/platform/platform.h"
 
@@ -45,9 +46,18 @@ bool Engine::frame(double frameSeconds)
         return false;
     }
 
+    if (audio_ != nullptr) {
+        // Cues raised this frame are heard from where the camera was last drawn.
+        audio_->setListener(view_.camera.position, view_.camera.rotation);
+    }
     const int steps = step_.advance(frameSeconds);
     for (int i = 0; i < steps && !replayFinished(); ++i) {
         scene_.tick(step_.dt(), nextInput());
+        if (audio_ != nullptr) {
+            for (const SoundEvent& event : scene_.soundEvents()) {
+                audio_->play(event.sound, event.position, true);
+            }
+        }
     }
 
     renderer_.beginFrame();

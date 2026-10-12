@@ -10,6 +10,7 @@
 
 namespace ichor {
 
+class AudioHost;
 class Platform;
 class Renderer;
 
@@ -33,6 +34,9 @@ public:
     // the interpolation alpha for rendering between two fixed steps.
     void setViewBuilder(ViewBuilder builder) { viewBuilder_ = std::move(builder); }
 
+    // Optional: receives the scene's sound events each tick and the camera as listener.
+    void setAudio(AudioHost* audio) { audio_ = audio; }
+
     void recordInputs(bool enabled) { recording_ = enabled; }
     const InputStream& recordedInputs() const { return recorded_; }
 
@@ -54,6 +58,7 @@ private:
 
     Platform& platform_;
     Renderer& renderer_;
+    AudioHost* audio_ = nullptr;
     FixedStep step_;
     Scene scene_;
     RenderView view_;

@@ -58,6 +58,7 @@ void Scene::clearForRestore()
     physics_->clear();
     rngs_.clear();
     pending_.clear();
+    soundEvents_.clear();
     log_.entries.clear();
 }
 
@@ -107,7 +108,12 @@ void Scene::apply(const Command& command)
             player.activeEnd = c.activeEnd;
             player.recoveryEnd = c.recoveryEnd;
             player.phase = static_cast<std::uint8_t>(MontagePhase::Windup);
+            player.windupSound = c.windupSound;
+            player.activeSound = c.activeSound;
             registry_.emplace_or_replace<MontagePlayer>(entity, player);
+            if (c.windupSound != kNoSound) {
+                soundEvents_.push_back({c.id, c.windupSound, registry_.get<Transform>(entity).position});
+            }
         } else if constexpr (std::is_same_v<T, DestroyCommand>) {
             const entt::entity entity = find(c.id);
             if (entity != entt::null) {
@@ -196,7 +202,9 @@ void Scene::animationSystem(double dt)
             state.montage = {montage->clip, montage->activeStart, montage->activeEnd, montage->recoveryEnd};
             state.time = montage->time;
             state.phase = static_cast<MontagePhase>(montage->phase);
-            state.advance(fdt);
+            if (state.advance(fdt) == MontagePhase::Active && montage->activeSound != kNoSound) {
+                soundEvents_.push_back({id, montage->activeSound, transform.position});
+            }
             clip = montage->clip;
             before = montage->time;
             after = state.time;
@@ -270,6 +278,7 @@ void Scene::physicsSystem(double dt)
 
 void Scene::tick(double dt, const InputFrame& input)
 {
+    soundEvents_.clear();
     rememberPreviousTransforms();
     for (const Command& command : pending_) {
         log_.entries.push_back({tickCount_, command});
