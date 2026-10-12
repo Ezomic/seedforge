@@ -2,6 +2,7 @@
 
 #include "ichor/gfx/render_view.h"
 
+#include <cstdint>
 #include <string>
 
 namespace ichor {
@@ -14,9 +15,11 @@ public:
 
     virtual bool init() = 0;
 
-    // Makes a cooked bundle's meshes, textures and materials drawable. Mesh
-    // indices in RenderInstance refer to this bundle.
+    // Makes a cooked bundle's meshes, textures and materials drawable, after
+    // whatever was uploaded before: the bundle's meshes get indices starting
+    // at meshCount() as it was before the call.
     virtual bool uploadBundle(const SceneBundle& bundle) = 0;
+    virtual std::uint32_t meshCount() const = 0;
 
     // Rebuilds pipelines from the shader files on disk. Hot reload calls this
     // when a compiled shader changes; a renderer without shaders does nothing.

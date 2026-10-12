@@ -22,6 +22,7 @@ struct SpawnCommand {
     std::optional<Player> player;
     std::optional<StaticBox> staticBox;
     std::optional<CharacterBody> character;
+    std::optional<Animator> animator;
 };
 
 struct DestroyCommand {
@@ -35,7 +36,17 @@ struct MoveCommand {
     glm::dvec3 delta{0.0};
 };
 
-using Command = std::variant<SpawnCommand, DestroyCommand, MoveCommand>;
+// Starts a montage on an entity that has an Animator; ignored while one is
+// already playing, which is what makes attacks commit.
+struct PlayMontageCommand {
+    StableId id;
+    std::uint32_t clip = 0;
+    float activeStart = 0.0f;
+    float activeEnd = 0.0f;
+    float recoveryEnd = 0.0f;
+};
+
+using Command = std::variant<SpawnCommand, DestroyCommand, MoveCommand, PlayMontageCommand>;
 
 struct CommandLog {
     struct Entry {

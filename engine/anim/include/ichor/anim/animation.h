@@ -22,7 +22,10 @@ public:
     AnimationSet(const AnimationSet&) = delete;
     AnimationSet& operator=(const AnimationSet&) = delete;
 
+    // Appends: the bundle's skeletons and clips get indices continuing from
+    // skeletonCount() and clipCount() as they were before the call.
     bool load(const SceneBundle& bundle);
+    void clear();
 
     std::uint32_t skeletonCount() const;
     std::uint32_t clipCount() const;

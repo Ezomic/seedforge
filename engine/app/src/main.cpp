@@ -1,3 +1,4 @@
+#include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
@@ -29,6 +30,7 @@ struct Options {
     std::uint64_t frames = 0; // 0 runs until quit
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
+    std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path record;
     std::filesystem::path replay;
     std::filesystem::path load;
@@ -55,6 +57,8 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.seed)) return false;
         } else if (arg == "--scene" && hasValue) {
             options.scene = argv[++i];
+        } else if (arg == "--actor" && hasValue) {
+            options.actor = argv[++i];
         } else if (arg == "--record" && hasValue) {
             options.record = argv[++i];
         } else if (arg == "--replay" && hasValue) {
@@ -73,7 +77,7 @@ bool parse(int argc, char** argv, Options& options)
 
 // The kit laid out as entities: the three pieces, a slowly turning helmet,
 // and the player, whose transform is the camera.
-void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle)
+void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32_t armMesh, std::uint32_t armClip)
 {
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     for (std::size_t i = 0; i < bundle.nodes.size(); ++i) {
@@ -106,6 +110,16 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle)
     box("wall-north", {0.0, 0.5, -10.25}, {10.0f, 1.5f, 0.25f});
     box("wall-south", {0.0, 0.5, 10.25}, {10.0f, 1.5f, 0.25f});
 
+    // The waving arm stands beside the shield. Root motion is off here so it
+    // stays in view; the simulation tests cover it walking.
+    ichor::SpawnCommand arm;
+    arm.id = ichor::StableId::of("arm");
+    arm.name.value = "arm";
+    arm.transform.position = {-1.3, -0.45, -0.7};
+    arm.mesh = ichor::MeshRef{armMesh};
+    arm.animator = ichor::Animator{armClip, 0.0f, 1.0f, true, false};
+    scene.enqueue(arm);
+
     ichor::SpawnCommand player;
     player.id = ichor::StableId::of("player");
     player.name.value = "player";
@@ -125,17 +139,25 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
     if (!ichor::readBundle(options.scene, bundle) || !renderer.uploadBundle(bundle)) {
         return 1;
     }
+    ichor::AnimationSet animations;
+    ichor::SceneBundle actor;
+    const std::uint32_t armMesh = renderer.meshCount();
+    if (!ichor::readBundle(options.actor, actor) || !renderer.uploadBundle(actor) || !animations.load(actor)) {
+        return 1;
+    }
+    const std::uint32_t armClip = animations.findClip("wave");
 
     ichor::EngineConfig config;
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
+    engine.scene().setAnimations(&animations);
 
     if (!options.load.empty()) {
         if (!ichor::loadScene(options.load, engine.scene())) {
             return 1;
         }
     } else {
-        populate(engine.scene(), bundle);
+        populate(engine.scene(), bundle, armMesh, armClip);
     }
     if (!options.replay.empty()) {
         ichor::InputStream stream;
@@ -155,12 +177,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, const Options& opt
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
             return std::pair{glm::mix(previous.position, current.position, alpha), glm::slerp(previous.rotation, current.rotation, static_cast<float>(alpha))};
         };
+        view.jointPalette.clear();
         for (auto [entity, previous, transform, mesh] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::MeshRef>().each()) {
             const auto [position, rotation] = blend(previous, transform);
             ichor::RenderInstance instance;
             instance.mesh = mesh.mesh;
             instance.position = position;
             instance.basis = glm::mat3_cast(rotation) * glm::mat3(glm::vec3(transform.scale.x, 0.0f, 0.0f), glm::vec3(0.0f, transform.scale.y, 0.0f), glm::vec3(0.0f, 0.0f, transform.scale.z));
+            if (const auto* pose = scene.registry().try_get<ichor::SkinPose>(entity); pose != nullptr && !pose->matrices.empty()) {
+                instance.jointOffset = static_cast<std::uint32_t>(view.jointPalette.size());
+                instance.jointCount = static_cast<std::uint32_t>(pose->matrices.size());
+                view.jointPalette.insert(view.jointPalette.end(), pose->matrices.begin(), pose->matrices.end());
+            }
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {

@@ -2,6 +2,7 @@
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat3x3.hpp>
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <cstdint>
@@ -17,6 +18,9 @@ struct RenderInstance {
     std::uint32_t mesh = 0;
     glm::dvec3 position{0.0};
     glm::mat3 basis{1.0f}; // rotation and uniform scale; normals are transformed by it directly
+    // Skinned instances point at a run of matrices in RenderView::jointPalette.
+    std::uint32_t jointOffset = 0;
+    std::uint32_t jointCount = 0; // zero draws the mesh rigid
 };
 
 struct RenderCamera {
@@ -41,6 +45,7 @@ struct RenderView {
     glm::vec3 ambient{0.18f, 0.2f, 0.26f};
     glm::vec3 clearColor{0.45f, 0.58f, 0.75f};
     std::vector<RenderInstance> instances;
+    std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<DebugLine> lines;
 };
 

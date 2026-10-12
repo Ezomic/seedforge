@@ -17,7 +17,7 @@ if(ENGINE_RUNTIME)
     set(ICHOR_SHADER_DIR ${CMAKE_BINARY_DIR}/shaders)
     file(MAKE_DIRECTORY ${ICHOR_SHADER_DIR})
 
-    set(shaders pbr.vert pbr.frag shadow.vert debug.vert debug.frag)
+    set(shaders pbr.vert pbr_skinned.vert pbr.frag shadow.vert shadow_skinned.vert debug.vert debug.frag)
     set(shader_outputs)
     foreach(shader ${shaders})
         if(shader MATCHES "\.vert$")

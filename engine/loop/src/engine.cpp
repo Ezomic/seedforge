@@ -54,6 +54,7 @@ bool Engine::frame(double frameSeconds)
     if (viewBuilder_) {
         view_.instances.clear();
         view_.lines.clear();
+        view_.jointPalette.clear();
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
     }

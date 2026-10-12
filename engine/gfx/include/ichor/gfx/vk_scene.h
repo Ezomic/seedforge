@@ -24,7 +24,9 @@ public:
     ~SceneRenderer();
 
     bool init();
+    // Appends; mesh and material indices continue from what is already loaded.
     bool uploadBundle(const SceneBundle& bundle);
+    std::uint32_t meshCount() const { return static_cast<std::uint32_t>(meshes_.size()); }
 
     // Drops the pipelines and builds them again from the shader files on disk.
     bool reloadPipelines();
@@ -43,10 +45,12 @@ private:
         GpuBuffer vertices;
         GpuBuffer indices;
         std::vector<std::array<std::uint32_t, 3>> submeshes; // firstIndex, indexCount, material
+        bool skinned = false;
     };
     struct FrameSlot {
         GpuBuffer frameUbo;
         GpuBuffer debugVertices;
+        GpuBuffer jointPalette;
         VkDescriptorSet frameSet = VK_NULL_HANDLE;
     };
 
@@ -69,7 +73,9 @@ private:
     VkDescriptorSetLayout materialLayout_ = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline pbrPipeline_ = VK_NULL_HANDLE;
+    VkPipeline pbrSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowPipeline_ = VK_NULL_HANDLE;
+    VkPipeline shadowSkinnedPipeline_ = VK_NULL_HANDLE;
     VkPipeline debugPipeline_ = VK_NULL_HANDLE;
     VkDescriptorPool pool_ = VK_NULL_HANDLE;
     std::array<FrameSlot, kFrameSlots> slots_{};

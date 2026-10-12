@@ -1,3 +1,4 @@
+#include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
 #include "ichor/gfx/reference_view.h"
@@ -18,6 +19,7 @@ constexpr std::uint32_t kHeight = 360;
 
 const std::filesystem::path kGoldenDir = std::filesystem::path(ICHOR_TEST_DATA) / "golden";
 const std::filesystem::path kContent = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
+const std::filesystem::path kArmContent = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
 const std::filesystem::path kOutDir = std::filesystem::path(ICHOR_TEST_OUTPUT);
 
 struct Diff {
@@ -95,6 +97,61 @@ TEST_CASE("golden image: the hoplite kit")
     // Driver differences move a few edge pixels; a real regression moves many.
     const Diff diff = compare(actual, expected, 16);
     writePng(kOutDir / "kit.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the skinned arm mid-wave")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    SceneBundle bundle;
+    REQUIRE(readBundle(kArmContent, bundle));
+    REQUIRE(renderer.uploadBundle(bundle));
+    AnimationSet animations;
+    REQUIRE(animations.load(bundle));
+
+    RenderView view;
+    view.sunDirection = glm::normalize(glm::vec3(-0.5f, 0.9f, 0.35f));
+    const glm::dvec3 eye(1.6, 1.1, 1.9);
+    const glm::dvec3 target(0.0, 0.5, 0.0);
+    view.camera.position = eye;
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+    view.camera.fovY = glm::radians(45.0f);
+    RenderInstance instance;
+    instance.mesh = 0;
+    instance.jointOffset = 0;
+    REQUIRE(animations.skinningMatrices(0, 0.26f, view.jointPalette));
+    instance.jointCount = static_cast<std::uint32_t>(view.jointPalette.size());
+    view.instances.push_back(instance);
+    for (int i = -2; i <= 2; ++i) {
+        view.lines.push_back({glm::dvec3(i, 0.0, -2.0), glm::dvec3(i, 0.0, 2.0), glm::vec3(0.35f)});
+        view.lines.push_back({glm::dvec3(-2.0, 0.0, i), glm::dvec3(2.0, 0.0, i), glm::vec3(0.35f)});
+    }
+
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "arm.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "arm.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect arm.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "arm.diff.png", kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);

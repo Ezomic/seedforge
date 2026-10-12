@@ -97,10 +97,15 @@ AnimationSet::AnimationSet()
 
 AnimationSet::~AnimationSet() = default;
 
-bool AnimationSet::load(const SceneBundle& bundle)
+void AnimationSet::clear()
 {
     impl_->skeletons.clear();
     impl_->clips.clear();
+}
+
+bool AnimationSet::load(const SceneBundle& bundle)
+{
+    const auto skeletonBase = static_cast<std::uint32_t>(impl_->skeletons.size());
     for (const Skeleton& source : bundle.skeletons) {
         Impl::SkeletonEntry entry;
         if (!deserialize(source.ozzBytes, entry.skeleton)) {
@@ -117,16 +122,17 @@ bool AnimationSet::load(const SceneBundle& bundle)
     }
     for (const AnimationClip& source : bundle.clips) {
         Impl::ClipEntry entry;
-        if (source.skeleton >= impl_->skeletons.size() || !deserialize(source.ozzBytes, entry.animation)) {
+        const std::uint32_t skeleton = skeletonBase + source.skeleton;
+        if (skeleton >= impl_->skeletons.size() || !deserialize(source.ozzBytes, entry.animation)) {
             logf(LogLevel::Error, "clip {}: not an ozz animation", source.name);
             return false;
         }
-        if (entry.animation.num_tracks() != impl_->skeletons[source.skeleton].skeleton.num_joints()) {
+        if (entry.animation.num_tracks() != impl_->skeletons[skeleton].skeleton.num_joints()) {
             logf(LogLevel::Error, "clip {}: track count disagrees with its skeleton", source.name);
             return false;
         }
         entry.name = source.name;
-        entry.skeleton = source.skeleton;
+        entry.skeleton = skeleton;
         entry.duration = source.duration;
         impl_->clips.push_back(std::move(entry));
     }

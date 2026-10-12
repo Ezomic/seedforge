@@ -1,0 +1,34 @@
+#include "common.hlsli"
+
+struct VSIn {
+    [[vk::location(0)]] float3 position : POSITION;
+    [[vk::location(1)]] float3 normal : NORMAL;
+    [[vk::location(2)]] float4 tangent : TANGENT;
+    [[vk::location(3)]] float2 uv : TEXCOORD0;
+    [[vk::location(4)]] uint4 joints : BLENDINDICES;
+    [[vk::location(5)]] float4 weights : BLENDWEIGHT;
+};
+
+struct VSOut {
+    float4 clip : SV_Position;
+    float3 worldPos : TEXCOORD0;
+    float3 normal : TEXCOORD1;
+    float4 tangent : TEXCOORD2;
+    float2 uv : TEXCOORD3;
+};
+
+VSOut main(VSIn i)
+{
+    const float4x4 skin = skinMatrix(i.joints, i.weights);
+    const float4x4 model = mul(push.model, skin);
+    const float4 world = mul(model, float4(i.position, 1.0));
+    const float3x3 basis = (float3x3)model;
+
+    VSOut o;
+    o.clip = mul(frame.viewProj, world);
+    o.worldPos = world.xyz;
+    o.normal = normalize(mul(basis, i.normal));
+    o.tangent = float4(normalize(mul(basis, i.tangent.xyz)), i.tangent.w);
+    o.uv = i.uv;
+    return o;
+}

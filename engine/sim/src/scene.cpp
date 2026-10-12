@@ -86,6 +86,25 @@ void Scene::apply(const Command& command)
                 registry_.emplace<CharacterBody>(entity, *c.character);
                 physics_->addCharacter(c.id, *c.character, c.transform);
             }
+            if (c.animator) {
+                registry_.emplace<Animator>(entity, *c.animator);
+                registry_.emplace<SkinPose>(entity);
+            }
+        } else if constexpr (std::is_same_v<T, PlayMontageCommand>) {
+            const entt::entity entity = find(c.id);
+            if (entity == entt::null || !registry_.all_of<Animator>(entity)) {
+                return;
+            }
+            if (auto* playing = registry_.try_get<MontagePlayer>(entity); playing != nullptr && playing->phase != 0) {
+                return;
+            }
+            MontagePlayer player;
+            player.clip = c.clip;
+            player.activeStart = c.activeStart;
+            player.activeEnd = c.activeEnd;
+            player.recoveryEnd = c.recoveryEnd;
+            player.phase = static_cast<std::uint8_t>(MontagePhase::Windup);
+            registry_.emplace_or_replace<MontagePlayer>(entity, player);
         } else if constexpr (std::is_same_v<T, DestroyCommand>) {
             const entt::entity entity = find(c.id);
             if (entity != entt::null) {
@@ -155,6 +174,72 @@ void Scene::spinSystem(double dt)
     }
 }
 
+void Scene::animationSystem(double dt)
+{
+    if (animations_ == nullptr) {
+        return;
+    }
+    const float fdt = static_cast<float>(dt);
+    for (auto [entity, id, transform, animator, pose] : registry_.view<const StableId, const Transform, Animator, SkinPose>().each()) {
+        std::uint32_t clip = animator.clip;
+        float before = animator.time;
+        float after = animator.time;
+
+        // A montage owns the entity while it plays; the loop clip waits.
+        auto* montage = registry_.try_get<MontagePlayer>(entity);
+        if (montage != nullptr && montage->phase != 0) {
+            MontageState state;
+            state.montage = {montage->clip, montage->activeStart, montage->activeEnd, montage->recoveryEnd};
+            state.time = montage->time;
+            state.phase = static_cast<MontagePhase>(montage->phase);
+            state.advance(fdt);
+            clip = montage->clip;
+            before = montage->time;
+            after = state.time;
+            montage->time = state.time;
+            montage->phase = static_cast<std::uint8_t>(state.phase);
+        } else {
+            const float duration = animations_->clipDuration(animator.clip);
+            after = animator.time + fdt * animator.speed;
+            if (duration > 0.0f) {
+                if (animator.loop) {
+                    after = std::fmod(after, duration);
+                } else {
+                    after = std::min(after, duration);
+                }
+            }
+            animator.time = after;
+        }
+
+        if (animator.rootMotion) {
+            // Travel of the root joint this tick, in the entity's frame; a loop wrap adds the tail.
+            glm::vec3 a;
+            glm::vec3 b;
+            glm::vec3 delta(0.0f);
+            if (animations_->rootTranslation(clip, before, a) && animations_->rootTranslation(clip, after, b)) {
+                delta = b - a;
+                if (after < before) {
+                    glm::vec3 end;
+                    glm::vec3 start;
+                    animations_->rootTranslation(clip, animations_->clipDuration(clip), end);
+                    animations_->rootTranslation(clip, 0.0f, start);
+                    delta = (end - a) + (b - start);
+                }
+            }
+            const glm::vec3 world = transform.rotation * delta;
+            if (registry_.all_of<CharacterBody>(entity)) {
+                const glm::vec3 intent = fdt > 0.0f ? world / fdt : glm::vec3(0.0f);
+                registry_.get<CharacterBody>(entity).intent = glm::vec3(intent.x, 0.0f, intent.z);
+                physics_->setCharacterIntent(id, intent);
+            } else {
+                registry_.get<Transform>(entity).position += glm::dvec3(world);
+            }
+        }
+
+        animations_->skinningMatrices(clip, after, pose.matrices);
+    }
+}
+
 void Scene::physicsSystem(double dt)
 {
     physics_->step(dt);
@@ -180,6 +265,7 @@ void Scene::tick(double dt, const InputFrame& input)
 
     applyInput(input, dt);
     spinSystem(dt);
+    animationSystem(dt);
     physicsSystem(dt);
 
     ++tickCount_;
@@ -209,7 +295,10 @@ std::uint64_t Scene::stateHash() const
         const auto* player = registry_.try_get<Player>(entity);
         const auto* box = registry_.try_get<StaticBox>(entity);
         const auto* body = registry_.try_get<CharacterBody>(entity);
-        const std::uint32_t present = (mesh ? 1u : 0u) | (spin ? 2u : 0u) | (player ? 4u : 0u) | (box ? 8u : 0u) | (body ? 16u : 0u);
+        const auto* animator = registry_.try_get<Animator>(entity);
+        const auto* montage = registry_.try_get<MontagePlayer>(entity);
+        const std::uint32_t present = (mesh ? 1u : 0u) | (spin ? 2u : 0u) | (player ? 4u : 0u) | (box ? 8u : 0u) | (body ? 16u : 0u)
+            | (animator ? 32u : 0u) | (montage ? 64u : 0u);
         w.write(registry_.get<StableId>(entity));
         w.write(registry_.get<Name>(entity));
         w.write(registry_.get<Transform>(entity));
@@ -219,6 +308,8 @@ std::uint64_t Scene::stateHash() const
         if (player) w.write(*player);
         if (box) w.write(*box);
         if (body) w.write(*body);
+        if (animator) w.write(*animator);
+        if (montage) w.write(*montage);
     }
     const auto& bytes = w.bytes();
     return hashCombine(h, hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size())));
