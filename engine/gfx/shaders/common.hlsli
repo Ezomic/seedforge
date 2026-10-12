@@ -14,6 +14,10 @@ struct FrameData {
     float4 ambient;         // rgb
     float4 shadowParams;    // x texel size, y depth bias, z normal offset, w unused
     float4 cameraWorld;     // xyz world position of the camera, which is the origin of worldPos
+    float4 skyZenith;       // rgb linear
+    float4 skyHorizon;      // rgb linear
+    float4 fogColor;        // rgb linear, w density per metre
+    float4 skyParams;       // x tan(fov/2) * aspect, y tan(fov/2)
 };
 
 struct PushData {
@@ -26,6 +30,12 @@ struct PushData {
 [[vk::binding(0, 0)]] ConstantBuffer<FrameData> frame;
 [[vk::binding(3, 0)]] StructuredBuffer<float4x4> jointPalette;
 [[vk::push_constant]] PushData push;
+
+float4 toneMap(float3 color)
+{
+    color = color / (color + 1.0);
+    return float4(pow(color, 1.0 / 2.2), 1.0);
+}
 
 // Blends the four joint matrices of a skinned vertex.
 float4x4 skinMatrix(uint4 joints, float4 weights)
