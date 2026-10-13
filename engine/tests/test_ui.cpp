@@ -305,6 +305,21 @@ TEST_CASE("the ledger escapes markup so an entry can never act as a document")
     REQUIRE(escapeRml("<div id=\"list\">x</div>") == "&lt;div id=&quot;list&quot;&gt;x&lt;/div&gt;");
 }
 
+TEST_CASE("the ledger cleans control characters and bad UTF-8, and entities cannot be smuggled in")
+{
+    REQUIRE(escapeRml("it's fine") == "it's fine");
+    REQUIRE(escapeRml("a & b") == "a &amp; b");
+    REQUIRE(escapeRml("&amp;") == "&amp;amp;");
+    REQUIRE(escapeRml("&#60;div&#62;") == "&amp;#60;div&amp;#62;");
+    REQUIRE(escapeRml(std::string("a\0b", 3)) == "a b");
+    REQUIRE(escapeRml("tab\there\r\n\x01\x7f") == "tab here    ");
+    REQUIRE(escapeRml("caf\xC3\xA9") == "caf\xC3\xA9");           // a valid two-byte character stays
+    REQUIRE(escapeRml("\xE2\x82\xAC") == "\xE2\x82\xAC");           // and a three-byte one
+    REQUIRE(escapeRml("bad\xFF" "byte") == "bad?byte");                // a byte that cannot start a character
+    REQUIRE(escapeRml("cut\xE2\x82") == "cut??");                  // a sequence cut short
+    REQUIRE(escapeRml("\xC0\x80") == "??");                        // an overlong form
+}
+
 TEST_CASE("the ledger draws nothing until shown, then its card and rows, and only relays out when the rows change")
 {
     RecordingUiRenderer renderer;
@@ -363,4 +378,25 @@ TEST_CASE("an empty ledger says so, and rows beyond the card's room are left off
     frame(ui, renderer, 0.2);
     REQUIRE(renderer.draws().size() == full); // the same twelve rows
     REQUIRE(full > empty);
+}
+
+TEST_CASE("a long unbroken entry stays inside the card")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Ledger ledger(ui);
+    ledger.setVisible(true);
+    ledger.setRows(std::vector<LedgerRow>(Ledger::kMaxRows, LedgerRow{"9:59:59", "note", std::string(500, 'w')}));
+    frame(ui, renderer, 0.0);
+    // Nothing is drawn below the card's bottom edge (88% of the window), scissor or not.
+    for (const auto& draw : renderer.draws()) {
+        if (draw.scissored) {
+            REQUIRE(draw.scissor.Bottom() <= 720 * 88 / 100 + 2);
+        }
+    }
+    REQUIRE_FALSE(renderer.draws().empty());
 }

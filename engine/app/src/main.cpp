@@ -571,7 +571,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
         // The journal is only a view, so it works in a replay too.
         const bool journal = (buttons & ichor::InputFrame::Journal) != 0;
-        if (journal && !journalHeld && ledger) {
+        // Tab moves between the editor's fields, so there it does not open the journal.
+        if (journal && !journalHeld && ledger && !editing) {
             ledger->setVisible(!ledger->visible());
         }
         journalHeld = journal;
