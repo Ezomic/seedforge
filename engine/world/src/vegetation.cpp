@@ -137,6 +137,10 @@ void scatterVegetation(const Heightfield& heightfield, CellId id, const Vegetati
             if (above < params.minHeight || above > params.maxHeight) {
                 continue;
             }
+            // Trees stand on the bank, not in the water.
+            if (desc.hasWater() && height < desc.waterLevel() + params.bankMargin) {
+                continue;
+            }
             if (1.0f - heightfield.normalAt(worldX, worldZ).y > params.maxSlope) {
                 continue;
             }

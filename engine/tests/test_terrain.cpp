@@ -110,13 +110,16 @@ TEST_CASE("sampling is bilinear and cells share their edge samples")
 
 TEST_CASE("the world round-trips through its on-disk layout")
 {
-    const Heightfield field = forgeHeightfield(smallWorld(11));
+    WorldDesc desc = smallWorld(11);
+    desc.waterHeight = 7.5f;
+    const Heightfield field = forgeHeightfield(desc);
     const auto dir = std::filesystem::temp_directory_path() / "ichor_world";
     REQUIRE(writeWorld(dir, field));
     Heightfield loaded;
     REQUIRE(readWorld(dir, loaded));
     REQUIRE(loaded.digest() == field.digest());
     REQUIRE(loaded.desc().cellMetres == 256);
+    REQUIRE(loaded.desc().waterHeight == field.desc().waterHeight);
     std::filesystem::remove_all(dir);
 }
 

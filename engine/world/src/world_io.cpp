@@ -13,7 +13,7 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'W', 'L', 'D'};
-constexpr std::uint32_t kVersion = 1;
+constexpr std::uint32_t kVersion = 2;
 
 }
 

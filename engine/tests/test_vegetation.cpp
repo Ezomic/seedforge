@@ -97,6 +97,41 @@ TEST_CASE("tighter spacing plants more and a steep limit plants fewer")
     REQUIRE(c.size() < a.size());
 }
 
+TEST_CASE("no tree grows below the water and the world's own water level is a field of its description")
+{
+    WorldDesc desc;
+    desc.seed = 5;
+    desc.sizeMetres = 2048;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 512;
+    REQUIRE_FALSE(desc.hasWater());
+    const Heightfield dry = forgeHeightfield(desc);
+    desc.waterHeight = 120.0f;
+    REQUIRE(desc.hasWater());
+    REQUIRE(desc.waterLevel() == desc.minHeight + 120.0f);
+    const Heightfield flooded(desc, dry.samples());
+
+    std::vector<VegetationInstance> before;
+    std::vector<VegetationInstance> after;
+    scatterVegetation(dry, {1, 1}, VegetationParams{}, before);
+    scatterVegetation(flooded, {1, 1}, VegetationParams{}, after);
+    REQUIRE(after.size() < before.size());
+    // Flooding only removes trees: every survivor is a tree the dry world had, unchanged.
+    std::size_t next = 0;
+    for (const VegetationInstance& tree : after) {
+        while (next < before.size() && before[next].position != tree.position) {
+            ++next;
+        }
+        REQUIRE(next < before.size());
+        REQUIRE(before[next].kind == tree.kind);
+        REQUIRE(before[next].yaw == tree.yaw);
+        REQUIRE(before[next].scale == tree.scale);
+    }
+    for (const VegetationInstance& tree : after) {
+        REQUIRE(tree.position.y >= desc.waterLevel());
+    }
+}
+
 TEST_CASE("the tree meshes are closed over valid indices and face outward")
 {
     const SceneBundle bundle = treeBundle();

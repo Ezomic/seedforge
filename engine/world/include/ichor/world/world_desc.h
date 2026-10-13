@@ -2,6 +2,7 @@
 
 #include "ichor/core/reflect.h"
 
+#include <cmath>
 #include <cstdint>
 #include <tuple>
 
@@ -17,6 +18,9 @@ struct WorldDesc {
     std::uint32_t cellMetres = 512;
     float minHeight = 0.0f;   // metres, what a sample of 0 means
     float heightRange = 400.0f; // metres, what a sample of 65535 adds
+    float waterHeight = 0.0f;   // metres above minHeight where the water lies; zero or less is a dry world
+    float waterLevel() const { return minHeight + waterHeight; }
+    bool hasWater() const { return waterHeight > 0.0f; }
 
     std::uint32_t samplesPerSide() const { return sizeMetres / metresPerSample + 1; }
     std::uint32_t cellsPerSide() const { return sizeMetres / cellMetres; }
@@ -24,7 +28,7 @@ struct WorldDesc {
     bool valid() const
     {
         return sizeMetres > 0 && metresPerSample > 0 && cellMetres > 0 && sizeMetres % cellMetres == 0 && cellMetres % metresPerSample == 0
-            && heightRange > 0.0f && cellsPerSide() <= 256 && samplesPerSide() <= 8193;
+            && heightRange > 0.0f && std::isfinite(waterHeight) && cellsPerSide() <= 256 && samplesPerSide() <= 8193;
     }
 };
 
@@ -33,7 +37,8 @@ struct Reflect<WorldDesc> {
     static constexpr auto fields()
     {
         return std::make_tuple(field("seed", &WorldDesc::seed), field("sizeMetres", &WorldDesc::sizeMetres), field("metresPerSample", &WorldDesc::metresPerSample),
-            field("cellMetres", &WorldDesc::cellMetres), field("minHeight", &WorldDesc::minHeight), field("heightRange", &WorldDesc::heightRange));
+            field("cellMetres", &WorldDesc::cellMetres), field("minHeight", &WorldDesc::minHeight), field("heightRange", &WorldDesc::heightRange),
+            field("waterHeight", &WorldDesc::waterHeight));
     }
 };
 

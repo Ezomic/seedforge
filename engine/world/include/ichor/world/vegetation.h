@@ -21,6 +21,7 @@ struct VegetationParams {
     float minHeight = 2.0f;   // metres above the height range's floor
     float maxHeight = 220.0f; // above this is the snow line
     float forestScale = 600.0f; // metres across a forest patch or a clearing
+    float bankMargin = 1.0f;  // metres above the world's water that trees keep clear of
 };
 
 // Kinds of vegetation, in the order of the meshes in treeBundle().
