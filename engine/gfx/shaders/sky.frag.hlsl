@@ -24,5 +24,8 @@ float4 main(PSIn i) : SV_Target
     const float3 light = frame.sunColor.rgb * (frame.sunColor.w * 6.0);
     color += light * (disc + glow) * smoothstep(-0.05, 0.02, up);
 
+    if (isUnderwater()) {
+        color = underwaterColor();
+    }
     return toneMap(color);
 }

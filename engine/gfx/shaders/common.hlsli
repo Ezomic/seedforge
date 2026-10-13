@@ -35,6 +35,18 @@ struct PushData {
 [[vk::binding(3, 0)]] StructuredBuffer<float4x4> jointPalette;
 [[vk::push_constant]] PushData push;
 
+// The camera is below the surface of the water.
+bool isUnderwater()
+{
+    return frame.waterColor.w > 0.0 && frame.cameraWorld.y < frame.waterParams.x;
+}
+
+// What the water looks like from inside: its deep colour, lit by the sky above and a little sun.
+float3 underwaterColor()
+{
+    return frame.waterColor.rgb * (0.3 + frame.ambient.rgb * 2.0 + frame.sunColor.rgb * frame.sunColor.w * 0.04);
+}
+
 float4 toneMap(float3 color)
 {
     color = color / (color + 1.0);
