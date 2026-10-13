@@ -53,6 +53,8 @@ public:
     // Pointer input in pixels. Return true when the UI used the event.
     bool mouseMove(int x, int y);
     bool mouseButton(int button, bool down);
+    // The pointer left the window: nothing stays hovered.
+    void mouseLeave();
 
     Rml::Context* context() { return context_; }
 

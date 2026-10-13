@@ -556,6 +556,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
     bool journalHeld = false;
+    bool pointerHeld = false;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
     for (;;) {
@@ -576,6 +577,28 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ledger->setVisible(!ledger->visible());
         }
         journalHeld = journal;
+        // The pointer drives the game UI (the game itself does not use the mouse); the editor's
+        // own windows have it while they are up. Away from the window, or under the editor, a
+        // press the UI still holds is let go and nothing stays hovered.
+        if (ui) {
+            const ichor::Pointer pointer = platform.pointer();
+            if (pointer.inside && !editing) {
+                ui->mouseMove(pointer.x, pointer.y);
+                if (pointer.primary != pointerHeld) {
+                    ui->mouseButton(0, pointer.primary);
+                    pointerHeld = pointer.primary;
+                }
+            } else {
+                if (pointerHeld) {
+                    ui->mouseButton(0, false);
+                    pointerHeld = false;
+                }
+                ui->mouseLeave();
+            }
+            if (ledger->takeCloseRequest()) {
+                ledger->setVisible(false);
+            }
+        }
         // Saving over the player's quicksave while a replay drives the run would be a surprise.
         if (quickSave && !quickSaveHeld && options.replay.empty()) {
             if (slots.save(quickSlot, engine.scene(), saveContext(), chronicle)) {
