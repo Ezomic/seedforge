@@ -148,6 +148,9 @@ SceneRenderer::~SceneRenderer()
     }
     vkDeviceWaitIdle(device);
     destroyBundle();
+    for (auto& [handle, mesh] : waterCells_) {
+        destroyGpuMesh(mesh);
+    }
     for (auto& [handle, cell] : terrainCells_) {
         for (GpuMesh& lod : cell.lods) destroyGpuMesh(lod);
     }
@@ -166,7 +169,7 @@ SceneRenderer::~SceneRenderer()
         ctx_.destroyBuffer(slot.jointPalette);
     }
     vkDestroyDescriptorPool(device, pool_, nullptr);
-    for (VkPipeline pipeline : {pbrPipeline_, pbrSkinnedPipeline_, terrainPipeline_, skyPipeline_, pbrInstancedPipeline_, rainPipeline_, waterPipeline_, shadowInstancedPipeline_, shadowPipeline_, shadowSkinnedPipeline_, debugPipeline_}) {
+    for (VkPipeline pipeline : {pbrPipeline_, pbrSkinnedPipeline_, terrainPipeline_, skyPipeline_, pbrInstancedPipeline_, rainPipeline_, waterPipeline_, waterMeshPipeline_, shadowInstancedPipeline_, shadowPipeline_, shadowSkinnedPipeline_, debugPipeline_}) {
         vkDestroyPipeline(device, pipeline, nullptr);
     }
     vkDestroyPipelineLayout(device, pipelineLayout_, nullptr);
@@ -294,13 +297,14 @@ bool SceneRenderer::createPipelines()
     VkShaderModule skyFrag = ctx_.loadShader("sky.frag.spv");
     VkShaderModule rainFrag = ctx_.loadShader("rain.frag.spv");
     VkShaderModule waterFrag = ctx_.loadShader("water.frag.spv");
+    VkShaderModule waterMeshFrag = ctx_.loadShader("watermesh.frag.spv");
     const auto destroyModules = [&] {
-        for (VkShaderModule m : {pbrVert, pbrSkinnedVert, pbrFrag, terrainFrag, shadowVert, shadowSkinnedVert, debugVert, debugFrag, skyVert, skyFrag, rainFrag, waterFrag, instancedVert, shadowInstancedVert}) {
+        for (VkShaderModule m : {pbrVert, pbrSkinnedVert, pbrFrag, terrainFrag, shadowVert, shadowSkinnedVert, debugVert, debugFrag, skyVert, skyFrag, rainFrag, waterFrag, waterMeshFrag, instancedVert, shadowInstancedVert}) {
             vkDestroyShaderModule(ctx_.device(), m, nullptr);
         }
     };
     if (pbrVert == VK_NULL_HANDLE || pbrSkinnedVert == VK_NULL_HANDLE || pbrFrag == VK_NULL_HANDLE || terrainFrag == VK_NULL_HANDLE || shadowVert == VK_NULL_HANDLE
-        || shadowSkinnedVert == VK_NULL_HANDLE || debugVert == VK_NULL_HANDLE || debugFrag == VK_NULL_HANDLE || skyVert == VK_NULL_HANDLE || skyFrag == VK_NULL_HANDLE || rainFrag == VK_NULL_HANDLE || waterFrag == VK_NULL_HANDLE || instancedVert == VK_NULL_HANDLE || shadowInstancedVert == VK_NULL_HANDLE) {
+        || shadowSkinnedVert == VK_NULL_HANDLE || debugVert == VK_NULL_HANDLE || debugFrag == VK_NULL_HANDLE || skyVert == VK_NULL_HANDLE || skyFrag == VK_NULL_HANDLE || rainFrag == VK_NULL_HANDLE || waterFrag == VK_NULL_HANDLE || waterMeshFrag == VK_NULL_HANDLE || instancedVert == VK_NULL_HANDLE || shadowInstancedVert == VK_NULL_HANDLE) {
         destroyModules();
         return false;
     }
@@ -621,6 +625,54 @@ bool SceneRenderer::createPipelines()
         ok = ok && vkCheck(vkCreateGraphicsPipelines(ctx_.device(), VK_NULL_HANDLE, 1, &info, nullptr, &waterPipeline_), "water pipeline");
     }
 
+    // Rivers and lakes: the rigid vertex stage over the cell's surface mesh, the sea's shading,
+    // blended over the picture with no depth write.
+    {
+        const std::array stages{stage(VK_SHADER_STAGE_VERTEX_BIT, pbrVert), stage(VK_SHADER_STAGE_FRAGMENT_BIT, waterMeshFrag)};
+        VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.pVertexBindingDescriptions = &meshBinding;
+        vertexInput.vertexAttributeDescriptionCount = 4u;
+        vertexInput.pVertexAttributeDescriptions = meshAttributes.data();
+        VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+        assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        VkPipelineRasterizationStateCreateInfo raster{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+        raster.polygonMode = VK_POLYGON_MODE_FILL;
+        raster.cullMode = VK_CULL_MODE_NONE;
+        raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        raster.lineWidth = 1.0f;
+        VkPipelineDepthStencilStateCreateInfo waterMeshDepth{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+        waterMeshDepth.depthTestEnable = VK_TRUE;
+        waterMeshDepth.depthWriteEnable = VK_FALSE;
+        waterMeshDepth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        VkPipelineColorBlendAttachmentState meshBlendAttachment = blendAttachment;
+        meshBlendAttachment.blendEnable = VK_TRUE;
+        meshBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        meshBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        meshBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        meshBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        meshBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        meshBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        VkPipelineColorBlendStateCreateInfo meshBlend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+        meshBlend.attachmentCount = 1;
+        meshBlend.pAttachments = &meshBlendAttachment;
+
+        VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+        info.pNext = &mainRendering;
+        info.stageCount = static_cast<std::uint32_t>(stages.size());
+        info.pStages = stages.data();
+        info.pVertexInputState = &vertexInput;
+        info.pInputAssemblyState = &assembly;
+        info.pViewportState = &viewport;
+        info.pRasterizationState = &raster;
+        info.pMultisampleState = &multisample;
+        info.pDepthStencilState = &waterMeshDepth;
+        info.pColorBlendState = &meshBlend;
+        info.pDynamicState = &dynamic;
+        info.layout = pipelineLayout_;
+        ok = ok && vkCheck(vkCreateGraphicsPipelines(ctx_.device(), VK_NULL_HANDLE, 1, &info, nullptr, &waterMeshPipeline_), "water mesh pipeline");
+    }
+
     // Debug lines
     {
         const std::array stages{stage(VK_SHADER_STAGE_VERTEX_BIT, debugVert), stage(VK_SHADER_STAGE_FRAGMENT_BIT, debugFrag)};
@@ -662,7 +714,7 @@ bool SceneRenderer::createPipelines()
 bool SceneRenderer::reloadPipelines()
 {
     vkDeviceWaitIdle(ctx_.device());
-    for (VkPipeline* pipeline : {&pbrPipeline_, &pbrSkinnedPipeline_, &terrainPipeline_, &skyPipeline_, &pbrInstancedPipeline_, &rainPipeline_, &waterPipeline_, &shadowInstancedPipeline_, &shadowPipeline_, &shadowSkinnedPipeline_, &debugPipeline_}) {
+    for (VkPipeline* pipeline : {&pbrPipeline_, &pbrSkinnedPipeline_, &terrainPipeline_, &skyPipeline_, &pbrInstancedPipeline_, &rainPipeline_, &waterPipeline_, &waterMeshPipeline_, &shadowInstancedPipeline_, &shadowPipeline_, &shadowSkinnedPipeline_, &debugPipeline_}) {
         vkDestroyPipeline(ctx_.device(), *pipeline, nullptr);
         *pipeline = VK_NULL_HANDLE;
     }
@@ -800,6 +852,30 @@ std::uint32_t SceneRenderer::uploadTerrainCell(const std::vector<Mesh>& lods)
     const std::uint32_t handle = nextTerrainCell_++;
     terrainCells_[handle] = std::move(cell);
     return handle;
+}
+
+std::uint32_t SceneRenderer::uploadWaterCell(const Mesh& surface)
+{
+    if (surface.vertices.empty() || surface.indices.empty()) {
+        return Renderer::kNoHandle;
+    }
+    GpuMesh gpu = makeGpuMesh(surface, 0);
+    if (gpu.vertices.buffer == VK_NULL_HANDLE) {
+        return Renderer::kNoHandle;
+    }
+    const std::uint32_t handle = nextWaterCell_++;
+    waterCells_[handle] = std::move(gpu);
+    return handle;
+}
+
+void SceneRenderer::removeWaterCell(std::uint32_t handle)
+{
+    const auto found = waterCells_.find(handle);
+    if (found == waterCells_.end()) {
+        return;
+    }
+    retired_.push_back({renderedFrames_, std::move(found->second)});
+    waterCells_.erase(found);
 }
 
 void SceneRenderer::removeTerrainCell(std::uint32_t handle)
@@ -1237,6 +1313,26 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     drawTerrain(false, 0);
 
     drawVegetation(false, 0);
+
+    if (!view.waterCells.empty() && waterMeshPipeline_ != VK_NULL_HANDLE) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, waterMeshPipeline_);
+        for (const WaterDraw& draw : view.waterCells) {
+            const auto found = waterCells_.find(draw.cell);
+            if (found == waterCells_.end() || found->second.submeshes.empty()) {
+                continue;
+            }
+            const GpuMesh& mesh = found->second;
+            PushData push{};
+            push.model = glm::mat4(1.0f);
+            push.model[3] = glm::vec4(glm::vec3(draw.origin - view.camera.position), 1.0f);
+            push.baseColorFactor = glm::vec4(1.0f);
+            const VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices.buffer, &offset);
+            vkCmdBindIndexBuffer(cmd, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushData), &push);
+            vkCmdDrawIndexed(cmd, mesh.submeshes[0][1], 1, 0, 0, 0);
+        }
+    }
 
     if (view.waterEnabled && waterPipeline_ != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, waterPipeline_);

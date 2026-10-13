@@ -97,6 +97,41 @@ Hydrology computeHydrology(const Heightfield& heightfield)
         }
     }
 
+    // Lakes: runs of samples that the flood lifted to one level, joined edge to edge.
+    out.lake.assign(total, 0);
+    std::vector<std::uint32_t> walk;
+    for (std::size_t start = 0; start < total; ++start) {
+        const float startGround = height(static_cast<std::uint32_t>(start % n), static_cast<std::uint32_t>(start / n));
+        if (out.lake[start] != 0 || !(out.filled[start] > startGround)) {
+            continue;
+        }
+        const auto id = static_cast<std::uint32_t>(out.lakeDeepest.size() + 1);
+        const float level = out.filled[start];
+        float deepest = 0.0f;
+        out.lake[start] = id;
+        walk.push_back(static_cast<std::uint32_t>(start));
+        while (!walk.empty()) {
+            const std::uint32_t at = walk.back();
+            walk.pop_back();
+            const auto ax = at % n;
+            const auto az = at / n;
+            deepest = std::max(deepest, level - height(ax, az));
+            for (std::uint8_t d = 0; d < 8; d += 2) { // east, south, west, north
+                const std::int64_t nx = static_cast<std::int64_t>(ax) + kDx[d];
+                const std::int64_t nz = static_cast<std::int64_t>(az) + kDz[d];
+                if (nx < 0 || nz < 0 || nx >= n || nz >= n) {
+                    continue;
+                }
+                const std::size_t ni = static_cast<std::size_t>(nz) * n + static_cast<std::size_t>(nx);
+                if (out.lake[ni] == 0 && out.filled[ni] == level && out.filled[ni] > height(static_cast<std::uint32_t>(nx), static_cast<std::uint32_t>(nz))) {
+                    out.lake[ni] = id;
+                    walk.push_back(static_cast<std::uint32_t>(ni));
+                }
+            }
+        }
+        out.lakeDeepest.push_back(deepest);
+    }
+
     // Everything drains to a sample reached before it, so adding up in reverse order of reaching
     // hands each sample's whole catchment to the one below before that one is handed on.
     for (std::size_t k = order.size(); k-- > 0;) {
@@ -174,7 +209,9 @@ bool isLake(const Hydrology& hydrology, const Heightfield& heightfield, std::uin
     if (hydrology.empty() || sx >= hydrology.side || sz >= hydrology.side) {
         return false;
     }
-    return hydrology.filled[hydrology.index(sx, sz)] - heightfield.heightAtSample(sx, sz) >= params.lakeDepth;
+    const std::size_t at = hydrology.index(sx, sz);
+    const std::uint32_t id = at < hydrology.lake.size() ? hydrology.lake[at] : 0;
+    return id != 0 && hydrology.filled[at] - heightfield.heightAtSample(sx, sz) >= params.lakeDepth && hydrology.lakeDeepest[id - 1] <= params.maxLakeDepth;
 }
 
 }

@@ -1,3 +1,5 @@
+#include "ichor/world/hydrology.h"
+#include "ichor/world/water_mesh.h"
 #include "ichor/world/palette.h"
 #include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
@@ -313,7 +315,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false, bool lakes = false)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -322,6 +324,12 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
     Heightfield heightfield;
     REQUIRE(readWorld(worldDir, heightfield));
+    HydrologyParams lakeParams;
+    lakeParams.maxLakeDepth = 10.0f;
+    Hydrology hydrology;
+    if (lakes) {
+        hydrology = computeHydrology(heightfield);
+    }
     SceneBundle layers;
     REQUIRE(readBundle(worldDir / "terrain.iscene", layers));
     REQUIRE(renderer.setTerrainMaterials(layers));
@@ -342,6 +350,12 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
             REQUIRE(handle != Renderer::kNoHandle);
             const int ring = std::max(std::abs(dx), std::abs(dz));
             view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, static_cast<std::uint32_t>(std::min(ring, 2))});
+            if (lakes) {
+                const std::uint32_t surface = renderer.uploadWaterCell(buildWaterMesh(heightfield, hydrology, lakeParams, id));
+                if (surface != Renderer::kNoHandle) {
+                    view.waterCells.push_back({surface, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}});
+                }
+            }
             if (vegetation) {
                 std::vector<PlantInstance> plants;
                 scatterVegetation(heightfield, id, VegetationParams{}, plants);
@@ -693,4 +707,9 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the rivers and lakes of the forged world")
+{
+    checkTerrainAtHour(15.0f, "terrain_lakes", true, {}, false, false, true, true);
 }

@@ -37,6 +37,11 @@ public:
     virtual std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) = 0;
     virtual void removeTerrainCell(std::uint32_t cell) = 0;
 
+    // Water: one surface mesh per cell with any, positions relative to the cell origin given in
+    // WaterDraw. A renderer that draws no water hands back kNoHandle.
+    virtual std::uint32_t uploadWaterCell(const Mesh& surface) { (void)surface; return kNoHandle; }
+    virtual void removeWaterCell(std::uint32_t cell) { (void)cell; }
+
     // Vegetation: the meshes of the kinds once (mesh i is kind i), then one set of
     // instances per cell, drawn instanced with one buffer per cell.
     virtual bool setVegetationMeshes(const SceneBundle& trees) = 0;

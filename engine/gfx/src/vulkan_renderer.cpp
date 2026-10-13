@@ -272,6 +272,16 @@ void VulkanRenderer::removeTerrainCell(std::uint32_t cell)
     impl_->scene->removeTerrainCell(cell);
 }
 
+std::uint32_t VulkanRenderer::uploadWaterCell(const Mesh& surface)
+{
+    return impl_->scene->uploadWaterCell(surface);
+}
+
+void VulkanRenderer::removeWaterCell(std::uint32_t cell)
+{
+    impl_->scene->removeWaterCell(cell);
+}
+
 bool VulkanRenderer::setVegetationMeshes(const SceneBundle& trees)
 {
     return impl_->scene->setVegetationMeshes(trees);

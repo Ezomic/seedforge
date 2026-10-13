@@ -245,6 +245,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
     streaming.vegetation = !options.headless;
+    streaming.water = !options.headless;
+    streaming.rivers.maxLakeDepth = 10.0f; // deeper basins are the terrain's artefacts, not lakes
     const auto ringSide = static_cast<std::uint32_t>(2 * (streaming.radiusCells + streaming.hysteresisCells) + 1);
     ichor::NavWorld navigation;
     if (!heightfield.empty() && !navigation.init(heightfield.desc(), ringSide * ringSide)) {
@@ -311,6 +313,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     struct ResidentCell {
         std::uint32_t handle = ichor::Renderer::kNoHandle;
         std::uint32_t grove = ichor::Renderer::kNoHandle; // the cell's trees
+        std::uint32_t water = ichor::Renderer::kNoHandle; // the cell's rivers and lakes
         glm::dvec3 origin{0.0};
     };
     std::map<ichor::CellId, ResidentCell> cells;
@@ -321,6 +324,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!payload.plants.empty()) {
             cell.grove = renderer.uploadVegetationCell(payload.plants);
         }
+        cell.water = renderer.uploadWaterCell(payload.water);
         engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
@@ -335,6 +339,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (found->second.grove != ichor::Renderer::kNoHandle) {
                 renderer.removeVegetationCell(found->second.grove);
             }
+            renderer.removeWaterCell(found->second.water);
             cells.erase(found);
         }
         engine.scene().physics().remove(ichor::StableId::of("cell", ichor::cellKey(id)));
@@ -534,6 +539,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.terrain.push_back({cell.handle, cell.origin, lod});
             if (cell.grove != ichor::Renderer::kNoHandle && distance < 2.2) {
                 view.vegetation.push_back({cell.grove, cell.origin});
+            }
+            if (cell.water != ichor::Renderer::kNoHandle) {
+                view.waterCells.push_back({cell.water, cell.origin});
             }
         }
         {

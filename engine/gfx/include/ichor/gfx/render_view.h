@@ -71,6 +71,12 @@ struct MaterialResponse {
     float albedoMax = 1000.0f; // effectively open
 };
 
+// A resident water cell: the handle the renderer gave its surface mesh and where the cell sits.
+struct WaterDraw {
+    std::uint32_t cell = 0;
+    glm::dvec3 origin{0.0};
+};
+
 struct RenderCamera {
     glm::dvec3 position{0.0};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f}; // looks down -Z, Y up
@@ -117,6 +123,7 @@ struct RenderView {
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;
     std::vector<VegetationDraw> vegetation;
+    std::vector<WaterDraw> waterCells; // rivers and lakes, drawn with the sea's shading
     std::vector<DebugLine> lines;
 };
 
