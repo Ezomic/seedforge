@@ -122,23 +122,31 @@ float3 applyFog(float3 color, float3 worldPos, float2 pixel)
     }
     float3 fogged = lerp(color, frame.fogColor.rgb, 1.0 - exp(-depth));
 
-    // Light shafts: march the view ray and gather the sun where nothing shades it, weighted
-    // by how much fog there is at each step. A per-pixel offset trades banding for noise.
+    // Light shafts: march the view ray through the range the shadow map covers, gathering the
+    // sun where nothing shades it. Each step is weighted by the fog there and by how much of
+    // the light survives the fog in front of it. Fog beyond the range counts as lit. A
+    // per-pixel offset trades banding for noise.
     if (frame.shaftParams.x > 0.0) {
-        const float rayLength = min(length(worldPos), 300.0);
+        const float rayLength = min(length(worldPos), frame.cascadeSplits.z);
         const float3 direction = normalize(worldPos);
         const float jitter = frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
         const int steps = 16;
         const float stepLength = rayLength / steps;
         float gathered = 0.0;
+        float transmittance = 1.0;
+        float marched = 0.0;
         for (int s = 0; s < steps; ++s) {
             const float3 p = direction * ((s + jitter) * stepLength);
             float density = frame.fogColor.w;
             if (k > 0.0) {
                 density *= exp(-k * (frame.cameraWorld.y + p.y - 120.0));
             }
-            gathered += sunReaches(p) * density * stepLength;
+            const float opticalStep = density * stepLength;
+            gathered += sunReaches(p) * (1.0 - exp(-opticalStep)) * transmittance;
+            transmittance *= exp(-opticalStep);
+            marched += opticalStep;
         }
+        gathered += (1.0 - exp(-max(depth - marched, 0.0))) * transmittance;
         const float phase = henyeyGreenstein(dot(direction, normalize(frame.sunDirection.xyz)), frame.shaftParams.y);
         fogged += frame.sunColor.rgb * frame.sunColor.w * phase * gathered * frame.shaftParams.x;
     }
