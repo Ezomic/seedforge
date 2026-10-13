@@ -26,13 +26,14 @@ struct FrameData {
     float4 gradeShadows;    // rgb multiplier on the dark end
     float4 gradeHighlights; // rgb multiplier on the bright end
     float4 materialParams;  // x roughness min, y roughness max, z albedo min, w albedo max
+    float4 groundParams;    // rgb colour of the ground at the foot of objects, w metres it reaches up (0 is off)
 };
 
 struct PushData {
     float4x4 model;
     float4 baseColorFactor;
     float4 params; // x metallic, y roughness, z has normal map, w cascade index (shadow pass)
-    uint4 skin;    // x joint offset into the palette, y joint count (0 = rigid)
+    uint4 skin;    // x joint offset into the palette, y joint count (0 = rigid), z 1 to blend the foot into the ground
 };
 
 [[vk::binding(0, 0)]] ConstantBuffer<FrameData> frame;

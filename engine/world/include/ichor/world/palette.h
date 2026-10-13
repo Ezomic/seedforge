@@ -10,6 +10,9 @@ namespace ichor {
 struct Palette {
     ColourGrade grade;
     MaterialResponse response;
+    // One colour for the whole world: right where the ground is grass, which is where most objects stand.
+    glm::vec3 groundColor{0.1f, 0.16f, 0.06f}; // what the ground looks like, for blending objects into it
+    float groundBlendHeight = 0.0f;            // metres up an object the blend reaches
 };
 
 // The slice's palette: slightly muted, with cool shadows and warm highlights, and surfaces

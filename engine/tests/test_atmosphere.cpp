@@ -142,6 +142,7 @@ TEST_CASE("a view starts with a neutral grade and an open material response")
     REQUIRE(view.response.roughnessMax == 1.0f);
     REQUIRE(view.response.albedoMin == 0.0f);
     REQUIRE(view.response.albedoMax >= 1.0f);
+    REQUIRE(view.groundBlendHeight == 0.0f);
 }
 
 TEST_CASE("the default palette is a real grade over a narrowed response, and applying it copies both")
@@ -167,4 +168,7 @@ TEST_CASE("the default palette is a real grade over a narrowed response, and app
     REQUIRE(view.grade.shadows == palette.grade.shadows);
     REQUIRE(view.response.roughnessMin == palette.response.roughnessMin);
     REQUIRE(view.response.albedoMax == palette.response.albedoMax);
+    REQUIRE(view.groundBlendHeight == palette.groundBlendHeight);
+    REQUIRE(view.groundColor == palette.groundColor);
+    REQUIRE(palette.groundBlendHeight > 0.0f);
 }

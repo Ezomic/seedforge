@@ -47,8 +47,9 @@ struct FrameData {
     glm::vec4 gradeShadows;
     glm::vec4 gradeHighlights;
     glm::vec4 materialParams;
+    glm::vec4 groundParams;
 };
-static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 18));
+static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 19));
 
 struct InstanceGpu {
     glm::vec4 positionScale; // xyz relative to the cell origin, w scale
@@ -1038,6 +1039,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.gradeShadows = glm::vec4(view.grade.shadows, 0.0f);
     data.gradeHighlights = glm::vec4(view.grade.highlights, 0.0f);
     data.materialParams = glm::vec4(view.response.roughnessMin, view.response.roughnessMax, view.response.albedoMin, view.response.albedoMax);
+    data.groundParams = glm::vec4(view.groundColor, view.groundBlendHeight);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
     vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 
@@ -1106,6 +1108,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
             PushData push{};
             push.model = glm::mat4(1.0f);
             push.model[3] = glm::vec4(glm::vec3(draw.origin - view.camera.position), 1.0f);
+            push.skin = glm::uvec4(0u, 0u, 1u, 0u); // trees stand on the ground
             for (std::uint32_t kind = 0; kind < vegetationKinds_; ++kind) {
                 if (cell.count[kind] == 0 || vegetationBase_ + kind >= meshes_.size()) {
                     continue;
@@ -1149,7 +1152,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
             PushData push{};
             push.model = glm::mat4(instance.basis);
             push.model[3] = glm::vec4(glm::vec3(instance.position - view.camera.position), 1.0f);
-            push.skin = glm::uvec4(skinned ? instance.jointOffset : 0u, skinned ? instance.jointCount : 0u, 0u, 0u);
+            push.skin = glm::uvec4(skinned ? instance.jointOffset : 0u, skinned ? instance.jointCount : 0u, instance.groundBlend && !skinned ? 1u : 0u, 0u);
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices.buffer, &offset);
             vkCmdBindIndexBuffer(cmd, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);

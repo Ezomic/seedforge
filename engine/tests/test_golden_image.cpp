@@ -623,3 +623,74 @@ TEST_CASE("golden image: the default palette over the forest")
 {
     checkTerrainAtHour(15.0f, "terrain_graded", true, {}, false, false, true);
 }
+
+TEST_CASE("golden image: a prop that opts in blends into the terrain, one that does not stands on it")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
+    Heightfield heightfield;
+    REQUIRE(readWorld(worldDir, heightfield));
+    SceneBundle layers;
+    REQUIRE(readBundle(worldDir / "terrain.iscene", layers));
+    REQUIRE(renderer.setTerrainMaterials(layers));
+
+    // The trees' meshes, used here as ordinary props: they have their origin at the foot.
+    const std::uint32_t treeMesh = 0; // the first bundle uploaded: terrain keeps its own meshes
+    REQUIRE(renderer.uploadBundle(treeBundle()));
+
+    RenderView view;
+    const double centre = heightfield.desc().sizeMetres * 0.5;
+    const CellId home = heightfield.cellAt(centre, centre);
+    CellPayload payload;
+    WorldStreamer::buildPayload(heightfield, home, StreamerConfig{}, payload);
+    const std::uint32_t handle = renderer.uploadTerrainCell(payload.lods);
+    REQUIRE(handle != Renderer::kNoHandle);
+    view.terrain.push_back({handle, {heightfield.cellOriginX(home), 0.0, heightfield.cellOriginZ(home)}, 0u});
+
+    const double x = centre + 40.0;
+    const double z = centre + 40.0;
+    const glm::dvec3 eye(x - 3.0, heightfield.heightAt(x - 3.0, z + 8.0) + 3.0, z + 8.0);
+    for (int i = 0; i < 2; ++i) {
+        const double px = x + (i == 0 ? -2.5 : 2.5) + 1.0;
+        RenderInstance prop;
+        prop.mesh = treeMesh; // the conifer
+        prop.position = {px, heightfield.heightAt(px, z), z};
+        prop.basis = glm::mat3(1.5f);
+        prop.groundBlend = i == 0;
+        view.instances.push_back(prop);
+    }
+    Atmosphere atmosphere = atmosphereAt(15.0f);
+    applyAtmosphere(atmosphere, view);
+    applyPalette(defaultPalette(), view);
+    view.camera.position = eye;
+    const glm::dvec3 target(x + 1.0, heightfield.heightAt(x + 1.0, z) + 1.0, z);
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+    view.camera.farPlane = 800.0f;
+
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "props_grounded.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "props_grounded.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect props_grounded.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "props_grounded.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}

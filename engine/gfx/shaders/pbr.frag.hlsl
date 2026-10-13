@@ -11,12 +11,20 @@ struct PSIn {
     float3 normal : TEXCOORD1;
     float4 tangent : TEXCOORD2;
     float2 uv : TEXCOORD3;
+    float rise : TEXCOORD4;
 };
 
 float4 main(PSIn i) : SV_Target
 {
     const float4 baseSample = baseColorTex.Sample(materialSampler, i.uv);
-    const float3 baseColor = baseSample.rgb * push.baseColorFactor.rgb;
+    float3 baseColor = baseSample.rgb * push.baseColorFactor.rgb;
+    // Objects that stand on the ground take its colour at their foot, and darken where they meet
+    // it, so they sit in the terrain instead of on it. skin.z marks the ones that do.
+    if (frame.groundParams.w > 0.0 && push.skin.z != 0) {
+        const float foot = 1.0 - smoothstep(0.0, frame.groundParams.w, i.rise);
+        baseColor = lerp(baseColor, frame.groundParams.rgb, foot * 0.85);
+        baseColor *= 1.0 - 0.45 * foot * foot;
+    }
     const float2 metalRough = metalRoughTex.Sample(materialSampler, i.uv).bg;
     const float metallic = saturate(metalRough.x * push.params.x);
     const float roughness = clamp(metalRough.y * push.params.y, 0.04, 1.0);

@@ -15,6 +15,7 @@ struct VSOut {
     float3 normal : TEXCOORD1;
     float4 tangent : TEXCOORD2;
     float2 uv : TEXCOORD3;
+    float rise : TEXCOORD4; // metres above the foot of the object, for blending it into the ground
 };
 
 VSOut main(VSIn i)
@@ -30,5 +31,6 @@ VSOut main(VSIn i)
     o.normal = normalize(mul(basis, i.normal));
     o.tangent = float4(normalize(mul(basis, i.tangent.xyz)), i.tangent.w);
     o.uv = i.uv;
+    o.rise = 0.0;
     return o;
 }
