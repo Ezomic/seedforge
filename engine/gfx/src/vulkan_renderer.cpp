@@ -3,6 +3,7 @@
 #include "ichor/core/log.h"
 #include "ichor/gfx/vk_context.h"
 #include "ichor/gfx/vk_scene.h"
+#include "ichor/gfx/vulkan_ui.h"
 #include "ichor/platform/sdl_platform.h"
 
 #include <SDL3/SDL.h>
@@ -37,6 +38,7 @@ struct VulkanRenderer::Impl {
     SdlPlatform& platform;
     VulkanContext ctx;
     std::unique_ptr<SceneRenderer> scene;
+    std::unique_ptr<VulkanUiRenderer> ui;
 
     vkb::Swapchain swapchain{};
     std::vector<VkImage> swapchainImages;
@@ -201,6 +203,7 @@ void VulkanRenderer::Impl::destroyAll()
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
     }
+    ui.reset();
     scene.reset();
     vkDestroyDescriptorPool(ctx.device(), imguiPool, nullptr);
     for (std::uint32_t i = 0; i < kFrameSlots; ++i) {
@@ -231,8 +234,17 @@ bool VulkanRenderer::init()
     if (!v.scene->init() || !v.createImgui()) {
         return false;
     }
+    v.ui = std::make_unique<VulkanUiRenderer>(v.ctx, v.swapchain.image_format, SceneRenderer::depthFormat());
+    if (!v.ui->init()) {
+        return false;
+    }
     v.platform.setEventHook([](const SDL_Event& event) { ImGui_ImplSDL3_ProcessEvent(&event); });
     return true;
+}
+
+Rml::RenderInterface* VulkanRenderer::uiRenderInterface()
+{
+    return impl_->ui.get();
 }
 
 bool VulkanRenderer::uploadBundle(const SceneBundle& bundle)
@@ -364,7 +376,15 @@ void VulkanRenderer::endFrame()
     static const RenderView kEmptyView;
     const RenderView& view = hasView_ ? view_ : kEmptyView;
     v.scene->render(cmd, v.frame, view, v.swapchainViews[v.imageIndex], v.depth.view, v.swapchain.extent,
-        [](VkCommandBuffer overlayCmd) { ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), overlayCmd); });
+        [&](VkCommandBuffer overlayCmd) {
+            // The game UI first, so the debug overlay and the editor stay on top of it.
+            if (uiHook_ && v.ui != nullptr) {
+                v.ui->begin(overlayCmd, v.swapchain.extent);
+                uiHook_();
+                v.ui->end();
+            }
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), overlayCmd);
+        });
 
     transitionImage(cmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

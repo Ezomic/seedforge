@@ -7,6 +7,10 @@
 #include <string>
 #include <vector>
 
+namespace Rml {
+class RenderInterface;
+}
+
 namespace ichor {
 
 struct Mesh;
@@ -53,6 +57,12 @@ public:
     // Called every frame while the debug UI is being built, so the editor can add its
     // windows. Renderers without a UI ignore it.
     virtual void setGuiHook(std::function<void()> hook) { (void)hook; }
+
+    // The game UI: the interface RmlUi draws through, null where there is no window, and a
+    // hook called each frame inside the open pass, under the debug overlay, in which the
+    // caller renders its UI context.
+    virtual Rml::RenderInterface* uiRenderInterface() { return nullptr; }
+    virtual void setUiHook(std::function<void()> hook) { (void)hook; }
 };
 
 }

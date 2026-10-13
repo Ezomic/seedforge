@@ -32,12 +32,15 @@ public:
     void endFrame() override;
     void debugText(std::string line) override;
     void setGuiHook(std::function<void()> hook) override { guiHook_ = std::move(hook); }
+    Rml::RenderInterface* uiRenderInterface() override;
+    void setUiHook(std::function<void()> hook) override { uiHook_ = std::move(hook); }
 
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     std::vector<std::string> lines_;
     std::function<void()> guiHook_;
+    std::function<void()> uiHook_;
     RenderView view_;
     bool hasView_ = false;
 };

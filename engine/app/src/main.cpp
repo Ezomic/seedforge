@@ -6,6 +6,8 @@
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/editor/panels.h"
+#include "ichor/ui/hud.h"
+#include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
@@ -431,6 +433,37 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         ichor::log(ichor::LogLevel::Info, "hot reload of scripts and data is off while recording or replaying");
     }
 
+    // The game UI draws through the window renderer; headless runs have none. The context goes
+    // before the HUD so the HUD, which borrows it, goes first.
+    std::unique_ptr<ichor::UiContext> ui;
+    std::unique_ptr<ichor::Hud> hud;
+    float hudHeading = 0.0f;
+    float hudHour = options.startHour;
+    if (!options.headless && renderer.uiRenderInterface() != nullptr) {
+        const ichor::Extent size = platform.drawableSize();
+        ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
+        const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+        bool fontsLoaded = ui->ok();
+        for (const char* file : {"AlegreyaSans-Regular.ttf", "AlegreyaSans-Bold.ttf", "Cinzel.ttf"}) {
+            fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
+        }
+        hud = std::make_unique<ichor::Hud>(*ui);
+        if (!fontsLoaded || !hud->ok()) {
+            ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            hud.reset();
+            ui.reset();
+        }
+    }
+    if (ui) {
+        renderer.setUiHook([&] {
+            const ichor::Extent size = platform.drawableSize();
+            ui->setSize(static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
+            hud->update(hudHeading, hudHour);
+            ui->update(platform.now());
+            ui->render();
+        });
+    }
+
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
@@ -449,6 +482,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
             view.waterLevel = options.waterLevel.value_or(heightfield.desc().waterLevel());
+            hudHour = hour;
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -483,6 +517,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (cell.grove != ichor::Renderer::kNoHandle && distance < 2.2) {
                 view.vegetation.push_back({cell.grove, cell.origin});
             }
+        }
+        {
+            // Looking down -Z is north, and the heading turns clockwise from it.
+            const glm::vec3 forward = view.camera.rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+            hudHeading = std::atan2(forward.x, -forward.z);
         }
         std::vector<ichor::LineSegment> colliders;
         scene.physics().debugLines(colliders);
@@ -606,6 +645,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
 
     renderer.setGuiHook({}); // the panels are about to go out of scope
+    renderer.setUiHook({});  // and so are the UI and the HUD
     if (!options.record.empty() && !engine.recordedInputs().save(options.record)) {
         return 1;
     }
