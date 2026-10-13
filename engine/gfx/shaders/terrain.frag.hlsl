@@ -30,7 +30,7 @@ float4 main(PSIn i) : SV_Target
     const float3 s = snowTex.Sample(materialSampler, i.uv * 0.5).rgb;
     float3 baseColor = g * grass + r * rock + s * snow;
     // Under water the ground takes on the water's colour with depth, and the bank above it is wet.
-    if (frame.waterColor.w > 0.0) {
+    if (frame.waterColor.w > 0.0 && frame.cameraWorld.y > frame.waterParams.x) {
         const float below = frame.waterParams.x - height;
         const float wet = smoothstep(-1.0, 0.0, below) * 0.5;
         baseColor *= 1.0 - wet;

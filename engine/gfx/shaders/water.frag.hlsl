@@ -36,7 +36,8 @@ PSOut main(PSIn i)
     const float travelled = height / direction.y;
     const float3 position = direction * travelled;
     const float4 clip = mul(frame.viewProj, float4(position, 1.0));
-    const float depth = clip.z / clip.w;
+    // A little nearer than exact, so the waterline does not speckle where it meets the land.
+    const float depth = clip.z / clip.w - 2e-6;
     if (depth >= 1.0) {
         discard;
     }
