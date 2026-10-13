@@ -310,7 +310,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -362,7 +362,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
             lowest = std::min(lowest, heightfield.heightAt(centre - 60.0 - 840.0 * t, centre + 90.0 - 190.0 * t));
         }
         view.waterEnabled = true;
-        view.waterLevel = std::min(lowest + 22.0f, static_cast<float>(eye.y) - 8.0f);
+        view.waterLevel = submerged ? static_cast<float>(eye.y) + 4.0f : std::min(lowest + 22.0f, static_cast<float>(eye.y) - 8.0f);
     }
     const glm::dvec3 west(centre - 900.0, heightfield.heightAt(centre - 900.0, centre - 100.0) + 30.0, centre - 100.0);
     view.camera.position = eye;
@@ -429,4 +429,9 @@ TEST_CASE("golden image: a downpour")
 TEST_CASE("golden image: flooded hollows")
 {
     checkTerrainAtHour(15.0f, "terrain_water", true, {}, true);
+}
+
+TEST_CASE("golden image: under the water")
+{
+    checkTerrainAtHour(15.0f, "terrain_underwater", true, {}, true, true);
 }

@@ -109,6 +109,10 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
 // Exponential fog by distance from the camera; positions are camera-relative.
 float3 applyFog(float3 color, float3 worldPos, float2 pixel)
 {
+    // Under water the world fades into the water's own colour over a few tens of metres.
+    if (isUnderwater()) {
+        return lerp(color, underwaterColor(), 1.0 - exp(-0.022 * length(worldPos)));
+    }
     // With a height falloff the density at a point is base * exp(-k * (y - reference)); the
     // optical depth along the ray from the camera is the integral of that, which has a
     // closed form. The reference height is where the fog has its stated density.
