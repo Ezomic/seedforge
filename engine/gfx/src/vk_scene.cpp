@@ -43,8 +43,12 @@ struct FrameData {
     glm::vec4 shaftParams;
     glm::vec4 waterColor;
     glm::vec4 waterParams;
+    glm::vec4 gradeParams;
+    glm::vec4 gradeShadows;
+    glm::vec4 gradeHighlights;
+    glm::vec4 materialParams;
 };
-static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 14));
+static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 18));
 
 struct InstanceGpu {
     glm::vec4 positionScale; // xyz relative to the cell origin, w scale
@@ -1030,6 +1034,10 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.shaftParams = glm::vec4(view.lightShafts, kShaftAnisotropy, 0.0f, 0.0f);
     data.waterColor = glm::vec4(view.waterColor, view.waterEnabled ? 1.0f : 0.0f);
     data.waterParams = glm::vec4(view.waterLevel, 0.0f, 0.0f, 0.0f);
+    data.gradeParams = glm::vec4(view.grade.saturation, view.grade.contrast, view.grade.exposure, 0.0f);
+    data.gradeShadows = glm::vec4(view.grade.shadows, 0.0f);
+    data.gradeHighlights = glm::vec4(view.grade.highlights, 0.0f);
+    data.materialParams = glm::vec4(view.response.roughnessMin, view.response.roughnessMax, view.response.albedoMin, view.response.albedoMax);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
     vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 

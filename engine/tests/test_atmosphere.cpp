@@ -1,3 +1,4 @@
+#include "ichor/world/palette.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/world/atmosphere.h"
 
@@ -127,4 +128,43 @@ TEST_CASE("the wind and the height fog are copied into the view")
     REQUIRE(view.windStrength == Approx(a.windStrength));
     REQUIRE(view.fogHeightFalloff == Approx(a.fogHeightFalloff));
     REQUIRE(view.lightShafts == Approx(a.lightShafts));
+}
+
+TEST_CASE("a view starts with a neutral grade and an open material response")
+{
+    RenderView view;
+    REQUIRE(view.grade.saturation == 1.0f);
+    REQUIRE(view.grade.contrast == 1.0f);
+    REQUIRE(view.grade.exposure == 1.0f);
+    REQUIRE(view.grade.shadows == glm::vec3(1.0f));
+    REQUIRE(view.grade.highlights == glm::vec3(1.0f));
+    REQUIRE(view.response.roughnessMin <= 0.04f);
+    REQUIRE(view.response.roughnessMax == 1.0f);
+    REQUIRE(view.response.albedoMin == 0.0f);
+    REQUIRE(view.response.albedoMax >= 1.0f);
+}
+
+TEST_CASE("the default palette is a real grade over a narrowed response, and applying it copies both")
+{
+    const Palette palette = defaultPalette();
+    REQUIRE(palette.grade.saturation > 0.0f);
+    REQUIRE(palette.grade.saturation < 1.0f);
+    REQUIRE(palette.grade.contrast > 1.0f);
+    REQUIRE(palette.grade.exposure > 0.0f);
+    // Cool shadows, warm highlights.
+    REQUIRE(palette.grade.shadows.b > palette.grade.shadows.r);
+    REQUIRE(palette.grade.highlights.r > palette.grade.highlights.b);
+    REQUIRE(palette.response.roughnessMin > 0.04f);
+    REQUIRE(palette.response.roughnessMin < palette.response.roughnessMax);
+    REQUIRE(palette.response.roughnessMax <= 1.0f);
+    REQUIRE(palette.response.albedoMin > 0.0f);
+    REQUIRE(palette.response.albedoMin < palette.response.albedoMax);
+    REQUIRE(palette.response.albedoMax < 1.0f);
+
+    RenderView view;
+    applyPalette(palette, view);
+    REQUIRE(view.grade.saturation == palette.grade.saturation);
+    REQUIRE(view.grade.shadows == palette.grade.shadows);
+    REQUIRE(view.response.roughnessMin == palette.response.roughnessMin);
+    REQUIRE(view.response.albedoMax == palette.response.albedoMax);
 }

@@ -46,6 +46,25 @@ struct VegetationDraw {
     glm::dvec3 origin{0.0};
 };
 
+// The grade laid over the picture as the scene shaders draw it: sky, water, ground and
+// objects, but not rain, the debug lines or the UI. The defaults change nothing.
+struct ColourGrade {
+    float saturation = 1.0f; // 0 is grey, 1 as drawn
+    float contrast = 1.0f;   // around middle grey
+    float exposure = 1.0f;   // before tone mapping
+    glm::vec3 shadows{1.0f};    // multiplies the dark end
+    glm::vec3 highlights{1.0f}; // multiplies the bright end
+};
+
+// How far any surface may stray, whatever its source: the range roughness is held to and
+// the range of albedo brightness for non-metals. The defaults change nothing.
+struct MaterialResponse {
+    float roughnessMin = 0.04f;
+    float roughnessMax = 1.0f;
+    float albedoMin = 0.0f;
+    float albedoMax = 1000.0f; // effectively open
+};
+
 struct RenderCamera {
     glm::dvec3 position{0.0};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f}; // looks down -Z, Y up
@@ -79,6 +98,8 @@ struct RenderView {
     glm::vec2 windDirection{1.0f, 0.0f}; // ground-plane unit vector; trees lean and sway along it
     float windStrength = 0.0f;           // 0 still to 1 gale
     float fogHeightFalloff = 0.0f;       // per metre; zero is fog of one density at every height
+    ColourGrade grade;
+    MaterialResponse response;
     float lightShafts = 0.0f;            // how strongly the sun scatters in the fog where the shadows let it through; zero is off
     // A flat sheet of water at one height, over the whole world. Seen only from above.
     bool waterEnabled = false;

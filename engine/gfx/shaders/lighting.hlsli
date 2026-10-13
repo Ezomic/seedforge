@@ -81,6 +81,16 @@ float henyeyGreenstein(float cosAngle, float g)
 // the view vector is just the negated position.
 float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor, float metallic, float roughness)
 {
+    // One response for every asset: roughness and the brightness of non-metal albedo are held
+    // to the same ranges, whatever the source material said.
+    roughness = clamp(roughness, frame.materialParams.x, frame.materialParams.y);
+    const float albedoLuma = dot(baseColor, float3(0.2126, 0.7152, 0.0722));
+    const float albedoTarget = clamp(albedoLuma, frame.materialParams.z, frame.materialParams.w);
+    // Near black the rescale would blow a faint hue up to full brightness, so it gives way to grey.
+    const float3 grey = float3(albedoTarget, albedoTarget, albedoTarget);
+    const float3 held = lerp(grey, baseColor * (albedoTarget / max(albedoLuma, 1e-4)), saturate(albedoLuma / 0.01));
+    baseColor = lerp(held, baseColor, metallic);
+
     const float3 v = normalize(-worldPos);
     const float3 l = normalize(frame.sunDirection.xyz);
     const float3 h = normalize(v + l);
