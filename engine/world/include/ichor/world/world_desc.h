@@ -2,6 +2,7 @@
 
 #include "ichor/core/reflect.h"
 
+#include <cmath>
 #include <cstdint>
 #include <tuple>
 
@@ -27,7 +28,7 @@ struct WorldDesc {
     bool valid() const
     {
         return sizeMetres > 0 && metresPerSample > 0 && cellMetres > 0 && sizeMetres % cellMetres == 0 && cellMetres % metresPerSample == 0
-            && heightRange > 0.0f && cellsPerSide() <= 256 && samplesPerSide() <= 8193;
+            && heightRange > 0.0f && std::isfinite(waterHeight) && cellsPerSide() <= 256 && samplesPerSide() <= 8193;
     }
 };
 

@@ -446,7 +446,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
-            // The flag overrides the world's own water.
+            // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
             view.waterLevel = options.waterLevel.value_or(heightfield.desc().waterLevel());
         }

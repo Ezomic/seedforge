@@ -116,6 +116,17 @@ TEST_CASE("no tree grows below the water and the world's own water level is a fi
     scatterVegetation(dry, {1, 1}, VegetationParams{}, before);
     scatterVegetation(flooded, {1, 1}, VegetationParams{}, after);
     REQUIRE(after.size() < before.size());
+    // Flooding only removes trees: every survivor is a tree the dry world had, unchanged.
+    std::size_t next = 0;
+    for (const VegetationInstance& tree : after) {
+        while (next < before.size() && before[next].position != tree.position) {
+            ++next;
+        }
+        REQUIRE(next < before.size());
+        REQUIRE(before[next].kind == tree.kind);
+        REQUIRE(before[next].yaw == tree.yaw);
+        REQUIRE(before[next].scale == tree.scale);
+    }
     for (const VegetationInstance& tree : after) {
         REQUIRE(tree.position.y >= desc.waterLevel());
     }
