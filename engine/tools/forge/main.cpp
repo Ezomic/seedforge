@@ -24,7 +24,7 @@ bool parseU32(std::string_view text, std::uint32_t& out)
 int main(int argc, char** argv)
 {
     if (argc < 3) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor_forge <out dir> <seed> [sizeMetres] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor_forge <out dir> <seed> [sizeMetres] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold, 0 for no rivers]");
         return 2;
     }
     ichor::WorldDesc desc;
@@ -34,13 +34,13 @@ int main(int argc, char** argv)
     if (argc > 3 && !parseU32(argv[3], desc.sizeMetres)) return 2;
     if (argc > 4 && !parseU32(argv[4], desc.metresPerSample)) return 2;
     if (argc > 5 && !parseU32(argv[5], desc.cellMetres)) return 2;
-    std::uint32_t riverThreshold = 0;
-    if (argc > 7 && !parseU32(argv[7], riverThreshold)) return 2;
     if (argc > 6) {
         std::uint32_t water = 0;
         if (!parseU32(argv[6], water)) return 2;
         desc.waterHeight = static_cast<float>(water);
     }
+    std::uint32_t riverThreshold = 0; // zero: the land is left as forged
+    if (argc > 7 && !parseU32(argv[7], riverThreshold)) return 2;
     if (!desc.valid()) {
         ichor::log(ichor::LogLevel::Error, "the world description is not valid");
         return 2;
