@@ -37,6 +37,7 @@
 #include <format>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -60,6 +61,7 @@ struct Options {
     bool ironman = false;
     bool editor = false;
     float startHour = 9.0f;      // hour of the day when play starts
+    std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
@@ -104,6 +106,10 @@ bool parse(int argc, char** argv, Options& options)
             options.exportChronicle = argv[++i];
         } else if (arg == "--load-slot" && hasValue) {
             options.loadSlot = argv[++i];
+        } else if (arg == "--water" && hasValue) {
+            float level = 0.0f;
+            if (!parseNumber(argv[++i], level)) return false;
+            options.waterLevel = level;
         } else if (arg == "--hour" && hasValue) {
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
@@ -440,6 +446,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
+            view.waterEnabled = options.waterLevel.has_value();
+            view.waterLevel = options.waterLevel.value_or(0.0f);
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -623,7 +631,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--editor]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor]");
         return 2;
     }
 

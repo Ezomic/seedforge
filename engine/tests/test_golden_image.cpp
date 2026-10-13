@@ -310,7 +310,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {})
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -354,6 +354,16 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     applyAtmosphere(atmosphere, view);
     view.time = 1.25f;
     const glm::dvec3 eye(centre - 60.0, heightfield.heightAt(centre - 60.0, centre + 90.0) + 25.0, centre + 90.0);
+    if (water) {
+        // Flood the hollows: a few metres over the lowest ground along the line of sight.
+        float lowest = 1e30f;
+        for (int step = 1; step <= 45; ++step) {
+            const double t = step / 45.0;
+            lowest = std::min(lowest, heightfield.heightAt(centre - 60.0 - 840.0 * t, centre + 90.0 - 190.0 * t));
+        }
+        view.waterEnabled = true;
+        view.waterLevel = std::min(lowest + 22.0f, static_cast<float>(eye.y) - 8.0f);
+    }
     const glm::dvec3 west(centre - 900.0, heightfield.heightAt(centre - 900.0, centre - 100.0) + 30.0, centre - 100.0);
     view.camera.position = eye;
     view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(west - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -414,4 +424,9 @@ TEST_CASE("golden image: an overcast day")
 TEST_CASE("golden image: a downpour")
 {
     checkTerrainAtHour(15.0f, "terrain_rain", true, {1.0f, 1.0f});
+}
+
+TEST_CASE("golden image: flooded hollows")
+{
+    checkTerrainAtHour(15.0f, "terrain_water", true, {}, true);
 }
