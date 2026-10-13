@@ -8,6 +8,7 @@
 #include "ichor/editor/panels.h"
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
+#include "ichor/world/water_field.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
@@ -247,6 +248,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     streaming.vegetation = !options.headless;
     streaming.water = !options.headless;
     streaming.rivers.maxLakeDepth = ichor::kPlayableLakeDepth; // deeper basins are the terrain's artefacts, not lakes
+    // The world's water, worked out once and shared: the streamer draws it and the player wades
+    // through it. Headless runs have it too, so the simulation is the same with or without a window.
+    std::shared_ptr<const ichor::Hydrology> hydrology;
+    std::unique_ptr<ichor::WaterField> waterField;
+    if (!heightfield.empty()) {
+        hydrology = std::make_shared<const ichor::Hydrology>(ichor::computeHydrology(heightfield));
+        waterField = std::make_unique<ichor::WaterField>(heightfield, hydrology, streaming.rivers, streaming.waterMesh);
+        streaming.hydrology = hydrology;
+    }
     const auto ringSide = static_cast<std::uint32_t>(2 * (streaming.radiusCells + streaming.hysteresisCells) + 1);
     ichor::NavWorld navigation;
     if (!heightfield.empty() && !navigation.init(heightfield.desc(), ringSide * ringSide)) {
@@ -266,6 +276,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.scene().setAnimations(&animations);
+    if (waterField) {
+        engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
+            return static_cast<double>(ichor::wadingSpeedFactor(waterField->at(position.x, position.z).depth));
+        });
+    }
     engine.setAudio(&audio);
 
     // Content scripts and the data layer. A broken script or data file is

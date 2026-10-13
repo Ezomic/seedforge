@@ -1,3 +1,4 @@
+#include "ichor/sim/scene.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/water_field.h"
@@ -257,4 +258,55 @@ TEST_CASE("the water field and the water mesh give the same surface across a cel
         }
     }
     REQUIRE(checked > 20);
+}
+
+TEST_CASE("wading takes nothing over the ankles and falls smoothly to a third at chest height")
+{
+    REQUIRE(wadingSpeedFactor(0.0f) == 1.0f);
+    REQUIRE(wadingSpeedFactor(0.1f) == 1.0f);
+    REQUIRE(wadingSpeedFactor(-3.0f) == 1.0f);
+    REQUIRE(wadingSpeedFactor(std::nanf("")) == 1.0f);
+    REQUIRE(wadingSpeedFactor(1.5f) == Approx(0.35f).margin(1e-5f));
+    REQUIRE(wadingSpeedFactor(40.0f) == Approx(0.35f).margin(1e-5f));
+    float last = 1.0f;
+    for (float depth = 0.0f; depth <= 2.0f; depth += 0.05f) {
+        const float factor = wadingSpeedFactor(depth);
+        REQUIRE(factor <= last); // never faster in deeper water
+        REQUIRE(factor >= 0.35f - 1e-5f);
+        last = factor;
+    }
+}
+
+TEST_CASE("a player walking into a lake slows down as the water deepens and speeds up again on the way out")
+{
+    const Heightfield field = basinOf(9950); // a lake 5 m deep over x = 5..11
+    HydrologyParams rivers;
+    rivers.riverThreshold = 100000;
+    const WaterField water(field, hydrologyOf(field), rivers);
+
+    constexpr double kDt = 1.0 / 60.0;
+    Scene scene(3);
+    SpawnCommand spawn;
+    spawn.id = StableId::of("player");
+    spawn.name.value = "player";
+    spawn.player = Player{4.0f};
+    spawn.transform.position = {1.0, 0.0, 8.0};
+    scene.enqueue(spawn);
+    scene.setSpeedModifier([&](const glm::dvec3& p) { return static_cast<double>(wadingSpeedFactor(water.at(p.x, p.z).depth)); });
+    InputFrame east;
+    east.moveX = 1.0f;
+    double dryStep = 0.0;
+    double deepStep = 1e9;
+    double lastX = 1.0;
+    for (int i = 0; i < 1200 && lastX < 15.0; ++i) {
+        scene.tick(kDt, east);
+        const double x = scene.registry().get<Transform>(scene.find(StableId::of("player"))).position.x;
+        const double step = x - lastX;
+        lastX = x;
+        if (x < 3.0) dryStep = std::max(dryStep, step);
+        if (x > 6.5 && x < 10.0) deepStep = std::min(deepStep, step);
+    }
+    REQUIRE(dryStep == Approx(4.0 * kDt).margin(1e-9));
+    REQUIRE(deepStep == Approx(4.0 * 0.35 * kDt).margin(1e-6)); // chest deep in the middle
+    REQUIRE(lastX >= 15.0);                                      // and out the other side
 }

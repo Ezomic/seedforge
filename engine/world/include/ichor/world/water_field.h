@@ -12,6 +12,11 @@ namespace ichor {
 // water meshes draw. Built from the same hydrology and the same parameters as the meshes, so the
 // water you stand in is the water you see. A pure function of the ground, so the same point has
 // the same answer on every machine and in every replay.
+// How much of their speed a walker keeps wading through water of this depth: all of it over the
+// ankles, falling smoothly to a third of it by chest height. Plain float arithmetic, because the
+// simulation reads it.
+float wadingSpeedFactor(float depth);
+
 class WaterField {
 public:
     struct Sample {
