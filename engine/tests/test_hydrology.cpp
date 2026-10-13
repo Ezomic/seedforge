@@ -346,3 +346,34 @@ TEST_CASE("a lake keeps its depth when its rivers are carved, and the map's edge
     REQUIRE(isLake(again, carved, 8, 8, rivers));
     REQUIRE(again.filled[again.index(8, 8)] == h.filled[h.index(8, 8)]);
 }
+
+TEST_CASE("a basin deeper than the cap is not a lake, and one inside it is")
+{
+    const auto basin = [](std::uint16_t floor) {
+        return gridOf(17, [floor](std::uint32_t x, std::uint32_t z) {
+            if (x == 16 && z == 8) return std::uint16_t{5000};
+            if (x >= 5 && x <= 11 && z >= 5 && z <= 11) return floor;
+            return std::uint16_t{10000};
+        });
+    };
+    HydrologyParams cap;
+    cap.maxLakeDepth = 10.0f;
+
+    const Heightfield deep = basin(1000); // 90 m below the rim
+    const Hydrology deepWater = computeHydrology(deep);
+    REQUIRE(isLake(deepWater, deep, 8, 8, HydrologyParams{})); // no cap, a lake
+    REQUIRE_FALSE(isLake(deepWater, deep, 8, 8, cap));
+    REQUIRE_FALSE(isLake(deepWater, deep, 6, 6, cap));
+
+    const Heightfield shallow = basin(9950); // 5 m below the rim
+    const Hydrology shallowWater = computeHydrology(shallow);
+    REQUIRE(isLake(shallowWater, shallow, 8, 8, cap));
+    REQUIRE(isLake(shallowWater, shallow, 5, 11, cap)); // the whole lake, not just its middle
+    REQUIRE_FALSE(isLake(shallowWater, shallow, 2, 2, cap));
+    REQUIRE(shallowWater.lakeDeepest.size() == 1);
+    REQUIRE(shallowWater.lakeDeepest[0] > 4.9f);
+    REQUIRE(shallowWater.lakeDeepest[0] < 5.1f);
+    // Every lake sample belongs to the one lake, and the plateau to none.
+    REQUIRE(shallowWater.lake[shallowWater.index(8, 8)] == 1);
+    REQUIRE(shallowWater.lake[shallowWater.index(2, 2)] == 0);
+}

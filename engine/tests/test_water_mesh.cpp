@@ -319,3 +319,22 @@ TEST_CASE("the last cell of the world builds, and a payload asked for water with
     REQUIRE(payload.water.vertices.empty());
     REQUIRE_FALSE(payload.lods.empty()); // the rest of the cell is built all the same
 }
+
+TEST_CASE("a basin too deep to be a lake is dry ground, with no river drawn across its floor")
+{
+    const Heightfield field = gridOf(17, basinWorld); // 90 m deep
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 3;
+    rivers.maxLakeDepth = kPlayableLakeDepth;
+    const WaterMeshParams params;
+    const Mesh mesh = buildWaterMesh(field, h, rivers, {0, 0}, params);
+    for (const Vertex& v : mesh.vertices) {
+        const auto x = static_cast<std::uint32_t>(v.position.x);
+        const auto z = static_cast<std::uint32_t>(v.position.z);
+        if (x >= 5 && x <= 11 && z >= 5 && z <= 11) {
+            // Nothing floats on the basin floor: whatever is drawn there is sunk below the ground.
+            REQUIRE(v.position.y <= field.heightAtSample(x, z) - params.submerge);
+        }
+    }
+}

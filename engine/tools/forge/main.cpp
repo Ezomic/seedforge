@@ -52,6 +52,7 @@ int main(int argc, char** argv)
     if (riverThreshold > 0) {
         ichor::HydrologyParams rivers;
         rivers.riverThreshold = riverThreshold;
+        rivers.maxLakeDepth = ichor::kPlayableLakeDepth;
         heightfield = ichor::carveRivers(heightfield, ichor::computeHydrology(heightfield), rivers, ichor::CarveParams{});
     }
     if (!ichor::writeWorld(out, heightfield)) {

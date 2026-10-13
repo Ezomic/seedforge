@@ -28,7 +28,8 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
         if (isLake(hydrology, heightfield, x, z, rivers)) {
             return hydrology.filled[hydrology.index(x, z)];
         }
-        if (isRiver(hydrology, hydrology.index(x, z), rivers)) {
+        // Over the floor of a basin too deep to be a lake there is no river either: it is dry ground.
+        if (hydrology.lake[hydrology.index(x, z)] == 0 && isRiver(hydrology, hydrology.index(x, z), rivers)) {
             return heightfield.heightAtSample(x, z) + params.riverSurface;
         }
         return std::nullopt;

@@ -36,6 +36,8 @@ public:
     void removeVegetationCell(std::uint32_t cell);
     std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods);
     void removeTerrainCell(std::uint32_t cell);
+    std::uint32_t uploadWaterCell(const Mesh& surface);
+    void removeWaterCell(std::uint32_t cell);
 
     // Drops the pipelines and builds them again from the shader files on disk.
     bool reloadPipelines();
@@ -88,6 +90,7 @@ private:
     VkPipeline pbrInstancedPipeline_ = VK_NULL_HANDLE;
     VkPipeline rainPipeline_ = VK_NULL_HANDLE;
     VkPipeline waterPipeline_ = VK_NULL_HANDLE;
+    VkPipeline waterMeshPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowInstancedPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowPipeline_ = VK_NULL_HANDLE;
     VkPipeline shadowSkinnedPipeline_ = VK_NULL_HANDLE;
@@ -117,6 +120,8 @@ private:
     };
     std::map<std::uint32_t, TerrainCell> terrainCells_;
     std::uint32_t nextTerrainCell_ = 0;
+    std::map<std::uint32_t, GpuMesh> waterCells_;
+    std::uint32_t nextWaterCell_ = 0;
     // Removed cells wait here until every frame that could read them has retired.
     struct RetiredMesh {
         std::uint64_t frame = 0;

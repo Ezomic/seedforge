@@ -7,11 +7,19 @@
 
 namespace ichor {
 
+// The deepest basin a world lets stand as a lake; the forge and the game both use it, so the rivers
+// carved through deeper basins are the ones the game does not draw a lake over.
+constexpr float kPlayableLakeDepth = 10.0f;
+
 struct HydrologyParams {
     // A sample is a river when this many samples (itself included) drain through it.
     std::uint32_t riverThreshold = 2000;
     // A depression is a lake where the filled surface is this much above the ground, in metres.
     float lakeDepth = 0.05f;
+    // A lake whose deepest point is deeper than this is not drawn as one. The flood fills a basin
+    // to its rim however high that is, which on rough ground makes reservoirs hundreds of metres
+    // deep; a real world would have breached the rim. The default is no limit.
+    float maxLakeDepth = 1.0e9f;
 };
 
 // Where the water goes (doc 08, phase 3). Every sample of the heightfield has one place it
@@ -25,7 +33,7 @@ struct HydrologyParams {
 // not steepest descent, and a diagonal neighbour is chosen on height alone, not slope per metre.
 // Accumulation counts samples, not area.
 //
-// The working set is about 16 bytes per sample plus the frontier: roughly 1 GB at the largest
+// The working set is about 20 bytes per sample plus the frontier: roughly 1.2 GB at the largest
 // world WorldDesc allows (8193 samples a side), a few tens of MB for the 4 km world.
 class Hydrology {
 public:
@@ -39,6 +47,11 @@ public:
     std::vector<std::uint8_t> direction;
     // How many samples drain through this one, itself included.
     std::vector<std::uint32_t> accumulation;
+    // The lake a sample lies under, counting from one, or zero when it is dry: a run of samples
+    // with the same filled level above the ground. lakeDeepest[id - 1] is the deepest point of lake id.
+    // Basins that touch edge to edge at one level count as one lake.
+    std::vector<std::uint32_t> lake;
+    std::vector<float> lakeDeepest;
 
     bool empty() const { return filled.empty(); }
     std::size_t index(std::uint32_t sx, std::uint32_t sz) const { return static_cast<std::size_t>(sz) * side + sx; }
