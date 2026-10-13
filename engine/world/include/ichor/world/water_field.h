@@ -20,18 +20,19 @@ public:
         bool wet() const { return depth > 0.0f; }
     };
 
-    // Keeps the heightfield alive by reference: it must outlive the field.
+    // Keeps the heightfield alive by reference: it must outlive the field. Give it the same river and
+    // mesh parameters as the streamer builds the meshes with, or the water waded through is not the
+    // water drawn.
     WaterField(const Heightfield& heightfield, std::shared_ptr<const Hydrology> hydrology, const HydrologyParams& rivers, const WaterMeshParams& mesh = {});
 
-    // Depth blends smoothly between the four samples around the point, so the shore is a slope and
-    // not a step. Outside the map it is dry.
+    // The surface is the one the water mesh draws, blended across the cell, and the depth is how far
+    // it stands over the ground, so the shore is a slope and not a step. Outside the map, or for a point
+    // that is not a number, it is dry.
     Sample at(double x, double z) const;
 
     const Hydrology& hydrology() const { return *hydrology_; }
 
 private:
-    float depthAtSample(std::uint32_t sx, std::uint32_t sz) const;
-
     const Heightfield& heightfield_;
     std::shared_ptr<const Hydrology> hydrology_;
     HydrologyParams rivers_;

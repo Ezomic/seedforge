@@ -5,6 +5,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -75,10 +77,19 @@ TEST_CASE("the shore is a slope: depth blends between the samples around a point
     HydrologyParams rivers;
     rivers.riverThreshold = 100000;
     const WaterField water(field, hydrologyOf(field), rivers);
-    // Sample x = 4 is dry and x = 5 holds 5 m of water, so halfway between there is half as much.
+    // Sample x = 4 is dry and x = 5 holds 5 m of water. Halfway between, the surface is half way
+    // between the bank's sunk level and the lake's, over ground that is half way down the bank.
     REQUIRE(water.at(4.0, 8.0).depth == 0.0f);
-    REQUIRE(water.at(4.5, 8.0).depth == Approx(2.5f).margin(0.05f));
+    REQUIRE(water.at(4.5, 8.0).depth == Approx(2.2f).margin(0.05f));
     REQUIRE(water.at(5.0, 8.0).depth == Approx(5.0f).margin(0.05f));
+    // The surface never stands above the lake's own level, even where the bank is higher.
+    for (double x = 4.0; x <= 6.0; x += 0.125) {
+        const WaterField::Sample sample = water.at(x, 8.0);
+        if (sample.wet()) {
+            REQUIRE(sample.surface <= field.heightAtSample(2, 2) + 0.001f);
+            REQUIRE(sample.surface > field.heightAt(x, 8.0));
+        }
+    }
     // And it only ever rises towards the middle.
     float last = -1.0f;
     for (double x = 4.0; x <= 6.0; x += 0.25) {
@@ -105,7 +116,6 @@ TEST_CASE("a river has the depth the meshes give it, and the water field and the
     const WaterField water(field, hydrology, rivers, mesh);
 
     std::size_t rivery = 0;
-    std::size_t lakey = 0;
     for (std::uint32_t z = 1; z < 128; ++z) {
         for (std::uint32_t x = 1; x < 128; ++x) {
             const std::size_t i = hydrology->index(x, z);
@@ -119,12 +129,10 @@ TEST_CASE("a river has the depth the meshes give it, and the water field and the
             }
             if (lake) {
                 REQUIRE(sample.depth >= rivers.lakeDepth);
-                ++lakey;
             }
         }
     }
     REQUIRE(rivery > 0);
-    (void)lakey;
 }
 
 TEST_CASE("outside the map, with no hydrology, or with a hydrology of another world, there is no water")
@@ -137,6 +145,14 @@ TEST_CASE("outside the map, with no hydrology, or with a hydrology of another wo
     REQUIRE_FALSE(water.at(8.0, 17.0).wet());
     REQUIRE_FALSE(water.at(1000.0, 1000.0).wet());
     REQUIRE_FALSE(water.at(std::nan(""), 8.0).wet());
+    REQUIRE_FALSE(water.at(8.0, std::nan("")).wet());
+    REQUIRE(std::isfinite(water.at(std::nan(""), 8.0).surface));
+    REQUIRE_FALSE(water.at(INFINITY, 8.0).wet());
+    REQUIRE_FALSE(water.at(8.0, -INFINITY).wet());
+    REQUIRE(std::isfinite(water.at(INFINITY, 8.0).surface));
+    REQUIRE_FALSE(water.at(-0.0, 8.0).wet());
+    REQUIRE_FALSE(water.at(16.0, 16.0).wet()); // the last sample, a dry corner
+    REQUIRE(water.at(16.0, 16.0).surface == Approx(field.heightAtSample(16, 16)));
 
     const WaterField none(field, nullptr, rivers);
     REQUIRE_FALSE(none.at(8.0, 8.0).wet());
@@ -186,15 +202,59 @@ TEST_CASE("a streamer given the world's hydrology uses it instead of working it 
         streamer.update({512.0, 0.0, 512.0});
     }
     REQUIRE(vertices > 0);
-    // A shared hydrology of another world would give no water: proof that the shared one is what was read.
+    // A shared hydrology of another size is ignored, and the streamer works its own out.
     const Heightfield other = gridOf(9, [](std::uint32_t, std::uint32_t) { return std::uint16_t{0}; });
-    StreamerConfig wrong = config;
-    wrong.hydrology = hydrologyOf(other);
-    WorldStreamer wrongStreamer(field, wrong);
-    std::size_t none = 0;
-    wrongStreamer.onLoaded([&](const CellPayload& payload) { none += payload.water.vertices.size(); });
+    StreamerConfig wrongSize = config;
+    wrongSize.hydrology = hydrologyOf(other);
+    WorldStreamer ignoring(field, wrongSize);
+    std::size_t ownWater = 0;
+    ignoring.onLoaded([&](const CellPayload& payload) { ownWater += payload.water.vertices.size(); });
     for (int i = 0; i < 4; ++i) {
-        wrongStreamer.update({512.0, 0.0, 512.0});
+        ignoring.update({512.0, 0.0, 512.0});
+    }
+    REQUIRE(ownWater == vertices);
+
+    // A shared hydrology of the right size is what is read: with its water taken out, there is none.
+    Hydrology dried = *hydrology;
+    std::fill(dried.accumulation.begin(), dried.accumulation.end(), 1u);
+    std::fill(dried.lake.begin(), dried.lake.end(), 0u);
+    StreamerConfig dry = config;
+    dry.hydrology = std::make_shared<const Hydrology>(std::move(dried));
+    WorldStreamer dryStreamer(field, dry);
+    std::size_t none = 0;
+    dryStreamer.onLoaded([&](const CellPayload& payload) { none += payload.water.vertices.size(); });
+    for (int i = 0; i < 4; ++i) {
+        dryStreamer.update({512.0, 0.0, 512.0});
     }
     REQUIRE(none == 0);
+}
+
+TEST_CASE("the water field and the water mesh give the same surface across a cell, shores included")
+{
+    const Heightfield field = basinOf(9950);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 100000;
+    const auto hydrology = hydrologyOf(field);
+    const WaterField water(field, hydrology, rivers);
+    const Mesh mesh = buildWaterMesh(field, *hydrology, rivers, {0, 0});
+    REQUIRE_FALSE(mesh.vertices.empty());
+    std::size_t checked = 0;
+    for (std::size_t t = 0; t < mesh.indices.size(); t += 3) {
+        const glm::vec3 a = mesh.vertices[mesh.indices[t]].position;
+        const glm::vec3 b = mesh.vertices[mesh.indices[t + 1]].position;
+        const glm::vec3 c = mesh.vertices[mesh.indices[t + 2]].position;
+        const glm::vec3 centre = (a + b + c) / 3.0f;
+        const WaterField::Sample sample = water.at(centre.x, centre.z);
+        // Where the mesh stands over the ground the field is wet, at the mesh's height to within the
+        // difference between a triangle's slope and a cell's blend; where it is sunk the field is dry.
+        const float clearance = centre.y - field.heightAt(centre.x, centre.z);
+        if (clearance > 0.25f) {
+            REQUIRE(sample.wet());
+            REQUIRE(sample.surface == Approx(centre.y).margin(0.25f));
+            ++checked;
+        } else if (clearance < -0.25f) {
+            REQUIRE_FALSE(sample.wet());
+        }
+    }
+    REQUIRE(checked > 20);
 }

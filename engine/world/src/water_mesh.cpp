@@ -5,6 +5,44 @@
 
 namespace ichor {
 
+namespace {
+
+// Water at a sample, if there is any: a lake at its filled level, a river a little over its bed.
+std::optional<float> waterAt(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const WaterMeshParams& params, std::int64_t gx, std::int64_t gz)
+{
+    if (gx < 0 || gz < 0 || gx >= hydrology.side || gz >= hydrology.side) {
+        return std::nullopt;
+    }
+    const auto x = static_cast<std::uint32_t>(gx);
+    const auto z = static_cast<std::uint32_t>(gz);
+    if (isLake(hydrology, heightfield, x, z, rivers)) {
+        return hydrology.filled[hydrology.index(x, z)];
+    }
+    // Over the floor of a basin too deep to be a lake there is no river either: it is dry ground.
+    if (hydrology.lake[hydrology.index(x, z)] == 0 && isRiver(hydrology, hydrology.index(x, z), rivers)) {
+        return heightfield.heightAtSample(x, z) + params.riverSurface;
+    }
+    return std::nullopt;
+}
+
+}
+
+WaterLevel waterLevelAtSample(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const WaterMeshParams& params, std::int64_t gx, std::int64_t gz)
+{
+    if (const auto water = waterAt(heightfield, hydrology, rivers, params, gx, gz)) {
+        return {true, *water};
+    }
+    float sunk = heightfield.heightAtSample(static_cast<std::uint32_t>(gx), static_cast<std::uint32_t>(gz)) - params.submerge;
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            if (const auto beside = waterAt(heightfield, hydrology, rivers, params, gx + dx, gz + dz)) {
+                sunk = std::min(sunk, *beside - params.submerge);
+            }
+        }
+    }
+    return {false, sunk};
+}
+
 Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, CellId id, const WaterMeshParams& params)
 {
     Mesh mesh;
@@ -17,50 +55,17 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
     const std::uint32_t firstX = static_cast<std::uint32_t>(id.x) * perCell;
     const std::uint32_t firstZ = static_cast<std::uint32_t>(id.z) * perCell;
 
-    // Where the water lies at a sample of the world, if there is any: a lake at its filled
-    // level, a river a little over its bed.
-    const auto waterAt = [&](std::int64_t gx, std::int64_t gz) -> std::optional<float> {
-        if (gx < 0 || gz < 0 || gx >= hydrology.side || gz >= hydrology.side) {
-            return std::nullopt;
-        }
-        const auto x = static_cast<std::uint32_t>(gx);
-        const auto z = static_cast<std::uint32_t>(gz);
-        if (isLake(hydrology, heightfield, x, z, rivers)) {
-            return hydrology.filled[hydrology.index(x, z)];
-        }
-        // Over the floor of a basin too deep to be a lake there is no river either: it is dry ground.
-        if (hydrology.lake[hydrology.index(x, z)] == 0 && isRiver(hydrology, hydrology.index(x, z), rivers)) {
-            return heightfield.heightAtSample(x, z) + params.riverSurface;
-        }
-        return std::nullopt;
-    };
-
-    // Each sample of the cell: whether it holds water and where the surface lies there. A dry
-    // sample is sunk below its own ground and below the water beside it, so the surface passes
-    // under a bank that is lower than the water and never hangs past it.
+    // Each sample of the cell: whether it holds water and where the surface lies there.
     std::vector<float> level(static_cast<std::size_t>(side) * side);
     std::vector<bool> wet(static_cast<std::size_t>(side) * side, false);
     bool any = false;
     for (std::uint32_t j = 0; j < side; ++j) {
         for (std::uint32_t i = 0; i < side; ++i) {
-            const std::int64_t gx = static_cast<std::int64_t>(firstX) + i;
-            const std::int64_t gz = static_cast<std::int64_t>(firstZ) + j;
             const std::size_t at = static_cast<std::size_t>(j) * side + i;
-            if (const auto water = waterAt(gx, gz)) {
-                wet[at] = true;
-                level[at] = *water;
-                any = true;
-                continue;
-            }
-            float sunk = heightfield.heightAtSample(static_cast<std::uint32_t>(gx), static_cast<std::uint32_t>(gz)) - params.submerge;
-            for (int dz = -1; dz <= 1; ++dz) {
-                for (int dx = -1; dx <= 1; ++dx) {
-                    if (const auto beside = waterAt(gx + dx, gz + dz)) {
-                        sunk = std::min(sunk, *beside - params.submerge);
-                    }
-                }
-            }
-            level[at] = sunk;
+            const WaterLevel sample = waterLevelAtSample(heightfield, hydrology, rivers, params, static_cast<std::int64_t>(firstX) + i, static_cast<std::int64_t>(firstZ) + j);
+            wet[at] = sample.wet;
+            level[at] = sample.level;
+            any = any || sample.wet;
         }
     }
     if (!any) {

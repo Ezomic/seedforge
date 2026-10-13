@@ -154,6 +154,11 @@ WorldStreamer::WorldStreamer(const Heightfield& heightfield, StreamerConfig conf
     : heightfield_(heightfield)
     , config_(config)
 {
+    // A shared hydrology of another world would put water in the wrong places, so it is not used.
+    if (config_.hydrology && config_.hydrology->side != heightfield_.desc().samplesPerSide()) {
+        logf(LogLevel::Warn, "the hydrology given to the streamer is for a world of another size and is ignored");
+        config_.hydrology.reset();
+    }
     if (!config_.synchronous) {
         thread_ = std::thread([this] { worker(); });
     }
