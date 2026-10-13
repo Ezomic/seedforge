@@ -22,6 +22,7 @@ add_executable(ichor_tests
     test_data.cpp
     test_atmosphere.cpp
     test_vegetation.cpp
+    test_hydrology.cpp
     test_reverb.cpp
     test_editor.cpp
     test_weather.cpp
