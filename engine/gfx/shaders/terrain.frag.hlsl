@@ -28,7 +28,14 @@ float4 main(PSIn i) : SV_Target
     const float3 g = lerp(grassTex.Sample(materialSampler, i.uv).rgb, grassTex.Sample(materialSampler, i.uv * 0.13).rgb, 0.4);
     const float3 r = lerp(rockTex.Sample(materialSampler, i.uv * 0.7).rgb, rockTex.Sample(materialSampler, i.uv * 0.09).rgb, 0.4);
     const float3 s = snowTex.Sample(materialSampler, i.uv * 0.5).rgb;
-    const float3 baseColor = g * grass + r * rock + s * snow;
+    float3 baseColor = g * grass + r * rock + s * snow;
+    // Under water the ground takes on the water's colour with depth, and the bank above it is wet.
+    if (frame.waterColor.w > 0.0 && frame.cameraWorld.y > frame.waterParams.x) {
+        const float below = frame.waterParams.x - height;
+        const float wet = smoothstep(-1.0, 0.0, below) * 0.5;
+        baseColor *= 1.0 - wet;
+        baseColor = lerp(baseColor, frame.waterColor.rgb * 0.6, 1.0 - exp(-max(below, 0.0) * 0.35));
+    }
     const float roughness = lerp(0.95, 0.7, snow);
     return toneMap(applyFog(shade(i.worldPos, n, n, baseColor, 0.0, roughness), i.worldPos, i.clip.xy));
 }

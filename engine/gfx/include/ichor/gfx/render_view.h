@@ -80,6 +80,10 @@ struct RenderView {
     float windStrength = 0.0f;           // 0 still to 1 gale
     float fogHeightFalloff = 0.0f;       // per metre; zero is fog of one density at every height
     float lightShafts = 0.0f;            // how strongly the sun scatters in the fog where the shadows let it through; zero is off
+    // A flat sheet of water at one height, over the whole world. Seen only from above.
+    bool waterEnabled = false;
+    float waterLevel = 0.0f;                   // world y in metres
+    glm::vec3 waterColor{0.02f, 0.10f, 0.13f}; // linear colour of deep water
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;
