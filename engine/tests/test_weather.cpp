@@ -81,4 +81,7 @@ TEST_CASE("cloud dims the sun, greys the sky, thickens the fog and carries the r
     REQUIRE(storm.windStrength > clear.windStrength * 2.0f);
     REQUIRE(storm.windStrength <= 1.0f);
     REQUIRE(none.windStrength == Approx(clear.windStrength));
+    REQUIRE(clear.lightShafts > 0.0f);
+    REQUIRE(none.lightShafts == Approx(clear.lightShafts));
+    REQUIRE(storm.lightShafts == 0.0f);
 }

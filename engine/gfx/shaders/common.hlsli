@@ -19,6 +19,7 @@ struct FrameData {
     float4 fogColor;        // rgb linear, w density per metre
     float4 skyParams;       // x tan(fov/2) * aspect, y tan(fov/2), z time in seconds, w rain intensity
     float4 wind;            // xy direction on the ground plane, z strength, w fog height falloff per metre
+    float4 shaftParams;     // x light shaft strength (0 is off), y scattering anisotropy
 };
 
 struct PushData {

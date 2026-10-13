@@ -56,6 +56,27 @@ float sampleShadow(float3 worldPos, float3 normal, float nDotL)
     return lit / 9.0;
 }
 
+// Whether the sun reaches a point: one tap of the cascades, for marching through fog.
+float sunReaches(float3 worldPos)
+{
+    const float viewDepth = -mul(frame.view, float4(worldPos, 1.0)).z;
+    int cascade = 0;
+    if (viewDepth > frame.cascadeSplits.x) cascade = 1;
+    if (viewDepth > frame.cascadeSplits.y) cascade = 2;
+    if (viewDepth > frame.cascadeSplits.z) return 1.0;
+    const float4 light = mul(frame.cascadeViewProj[cascade], float4(worldPos, 1.0));
+    const float2 uv = float2(light.x * 0.5 + 0.5, 0.5 - light.y * 0.5);
+    if (any(uv < 0.0) || any(uv > 1.0)) return 1.0;
+    return shadowMap.SampleCmpLevelZero(shadowSampler, float3(uv, cascade), light.z - frame.shadowParams.y * (cascade + 2));
+}
+
+// Henyey-Greenstein: fog throws the sun's light on towards the camera when looking at it.
+float henyeyGreenstein(float cosAngle, float g)
+{
+    const float denom = 1.0 + g * g - 2.0 * g * cosAngle;
+    return (1.0 - g * g) / (4.0 * PI * pow(max(denom, 1e-4), 1.5));
+}
+
 // Cook-Torrance with a hemisphere ambient; positions are camera-relative so
 // the view vector is just the negated position.
 float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor, float metallic, float roughness)
@@ -86,7 +107,7 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
 }
 
 // Exponential fog by distance from the camera; positions are camera-relative.
-float3 applyFog(float3 color, float3 worldPos)
+float3 applyFog(float3 color, float3 worldPos, float2 pixel)
 {
     // With a height falloff the density at a point is base * exp(-k * (y - reference)); the
     // optical depth along the ray from the camera is the integral of that, which has a
@@ -99,7 +120,29 @@ float3 applyFog(float3 color, float3 worldPos)
         const float integral = abs(t) > 1e-3 ? (1.0 - exp(-t)) / t : 1.0;
         depth *= exp(-k * (cameraY - 120.0)) * integral;
     }
-    return lerp(color, frame.fogColor.rgb, 1.0 - exp(-depth));
+    float3 fogged = lerp(color, frame.fogColor.rgb, 1.0 - exp(-depth));
+
+    // Light shafts: march the view ray and gather the sun where nothing shades it, weighted
+    // by how much fog there is at each step. A per-pixel offset trades banding for noise.
+    if (frame.shaftParams.x > 0.0) {
+        const float rayLength = min(length(worldPos), 300.0);
+        const float3 direction = normalize(worldPos);
+        const float jitter = frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
+        const int steps = 16;
+        const float stepLength = rayLength / steps;
+        float gathered = 0.0;
+        for (int s = 0; s < steps; ++s) {
+            const float3 p = direction * ((s + jitter) * stepLength);
+            float density = frame.fogColor.w;
+            if (k > 0.0) {
+                density *= exp(-k * (frame.cameraWorld.y + p.y - 120.0));
+            }
+            gathered += sunReaches(p) * density * stepLength;
+        }
+        const float phase = henyeyGreenstein(dot(direction, normalize(frame.sunDirection.xyz)), frame.shaftParams.y);
+        fogged += frame.sunColor.rgb * frame.sunColor.w * phase * gathered * frame.shaftParams.x;
+    }
+    return fogged;
 }
 
 #endif
