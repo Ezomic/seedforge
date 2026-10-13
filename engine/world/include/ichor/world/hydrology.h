@@ -49,6 +49,12 @@ public:
     bool isOutlet(std::size_t sample) const { return direction[sample] == kOutlet; }
 };
 
+struct CarveParams {
+    float baseDepth = 0.6f;         // metres cut where a river just begins
+    float depthPerDoubling = 0.35f; // metres deeper each time the catchment doubles
+    float maxDepth = 4.0f;          // a river is never cut deeper than this
+};
+
 // Needs a heightfield with at least a 3 by 3 grid of samples; anything smaller comes back empty.
 Hydrology computeHydrology(const Heightfield& heightfield);
 
@@ -56,5 +62,13 @@ Hydrology computeHydrology(const Heightfield& heightfield);
 // below the filled surface by at least lakeDepth.
 bool isRiver(const Hydrology& hydrology, std::size_t sample, const HydrologyParams& params);
 bool isLake(const Hydrology& hydrology, const Heightfield& heightfield, std::uint32_t sx, std::uint32_t sz, const HydrologyParams& params);
+
+// The heightfield with a channel cut along every river, deeper the more drains through it, so
+// the water has somewhere to lie. Lakes are spared, with their shores and spill points (any
+// river sample touching a lake) and the samples at the map's edge, so the lakes keep their
+// depth and the edge stays level. Depth never decreases downstream, so a channel still runs
+// downhill. A river threshold of zero, a bad height range or a hydrology of another size
+// returns the land as it was.
+Heightfield carveRivers(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const CarveParams& carve);
 
 }

@@ -1,6 +1,8 @@
 #include "ichor/world/hydrology.h"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <queue>
@@ -104,6 +106,62 @@ Hydrology computeHydrology(const Heightfield& heightfield)
         }
     }
     return out;
+}
+
+namespace {
+
+// How many times a catchment has doubled over the river threshold, counted in whole doublings
+// plus a straight line across the next one. Plain float arithmetic, so a forged world is the same
+// on every machine.
+float doublings(float ratio)
+{
+    float whole = 0.0f;
+    while (ratio >= 2.0f) {
+        ratio *= 0.5f;
+        whole += 1.0f;
+    }
+    return whole + (ratio - 1.0f);
+}
+
+// A lake sample, or one of its neighbours: the shore and the spill point, which set how deep the lake is.
+bool nearLake(const Hydrology& hydrology, const Heightfield& heightfield, std::uint32_t sx, std::uint32_t sz, const HydrologyParams& params)
+{
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const auto nx = static_cast<std::int64_t>(sx) + dx;
+            const auto nz = static_cast<std::int64_t>(sz) + dz;
+            if (nx >= 0 && nz >= 0 && nx < hydrology.side && nz < hydrology.side
+                && isLake(hydrology, heightfield, static_cast<std::uint32_t>(nx), static_cast<std::uint32_t>(nz), params)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+}
+
+Heightfield carveRivers(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const CarveParams& carve)
+{
+    const WorldDesc& desc = heightfield.desc();
+    if (hydrology.empty() || hydrology.side != desc.samplesPerSide() || heightfield.empty() || rivers.riverThreshold == 0 || !(desc.heightRange > 0.0f)) {
+        return heightfield;
+    }
+    std::vector<std::uint16_t> samples = heightfield.samples();
+    const float unitsPerMetre = 65535.0f / desc.heightRange;
+    for (std::uint32_t z = 0; z < hydrology.side; ++z) {
+        for (std::uint32_t x = 0; x < hydrology.side; ++x) {
+            const std::size_t i = hydrology.index(x, z);
+            if (!isRiver(hydrology, i, rivers) || hydrology.isOutlet(i) || nearLake(hydrology, heightfield, x, z, rivers)) {
+                continue;
+            }
+            const float ratio = static_cast<float>(hydrology.accumulation[i]) / static_cast<float>(std::max<std::uint32_t>(rivers.riverThreshold, 1));
+            const float depth = std::min(carve.baseDepth + carve.depthPerDoubling * doublings(ratio), carve.maxDepth);
+            const float lowered = (heightfield.heightAtSample(x, z) - depth - desc.minHeight) * unitsPerMetre;
+            samples[i] = static_cast<std::uint16_t>(std::lround(std::clamp(lowered, 0.0f, 65535.0f)));
+        }
+    }
+    return Heightfield(desc, std::move(samples));
 }
 
 bool isRiver(const Hydrology& hydrology, std::size_t sample, const HydrologyParams& params)

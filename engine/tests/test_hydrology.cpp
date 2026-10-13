@@ -13,6 +13,21 @@ using namespace ichor;
 
 namespace {
 
+// A lake sample, or one of its neighbours, as carving sees it.
+bool nearLake(const Hydrology& h, const Heightfield& field, std::uint32_t sx, std::uint32_t sz, const HydrologyParams& params)
+{
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const auto nx = static_cast<std::int64_t>(sx) + dx;
+            const auto nz = static_cast<std::int64_t>(sz) + dz;
+            if (nx >= 0 && nz >= 0 && nx < h.side && nz < h.side && isLake(h, field, static_cast<std::uint32_t>(nx), static_cast<std::uint32_t>(nz), params)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // A square heightfield n samples to a side, one metre apart, with a height in tenths of a
 // metre at each sample.
 Heightfield gridOf(std::uint32_t n, const std::function<std::uint16_t(std::uint32_t, std::uint32_t)>& tenths)
@@ -205,4 +220,129 @@ TEST_CASE("the smallest floodable map has one inner sample, and it drains to the
     REQUIRE_FALSE(h.isOutlet(h.index(1, 1)));
     REQUIRE(h.filled[h.index(1, 1)] == three.heightAtSample(0, 0)); // filled to the rim
     REQUIRE(h.accumulation[h.downstream(h.index(1, 1))] >= 2);
+}
+
+TEST_CASE("carving cuts channels along the rivers, deeper downstream, and touches nothing else")
+{
+    WorldDesc desc;
+    desc.seed = 11;
+    desc.sizeMetres = 1024;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 256;
+    const Heightfield field = forgeHeightfield(desc);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    const CarveParams carve;
+    const Heightfield carved = carveRivers(field, h, rivers, carve);
+    REQUIRE(carved.desc().sizeMetres == field.desc().sizeMetres);
+    REQUIRE(carved.samples().size() == field.samples().size());
+    REQUIRE(carved.digest() != field.digest());
+
+    const float metresPerUnit = desc.heightRange / 65535.0f;
+    std::size_t cut = 0;
+    for (std::uint32_t z = 0; z < h.side; ++z) {
+        for (std::uint32_t x = 0; x < h.side; ++x) {
+            const std::size_t i = h.index(x, z);
+            const float before = field.heightAtSample(x, z);
+            const float after = carved.heightAtSample(x, z);
+            const bool river = isRiver(h, i, rivers) && !h.isOutlet(i) && !nearLake(h, field, x, z, rivers);
+            if (!river) {
+                REQUIRE(after == before);
+                continue;
+            }
+            ++cut;
+            REQUIRE(after <= before);
+            // Cut by at least the base depth (to a sample's quantum), unless the land already ran out of height.
+            REQUIRE((before - after >= carve.baseDepth - 2.0f * metresPerUnit || after <= desc.minHeight + 2.0f * metresPerUnit));
+            REQUIRE(before - after <= carve.maxDepth + 2.0f * metresPerUnit);
+        }
+    }
+    REQUIRE(cut > 0);
+
+    // The deepest cut is at the biggest river, the shallowest where one begins.
+    const std::uint32_t biggestCatchment = *std::max_element(h.accumulation.begin(), h.accumulation.end());
+    REQUIRE(biggestCatchment >= 4 * rivers.riverThreshold);
+    float deepestSmall = 0.0f;
+    float deepestBig = 0.0f;
+    for (std::size_t i = 0; i < h.accumulation.size(); ++i) {
+        const auto x = static_cast<std::uint32_t>(i % 129);
+        const auto z = static_cast<std::uint32_t>(i / 129);
+        if (!isRiver(h, i, rivers) || h.isOutlet(i) || nearLake(h, field, x, z, rivers)) continue;
+        const float depth = field.heightAtSample(x, z) - carved.heightAtSample(x, z);
+        if (h.accumulation[i] < 2 * rivers.riverThreshold) deepestSmall = std::max(deepestSmall, depth);
+        if (h.accumulation[i] >= biggestCatchment / 2) deepestBig = std::max(deepestBig, depth);
+    }
+    REQUIRE(deepestBig > deepestSmall);
+
+    // The same river, forged again, is cut the same way.
+    REQUIRE(carveRivers(field, h, rivers, carve).digest() == carved.digest());
+    // A channel still runs downhill: carved ground never rises from one sample to the next down a river.
+    for (std::size_t i = 0; i < h.accumulation.size(); ++i) {
+        if (h.isOutlet(i)) continue;
+        const std::size_t d = h.downstream(i);
+        if (isRiver(h, i, rivers) && isRiver(h, d, rivers)) {
+            REQUIRE((carved.samples()[d] <= carved.samples()[i] || field.samples()[d] > field.samples()[i]));
+        }
+    }
+
+    // Nothing is carved from an empty hydrology, one of another size, a zero threshold or a bad height range.
+    REQUIRE(carveRivers(field, Hydrology{}, rivers, carve).digest() == field.digest());
+    WorldDesc small = desc;
+    small.sizeMetres = 512;
+    const Heightfield smaller = forgeHeightfield(small);
+    REQUIRE(carveRivers(field, computeHydrology(smaller), rivers, carve).digest() == field.digest());
+    HydrologyParams nothing;
+    nothing.riverThreshold = 0;
+    REQUIRE(carveRivers(field, h, nothing, carve).digest() == field.digest());
+    WorldDesc flatRange = desc;
+    flatRange.heightRange = 0.0f;
+    REQUIRE(carveRivers(Heightfield(flatRange, field.samples()), h, rivers, carve).digest() == Heightfield(flatRange, field.samples()).digest());
+
+    // A cut deeper than the land is high stops at the floor.
+    CarveParams abyss;
+    abyss.baseDepth = 1e6f;
+    abyss.maxDepth = 1e6f;
+    const Heightfield bottomed = carveRivers(field, h, rivers, abyss);
+    std::size_t atFloor = 0;
+    for (std::size_t i = 0; i < h.accumulation.size(); ++i) {
+        atFloor += bottomed.samples()[i] == 0 && field.samples()[i] != 0 ? 1 : 0;
+    }
+    std::size_t wouldReachFloor = 0;
+    for (std::uint32_t z = 0; z < h.side; ++z) {
+        for (std::uint32_t x = 0; x < h.side; ++x) {
+            const std::size_t i = h.index(x, z);
+            const bool river = isRiver(h, i, rivers) && !h.isOutlet(i) && !nearLake(h, field, x, z, rivers);
+            wouldReachFloor += river && field.samples()[i] != 0 ? 1 : 0;
+        }
+    }
+    REQUIRE(wouldReachFloor > 0);
+    REQUIRE(atFloor == wouldReachFloor);
+}
+
+TEST_CASE("a lake keeps its depth when its rivers are carved, and the map's edge is left level")
+{
+    // The basin from before: a plateau with a deep basin and a notch to the east.
+    const Heightfield field = gridOf(17, [](std::uint32_t x, std::uint32_t z) {
+        if (x == 16 && z == 8) return std::uint16_t{5000};
+        if (x >= 5 && x <= 11 && z >= 5 && z <= 11) return std::uint16_t{1000};
+        return std::uint16_t{10000};
+    });
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 3;
+    const Heightfield carved = carveRivers(field, h, rivers, CarveParams{});
+    REQUIRE(carved.digest() != field.digest()); // something was cut
+    for (std::uint32_t z = 0; z < 17; ++z) {
+        for (std::uint32_t x = 0; x < 17; ++x) {
+            const bool edge = x == 0 || z == 0 || x == 16 || z == 16;
+            if (edge || isLake(h, field, x, z, rivers)) {
+                REQUIRE(carved.heightAtSample(x, z) == field.heightAtSample(x, z));
+            }
+        }
+    }
+    // The same lakes are there to be found after carving, as deep as they were.
+    const Hydrology again = computeHydrology(carved);
+    REQUIRE(isLake(again, carved, 8, 8, rivers));
+    REQUIRE(again.filled[again.index(8, 8)] == h.filled[h.index(8, 8)]);
 }
