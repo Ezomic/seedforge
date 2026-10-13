@@ -206,3 +206,62 @@ TEST_CASE("the smallest floodable map has one inner sample, and it drains to the
     REQUIRE(h.filled[h.index(1, 1)] == three.heightAtSample(0, 0)); // filled to the rim
     REQUIRE(h.accumulation[h.downstream(h.index(1, 1))] >= 2);
 }
+
+TEST_CASE("carving cuts channels along the rivers, deeper downstream, and touches nothing else")
+{
+    WorldDesc desc;
+    desc.seed = 11;
+    desc.sizeMetres = 1024;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 256;
+    const Heightfield field = forgeHeightfield(desc);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    const CarveParams carve;
+    const Heightfield carved = carveRivers(field, h, rivers, carve);
+    REQUIRE(carved.desc().sizeMetres == field.desc().sizeMetres);
+    REQUIRE(carved.samples().size() == field.samples().size());
+    REQUIRE(carved.digest() != field.digest());
+
+    const float metresPerUnit = desc.heightRange / 65535.0f;
+    std::size_t cut = 0;
+    for (std::uint32_t z = 0; z < 129; ++z) {
+        for (std::uint32_t x = 0; x < 129; ++x) {
+            const std::size_t i = h.index(x, z);
+            const float before = field.heightAtSample(x, z);
+            const float after = carved.heightAtSample(x, z);
+            const bool river = isRiver(h, i, rivers) && !isLake(h, field, x, z, rivers);
+            if (!river) {
+                REQUIRE(after == before);
+                continue;
+            }
+            ++cut;
+            REQUIRE(after <= before);
+            // Cut by at least the base depth (to a sample's quantum), unless the land already ran out of height.
+            REQUIRE((before - after >= carve.baseDepth - 2.0f * metresPerUnit || after <= desc.minHeight + 2.0f * metresPerUnit));
+            REQUIRE(before - after <= carve.maxDepth + 2.0f * metresPerUnit);
+        }
+    }
+    REQUIRE(cut > 0);
+
+    // The deepest cut is at the biggest river, the shallowest where one begins.
+    const std::uint32_t biggestCatchment = *std::max_element(h.accumulation.begin(), h.accumulation.end());
+    REQUIRE(biggestCatchment >= 4 * rivers.riverThreshold);
+    float deepestSmall = 0.0f;
+    float deepestBig = 0.0f;
+    for (std::size_t i = 0; i < h.accumulation.size(); ++i) {
+        const auto x = static_cast<std::uint32_t>(i % 129);
+        const auto z = static_cast<std::uint32_t>(i / 129);
+        if (!isRiver(h, i, rivers) || isLake(h, field, x, z, rivers)) continue;
+        const float depth = field.heightAtSample(x, z) - carved.heightAtSample(x, z);
+        if (h.accumulation[i] < 2 * rivers.riverThreshold) deepestSmall = std::max(deepestSmall, depth);
+        if (h.accumulation[i] >= biggestCatchment / 2) deepestBig = std::max(deepestBig, depth);
+    }
+    REQUIRE(deepestBig > deepestSmall);
+
+    // The same river, forged again, is cut the same way.
+    REQUIRE(carveRivers(field, h, rivers, carve).digest() == carved.digest());
+    // A hydrology of another size is refused: the land comes back as it was.
+    REQUIRE(carveRivers(field, Hydrology{}, rivers, carve).digest() == field.digest());
+}

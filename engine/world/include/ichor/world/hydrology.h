@@ -49,6 +49,17 @@ public:
     bool isOutlet(std::size_t sample) const { return direction[sample] == kOutlet; }
 };
 
+struct CarveParams {
+    float baseDepth = 0.6f;         // metres cut where a river just begins
+    float depthPerDoubling = 0.35f; // metres deeper each time the catchment doubles
+    float maxDepth = 4.0f;          // a river is never cut deeper than this
+};
+
+// The heightfield with a channel cut along every river, deeper the more drains through it, so
+// the water has somewhere to lie. Lakes are left as they are. A world forged once and read
+// for the campaign's lifetime: nothing here runs while playing.
+Heightfield carveRivers(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const CarveParams& carve);
+
 // Needs a heightfield with at least a 3 by 3 grid of samples; anything smaller comes back empty.
 Hydrology computeHydrology(const Heightfield& heightfield);
 
