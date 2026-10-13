@@ -63,6 +63,14 @@ UiContext::~UiContext()
     }
 }
 
+bool UiContext::loadFontFace(const std::filesystem::path& path, bool fallback)
+{
+    if (context_ == nullptr) {
+        return false;
+    }
+    return Rml::LoadFontFace(path.generic_string(), fallback);
+}
+
 Rml::ElementDocument* UiContext::loadDocumentFromMemory(std::string_view rml, std::string_view sourceUrl)
 {
     return context_ == nullptr ? nullptr : context_->LoadDocumentFromMemory(Rml::String(rml), Rml::String(sourceUrl));

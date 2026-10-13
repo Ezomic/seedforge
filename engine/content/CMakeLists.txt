@@ -34,4 +34,17 @@ add_custom_command(
     VERBATIM
 )
 list(APPEND outputs ${ICHOR_WORLD_DIR}/manifest.iworld)
+# The UI's typefaces, both under the SIL Open Font License, which asks that the licence
+# travel with the fonts, so the texts are copied too.
+set(ICHOR_FONT_DIR ${ICHOR_CONTENT_DIR}/fonts)
+foreach(font AlegreyaSans-Regular.ttf AlegreyaSans-Bold.ttf Cinzel.ttf AlegreyaSans-OFL.txt Cinzel-OFL.txt)
+    add_custom_command(
+        OUTPUT ${ICHOR_FONT_DIR}/${font}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ICHOR_ART_DIR}/fonts/${font} ${ICHOR_FONT_DIR}/${font}
+        DEPENDS ${ICHOR_ART_DIR}/fonts/${font}
+        COMMENT "font: ${font}"
+        VERBATIM
+    )
+    list(APPEND outputs ${ICHOR_FONT_DIR}/${font})
+endforeach()
 add_custom_target(ichor_content ALL DEPENDS ${outputs})

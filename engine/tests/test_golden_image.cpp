@@ -435,3 +435,72 @@ TEST_CASE("golden image: under the water")
 {
     checkTerrainAtHour(15.0f, "terrain_underwater", true, {}, true, true);
 }
+
+namespace {
+
+constexpr const char* kTextDocument = R"(<rml><head><style>
+    body, div { display: block; }
+    body { width: 640px; height: 360px; }
+    .card { position: absolute; left: 40px; top: 40px; width: 560px; height: 280px; background-color: #1a1f2acc; border: 3px #a08850; }
+    .title { position: absolute; left: 30px; top: 24px; font-family: Cinzel; font-size: 40px; color: #e8d8a8; letter-spacing: 3px; }
+    .body { position: absolute; left: 30px; top: 100px; width: 500px; font-family: Alegreya Sans; font-size: 22px; color: #d8d8d8; line-height: 28px; }
+    .strong { position: absolute; left: 30px; top: 200px; font-family: Alegreya Sans; font-weight: bold; font-size: 24px; color: #f0b040; }
+</style></head><body>
+    <div class="card">
+        <div class="title">THE LEDGER</div>
+        <div class="body">The ridge road holds three open debts. Carry the ash to the ferryman before the river rises.</div>
+        <div class="strong">Hecatomb: health is the offering</div>
+    </div>
+</body></rml>)";
+
+}
+
+TEST_CASE("golden image: UI text in the game fonts")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Bold.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    std::filesystem::create_directories(kOutDir);
+    Rml::ElementDocument* document = ui.loadDocumentFromMemory(kTextDocument, "[text document]");
+    REQUIRE(document != nullptr);
+    document->Show();
+    ui.update(0.0);
+
+    RenderView view;
+    view.clearColor = glm::vec3(0.12f, 0.14f, 0.18f);
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    REQUIRE(writePng(kOutDir / "ui_text.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "ui_text.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_text.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "ui_text.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
