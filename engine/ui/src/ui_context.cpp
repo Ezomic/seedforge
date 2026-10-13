@@ -121,6 +121,13 @@ bool UiContext::mouseMove(int x, int y)
     return context_ != nullptr && !context_->ProcessMouseMove(x, y, 0);
 }
 
+void UiContext::mouseLeave()
+{
+    if (context_ != nullptr) {
+        context_->ProcessMouseLeave();
+    }
+}
+
 bool UiContext::mouseButton(int button, bool down)
 {
     if (context_ == nullptr) {

@@ -577,14 +577,24 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ledger->setVisible(!ledger->visible());
         }
         journalHeld = journal;
-        // The pointer drives the game UI; the editor's own windows have it while they are up.
-        if (ui && !editing) {
+        // The pointer drives the game UI (the game itself does not use the mouse); the editor's
+        // own windows have it while they are up. Away from the window, or under the editor, a
+        // press the UI still holds is let go and nothing stays hovered.
+        if (ui) {
             const ichor::Pointer pointer = platform.pointer();
-            ui->mouseMove(pointer.x, pointer.y);
-            if (pointer.primary != pointerHeld) {
-                ui->mouseButton(0, pointer.primary);
+            if (pointer.inside && !editing) {
+                ui->mouseMove(pointer.x, pointer.y);
+                if (pointer.primary != pointerHeld) {
+                    ui->mouseButton(0, pointer.primary);
+                    pointerHeld = pointer.primary;
+                }
+            } else {
+                if (pointerHeld) {
+                    ui->mouseButton(0, false);
+                    pointerHeld = false;
+                }
+                ui->mouseLeave();
             }
-            pointerHeld = pointer.primary;
             if (ledger->takeCloseRequest()) {
                 ledger->setVisible(false);
             }

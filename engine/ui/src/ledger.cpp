@@ -98,6 +98,10 @@ Ledger::Ledger(UiContext& ui)
 
 Ledger::~Ledger()
 {
+    if (close_ != nullptr) {
+        // The element may live on until the context next updates, and the listener goes first.
+        close_->RemoveEventListener("click", &click_);
+    }
     if (document_ != nullptr) {
         ui_.unloadDocument(document_);
     }

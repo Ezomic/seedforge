@@ -456,3 +456,35 @@ TEST_CASE("clicking the ledger's close button asks for it to be closed, and clic
     frame(ui, renderer, 1.0);
     REQUIRE_FALSE(ledger.takeCloseRequest());
 }
+
+TEST_CASE("a pointer that leaves the window unhovers the button, and a ledger can go while the context still lives")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    {
+        Ledger ledger(ui);
+        ledger.setVisible(true);
+        frame(ui, renderer, 0.0);
+        const auto centre = ledger.closeButtonCentre();
+        REQUIRE(centre.has_value());
+        ui.mouseMove(static_cast<int>(centre->first), static_cast<int>(centre->second));
+        frame(ui, renderer, 0.1);
+        ui.mouseLeave();
+        frame(ui, renderer, 0.2);
+        ui.mouseButton(0, true);
+        ui.mouseButton(0, false);
+        frame(ui, renderer, 0.3);
+        REQUIRE_FALSE(ledger.takeCloseRequest());
+    }
+    // The ledger is gone but its elements may be pending; the context carries on and clicks reach nothing.
+    ui.mouseMove(640, 100);
+    frame(ui, renderer, 0.4);
+    ui.mouseButton(0, true);
+    ui.mouseButton(0, false);
+    frame(ui, renderer, 0.5);
+    SUCCEED("no listener called after the ledger went");
+}

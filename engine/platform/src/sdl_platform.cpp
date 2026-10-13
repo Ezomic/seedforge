@@ -4,6 +4,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <cmath>
+
 namespace ichor {
 
 SdlPlatform::~SdlPlatform()
@@ -69,8 +71,8 @@ void SdlPlatform::pumpEvents()
     const Extent pixels = drawableSize();
     const float scaleX = windowWidth > 0 ? static_cast<float>(pixels.width) / static_cast<float>(windowWidth) : 1.0f;
     const float scaleY = windowHeight > 0 ? static_cast<float>(pixels.height) / static_cast<float>(windowHeight) : 1.0f;
-    pointer_.x = static_cast<int>(mouseX * scaleX);
-    pointer_.y = static_cast<int>(mouseY * scaleY);
+    pointer_.x = static_cast<int>(std::lround(mouseX * scaleX));
+    pointer_.y = static_cast<int>(std::lround(mouseY * scaleY));
     pointer_.primary = (mouseButtons & SDL_BUTTON_LMASK) != 0;
     pointer_.inside = (SDL_GetWindowFlags(window_) & SDL_WINDOW_MOUSE_FOCUS) != 0;
     input_ = frame;
