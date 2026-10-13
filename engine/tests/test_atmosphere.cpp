@@ -120,9 +120,11 @@ TEST_CASE("the wind and the height fog are copied into the view")
     RenderView view;
     REQUIRE(view.windStrength == 0.0f);
     REQUIRE(view.fogHeightFalloff == 0.0f);
+    REQUIRE(view.lightShafts == 0.0f);
     const Atmosphere a = atmosphereAt(10.0f);
     applyAtmosphere(a, view);
     REQUIRE(view.windDirection == a.windDirection);
     REQUIRE(view.windStrength == Approx(a.windStrength));
     REQUIRE(view.fogHeightFalloff == Approx(a.fogHeightFalloff));
+    REQUIRE(view.lightShafts == Approx(a.lightShafts));
 }

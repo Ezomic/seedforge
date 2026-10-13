@@ -28,5 +28,5 @@ float4 main(PSIn i) : SV_Target
         const float3 tn = normalTex.Sample(materialSampler, i.uv).xyz * 2.0 - 1.0;
         n = normalize(mul(tn, float3x3(t, b, n)));
     }
-    return toneMap(applyFog(shade(i.worldPos, n, normalize(i.normal), baseColor, metallic, roughness), i.worldPos));
+    return toneMap(applyFog(shade(i.worldPos, n, normalize(i.normal), baseColor, metallic, roughness), i.worldPos, i.clip.xy));
 }

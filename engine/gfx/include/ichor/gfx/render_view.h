@@ -79,6 +79,7 @@ struct RenderView {
     glm::vec2 windDirection{1.0f, 0.0f}; // ground-plane unit vector; trees lean and sway along it
     float windStrength = 0.0f;           // 0 still to 1 gale
     float fogHeightFalloff = 0.0f;       // per metre; zero is fog of one density at every height
+    float lightShafts = 0.0f;            // how strongly the sun scatters in the fog where the shadows let it through; zero is off
     std::vector<RenderInstance> instances;
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;

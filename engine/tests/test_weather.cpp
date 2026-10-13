@@ -81,4 +81,15 @@ TEST_CASE("cloud dims the sun, greys the sky, thickens the fog and carries the r
     REQUIRE(storm.windStrength > clear.windStrength * 2.0f);
     REQUIRE(storm.windStrength <= 1.0f);
     REQUIRE(none.windStrength == Approx(clear.windStrength));
+    REQUIRE(clear.lightShafts > 0.0f);
+    REQUIRE(none.lightShafts == Approx(clear.lightShafts));
+    REQUIRE(storm.lightShafts == 0.0f);
+}
+
+TEST_CASE("cloud takes the light shafts away in proportion")
+{
+    const Atmosphere clear = atmosphereAt(12.0f);
+    Atmosphere half = clear;
+    applyWeather({0.5f, 0.0f}, half);
+    REQUIRE(half.lightShafts == Approx(clear.lightShafts * 0.5f));
 }

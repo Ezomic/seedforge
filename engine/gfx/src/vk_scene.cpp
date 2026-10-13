@@ -22,6 +22,7 @@ constexpr std::uint32_t kMaxMaterials = 256;
 constexpr std::uint32_t kMaxDebugLines = 65536;
 constexpr std::uint32_t kMaxJoints = 4096;
 constexpr float kShadowDistance = 60.0f;
+constexpr float kShaftAnisotropy = 0.65f; // Henyey-Greenstein g: how much fog throws the sun's light on towards the eye
 
 struct FrameData {
     glm::mat4 view;
@@ -39,7 +40,9 @@ struct FrameData {
     glm::vec4 fogColor;
     glm::vec4 skyParams;
     glm::vec4 wind;
+    glm::vec4 shaftParams;
 };
+static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 12));
 
 struct InstanceGpu {
     glm::vec4 positionScale; // xyz relative to the cell origin, w scale
@@ -977,6 +980,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     const float tanHalf = std::tan(view.camera.fovY * 0.5f);
     data.skyParams = glm::vec4(tanHalf * aspect, tanHalf, view.time, view.rainIntensity);
     data.wind = glm::vec4(view.windDirection, view.windStrength, view.fogHeightFalloff);
+    data.shaftParams = glm::vec4(view.lightShafts, kShaftAnisotropy, 0.0f, 0.0f);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
     vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 
