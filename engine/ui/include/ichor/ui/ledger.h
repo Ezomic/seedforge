@@ -2,9 +2,13 @@
 
 #include "ichor/ui/ui_context.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
+
+#include <RmlUi/Core/EventListener.h>
 
 namespace Rml {
 class Element;
@@ -44,8 +48,22 @@ public:
     // the ones already on the card.
     void setRows(const std::vector<LedgerRow>& rows);
 
+    // True once after the close button was clicked.
+    bool takeCloseRequest();
+
+    // Where the close button sits on screen, once the card has been laid out. For tests and
+    // anything that wants to point at it.
+    std::optional<std::pair<float, float>> closeButtonCentre() const;
+
 private:
+    struct Click final : Rml::EventListener {
+        void ProcessEvent(Rml::Event&) override { requested = true; }
+        bool requested = false;
+    };
+
     UiContext& ui_;
+    Click click_;
+    Rml::Element* close_ = nullptr;
     Rml::ElementDocument* document_ = nullptr;
     Rml::Element* list_ = nullptr;
     std::vector<LedgerRow> shown_;

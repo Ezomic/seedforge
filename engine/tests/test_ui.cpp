@@ -400,3 +400,59 @@ TEST_CASE("a long unbroken entry stays inside the card")
     }
     REQUIRE_FALSE(renderer.draws().empty());
 }
+
+TEST_CASE("clicking the ledger's close button asks for it to be closed, and clicking elsewhere does not")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Ledger ledger(ui);
+    REQUIRE(ledger.ok());
+    REQUIRE_FALSE(ledger.closeButtonCentre().has_value()); // hidden: nowhere to click
+
+    // A click while it is hidden reaches nothing.
+    ui.mouseMove(640, 100);
+    ui.mouseButton(0, true);
+    ui.mouseButton(0, false);
+    frame(ui, renderer, 0.0);
+    REQUIRE_FALSE(ledger.takeCloseRequest());
+
+    ledger.setVisible(true);
+    frame(ui, renderer, 0.1);
+    const auto centre = ledger.closeButtonCentre();
+    REQUIRE(centre.has_value());
+    REQUIRE(centre->first > 640.0f); // top right of the card
+    REQUIRE(centre->second < 360.0f);
+
+    // Pressing on the card's body is no request.
+    ui.mouseMove(640, 400);
+    frame(ui, renderer, 0.2);
+    ui.mouseButton(0, true);
+    ui.mouseButton(0, false);
+    frame(ui, renderer, 0.3);
+    REQUIRE_FALSE(ledger.takeCloseRequest());
+
+    // Pressing and releasing on the button is.
+    ui.mouseMove(static_cast<int>(centre->first), static_cast<int>(centre->second));
+    frame(ui, renderer, 0.4);
+    ui.mouseButton(0, true);
+    frame(ui, renderer, 0.5);
+    ui.mouseButton(0, false);
+    frame(ui, renderer, 0.6);
+    REQUIRE(ledger.takeCloseRequest());
+    REQUIRE_FALSE(ledger.takeCloseRequest()); // once
+
+    // Pressing on the button and sliding off before releasing does not count.
+    ui.mouseMove(static_cast<int>(centre->first), static_cast<int>(centre->second));
+    frame(ui, renderer, 0.7);
+    ui.mouseButton(0, true);
+    frame(ui, renderer, 0.8);
+    ui.mouseMove(640, 400);
+    frame(ui, renderer, 0.9);
+    ui.mouseButton(0, false);
+    frame(ui, renderer, 1.0);
+    REQUIRE_FALSE(ledger.takeCloseRequest());
+}

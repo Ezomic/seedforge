@@ -1,6 +1,7 @@
 #include "ichor/ui/ledger.h"
 
 #include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/Event.h>
 #include <RmlUi/Core/ElementDocument.h>
 
 #include <algorithm>
@@ -13,13 +14,15 @@ constexpr const char* kLedgerDocument = R"(<rml><head><style>
     body, div { display: block; }
     body { width: 100%; height: 100%; }
     #card { position: absolute; top: 12%; bottom: 12%; left: 12%; right: 12%; overflow: hidden; padding: 22px 28px 22px 28px; background-color: #10141af0; border: 3px #a08850; }
+    #close { position: absolute; top: 10px; right: 14px; width: 34px; height: 34px; font-family: Alegreya Sans; font-size: 30px; line-height: 34px; text-align: center; color: #a08850; }
+    #close:hover { color: #e8d8a8; background-color: #2c3340; }
     #title { font-family: Cinzel; font-size: 34px; color: #e8d8a8; letter-spacing: 3px; text-align: center; padding-bottom: 12px; }
     .row { word-break: break-word; padding: 5px 0px 5px 0px; border-bottom: 1px #2c3340; font-family: Alegreya Sans; font-size: 19px; color: #d8d8d8; }
     .when { color: #8890a0; font-size: 16px; padding-right: 10px; }
     .kind { color: #f0b040; font-weight: bold; padding-right: 10px; }
     .empty { font-family: Alegreya Sans; font-size: 19px; color: #8890a0; text-align: center; padding: 18px 0px 18px 0px; }
 </style></head><body>
-    <div id="card"><div id="title">THE LEDGER</div><div id="list"></div></div>
+    <div id="card"><div id="close">&#215;</div><div id="title">THE LEDGER</div><div id="list"></div></div>
 </body></rml>)";
 
 }
@@ -84,10 +87,13 @@ Ledger::Ledger(UiContext& ui)
         return;
     }
     list_ = document_->GetElementById("list");
-    if (list_ == nullptr) {
+    close_ = document_->GetElementById("close");
+    if (list_ == nullptr || close_ == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
+        return;
     }
+    close_->AddEventListener("click", &click_);
 }
 
 Ledger::~Ledger()
@@ -95,6 +101,23 @@ Ledger::~Ledger()
     if (document_ != nullptr) {
         ui_.unloadDocument(document_);
     }
+}
+
+bool Ledger::takeCloseRequest()
+{
+    const bool requested = click_.requested;
+    click_.requested = false;
+    return requested;
+}
+
+std::optional<std::pair<float, float>> Ledger::closeButtonCentre() const
+{
+    if (close_ == nullptr || !visible_) {
+        return std::nullopt;
+    }
+    const Rml::Vector2f offset = close_->GetAbsoluteOffset(Rml::BoxArea::Border);
+    const Rml::Vector2f size = close_->GetBox().GetSize(Rml::BoxArea::Border);
+    return std::pair{offset.x + size.x * 0.5f, offset.y + size.y * 0.5f};
 }
 
 void Ledger::setVisible(bool visible)

@@ -17,6 +17,14 @@ struct Extent {
     int height = 0;
 };
 
+// The mouse as of the last pump, in pixels of the drawable, origin top left.
+struct Pointer {
+    int x = 0;
+    int y = 0;
+    bool primary = false; // the left button is down
+    bool inside = false;  // the window has the mouse
+};
+
 class Platform {
 public:
     virtual ~Platform() = default;
@@ -29,6 +37,9 @@ public:
 
     // The player's input as of the last pump, in simulation terms.
     virtual InputFrame input() const = 0;
+
+    // For the UI only: the simulation never reads it. Platforms without a mouse report none.
+    virtual Pointer pointer() const { return {}; }
 };
 
 }

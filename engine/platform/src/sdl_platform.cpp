@@ -58,6 +58,21 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_F5]) frame.buttons |= InputFrame::QuickSave;
     if (keys[SDL_SCANCODE_F9]) frame.buttons |= InputFrame::QuickLoad;
     if (keys[SDL_SCANCODE_TAB]) frame.buttons |= InputFrame::Journal;
+
+    // The mouse is reported in window units; the UI works in drawable pixels, which differ on a scaled display.
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    const SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseX, &mouseY);
+    int windowWidth = 0;
+    int windowHeight = 0;
+    SDL_GetWindowSize(window_, &windowWidth, &windowHeight);
+    const Extent pixels = drawableSize();
+    const float scaleX = windowWidth > 0 ? static_cast<float>(pixels.width) / static_cast<float>(windowWidth) : 1.0f;
+    const float scaleY = windowHeight > 0 ? static_cast<float>(pixels.height) / static_cast<float>(windowHeight) : 1.0f;
+    pointer_.x = static_cast<int>(mouseX * scaleX);
+    pointer_.y = static_cast<int>(mouseY * scaleY);
+    pointer_.primary = (mouseButtons & SDL_BUTTON_LMASK) != 0;
+    pointer_.inside = (SDL_GetWindowFlags(window_) & SDL_WINDOW_MOUSE_FOCUS) != 0;
     input_ = frame;
 }
 

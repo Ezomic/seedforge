@@ -20,6 +20,7 @@ public:
     double now() const override;
     Extent drawableSize() const override;
     InputFrame input() const override { return input_; }
+    Pointer pointer() const override { return pointer_; }
 
     SDL_Window* window() const { return window_; }
 
@@ -30,6 +31,7 @@ private:
     SDL_Window* window_ = nullptr;
     bool quit_ = false;
     InputFrame input_;
+    Pointer pointer_;
     std::function<void(const SDL_Event&)> hook_;
 };
 
