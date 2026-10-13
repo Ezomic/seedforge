@@ -1,7 +1,10 @@
 #include "ichor/world/hydrology.h"
 
 #include <array>
+#include <cstddef>
+#include <functional>
 #include <queue>
+#include <vector>
 
 namespace ichor {
 
@@ -12,7 +15,7 @@ constexpr std::array<int, 8> kDz{0, 1, 1, 1, 0, -1, -1, -1};
 
 struct Frontier {
     float height = 0.0f;
-    std::uint64_t order = 0; // first in, first out among equals
+    std::uint32_t order = 0; // first in, first out among equals; below the sample count, so it fits
     std::uint32_t sample = 0;
     bool operator>(const Frontier& other) const
     {
@@ -50,7 +53,7 @@ Hydrology computeHydrology(const Heightfield& heightfield)
     std::vector<std::uint32_t> order;
     order.reserve(total);
     std::priority_queue<Frontier, std::vector<Frontier>, std::greater<>> frontier;
-    std::uint64_t counter = 0;
+    std::uint32_t counter = 0;
 
     const auto height = [&](std::uint32_t sx, std::uint32_t sz) { return heightfield.heightAtSample(sx, sz); };
     // The flood starts from the map's edge: everything there drains off the map.

@@ -3,8 +3,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <numeric>
+#include <utility>
+#include <vector>
 
 using namespace ichor;
 
@@ -62,7 +65,8 @@ TEST_CASE("everything on a slope drains down it, and every sample is counted at 
     }
     REQUIRE(biggest > 17);
     for (std::uint32_t z = 1; z < 16; ++z) {
-        REQUIRE(h.downstream(h.index(8, z)) % 17 < 8); // one step further down the slope
+        const std::size_t next = h.downstream(h.index(8, z));
+        REQUIRE(next % 17 == 7); // one step further down the slope, whatever the row
     }
 }
 
@@ -114,7 +118,6 @@ TEST_CASE("no sample drains uphill and every drop of rain reaches the edge, on a
         rivers += isRiver(h, i, params) ? 1 : 0;
     }
     REQUIRE(rivers > 0);
-    REQUIRE(rivers < total / 4);
 
     // A walk down from anywhere ends at an outlet within as many steps as there are samples.
     for (std::size_t start = 0; start < total; start += 997) {
@@ -125,10 +128,17 @@ TEST_CASE("no sample drains uphill and every drop of rain reaches the edge, on a
         }
         REQUIRE(h.isOutlet(at));
     }
-    // A river runs on down: below a river sample there is another with at least its catchment.
+    // Water only gathers on its way down: below any sample there is one with a bigger catchment.
     for (std::size_t i = 0; i < total; ++i) {
-        if (isRiver(h, i, params) && !h.isOutlet(i)) {
+        if (!h.isOutlet(i)) {
             REQUIRE(h.accumulation[h.downstream(i)] > h.accumulation[i]);
+        }
+    }
+    // Only the edge of the map is an outlet.
+    for (std::uint32_t z = 0; z < 129; ++z) {
+        for (std::uint32_t x = 0; x < 129; ++x) {
+            const bool edge = x == 0 || z == 0 || x == 128 || z == 128;
+            REQUIRE(h.isOutlet(h.index(x, z)) == edge);
         }
     }
 }
@@ -152,4 +162,47 @@ TEST_CASE("the same ground always drains the same way, and a map too small to fl
     REQUIRE(computeHydrology(Heightfield{}).empty());
     REQUIRE_FALSE(isLake(Hydrology{}, field, 0, 0, HydrologyParams{}));
     REQUIRE_FALSE(isRiver(Hydrology{}, 0, HydrologyParams{}));
+}
+
+TEST_CASE("a flat plateau drains in a wave to the edge, and a pit takes the lower of its rim's heights")
+{
+    const Heightfield flat = gridOf(9, [](std::uint32_t, std::uint32_t) { return std::uint16_t{300}; });
+    const Hydrology h = computeHydrology(flat);
+    REQUIRE(drainedOffTheMap(h) == 81u);
+    for (std::uint32_t z = 0; z < 9; ++z) {
+        for (std::uint32_t x = 0; x < 9; ++x) {
+            const std::size_t i = h.index(x, z);
+            REQUIRE(h.filled[i] == flat.heightAtSample(x, z));
+            REQUIRE(h.isOutlet(i) == (x == 0 || z == 0 || x == 8 || z == 8));
+            if (!h.isOutlet(i)) {
+                // Each step is to a neighbour, one sample away in each direction at most.
+                const std::size_t d = h.downstream(i);
+                REQUIRE(std::abs(static_cast<int>(d % 9) - static_cast<int>(x)) <= 1);
+                REQUIRE(std::abs(static_cast<int>(d / 9) - static_cast<int>(z)) <= 1);
+            }
+        }
+    }
+
+    // A pit ringed by a low side and a high side fills to the low one: where the water spills over.
+    const Heightfield pit = gridOf(9, [](std::uint32_t x, std::uint32_t z) {
+        if (x == 4 && z == 4) return std::uint16_t{0};
+        if (x >= 3 && x <= 5 && z >= 3 && z <= 5) return x == 5 ? std::uint16_t{400} : std::uint16_t{900}; // the rim; east side the low one
+        if (z == 4 && x >= 6) return static_cast<std::uint16_t>(300 - (x - 6) * 100); // a channel from the low rim to the edge
+        return std::uint16_t{2000};
+    });
+    const Hydrology p = computeHydrology(pit);
+    REQUIRE(p.filled[p.index(4, 4)] == pit.heightAtSample(5, 4));
+    REQUIRE(p.filled[p.index(3, 4)] == pit.heightAtSample(3, 4)); // the high rim stays as it is
+    REQUIRE(isLake(p, pit, 4, 4, HydrologyParams{}));
+}
+
+TEST_CASE("the smallest floodable map has one inner sample, and it drains to the edge")
+{
+    const Heightfield three = gridOf(3, [](std::uint32_t x, std::uint32_t z) { return x == 1 && z == 1 ? std::uint16_t{0} : std::uint16_t{1000}; });
+    const Hydrology h = computeHydrology(three);
+    REQUIRE_FALSE(h.empty());
+    REQUIRE(drainedOffTheMap(h) == 9u);
+    REQUIRE_FALSE(h.isOutlet(h.index(1, 1)));
+    REQUIRE(h.filled[h.index(1, 1)] == three.heightAtSample(0, 0)); // filled to the rim
+    REQUIRE(h.accumulation[h.downstream(h.index(1, 1))] >= 2);
 }

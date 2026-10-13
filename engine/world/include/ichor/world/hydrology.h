@@ -20,7 +20,13 @@ struct HydrologyParams {
 // construction, so every river ends at the edge of the map or in a lake the flood filled, and
 // none can run uphill or stop in the middle of nowhere.
 //
-// The result depends only on the heights. Ties are broken by the order samples were reached.
+// The result depends only on the heights. Ties are broken by the order samples were reached, so
+// across a flat or a lake the water drains in a wave out from the spill point: deterministic,
+// not steepest descent, and a diagonal neighbour is chosen on height alone, not slope per metre.
+// Accumulation counts samples, not area.
+//
+// The working set is about 16 bytes per sample plus the frontier: roughly 1 GB at the largest
+// world WorldDesc allows (8193 samples a side), a few tens of MB for the 4 km world.
 class Hydrology {
 public:
     static constexpr std::uint8_t kOutlet = 255; // drains off the map
@@ -38,6 +44,7 @@ public:
     std::size_t index(std::uint32_t sx, std::uint32_t sz) const { return static_cast<std::size_t>(sz) * side + sx; }
 
     // The sample a sample drains to, or the sample itself at an outlet.
+    // downstream and isOutlet need a computed result and a sample inside it.
     std::size_t downstream(std::size_t from) const;
     bool isOutlet(std::size_t sample) const { return direction[sample] == kOutlet; }
 };
