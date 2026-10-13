@@ -122,13 +122,14 @@ Mesh simplifyLod(const Mesh& full, float spacing, std::size_t reduction)
 
 }
 
-void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, const StreamerConfig& config, CellPayload& out)
+void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, const StreamerConfig& config, CellPayload& out, const Hydrology* hydrology)
 {
     const std::uint32_t lodCount = config.lodCount;
     heightfield.cell(id, out.cell);
     out.lods.clear();
     out.nav.data.clear();
     out.plants.clear();
+    out.water = Mesh{};
     if (lodCount > 0) {
         out.lods.push_back(buildLod(heightfield, out.cell, 1));
     }
@@ -139,6 +140,9 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     }
     if (config.vegetation) {
         scatterVegetation(heightfield, id, config.plants, out.plants);
+    }
+    if (config.water && hydrology != nullptr) {
+        out.water = buildWaterMesh(heightfield, *hydrology, config.rivers, id, config.waterMesh);
     }
     if (config.navmesh && !buildNavTile(heightfield, id, config.nav, out.nav)) {
         logf(LogLevel::Warn, "navmesh: cell {},{} failed to build", id.x, id.z);
@@ -169,6 +173,11 @@ WorldStreamer::~WorldStreamer()
 
 void WorldStreamer::worker()
 {
+    // The whole world's drainage takes a while and is only read here, so it is worked out here, off
+    // the game thread, before the first cell is built.
+    if (config_.water) {
+        hydrology_ = computeHydrology(heightfield_);
+    }
     for (;;) {
         CellId id;
         std::uint64_t generation = 0;
@@ -183,7 +192,7 @@ void WorldStreamer::worker()
             generation = generation_;
         }
         auto payload = std::make_unique<CellPayload>();
-        buildPayload(heightfield_, id, config_, *payload);
+        buildPayload(heightfield_, id, config_, *payload, config_.water ? &hydrology_ : nullptr);
         const std::lock_guard lock(mutex_);
         if (generation == generation_) {
             finished_[id] = std::move(payload);
@@ -198,8 +207,11 @@ void WorldStreamer::request(CellId id)
     }
     requested_.insert(id);
     if (config_.synchronous) {
+        if (config_.water && hydrology_.empty()) {
+            hydrology_ = computeHydrology(heightfield_);
+        }
         auto payload = std::make_unique<CellPayload>();
-        buildPayload(heightfield_, id, config_, *payload);
+        buildPayload(heightfield_, id, config_, *payload, config_.water ? &hydrology_ : nullptr);
         finished_[id] = std::move(payload);
         return;
     }

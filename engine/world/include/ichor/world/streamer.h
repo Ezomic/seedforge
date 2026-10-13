@@ -2,6 +2,8 @@
 
 #include "ichor/assets/bundle.h"
 #include "ichor/world/heightfield.h"
+#include "ichor/world/hydrology.h"
+#include "ichor/world/water_mesh.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
 
@@ -27,6 +29,7 @@ struct CellPayload {
     std::vector<Mesh> lods; // 0 is full resolution
     NavTile nav;            // empty when navmeshes are off or the cell has nothing to walk on
     std::vector<VegetationInstance> plants; // empty when vegetation is off
+    Mesh water;             // the cell's rivers and lakes; no vertices when water is off or the cell is dry
 };
 
 struct StreamerConfig {
@@ -40,6 +43,9 @@ struct StreamerConfig {
     NavParams nav;
     bool vegetation = false; // scatter trees per cell beside its meshes
     VegetationParams plants;
+    bool water = false; // work out where the water runs over the whole world once, and build each cell's rivers and lakes
+    HydrologyParams rivers;
+    WaterMeshParams waterMesh;
 };
 
 // Keeps the cells around the player resident, building them on a worker
@@ -73,7 +79,8 @@ public:
     // Drops everything, synchronously.
     void clear();
 
-    static void buildPayload(const Heightfield& heightfield, CellId id, const StreamerConfig& config, CellPayload& out);
+    // `hydrology` is the world's, for a config that asks for water; without one there is none.
+    static void buildPayload(const Heightfield& heightfield, CellId id, const StreamerConfig& config, CellPayload& out, const Hydrology* hydrology = nullptr);
 
 private:
     void worker();
@@ -81,6 +88,7 @@ private:
 
     const Heightfield& heightfield_;
     StreamerConfig config_;
+    Hydrology hydrology_; // empty unless the config asks for water; written by whichever thread builds cells, before the first build
     Loaded loaded_;
     Unloaded unloaded_;
     std::set<CellId> resident_;
