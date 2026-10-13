@@ -217,6 +217,13 @@ engine. Each is gated on its tests, not on a feeling.
 | **E6** | **Content layer.** Lua host, RPG data layer from `data/`, RmlUi screens, the ledger as the save file | the 500 m slice from doc 18 is playable |
 | **E7** | **Atmosphere.** Time of day, sky, fog, weather, vegetation instancing, reverb stamps, then the editor | doc 16's unification stack is implemented |
 
+Status: E1 through E6 are merged apart from the pieces listed here, and E7 is mostly done.
+The Stage 0 gate has not been run by a human yet. Still open:
+
+- E6: RmlUi screens in the window (no font chosen, so no text), and the doc 18 500 m slice itself.
+- E7: volumetric fog, vegetation impostors, and editor tools for kits and dungeons.
+- The window paths (`--editor`, time of day and weather in the app, the UI renderer) are covered by offscreen golden images and headless tests but have never been run in a real window.
+
 In parallel, engine-independent and startable today:
 
 1. **NumPy generator, phases 1–6**, with PNG output
