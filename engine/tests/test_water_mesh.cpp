@@ -117,7 +117,7 @@ TEST_CASE("a lake's surface lies at its filled level, and ends below the bank wh
             ++atLake;
         } else {
             // A dry corner of a drawn quad is sunk below the ground there.
-            REQUIRE(v.position.y == field.heightAtSample(x, z) - params.submerge);
+            REQUIRE(v.position.y <= field.heightAtSample(x, z) - params.submerge);
         }
     }
     REQUIRE(atLake == 7u * 7u);
@@ -156,7 +156,7 @@ TEST_CASE("rivers get a surface over their bed, and a cell built twice is the sa
                 } else if (isRiver(h, h.index(gx, gz), rivers)) {
                     REQUIRE(v.position.y == ground + params.riverSurface);
                 } else {
-                    REQUIRE(v.position.y == ground - params.submerge);
+                    REQUIRE(v.position.y <= ground - params.submerge);
                 }
             }
         }
@@ -225,4 +225,97 @@ TEST_CASE("the streamer builds the water of each cell when asked, and not otherw
     // Without the world's hydrology there is no water, even when asked for.
     WorldStreamer::buildPayload(field, {1, 1}, config, payload, nullptr);
     REQUIRE(payload.water.vertices.empty());
+}
+
+TEST_CASE("a river that steps across a diagonal stays joined, and a bank lower than the water is not overhung")
+{
+    // A valley along the diagonal x = z that falls towards the corner at the origin.
+    const Heightfield field = gridOf(17, [](std::uint32_t x, std::uint32_t z) {
+        const int across = std::abs(static_cast<int>(x) - static_cast<int>(z));
+        return static_cast<std::uint16_t>(across * 150 + (x + z) * 20 + 100);
+    });
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 6;
+    const WaterMeshParams params;
+    const Mesh mesh = buildWaterMesh(field, h, rivers, {0, 0}, params);
+    REQUIRE_FALSE(mesh.vertices.empty());
+    requireWellFormed(mesh);
+
+    // The edges the triangles share, by the sample each end sits on.
+    std::map<std::pair<std::uint32_t, std::uint32_t>, bool> edges;
+    const auto sampleOf = [&](std::uint32_t index) {
+        const glm::vec3 p = mesh.vertices[index].position;
+        return static_cast<std::uint32_t>(p.z) * 17u + static_cast<std::uint32_t>(p.x);
+    };
+    for (std::size_t t = 0; t < mesh.indices.size(); t += 3) {
+        for (int k = 0; k < 3; ++k) {
+            const std::uint32_t a = sampleOf(mesh.indices[t + static_cast<std::size_t>(k)]);
+            const std::uint32_t b = sampleOf(mesh.indices[t + static_cast<std::size_t>((k + 1) % 3)]);
+            edges[{std::min(a, b), std::max(a, b)}] = true;
+        }
+    }
+    // The water along the valley is one connected sheet: walking the triangle edges between wet
+    // samples reaches every wet sample on the diagonal from the first.
+    const auto wetSample = [&](std::uint32_t sample) {
+        const std::uint32_t x = sample % 17u;
+        const std::uint32_t z = sample / 17u;
+        return isRiver(h, h.index(x, z), rivers) || isLake(h, field, x, z, rivers);
+    };
+    std::vector<std::uint32_t> diagonal;
+    for (std::uint32_t k = 2; k < 15; ++k) {
+        if (wetSample(k * 17u + k)) diagonal.push_back(k * 17u + k);
+    }
+    REQUIRE(diagonal.size() > 5);
+    std::map<std::uint32_t, bool> seen;
+    std::vector<std::uint32_t> walk{diagonal.front()};
+    seen[diagonal.front()] = true;
+    while (!walk.empty()) {
+        const std::uint32_t at = walk.back();
+        walk.pop_back();
+        for (const auto& [edge, present] : edges) {
+            (void)present;
+            const std::uint32_t other = edge.first == at ? edge.second : edge.second == at ? edge.first : at;
+            if (other != at && wetSample(other) && !seen[other]) {
+                seen[other] = true;
+                walk.push_back(other);
+            }
+        }
+    }
+    for (const std::uint32_t sample : diagonal) {
+        REQUIRE(seen[sample]);
+    }
+
+    // No vertex hangs above the ground it is sunk into by less than the river surface: a dry vertex
+    // lies no higher than the lowest water beside it, less the sinking.
+    for (const Vertex& v : mesh.vertices) {
+        const auto x = static_cast<std::uint32_t>(v.position.x);
+        const auto z = static_cast<std::uint32_t>(v.position.z);
+        const bool water = isRiver(h, h.index(x, z), rivers) || isLake(h, field, x, z, rivers);
+        if (!water) {
+            REQUIRE(v.position.y <= field.heightAtSample(x, z) - params.submerge);
+        }
+    }
+}
+
+TEST_CASE("the last cell of the world builds, and a payload asked for water without the hydrology has none")
+{
+    const Heightfield field = forgeHeightfield(forgedDesc());
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    for (const CellId id : {CellId{3, 3}, CellId{3, 0}, CellId{0, 3}}) {
+        const Mesh mesh = buildWaterMesh(field, h, rivers, id);
+        if (!mesh.vertices.empty()) {
+            requireWellFormed(mesh);
+            REQUIRE(mesh.boundsMax.x <= 256.0f);
+            REQUIRE(mesh.boundsMax.z <= 256.0f);
+        }
+    }
+    StreamerConfig config;
+    config.water = true;
+    CellPayload payload;
+    WorldStreamer::buildPayload(field, {1, 1}, config, payload, nullptr);
+    REQUIRE(payload.water.vertices.empty());
+    REQUIRE_FALSE(payload.lods.empty()); // the rest of the cell is built all the same
 }

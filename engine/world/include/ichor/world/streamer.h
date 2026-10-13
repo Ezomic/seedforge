@@ -88,7 +88,7 @@ private:
 
     const Heightfield& heightfield_;
     StreamerConfig config_;
-    Hydrology hydrology_; // empty unless the config asks for water
+    Hydrology hydrology_; // empty unless the config asks for water; written by whichever thread builds cells, before the first build
     Loaded loaded_;
     Unloaded unloaded_;
     std::set<CellId> resident_;
