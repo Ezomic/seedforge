@@ -46,6 +46,9 @@ struct StreamerConfig {
     bool water = false; // work out where the water runs over the whole world once, and build each cell's rivers and lakes
     HydrologyParams rivers;
     WaterMeshParams waterMesh;
+    // The world's hydrology, when the caller has worked it out already (for a WaterField, say), so it
+    // is not worked out twice. Without it the streamer works it out itself.
+    std::shared_ptr<const Hydrology> hydrology;
 };
 
 // Keeps the cells around the player resident, building them on a worker
@@ -84,6 +87,7 @@ public:
 
 private:
     void worker();
+    const Hydrology* activeHydrology() const; // null unless the config asks for water
     void request(CellId id);
 
     const Heightfield& heightfield_;

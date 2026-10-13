@@ -24,6 +24,7 @@ add_executable(ichor_tests
     test_vegetation.cpp
     test_hydrology.cpp
     test_water_mesh.cpp
+    test_water_field.cpp
     test_reverb.cpp
     test_editor.cpp
     test_weather.cpp

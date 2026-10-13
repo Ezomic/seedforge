@@ -8,6 +8,7 @@ add_library(ichor_world
     src/world_io.cpp
     src/streamer.cpp
     src/vegetation.cpp
+    src/water_field.cpp
     src/water_mesh.cpp
     src/weather.cpp
 )

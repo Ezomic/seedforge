@@ -171,11 +171,19 @@ WorldStreamer::~WorldStreamer()
     }
 }
 
+const Hydrology* WorldStreamer::activeHydrology() const
+{
+    if (!config_.water) {
+        return nullptr;
+    }
+    return config_.hydrology ? config_.hydrology.get() : &hydrology_;
+}
+
 void WorldStreamer::worker()
 {
     // The whole world's drainage takes a while and is only read here, so it is worked out here, off
     // the game thread, before the first cell is built.
-    if (config_.water) {
+    if (config_.water && !config_.hydrology) {
         hydrology_ = computeHydrology(heightfield_);
     }
     for (;;) {
@@ -192,7 +200,7 @@ void WorldStreamer::worker()
             generation = generation_;
         }
         auto payload = std::make_unique<CellPayload>();
-        buildPayload(heightfield_, id, config_, *payload, config_.water ? &hydrology_ : nullptr);
+        buildPayload(heightfield_, id, config_, *payload, activeHydrology());
         const std::lock_guard lock(mutex_);
         if (generation == generation_) {
             finished_[id] = std::move(payload);
@@ -207,11 +215,11 @@ void WorldStreamer::request(CellId id)
     }
     requested_.insert(id);
     if (config_.synchronous) {
-        if (config_.water && hydrology_.empty()) {
+        if (config_.water && !config_.hydrology && hydrology_.empty()) {
             hydrology_ = computeHydrology(heightfield_);
         }
         auto payload = std::make_unique<CellPayload>();
-        buildPayload(heightfield_, id, config_, *payload, config_.water ? &hydrology_ : nullptr);
+        buildPayload(heightfield_, id, config_, *payload, activeHydrology());
         finished_[id] = std::move(payload);
         return;
     }
