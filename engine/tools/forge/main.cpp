@@ -17,13 +17,13 @@ bool parseU32(std::string_view text, std::uint32_t& out)
 
 }
 
-// ichor_forge <out dir> <seed> [size] [metresPerSample] [cellMetres]
+// ichor_forge <out dir> <seed> [size] [metresPerSample] [cellMetres] [waterHeight]
 // Writes manifest.iworld, heightmap.r16 and terrain.iscene. Stands in for
 // libworldforge until the real phases exist; the layout is the shipped one.
 int main(int argc, char** argv)
 {
     if (argc < 3) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor_forge <out dir> <seed> [sizeMetres] [metresPerSample] [cellMetres]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor_forge <out dir> <seed> [sizeMetres] [metresPerSample] [cellMetres] [waterHeight]");
         return 2;
     }
     ichor::WorldDesc desc;
@@ -33,6 +33,11 @@ int main(int argc, char** argv)
     if (argc > 3 && !parseU32(argv[3], desc.sizeMetres)) return 2;
     if (argc > 4 && !parseU32(argv[4], desc.metresPerSample)) return 2;
     if (argc > 5 && !parseU32(argv[5], desc.cellMetres)) return 2;
+    if (argc > 6) {
+        std::uint32_t water = 0;
+        if (!parseU32(argv[6], water)) return 2;
+        desc.waterHeight = static_cast<float>(water);
+    }
     if (!desc.valid()) {
         ichor::log(ichor::LogLevel::Error, "the world description is not valid");
         return 2;

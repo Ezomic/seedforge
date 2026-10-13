@@ -17,6 +17,9 @@ struct WorldDesc {
     std::uint32_t cellMetres = 512;
     float minHeight = 0.0f;   // metres, what a sample of 0 means
     float heightRange = 400.0f; // metres, what a sample of 65535 adds
+    float waterHeight = 0.0f;   // metres above minHeight where the water lies; zero or less is a dry world
+    float waterLevel() const { return minHeight + waterHeight; }
+    bool hasWater() const { return waterHeight > 0.0f; }
 
     std::uint32_t samplesPerSide() const { return sizeMetres / metresPerSample + 1; }
     std::uint32_t cellsPerSide() const { return sizeMetres / cellMetres; }
@@ -33,7 +36,8 @@ struct Reflect<WorldDesc> {
     static constexpr auto fields()
     {
         return std::make_tuple(field("seed", &WorldDesc::seed), field("sizeMetres", &WorldDesc::sizeMetres), field("metresPerSample", &WorldDesc::metresPerSample),
-            field("cellMetres", &WorldDesc::cellMetres), field("minHeight", &WorldDesc::minHeight), field("heightRange", &WorldDesc::heightRange));
+            field("cellMetres", &WorldDesc::cellMetres), field("minHeight", &WorldDesc::minHeight), field("heightRange", &WorldDesc::heightRange),
+            field("waterHeight", &WorldDesc::waterHeight));
     }
 };
 
