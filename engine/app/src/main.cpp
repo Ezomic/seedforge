@@ -7,6 +7,7 @@
 #include "ichor/core/log.h"
 #include "ichor/editor/panels.h"
 #include "ichor/ui/hud.h"
+#include "ichor/world/palette.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
@@ -436,6 +437,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     // The game UI draws through the window renderer; headless runs have none. The context goes
     // before the HUD so the HUD, which borrows it, goes first.
+    const ichor::Palette palette = ichor::defaultPalette();
     std::unique_ptr<ichor::UiContext> ui;
     std::unique_ptr<ichor::Hud> hud;
     std::unique_ptr<ichor::Ledger> ledger;
@@ -493,6 +495,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
+            ichor::applyPalette(palette, view);
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();

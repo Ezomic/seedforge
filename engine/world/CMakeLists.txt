@@ -3,6 +3,7 @@ add_library(ichor_world
     src/forge.cpp
     src/heightfield.cpp
     src/navmesh.cpp
+    src/palette.cpp
     src/world_io.cpp
     src/streamer.cpp
     src/vegetation.cpp

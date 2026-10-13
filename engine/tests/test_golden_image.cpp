@@ -1,3 +1,4 @@
+#include "ichor/world/palette.h"
 #include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
@@ -312,7 +313,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -355,6 +356,9 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     applyWeather(weather, atmosphere);
     applyAtmosphere(atmosphere, view);
     view.time = 1.25f;
+    if (graded) {
+        applyPalette(defaultPalette(), view);
+    }
     const glm::dvec3 eye(centre - 60.0, heightfield.heightAt(centre - 60.0, centre + 90.0) + 25.0, centre + 90.0);
     if (water) {
         // Flood the hollows: a few metres over the lowest ground along the line of sight.
@@ -613,4 +617,9 @@ TEST_CASE("golden image: the ledger over the world")
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the default palette over the forest")
+{
+    checkTerrainAtHour(15.0f, "terrain_graded", true, {}, false, false, true);
 }

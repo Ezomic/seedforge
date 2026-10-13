@@ -22,6 +22,10 @@ struct FrameData {
     float4 shaftParams;     // x light shaft strength (0 is off), y scattering anisotropy
     float4 waterColor;      // rgb colour of deep water, w 0 when there is no water
     float4 waterParams;     // x height of the surface in world metres
+    float4 gradeParams;     // x saturation, y contrast, z exposure
+    float4 gradeShadows;    // rgb multiplier on the dark end
+    float4 gradeHighlights; // rgb multiplier on the bright end
+    float4 materialParams;  // x roughness min, y roughness max, z albedo min, w albedo max
 };
 
 struct PushData {
@@ -49,8 +53,16 @@ float3 underwaterColor()
 
 float4 toneMap(float3 color)
 {
+    color = color * frame.gradeParams.z;
     color = color / (color + 1.0);
-    return float4(pow(color, 1.0 / 2.2), 1.0);
+    // The grade works on the display-referred picture: saturation, then contrast around middle
+    // grey, then the split tone, which tints the dark end and the bright end differently.
+    const float luma = dot(color, float3(0.2126, 0.7152, 0.0722));
+    color = lerp(float3(luma, luma, luma), color, frame.gradeParams.x);
+    color = saturate((color - 0.5) * frame.gradeParams.y + 0.5);
+    const float tone = saturate(dot(color, float3(0.2126, 0.7152, 0.0722)));
+    color *= lerp(frame.gradeShadows.rgb, frame.gradeHighlights.rgb, tone);
+    return float4(pow(saturate(color), 1.0 / 2.2), 1.0);
 }
 
 // How far the wind pushes a point of a tree sideways, on the ground plane. Bends more
