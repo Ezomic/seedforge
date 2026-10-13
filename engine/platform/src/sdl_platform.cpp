@@ -57,6 +57,7 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_SPACE]) frame.buttons |= InputFrame::Dodge;
     if (keys[SDL_SCANCODE_F5]) frame.buttons |= InputFrame::QuickSave;
     if (keys[SDL_SCANCODE_F9]) frame.buttons |= InputFrame::QuickLoad;
+    if (keys[SDL_SCANCODE_TAB]) frame.buttons |= InputFrame::Journal;
     input_ = frame;
 }
 

@@ -1,3 +1,4 @@
+#include "ichor/ui/ledger.h"
 #include "ichor/ui/hud.h"
 #include "ichor/ui/recording_renderer.h"
 #include "ichor/ui/ui_context.h"
@@ -295,4 +296,71 @@ TEST_CASE("the HUD draws the compass and clock and only relays out when the text
     hud.update(3.9f, 17.5f);
     frame(ui, renderer, 0.2);
     REQUIRE(renderer.draws().size() >= 3);
+}
+
+TEST_CASE("the ledger escapes markup so an entry can never act as a document")
+{
+    REQUIRE(escapeRml("plain text") == "plain text");
+    REQUIRE(escapeRml("a < b && c > \"d\"") == "a &lt; b &amp;&amp; c &gt; &quot;d&quot;");
+    REQUIRE(escapeRml("<div id=\"list\">x</div>") == "&lt;div id=&quot;list&quot;&gt;x&lt;/div&gt;");
+}
+
+TEST_CASE("the ledger draws nothing until shown, then its card and rows, and only relays out when the rows change")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Ledger ledger(ui);
+    REQUIRE(ledger.ok());
+    REQUIRE_FALSE(ledger.visible());
+
+    ledger.setRows({{"0:01:05", "quest", "Took the ash to the ferryman."}});
+    frame(ui, renderer, 0.0);
+    REQUIRE(renderer.draws().empty());
+
+    ledger.setVisible(true);
+    frame(ui, renderer, 0.1);
+    const std::size_t shown = renderer.draws().size();
+    REQUIRE(shown >= 3);
+
+    ledger.setRows({{"0:01:05", "quest", "Took the ash to the ferryman."}});
+    frame(ui, renderer, 0.2);
+    REQUIRE(renderer.draws().size() == shown);
+
+    // A hostile entry is text on the card, not a second card.
+    ledger.setRows({{"0:02:00", "note", "<div style=\"background-color: #ff0000; width: 900px; height: 900px\">x</div>"}});
+    frame(ui, renderer, 0.3);
+    REQUIRE_FALSE(drewColour(renderer, 255, 0, 0));
+
+    ledger.setVisible(false);
+    frame(ui, renderer, 0.4);
+    REQUIRE(renderer.draws().empty());
+}
+
+TEST_CASE("an empty ledger says so, and rows beyond the card's room are left off")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Ledger ledger(ui);
+    ledger.setVisible(true);
+    ledger.setRows({});
+    frame(ui, renderer, 0.0);
+    const std::size_t empty = renderer.draws().size();
+    REQUIRE(empty >= 2);
+
+    std::vector<LedgerRow> many(40, LedgerRow{"0:00:01", "note", "a line"});
+    ledger.setRows(many);
+    frame(ui, renderer, 0.1);
+    const std::size_t full = renderer.draws().size();
+    ledger.setRows(std::vector<LedgerRow>(Ledger::kMaxRows, LedgerRow{"0:00:01", "note", "a line"}));
+    frame(ui, renderer, 0.2);
+    REQUIRE(renderer.draws().size() == full); // the same twelve rows
+    REQUIRE(full > empty);
 }
