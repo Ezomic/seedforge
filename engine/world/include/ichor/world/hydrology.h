@@ -7,6 +7,10 @@
 
 namespace ichor {
 
+// The deepest basin a world lets stand as a lake; the forge and the game both use it, so the rivers
+// carved through deeper basins are the ones the game does not draw a lake over.
+constexpr float kPlayableLakeDepth = 10.0f;
+
 struct HydrologyParams {
     // A sample is a river when this many samples (itself included) drain through it.
     std::uint32_t riverThreshold = 2000;
@@ -45,6 +49,7 @@ public:
     std::vector<std::uint32_t> accumulation;
     // The lake a sample lies under, counting from one, or zero when it is dry: a run of samples
     // with the same filled level above the ground. lakeDeepest[id - 1] is the deepest point of lake id.
+    // Basins that touch edge to edge at one level count as one lake.
     std::vector<std::uint32_t> lake;
     std::vector<float> lakeDeepest;
 

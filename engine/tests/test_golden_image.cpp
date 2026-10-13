@@ -315,7 +315,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false, bool lakes = false)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -324,12 +324,6 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
     Heightfield heightfield;
     REQUIRE(readWorld(worldDir, heightfield));
-    HydrologyParams lakeParams;
-    lakeParams.maxLakeDepth = 10.0f;
-    Hydrology hydrology;
-    if (lakes) {
-        hydrology = computeHydrology(heightfield);
-    }
     SceneBundle layers;
     REQUIRE(readBundle(worldDir / "terrain.iscene", layers));
     REQUIRE(renderer.setTerrainMaterials(layers));
@@ -350,12 +344,6 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
             REQUIRE(handle != Renderer::kNoHandle);
             const int ring = std::max(std::abs(dx), std::abs(dz));
             view.terrain.push_back({handle, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}, static_cast<std::uint32_t>(std::min(ring, 2))});
-            if (lakes) {
-                const std::uint32_t surface = renderer.uploadWaterCell(buildWaterMesh(heightfield, hydrology, lakeParams, id));
-                if (surface != Renderer::kNoHandle) {
-                    view.waterCells.push_back({surface, {heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)}});
-                }
-            }
             if (vegetation) {
                 std::vector<PlantInstance> plants;
                 scatterVegetation(heightfield, id, VegetationParams{}, plants);
@@ -709,7 +697,87 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
     CHECK(diff.fractionBad < 0.005);
 }
 
-TEST_CASE("golden image: the rivers and lakes of the forged world")
+TEST_CASE("golden image: the biggest river of the forged world")
 {
-    checkTerrainAtHour(15.0f, "terrain_lakes", true, {}, false, false, true, true);
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
+    Heightfield heightfield;
+    REQUIRE(readWorld(worldDir, heightfield));
+    SceneBundle layers;
+    REQUIRE(readBundle(worldDir / "terrain.iscene", layers));
+    REQUIRE(renderer.setTerrainMaterials(layers));
+
+    // The wettest dry-land sample not at the map's edge: where the most water gathers into a river.
+    HydrologyParams rivers;
+    rivers.maxLakeDepth = kPlayableLakeDepth;
+    const Hydrology hydrology = computeHydrology(heightfield);
+    const std::uint32_t side = hydrology.side;
+    std::size_t best = 0;
+    for (std::uint32_t z = 16; z + 16 < side; ++z) {
+        for (std::uint32_t x = 16; x + 16 < side; ++x) {
+            const std::size_t i = hydrology.index(x, z);
+            if (hydrology.lake[i] == 0 && hydrology.accumulation[i] > hydrology.accumulation[best]) {
+                best = i;
+            }
+        }
+    }
+    REQUIRE(isRiver(hydrology, best, rivers));
+    const double metres = heightfield.desc().metresPerSample;
+    const double targetX = static_cast<double>(best % side) * metres;
+    const double targetZ = static_cast<double>(best / side) * metres;
+
+    RenderView view;
+    const CellId home = heightfield.cellAt(targetX, targetZ);
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const CellId id{home.x + dx, home.z + dz};
+            if (!heightfield.contains(id)) continue;
+            const glm::dvec3 origin{heightfield.cellOriginX(id), 0.0, heightfield.cellOriginZ(id)};
+            CellPayload payload;
+            WorldStreamer::buildPayload(heightfield, id, StreamerConfig{}, payload);
+            const std::uint32_t handle = renderer.uploadTerrainCell(payload.lods);
+            REQUIRE(handle != Renderer::kNoHandle);
+            view.terrain.push_back({handle, origin, (dx == 0 && dz == 0) ? 0u : 1u});
+            const std::uint32_t surface = renderer.uploadWaterCell(buildWaterMesh(heightfield, hydrology, rivers, id));
+            if (surface != Renderer::kNoHandle) {
+                view.waterCells.push_back({surface, origin});
+            }
+        }
+    }
+    REQUIRE_FALSE(view.waterCells.empty());
+    applyAtmosphere(atmosphereAt(15.0f), view);
+    view.time = 1.25f;
+    applyPalette(defaultPalette(), view);
+    const glm::dvec3 target(targetX, heightfield.heightAt(targetX, targetZ), targetZ);
+    const glm::dvec3 eye(targetX - 45.0, heightfield.heightAt(targetX - 45.0, targetZ + 45.0) + 18.0, targetZ + 45.0);
+    view.camera.position = eye;
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+    view.camera.farPlane = 2500.0f;
+
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "terrain_river.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "terrain_river.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect terrain_river.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "terrain_river.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
 }

@@ -22,8 +22,13 @@ float4 shadeWater(float3 position, float2 pixel)
     const float travelled = length(position);
     const float3 direction = position / max(travelled, 1e-4);
     const float2 slope = ripple(position.xz + frame.cameraWorld.xz, frame.skyParams.z, travelled);
-    const float3 normal = normalize(float3(-slope.x, 1.0, -slope.y));
+    float3 normal = normalize(float3(-slope.x, 1.0, -slope.y));
     const float3 view = -direction;
+    // A surface seen from underneath, such as a river on a hillside above the viewer, is shaded
+    // from its other side, so it reads as water and not as a bright mirror.
+    if (dot(normal, view) < 0.0) {
+        normal = -normal;
+    }
     const float cosView = saturate(dot(normal, view));
     const float fresnel = 0.02 + 0.98 * pow(1.0 - cosView, 5.0);
 

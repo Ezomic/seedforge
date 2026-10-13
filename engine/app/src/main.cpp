@@ -246,7 +246,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
     streaming.vegetation = !options.headless;
     streaming.water = !options.headless;
-    streaming.rivers.maxLakeDepth = 10.0f; // deeper basins are the terrain's artefacts, not lakes
+    streaming.rivers.maxLakeDepth = ichor::kPlayableLakeDepth; // deeper basins are the terrain's artefacts, not lakes
     const auto ringSide = static_cast<std::uint32_t>(2 * (streaming.radiusCells + streaming.hysteresisCells) + 1);
     ichor::NavWorld navigation;
     if (!heightfield.empty() && !navigation.init(heightfield.desc(), ringSide * ringSide)) {
