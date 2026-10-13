@@ -359,6 +359,11 @@ void VulkanRenderer::endFrame()
     }
     ImGui::Render();
 
+    const bool uiLive = v.ui != nullptr && uiRender_ && v.swapchain.extent.width > 0 && v.swapchain.extent.height > 0;
+    if (uiLive && uiUpdate_) {
+        uiUpdate_(v.swapchain.extent.width, v.swapchain.extent.height);
+    }
+
     VkCommandBuffer cmd = v.commandBuffers[v.frame];
     vkResetCommandBuffer(cmd, 0);
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
@@ -378,9 +383,9 @@ void VulkanRenderer::endFrame()
     v.scene->render(cmd, v.frame, view, v.swapchainViews[v.imageIndex], v.depth.view, v.swapchain.extent,
         [&](VkCommandBuffer overlayCmd) {
             // The game UI first, so the debug overlay and the editor stay on top of it.
-            if (uiHook_ && v.ui != nullptr) {
+            if (uiLive) {
                 v.ui->begin(overlayCmd, v.swapchain.extent);
-                uiHook_();
+                uiRender_();
                 v.ui->end();
             }
             ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), overlayCmd);

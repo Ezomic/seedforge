@@ -444,10 +444,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
         const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
         bool fontsLoaded = ui->ok();
-        for (const char* file : {"AlegreyaSans-Regular.ttf", "AlegreyaSans-Bold.ttf", "Cinzel.ttf"}) {
+        for (const char* file : {"AlegreyaSans-Regular.ttf", "Cinzel.ttf"}) {
             fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
         }
-        hud = std::make_unique<ichor::Hud>(*ui);
+        if (fontsLoaded) {
+            hud = std::make_unique<ichor::Hud>(*ui);
+        }
         if (!fontsLoaded || !hud->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             hud.reset();
@@ -455,13 +457,14 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
     }
     if (ui) {
-        renderer.setUiHook([&] {
-            const ichor::Extent size = platform.drawableSize();
-            ui->setSize(static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
-            hud->update(hudHeading, hudHour);
-            ui->update(platform.now());
-            ui->render();
-        });
+        // The simulation clock drives the UI, so a replay sees the same animations.
+        renderer.setUiHooks(
+            [&](std::uint32_t width, std::uint32_t height) {
+                ui->setSize(width, height);
+                hud->update(hudHeading, hudHour);
+                ui->update(engine.scene().time());
+            },
+            [&] { ui->render(); });
     }
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
@@ -469,12 +472,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
         view.camera = reference.camera;
+        const float hour = editing && editorEnvironment.overrideTime ? editorEnvironment.hour : ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
+        hudHour = hour;
         if (!heightfield.empty()) {
             view.camera.farPlane = 2500.0f;
             // Time of day follows the tick, so it needs no saved state and a replay sees the same sky.
             // Weather follows the hours since the world began, so it needs no saved state either.
             // The editor can pin either one.
-            const float hour = editing && editorEnvironment.overrideTime ? editorEnvironment.hour : ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
             ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
@@ -482,7 +486,6 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
             view.waterLevel = options.waterLevel.value_or(heightfield.desc().waterLevel());
-            hudHour = hour;
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -521,7 +524,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         {
             // Looking down -Z is north, and the heading turns clockwise from it.
             const glm::vec3 forward = view.camera.rotation * glm::vec3(0.0f, 0.0f, -1.0f);
-            hudHeading = std::atan2(forward.x, -forward.z);
+            hudHeading = ichor::headingOf(forward.x, forward.z);
         }
         std::vector<ichor::LineSegment> colliders;
         scene.physics().debugLines(colliders);
@@ -645,7 +648,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
 
     renderer.setGuiHook({}); // the panels are about to go out of scope
-    renderer.setUiHook({});  // and so are the UI and the HUD
+    renderer.setUiHooks({}, {}); // and so are the UI and the HUD
     if (!options.record.empty() && !engine.recordedInputs().save(options.record)) {
         return 1;
     }

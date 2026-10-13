@@ -58,11 +58,17 @@ public:
     // windows. Renderers without a UI ignore it.
     virtual void setGuiHook(std::function<void()> hook) { (void)hook; }
 
-    // The game UI: the interface RmlUi draws through, null where there is no window, and a
-    // hook called each frame inside the open pass, under the debug overlay, in which the
-    // caller renders its UI context.
+    // The game UI: the interface RmlUi draws through, null where there is no window. Each
+    // frame `update` is called with the size of what is drawn into, outside any pass, so the
+    // caller can resize and lay out its UI context (which may upload textures); then `render`
+    // is called inside the open pass, under the debug overlay. Neither runs while the
+    // drawable is empty, as when the window is minimised.
     virtual Rml::RenderInterface* uiRenderInterface() { return nullptr; }
-    virtual void setUiHook(std::function<void()> hook) { (void)hook; }
+    virtual void setUiHooks(std::function<void(std::uint32_t, std::uint32_t)> update, std::function<void()> render)
+    {
+        (void)update;
+        (void)render;
+    }
 };
 
 }

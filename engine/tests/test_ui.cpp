@@ -2,9 +2,11 @@
 #include "ichor/ui/recording_renderer.h"
 #include "ichor/ui/ui_context.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <memory>
 
@@ -13,6 +15,7 @@
 #include <RmlUi/Core/SystemInterface.h>
 
 using namespace ichor;
+using Catch::Approx;
 
 namespace {
 
@@ -241,6 +244,20 @@ TEST_CASE("the compass names the eight points and wraps")
     // The point holds for a stretch either side of it.
     REQUIRE(compassLabel(0.3f) == "N");
     REQUIRE(compassLabel(0.5f) == "NE");
+}
+
+TEST_CASE("the heading of a view follows the compass and bad numbers read as north")
+{
+    constexpr float kQuarter = 1.57079632679f;
+    REQUIRE(headingOf(0.0f, -1.0f) == 0.0f);
+    REQUIRE(headingOf(1.0f, 0.0f) == Approx(kQuarter));
+    REQUIRE(std::abs(headingOf(0.0f, 1.0f)) == Approx(kQuarter * 2.0f));
+    REQUIRE(headingOf(-1.0f, 0.0f) == Approx(-kQuarter));
+    REQUIRE(compassLabel(headingOf(1.0f, 0.0f)) == "E");
+    REQUIRE(compassLabel(headingOf(-1.0f, 0.0f)) == "W");
+    REQUIRE(compassLabel(std::nanf("")) == "N");
+    REQUIRE(compassLabel(INFINITY) == "N");
+    REQUIRE(clockLabel(std::nanf("")) == "00:00");
 }
 
 TEST_CASE("the clock reads hours and minutes and wraps around the day")

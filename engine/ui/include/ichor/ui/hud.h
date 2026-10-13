@@ -12,8 +12,12 @@ class ElementDocument;
 namespace ichor {
 
 // The point of the compass a heading falls in: N, NE, E, SE, S, SW, W or NW. The heading is
-// in radians clockwise from north, and any value wraps.
+// in radians clockwise from north, and any value wraps. A value that is not a number reads as north.
 std::string compassLabel(float headingRadians);
+
+// The heading of a view that looks along (x, z) on the ground: zero towards -Z, which is
+// north, and growing clockwise, so +X is a quarter turn.
+float headingOf(float forwardX, float forwardZ);
 
 // A time of day as HH:MM. Hours run 0 to 24 and wrap.
 std::string clockLabel(float hour);

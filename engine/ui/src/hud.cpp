@@ -25,8 +25,16 @@ constexpr const char* kHudDocument = R"(<rml><head><style>
 
 }
 
+float headingOf(float forwardX, float forwardZ)
+{
+    return std::atan2(forwardX, -forwardZ);
+}
+
 std::string compassLabel(float headingRadians)
 {
+    if (!std::isfinite(headingRadians)) {
+        return "N";
+    }
     static constexpr std::array<const char*, 8> kPoints{"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
     float turns = std::fmod(headingRadians, kTwoPi);
     if (turns < 0.0f) {
@@ -38,6 +46,9 @@ std::string compassLabel(float headingRadians)
 
 std::string clockLabel(float hour)
 {
+    if (!std::isfinite(hour)) {
+        hour = 0.0f;
+    }
     float wrapped = std::fmod(hour, 24.0f);
     if (wrapped < 0.0f) {
         wrapped += 24.0f;
