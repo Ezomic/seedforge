@@ -33,7 +33,7 @@ struct PushData {
     float4x4 model;
     float4 baseColorFactor;
     float4 params; // x metallic, y roughness, z has normal map, w cascade index (shadow pass)
-    uint4 skin;    // x joint offset into the palette, y joint count (0 = rigid)
+    uint4 skin;    // x joint offset into the palette, y joint count (0 = rigid), z 1 to blend the foot into the ground
 };
 
 [[vk::binding(0, 0)]] ConstantBuffer<FrameData> frame;
