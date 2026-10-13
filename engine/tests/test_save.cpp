@@ -368,3 +368,24 @@ TEST_CASE("a slot says when its chronicle was damaged")
     REQUIRE(slots.save("none", scene, kContext));
     REQUIRE_FALSE(slots.load("none", restored, kContext).chronicleDamaged);
 }
+
+TEST_CASE("the chronicle hands the journal its newest entries first, timed in play")
+{
+    Chronicle chronicle;
+    REQUIRE(chronicle.recent(0.01, 5).empty());
+    chronicle.add(0, "start", "The road begins.");
+    chronicle.add(6000, "quest", "Took the ash to the ferryman.");
+    chronicle.add(366500, "death", "Fell on the ridge.");
+
+    const auto lines = chronicle.recent(0.01, 2);
+    REQUIRE(lines.size() == 2);
+    REQUIRE(lines[0].text == "Fell on the ridge.");
+    REQUIRE(lines[0].category == "death");
+    REQUIRE(lines[0].time == "1:01:05"); // 3665 s
+    REQUIRE(lines[1].time == "0:01:00");
+    REQUIRE(chronicle.recent(0.01, 99).size() == 3);
+    REQUIRE(chronicle.recent(0.01, 0).empty());
+    REQUIRE(chronicle.exportText(0.01).find("[1:01:05] death: Fell on the ridge.") != std::string::npos);
+    // A bad rate falls to zero rather than an undefined conversion.
+    REQUIRE(chronicle.recent(std::nan(""), 1)[0].time == "0:00:00");
+}

@@ -16,6 +16,13 @@ struct ChronicleEntry {
     bool operator==(const ChronicleEntry&) const = default;
 };
 
+// One entry as the journal shows it: the time of play as hours:minutes:seconds.
+struct ChronicleLine {
+    std::string time;
+    std::string category;
+    std::string text;
+};
+
 class Chronicle {
 public:
     static constexpr std::size_t kMaxEntries = 100000;
@@ -32,6 +39,9 @@ public:
     // The saved form: one line per entry. parse() is all or nothing.
     std::string serialize() const;
     static bool parse(std::string_view bytes, Chronicle& out);
+
+    // The newest `count` entries, newest first, for the journal screen.
+    std::vector<ChronicleLine> recent(double secondsPerTick, std::size_t count) const;
 
     // Readable text for the journal and for sharing, with the time of each
     // entry as hours:minutes:seconds of simulated play.

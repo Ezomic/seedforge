@@ -97,14 +97,35 @@ bool Chronicle::parse(std::string_view bytes, Chronicle& out)
     return true;
 }
 
+namespace {
+
+std::string playTime(std::uint64_t tick, double secondsPerTick)
+{
+    // NaN, a negative rate and absurd ticks all fall to zero instead of an undefined conversion.
+    const double elapsed = static_cast<double>(tick) * secondsPerTick;
+    const std::uint64_t seconds = elapsed >= 0.0 && elapsed < 1.8e19 ? static_cast<std::uint64_t>(elapsed) : 0;
+    return std::format("{}:{:02}:{:02}", seconds / 3600, seconds / 60 % 60, seconds % 60);
+}
+
+}
+
+std::vector<ChronicleLine> Chronicle::recent(double secondsPerTick, std::size_t count) const
+{
+    std::vector<ChronicleLine> lines;
+    const std::size_t take = std::min(count, entries_.size());
+    lines.reserve(take);
+    for (std::size_t i = 0; i < take; ++i) {
+        const ChronicleEntry& entry = entries_[entries_.size() - 1 - i];
+        lines.push_back({playTime(entry.tick, secondsPerTick), entry.category, entry.text});
+    }
+    return lines;
+}
+
 std::string Chronicle::exportText(double secondsPerTick) const
 {
     std::string out;
     for (const ChronicleEntry& entry : entries_) {
-        // NaN, a negative rate and absurd ticks all fall to zero instead of an undefined conversion.
-        const double elapsed = static_cast<double>(entry.tick) * secondsPerTick;
-        const std::uint64_t seconds = elapsed >= 0.0 && elapsed < 1.8e19 ? static_cast<std::uint64_t>(elapsed) : 0;
-        out += std::format("[{}:{:02}:{:02}] {}: {}\n", seconds / 3600, seconds / 60 % 60, seconds % 60, entry.category, entry.text);
+        out += std::format("[{}] {}: {}\n", playTime(entry.tick, secondsPerTick), entry.category, entry.text);
     }
     return out;
 }

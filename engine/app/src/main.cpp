@@ -7,6 +7,7 @@
 #include "ichor/core/log.h"
 #include "ichor/editor/panels.h"
 #include "ichor/ui/hud.h"
+#include "ichor/ui/ledger.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
@@ -437,6 +438,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // before the HUD so the HUD, which borrows it, goes first.
     std::unique_ptr<ichor::UiContext> ui;
     std::unique_ptr<ichor::Hud> hud;
+    std::unique_ptr<ichor::Ledger> ledger;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
@@ -449,9 +451,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         if (fontsLoaded) {
             hud = std::make_unique<ichor::Hud>(*ui);
+            ledger = std::make_unique<ichor::Ledger>(*ui);
         }
-        if (!fontsLoaded || !hud->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            ledger.reset();
             hud.reset();
             ui.reset();
         }
@@ -462,6 +466,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             [&](std::uint32_t width, std::uint32_t height) {
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour);
+                if (ledger->visible()) {
+                    std::vector<ichor::LedgerRow> rows;
+                    for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
+                        rows.push_back({std::move(line.time), std::move(line.category), std::move(line.text)});
+                    }
+                    ledger->setRows(rows);
+                }
                 ui->update(engine.scene().time());
             },
             [&] { ui->render(); });
@@ -544,6 +555,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool confirmHeld = false;
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
+    bool journalHeld = false;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
     for (;;) {
@@ -557,6 +569,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const std::uint32_t buttons = platform.input().buttons;
         const bool quickSave = (buttons & ichor::InputFrame::QuickSave) != 0;
         const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
+        // The journal is only a view, so it works in a replay too.
+        const bool journal = (buttons & ichor::InputFrame::Journal) != 0;
+        // Tab moves between the editor's fields, so there it does not open the journal.
+        if (journal && !journalHeld && ledger && !editing) {
+            ledger->setVisible(!ledger->visible());
+        }
+        journalHeld = journal;
         // Saving over the player's quicksave while a replay drives the run would be a surprise.
         if (quickSave && !quickSaveHeld && options.replay.empty()) {
             if (slots.save(quickSlot, engine.scene(), saveContext(), chronicle)) {
@@ -648,7 +667,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
 
     renderer.setGuiHook({}); // the panels are about to go out of scope
-    renderer.setUiHooks({}, {}); // and so are the UI and the HUD
+    renderer.setUiHooks({}, {}); // and so are the UI, the HUD and the ledger
     if (!options.record.empty() && !engine.recordedInputs().save(options.record)) {
         return 1;
     }
