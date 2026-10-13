@@ -14,6 +14,8 @@ Palette defaultPalette()
     palette.response.roughnessMax = 0.95f;
     palette.response.albedoMin = 0.04f;
     palette.response.albedoMax = 0.85f;
+    palette.groundColor = {0.09f, 0.15f, 0.055f};
+    palette.groundBlendHeight = 0.8f;
     return palette;
 }
 
@@ -21,6 +23,8 @@ void applyPalette(const Palette& palette, RenderView& view)
 {
     view.grade = palette.grade;
     view.response = palette.response;
+    view.groundColor = palette.groundColor;
+    view.groundBlendHeight = palette.groundBlendHeight;
 }
 
 }

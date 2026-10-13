@@ -22,6 +22,9 @@ struct RenderInstance {
     // Skinned instances point at a run of matrices in RenderView::jointPalette.
     std::uint32_t jointOffset = 0;
     std::uint32_t jointCount = 0; // zero draws the mesh rigid
+    // The object stands on the ground, with its origin at its foot: its base takes on the
+    // ground's colour (RenderView::groundColor). Skinned instances ignore it.
+    bool groundBlend = false;
 };
 
 // A resident terrain cell: the handle the renderer gave its meshes, where
@@ -99,6 +102,8 @@ struct RenderView {
     float windStrength = 0.0f;           // 0 still to 1 gale
     float fogHeightFalloff = 0.0f;       // per metre; zero is fog of one density at every height
     ColourGrade grade;
+    glm::vec3 groundColor{0.1f, 0.16f, 0.06f}; // linear colour of the ground, for blending objects into it
+    float groundBlendHeight = 0.0f;            // metres up an object the blend reaches; zero is off
     MaterialResponse response;
     float lightShafts = 0.0f;            // how strongly the sun scatters in the fog where the shadows let it through; zero is off
     // A flat sheet of water at one height, over the whole world. Seen only from above.

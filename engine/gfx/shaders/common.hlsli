@@ -26,6 +26,7 @@ struct FrameData {
     float4 gradeShadows;    // rgb multiplier on the dark end
     float4 gradeHighlights; // rgb multiplier on the bright end
     float4 materialParams;  // x roughness min, y roughness max, z albedo min, w albedo max
+    float4 groundParams;    // rgb colour of the ground at the foot of objects, w metres it reaches up (0 is off)
 };
 
 struct PushData {

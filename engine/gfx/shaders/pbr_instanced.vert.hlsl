@@ -15,6 +15,7 @@ struct VSOut {
     float3 normal : TEXCOORD1;
     float4 tangent : TEXCOORD2;
     float2 uv : TEXCOORD3;
+    float rise : TEXCOORD4; // metres above the foot of the object, for blending it into the ground
 };
 
 // Turns about the vertical axis; the cell's translation comes from the push constants.
@@ -37,5 +38,6 @@ VSOut main(VSIn i)
     o.normal = normalize(yaw(i.normal, c, s));
     o.tangent = float4(normalize(yaw(i.tangent.xyz, c, s)), i.tangent.w);
     o.uv = i.uv;
+    o.rise = i.position.y * i.positionScale.w;
     return o;
 }

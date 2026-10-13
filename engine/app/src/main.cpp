@@ -517,6 +517,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 instance.jointCount = static_cast<std::uint32_t>(pose->matrices.size());
                 view.jointPalette.insert(view.jointPalette.end(), pose->matrices.begin(), pose->matrices.end());
             }
+            instance.groundBlend = instance.jointCount == 0; // what is not animated stands where it was put
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
