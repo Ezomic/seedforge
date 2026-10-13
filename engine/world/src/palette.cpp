@@ -6,8 +6,8 @@ Palette defaultPalette()
 {
     Palette palette;
     palette.grade.saturation = 0.88f;
-    palette.grade.contrast = 1.06f;
-    palette.grade.exposure = 1.12f;
+    palette.grade.contrast = 1.18f;
+    palette.grade.exposure = 1.0f;
     palette.grade.shadows = {0.9f, 1.0f, 1.1f};
     palette.grade.highlights = {1.08f, 1.0f, 0.9f};
     palette.response.roughnessMin = 0.35f;

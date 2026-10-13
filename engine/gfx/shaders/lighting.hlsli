@@ -86,7 +86,9 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
     roughness = clamp(roughness, frame.materialParams.x, frame.materialParams.y);
     const float albedoLuma = dot(baseColor, float3(0.2126, 0.7152, 0.0722));
     const float albedoTarget = clamp(albedoLuma, frame.materialParams.z, frame.materialParams.w);
-    const float3 held = albedoLuma > 1e-4 ? baseColor * (albedoTarget / albedoLuma) : float3(albedoTarget, albedoTarget, albedoTarget);
+    // Near black the rescale would blow a faint hue up to full brightness, so it gives way to grey.
+    const float3 grey = float3(albedoTarget, albedoTarget, albedoTarget);
+    const float3 held = lerp(grey, baseColor * (albedoTarget / max(albedoLuma, 1e-4)), saturate(albedoLuma / 0.01));
     baseColor = lerp(held, baseColor, metallic);
 
     const float3 v = normalize(-worldPos);

@@ -435,9 +435,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         ichor::log(ichor::LogLevel::Info, "hot reload of scripts and data is off while recording or replaying");
     }
 
+    const ichor::Palette palette = ichor::defaultPalette();
+
     // The game UI draws through the window renderer; headless runs have none. The context goes
     // before the HUD so the HUD, which borrows it, goes first.
-    const ichor::Palette palette = ichor::defaultPalette();
     std::unique_ptr<ichor::UiContext> ui;
     std::unique_ptr<ichor::Hud> hud;
     std::unique_ptr<ichor::Ledger> ledger;

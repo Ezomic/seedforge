@@ -46,7 +46,8 @@ struct VegetationDraw {
     glm::dvec3 origin{0.0};
 };
 
-// The grade laid over the finished picture. The defaults change nothing.
+// The grade laid over the picture as the scene shaders draw it: sky, water, ground and
+// objects, but not rain, the debug lines or the UI. The defaults change nothing.
 struct ColourGrade {
     float saturation = 1.0f; // 0 is grey, 1 as drawn
     float contrast = 1.0f;   // around middle grey
@@ -61,7 +62,7 @@ struct MaterialResponse {
     float roughnessMin = 0.04f;
     float roughnessMax = 1.0f;
     float albedoMin = 0.0f;
-    float albedoMax = 1.0f;
+    float albedoMax = 1000.0f; // effectively open
 };
 
 struct RenderCamera {

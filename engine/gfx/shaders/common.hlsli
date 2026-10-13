@@ -54,15 +54,16 @@ float3 underwaterColor()
 float4 toneMap(float3 color)
 {
     color = color * frame.gradeParams.z;
-    color = color / (color + 1.0);
-    // The grade works on the display-referred picture: saturation, then contrast around middle
-    // grey, then the split tone, which tints the dark end and the bright end differently.
+    color = pow(color / (color + 1.0), 1.0 / 2.2);
+    // The grade works on the picture as it will be displayed, where 0.5 is middle grey:
+    // saturation, then contrast around middle grey, then the split tone, which tints the
+    // dark end and the bright end differently.
     const float luma = dot(color, float3(0.2126, 0.7152, 0.0722));
     color = lerp(float3(luma, luma, luma), color, frame.gradeParams.x);
     color = saturate((color - 0.5) * frame.gradeParams.y + 0.5);
     const float tone = saturate(dot(color, float3(0.2126, 0.7152, 0.0722)));
     color *= lerp(frame.gradeShadows.rgb, frame.gradeHighlights.rgb, tone);
-    return float4(pow(saturate(color), 1.0 / 2.2), 1.0);
+    return float4(saturate(color), 1.0);
 }
 
 // How far the wind pushes a point of a tree sideways, on the ground plane. Bends more
