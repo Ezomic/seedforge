@@ -1,9 +1,12 @@
+#include "ichor/ui/hud.h"
 #include "ichor/ui/recording_renderer.h"
 #include "ichor/ui/ui_context.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <memory>
 
@@ -12,6 +15,7 @@
 #include <RmlUi/Core/SystemInterface.h>
 
 using namespace ichor;
+using Catch::Approx;
 
 namespace {
 
@@ -224,4 +228,71 @@ TEST_CASE("each context reads its own clock, not whichever updated last")
     REQUIRE(Rml::GetSystemInterface()->GetElapsedTime() == 5.0);
     b.render();
     REQUIRE(Rml::GetSystemInterface()->GetElapsedTime() == 900.0);
+}
+
+TEST_CASE("the compass names the eight points and wraps")
+{
+    constexpr float kQuarter = 1.57079632679f;
+    REQUIRE(compassLabel(0.0f) == "N");
+    REQUIRE(compassLabel(kQuarter) == "E");
+    REQUIRE(compassLabel(kQuarter * 2.0f) == "S");
+    REQUIRE(compassLabel(kQuarter * 3.0f) == "W");
+    REQUIRE(compassLabel(kQuarter * 0.5f) == "NE");
+    REQUIRE(compassLabel(-kQuarter * 0.5f) == "NW");
+    REQUIRE(compassLabel(kQuarter * 4.0f) == "N");
+    REQUIRE(compassLabel(-kQuarter) == "W");
+    // The point holds for a stretch either side of it.
+    REQUIRE(compassLabel(0.3f) == "N");
+    REQUIRE(compassLabel(0.5f) == "NE");
+}
+
+TEST_CASE("the heading of a view follows the compass and bad numbers read as north")
+{
+    constexpr float kQuarter = 1.57079632679f;
+    REQUIRE(headingOf(0.0f, -1.0f) == 0.0f);
+    REQUIRE(headingOf(1.0f, 0.0f) == Approx(kQuarter));
+    REQUIRE(std::abs(headingOf(0.0f, 1.0f)) == Approx(kQuarter * 2.0f));
+    REQUIRE(headingOf(-1.0f, 0.0f) == Approx(-kQuarter));
+    REQUIRE(compassLabel(headingOf(1.0f, 0.0f)) == "E");
+    REQUIRE(compassLabel(headingOf(-1.0f, 0.0f)) == "W");
+    REQUIRE(compassLabel(std::nanf("")) == "N");
+    REQUIRE(compassLabel(INFINITY) == "N");
+    REQUIRE(clockLabel(std::nanf("")) == "00:00");
+}
+
+TEST_CASE("the clock reads hours and minutes and wraps around the day")
+{
+    REQUIRE(clockLabel(9.0f) == "09:00");
+    REQUIRE(clockLabel(17.5f) == "17:30");
+    REQUIRE(clockLabel(0.0f) == "00:00");
+    REQUIRE(clockLabel(23.99f) == "23:59");
+    REQUIRE(clockLabel(24.0f) == "00:00");
+    REQUIRE(clockLabel(-1.0f) == "23:00");
+}
+
+TEST_CASE("the HUD draws the compass and clock and only relays out when the text changes")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Hud hud(ui);
+    REQUIRE(hud.ok());
+
+    hud.update(0.0f, 9.0f);
+    frame(ui, renderer, 0.0);
+    const std::size_t firstDraws = renderer.draws().size();
+    REQUIRE(firstDraws >= 3); // the plate and its border, then text
+
+    // Nothing changed: the same picture.
+    hud.update(0.0f, 9.0f);
+    frame(ui, renderer, 0.1);
+    REQUIRE(renderer.draws().size() == firstDraws);
+
+    // A turn to the south-west and a later hour: still a picture, with different text in it.
+    hud.update(3.9f, 17.5f);
+    frame(ui, renderer, 0.2);
+    REQUIRE(renderer.draws().size() >= 3);
 }
