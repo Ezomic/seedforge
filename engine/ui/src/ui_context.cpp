@@ -63,6 +63,20 @@ UiContext::~UiContext()
     }
 }
 
+bool UiContext::loadFontFace(const std::filesystem::path& path, bool fallback)
+{
+    if (context_ == nullptr) {
+        return false;
+    }
+    // RmlUi reads a drive letter as a URL scheme, so a path under the working directory goes in relative.
+    std::error_code ec;
+    std::filesystem::path given = std::filesystem::relative(path, std::filesystem::current_path(), ec);
+    if (ec || given.empty() || given.generic_string().starts_with("..")) {
+        given = path;
+    }
+    return Rml::LoadFontFace(given.generic_string(), fallback);
+}
+
 Rml::ElementDocument* UiContext::loadDocumentFromMemory(std::string_view rml, std::string_view sourceUrl)
 {
     return context_ == nullptr ? nullptr : context_->LoadDocumentFromMemory(Rml::String(rml), Rml::String(sourceUrl));

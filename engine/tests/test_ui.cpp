@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
 
 #include <RmlUi/Core/ElementDocument.h>
@@ -47,6 +48,29 @@ void frame(UiContext& ui, RecordingUiRenderer& renderer, double time)
     ui.render();
 }
 
+}
+
+TEST_CASE("text draws a quad per glyph once a font is loaded")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 640, 360);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Bold.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    REQUIRE_FALSE(ui.loadFontFace(fonts / "missing.ttf"));
+
+    Rml::ElementDocument* document = ui.loadDocumentFromMemory(
+        "<rml><head><style>body, div { display: block; } body { width: 640px; height: 360px; }"
+        " div { font-family: Alegreya Sans; font-size: 20px; color: white; }</style></head>"
+        "<body><div>Hello</div></body></rml>");
+    REQUIRE(document != nullptr);
+    document->Show();
+    frame(ui, renderer, 0.0);
+    // Five letters, four vertices each.
+    const auto& draws = renderer.draws();
+    REQUIRE(std::any_of(draws.begin(), draws.end(), [](const RecordingUiRenderer::Draw& draw) { return draw.vertexCount >= 20; }));
 }
 
 TEST_CASE("a UI document renders its boxes through the render interface")

@@ -37,6 +37,11 @@ public:
     Rml::ElementDocument* loadDocument(const std::filesystem::path& path);
     void unloadDocument(Rml::ElementDocument* document);
 
+    // Registers a font file for every context in the process; documents then name it by its
+    // family and style, such as font-family: Alegreya Sans. `fallback` makes it the face tried
+    // for glyphs the others lack. False when the file cannot be read or is not a font.
+    bool loadFontFace(const std::filesystem::path& path, bool fallback = false);
+
     void setSize(std::uint32_t width, std::uint32_t height);
 
     // The UI clock is the one the caller advances, not the wall clock, so a
