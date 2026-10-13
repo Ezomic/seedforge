@@ -73,6 +73,36 @@ TEST_CASE("text draws a quad per glyph once a font is loaded")
     REQUIRE(std::any_of(draws.begin(), draws.end(), [](const RecordingUiRenderer::Draw& draw) { return draw.vertexCount >= 20; }));
 }
 
+TEST_CASE("fonts last as long as the contexts do, and a file that is not a font is refused")
+{
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    const auto textVertices = [&](bool loadFonts) {
+        RecordingUiRenderer renderer;
+        UiContext ui(renderer, 640, 360);
+        REQUIRE(ui.ok());
+        if (loadFonts) {
+            REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+            REQUIRE_FALSE(ui.loadFontFace(fonts / "AlegreyaSans-OFL.txt"));
+        }
+        Rml::ElementDocument* document = ui.loadDocumentFromMemory(
+            "<rml><head><style>body, div { display: block; } body { width: 640px; height: 360px; }"
+            " div { font-family: Alegreya Sans; font-size: 20px; color: white; }</style></head>"
+            "<body><div>Hello</div></body></rml>");
+        REQUIRE(document != nullptr);
+        document->Show();
+        frame(ui, renderer, 0.0);
+        std::size_t most = 0;
+        for (const auto& draw : renderer.draws()) {
+            most = std::max(most, draw.vertexCount);
+        }
+        return most;
+    };
+    REQUIRE(textVertices(true) >= 20);
+    // The first context is gone and took the fonts with it.
+    REQUIRE(textVertices(false) < 20);
+    REQUIRE(textVertices(true) >= 20);
+}
+
 TEST_CASE("a UI document renders its boxes through the render interface")
 {
     RecordingUiRenderer renderer;
