@@ -336,3 +336,31 @@ TEST_CASE("the speed modifier is asked where the player stands, and is not part 
     const double after = scene.registry().get<Transform>(scene.find(StableId::of("player"))).position.z;
     REQUIRE(before - after == Approx(4.0 * 0.5 * kDt).margin(1e-6));
 }
+
+TEST_CASE("the speed modifier scales a character's intent and a sprint too, and leaves other entities alone")
+{
+    const auto intentOf = [](double kept, bool sprint) {
+        Scene scene(3);
+        SpawnCommand hero = player();
+        hero.character = CharacterBody{};
+        scene.enqueue(hero);
+        SpawnCommand other = piece("walker", 1, {0.0, 0.0, 0.0});
+        other.character = CharacterBody{};
+        scene.enqueue(other);
+        scene.setSpeedModifier([kept](const glm::dvec3&) { return kept; });
+        InputFrame forward;
+        forward.moveY = 1.0f;
+        if (sprint) forward.buttons |= InputFrame::Sprint;
+        scene.tick(kDt, forward);
+        return std::pair{scene.registry().get<CharacterBody>(scene.find(StableId::of("player"))).intent.z,
+            scene.registry().get<CharacterBody>(scene.find(StableId::of("walker", 1))).intent.z};
+    };
+    const auto [free, freeOther] = intentOf(1.0, false);
+    REQUIRE(free == Approx(-4.0f));
+    REQUIRE(intentOf(0.5, false).first == Approx(-2.0f));
+    REQUIRE(intentOf(0.5, true).first == Approx(-4.0f)); // a sprint doubles it, the water halves it
+    REQUIRE(intentOf(0.0, false).first == 0.0f);
+    // Only the player is slowed: nothing else follows the player's input.
+    REQUIRE(freeOther == 0.0f);
+    REQUIRE(intentOf(0.5, false).second == 0.0f);
+}
