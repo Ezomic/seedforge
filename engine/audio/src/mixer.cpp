@@ -1,5 +1,7 @@
 #include "ichor/audio/mixer.h"
 
+#include "ichor/audio/ambience_layers.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -8,8 +10,6 @@ namespace ichor {
 namespace {
 
 constexpr float kReferenceDistance = 2.0f; // metres at which a spatial sound has fallen to half gain
-constexpr float kLoopEase = 1.0f / 12000.0f; // one-pole time constant of about a quarter second at 48 kHz
-constexpr float kLoopFloor = 1e-4f;
 constexpr float kCentreGain = 1.41421356f;   // undoes the equal-power pan at centre so spatial and flat cues match
 
 }
@@ -128,10 +128,7 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
         const double step = static_cast<double>(clip.sampleRate) / static_cast<double>(kRate);
         const double length = static_cast<double>(clip.samples.size());
         for (std::uint32_t f = 0; f < frames; ++f) {
-            loop.gain += (loop.target - loop.gain) * kLoopEase;
-            if (loop.gain < kLoopFloor && loop.target == 0.0f) {
-                loop.gain = 0.0f;
-            }
+            loop.gain = easeGain(loop.gain, loop.target);
             if (loop.gain > 0.0f) {
                 const auto index = static_cast<std::size_t>(loop.cursor);
                 const std::size_t next = index + 1 < clip.samples.size() ? index + 1 : 0;
