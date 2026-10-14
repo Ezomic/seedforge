@@ -43,6 +43,9 @@ public:
     // Whether the pointer is over one of the editor's windows, so a click there is not a pick.
     bool wantsPointer() const { return ImGui::GetIO().WantCaptureMouse; }
 
+    // Whether a field has the keyboard, so a key there is typing and not a nudge.
+    bool wantsKeyboard() const { return ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantTextInput; }
+
 private:
     void remember(const std::string& label);
     void toolbar();
