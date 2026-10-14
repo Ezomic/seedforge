@@ -1,9 +1,11 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
+#include "ichor/core/file_io.h"
 #include "ichor/core/log.h"
 #include "ichor/world/debug_images.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/hydrology.h"
+#include "ichor/world/validation.h"
 #include "ichor/world/world_io.h"
 
 #include <charconv>
@@ -74,15 +76,18 @@ bool dumpPngs(const std::filesystem::path& dir, std::uint32_t seed, const ichor:
 
 }
 
-// ichor_forge <out dir> <seed> [size] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold] [--dump-png <dir>]
+// ichor_forge <out dir> <seed> [size] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold] [--dump-png <dir>] [--verbose]
 // Writes manifest.iworld, heightmap.r16 and terrain.iscene. Stands in for
 // libworldforge until the real phases exist; the layout is the shipped one.
 int main(int argc, char** argv)
 {
     std::vector<char*> positional{argv[0]};
     std::filesystem::path pngDir;
+    bool verbose = false;
     for (int i = 1; i < argc; ++i) {
-        if (std::string_view(argv[i]) == "--dump-png") {
+        if (std::string_view(argv[i]) == "--verbose") {
+            verbose = true;
+        } else if (std::string_view(argv[i]) == "--dump-png") {
             if (i + 1 >= argc || !pngDir.empty()) {
                 ichor::log(ichor::LogLevel::Error, "--dump-png takes one directory");
                 return 2;
@@ -121,13 +126,33 @@ int main(int argc, char** argv)
     }
 
     const std::filesystem::path out = argv[1];
-    ichor::Heightfield heightfield = ichor::forgeHeightfield(desc);
     // A river threshold asks for channels cut along the flow of the water; without one the land is as forged.
-    if (riverThreshold > 0) {
-        heightfield = ichor::carveRivers(heightfield, ichor::computeHydrology(heightfield), rivers, ichor::CarveParams{});
+    ichor::ForgeRequest request;
+    request.desc = desc;
+    request.rivers = rivers;
+    request.carveRivers = riverThreshold > 0;
+    ichor::ValidatedWorld validated = ichor::forgeValidated(request, ichor::defaultGates());
+    for (const ichor::AttemptReport& report : validated.rejected) {
+        for (const ichor::GateFailure& failure : report.failures) {
+            ichor::logf(verbose ? ichor::LogLevel::Info : ichor::LogLevel::Debug, "attempt {} (seed {}) failed gate {}: {}", report.attempt, report.seed, failure.gate, failure.reason);
+        }
     }
+    if (!validated.passed) {
+        ichor::logf(ichor::LogLevel::Warn, "seed {} failed the validation gates on every attempt; writing the first world as forged", desc.seed);
+    }
+    if (verbose) {
+        ichor::logf(ichor::LogLevel::Info, "attempt {} of the seed was used", validated.attempt);
+    }
+    const ichor::Heightfield& heightfield = validated.world.heightfield;
     if (!ichor::writeWorld(out, heightfield)) {
         return 1;
+    }
+    // The manifest keeps the seed as given; a reroll's number sits beside it, and attempt 0 leaves nothing extra.
+    if (validated.attempt > 0) {
+        const std::string text = std::to_string(validated.attempt) + "\n";
+        if (!ichor::writeFileAtomically(out / "forge-attempt.txt", std::vector<std::uint8_t>(text.begin(), text.end()))) {
+            return 1;
+        }
     }
     if (!ichor::writeBundle(out / "terrain.iscene", ichor::forgeTerrainMaterials(desc.seed))) {
         return 1;
