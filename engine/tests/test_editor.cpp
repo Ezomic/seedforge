@@ -422,3 +422,69 @@ TEST_CASE("transactions nest, and only the outermost end closes the step")
     REQUIRE(editor.historySize() == before + 1);
     REQUIRE(editor.canUndo());
 }
+
+TEST_CASE("a nudge moves the entity by the offset and one undo takes it back")
+{
+    Scene scene(1);
+    scene.enqueue(wall("pillar", {1.0, 2.0, 3.0}));
+    scene.tick(kDt);
+    EditorSession editor(scene);
+    const StableId id = StableId::of("pillar");
+
+    REQUIRE(editor.nudge(id, {0.5, -1.0, 2.0}));
+    REQUIRE(editor.transformOf(id)->position == glm::dvec3(1.5, 1.0, 5.0));
+    scene.tick(kDt);
+    REQUIRE(scene.registry().get<Transform>(scene.find(id)).position == glm::dvec3(1.5, 1.0, 5.0));
+
+    REQUIRE(editor.undo());
+    scene.tick(kDt);
+    REQUIRE(scene.registry().get<Transform>(scene.find(id)).position == glm::dvec3(1.0, 2.0, 3.0));
+}
+
+TEST_CASE("nudges in the same tick add up")
+{
+    Scene scene(1);
+    scene.enqueue(wall("pillar", {0.0, 0.0, 0.0}));
+    scene.tick(kDt);
+    EditorSession editor(scene);
+    const StableId id = StableId::of("pillar");
+
+    REQUIRE(editor.nudge(id, {0.5, 0.0, 0.0}));
+    REQUIRE(editor.nudge(id, {0.5, 0.0, 0.0}));
+    scene.tick(kDt);
+    REQUIRE(scene.registry().get<Transform>(scene.find(id)).position.x == Approx(1.0));
+    REQUIRE(editor.historySize() == 2);
+}
+
+TEST_CASE("a nudge of something that is not there or not a number changes nothing")
+{
+    Scene scene(1);
+    scene.enqueue(wall("pillar", {1.0, 0.0, 0.0}));
+    scene.tick(kDt);
+    EditorSession editor(scene);
+    const StableId id = StableId::of("pillar");
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+
+    REQUIRE_FALSE(editor.nudge(StableId::of("ghost"), {1.0, 0.0, 0.0}));
+    REQUIRE_FALSE(editor.nudge(id, {nan, 0.0, 0.0}));
+    REQUIRE_FALSE(editor.nudge(id, {0.0, std::numeric_limits<double>::infinity(), 0.0}));
+    REQUIRE(editor.historySize() == 0);
+    REQUIRE(editor.transformOf(id)->position == glm::dvec3(1.0, 0.0, 0.0));
+
+    REQUIRE(editor.destroy(id));
+    REQUIRE_FALSE(editor.nudge(id, {1.0, 0.0, 0.0}));
+}
+
+TEST_CASE("a nudge keeps the rotation of a spinning entity")
+{
+    Scene scene(1);
+    scene.enqueue(wall("pillar", {0.0, 0.0, 0.0}));
+    scene.tick(kDt);
+    scene.tick(kDt);
+    EditorSession editor(scene);
+    const StableId id = StableId::of("pillar");
+    const glm::quat turned = scene.registry().get<Transform>(scene.find(id)).rotation;
+
+    REQUIRE(editor.nudge(id, {0.0, 1.0, 0.0}));
+    REQUIRE(editor.transformOf(id)->rotation == turned);
+}

@@ -30,6 +30,7 @@ add_executable(ichor_tests
     test_reverb.cpp
     test_editor.cpp
     test_picking.cpp
+    test_nudge.cpp
     test_weather.cpp
     test_ui.cpp
     test_save.cpp
