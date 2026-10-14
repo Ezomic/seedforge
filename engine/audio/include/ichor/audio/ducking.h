@@ -18,8 +18,10 @@ enum class SoundCategory : std::uint8_t {
 constexpr std::size_t kSoundCategoryCount = 4;
 
 // The loudest gain a voice of the category may play at. The ambience bed is held to 1 - ceiling
-// while the category plays, and the voice fades in as the bed fades out (see voiceGain), so ducked
-// ambience plus one capped voice cannot add up past full scale, not even during the attack.
+// while the category plays, so a ducked bed plus one capped voice stays within full scale once the
+// duck has settled. During the attack (kDuckAttackSeconds) the cue plays at once, to keep its
+// transient, and may briefly overlap the bed; the final clamp absorbs that. Several categorised
+// voices at once also rely on the clamp.
 constexpr float categoryCeiling(SoundCategory category)
 {
     switch (category) {
@@ -35,10 +37,9 @@ constexpr float categoryCeiling(SoundCategory category)
 constexpr float kDuckAttackSeconds = 0.02f;
 constexpr float kDuckReleaseSeconds = 0.4f;
 
-// The gain a voice really plays at under the current duck gain: its own gain, capped by the
-// category ceiling and by 1 - duck. The first cap is the budget, the second makes the voice rise
-// exactly as fast as the bed falls. SoundCategory::None passes through. NaN counts as silence.
-float voiceGain(SoundCategory category, float gain, float duck);
+// The gain a voice really plays at: its own gain (0..1) capped by the category ceiling.
+// SoundCategory::None passes through. NaN counts as silence.
+float voiceGain(SoundCategory category, float gain);
 
 using CategoryActivity = std::array<bool, kSoundCategoryCount>;
 

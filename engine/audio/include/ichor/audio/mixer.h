@@ -30,7 +30,7 @@ public:
 
     // Positions stay double until the listener-relative offset is formed, so
     // far from the origin the panning does not jitter.
-    // A categorised voice is capped by its ceiling and ducks the looping beds while it plays (see ducking.h).
+    // A categorised voice is capped by its ceiling and ducks the looping beds while it plays (see ducking.h). A NaN gain plays silent.
     void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial,
         SoundCategory category = SoundCategory::None);
     // One looping, non-spatial voice per clip, made on first use. The gain eases toward the target

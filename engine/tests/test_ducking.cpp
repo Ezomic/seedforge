@@ -146,16 +146,29 @@ TEST_CASE("louder categories duck deeper and a voice without a category does not
     CHECK(level[2] < level[1]);
 }
 
-TEST_CASE("ducked bed plus a full-gain categorised voice stays under full scale")
+TEST_CASE("a categorised cue keeps its onset at its ceiling")
+{
+    Rig rig(32767, 960);
+    rig.audio.setAmbience(rig.bed, 0.0f);
+    rig.render(48000);
+    rig.audio.play(rig.cue, glm::dvec3(0.0), false, 1.0f, SoundCategory::OneShot);
+    const std::vector<float> out = rig.render(96);
+    CHECK(out[0] == Approx(categoryCeiling(SoundCategory::OneShot)).margin(0.01));
+}
+
+TEST_CASE("a settled ducked bed plus a full-gain categorised voice stays under full scale")
 {
     Rig rig(32767, 48000 * 3);
     rig.audio.setAmbience(rig.bed, 0.9f);
     rig.render(48000);
     rig.audio.play(rig.cue, glm::dvec3(0.0), false, 1.0f, SoundCategory::Voice);
-    const std::vector<float> out = rig.render(48000);
-    const float peak = *std::max_element(out.begin(), out.end());
-    CHECK(peak <= 1.0f);
-    CHECK(peak < 0.999f);
+    std::vector<float> out;
+    for (int block = 0; block < 100; ++block) {
+        const std::vector<float> part = rig.render(480);
+        out.insert(out.end(), part.begin(), part.end());
+    }
+    const std::vector<float> settled(out.begin() + 9600, out.end());
+    CHECK(*std::max_element(settled.begin(), settled.end()) < 0.999f);
     CHECK(meanLeft(std::vector<float>(out.end() - 4800, out.end())) == Approx(0.97f).margin(0.02));
 }
 
@@ -207,4 +220,15 @@ TEST_CASE("the ducked mix is the same on every run")
         }
     }
     CHECK(runs[0] == runs[1]);
+
+    Rig plain(1000, 9600);
+    std::vector<float> unducked;
+    for (int block = 0; block < 100; ++block) {
+        if (block % 17 == 0) {
+            plain.audio.play(plain.cue, glm::dvec3(0.0), false, 0.8f);
+        }
+        const std::vector<float> out = plain.render(480);
+        unducked.insert(unducked.end(), out.begin(), out.end());
+    }
+    CHECK(unducked != runs[0]);
 }

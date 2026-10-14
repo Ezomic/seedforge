@@ -51,7 +51,7 @@ void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spati
     if (voices_.capacity() < kMaxVoices) {
         voices_.reserve(kMaxVoices);
     }
-    voices_.push_back({clip, 0.0, position, std::isnan(gain) ? 0.0f : category == SoundCategory::None ? gain : std::clamp(gain, 0.0f, 1.0f),
+    voices_.push_back({clip, 0.0, position, voiceGain(category, gain),
         spatial, category});
 }
 
@@ -128,7 +128,7 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
             const float t = static_cast<float>(voice.cursor - static_cast<double>(index));
             const float a = static_cast<float>(clip.samples[index]) / 32768.0f;
             const float b = static_cast<float>(clip.samples[index + 1]) / 32768.0f;
-            const float sample = (a + (b - a) * t) * voiceGain(voice.category, 1.0f, duckFrom + duckStep * static_cast<float>(f + 1));
+            const float sample = (a + (b - a) * t);
             interleaved[f * 2] += sample * left;
             interleaved[f * 2 + 1] += sample * right;
             voice.cursor += step;

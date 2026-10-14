@@ -22,7 +22,7 @@ float duckTarget(const CategoryActivity& active)
     return target;
 }
 
-float voiceGain(SoundCategory category, float gain, float duck)
+float voiceGain(SoundCategory category, float gain)
 {
     if (std::isnan(gain)) {
         return 0.0f;
@@ -30,8 +30,7 @@ float voiceGain(SoundCategory category, float gain, float duck)
     if (category == SoundCategory::None) {
         return gain;
     }
-    duck = std::isnan(duck) ? 1.0f : std::clamp(duck, 0.0f, 1.0f);
-    return std::clamp(gain, 0.0f, 1.0f) * std::min(categoryCeiling(category), 1.0f - duck);
+    return std::clamp(gain, 0.0f, 1.0f) * categoryCeiling(category);
 }
 
 float nextDuckGain(float current, float target, float dt)
