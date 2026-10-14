@@ -2,6 +2,7 @@ add_library(ichor_world
     src/atmosphere.cpp
     src/forge.cpp
     src/heightfield.cpp
+    src/map_image.cpp
     src/hydrology.cpp
     src/navmesh.cpp
     src/palette.cpp
