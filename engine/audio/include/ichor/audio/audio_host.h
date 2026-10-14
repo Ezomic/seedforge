@@ -22,7 +22,8 @@ public:
     virtual void addBundle(const SceneBundle& bundle) = 0;
     virtual std::uint32_t findSound(std::string_view name) const = 0;
 
-    virtual void play(std::uint32_t sound, glm::dvec3 position, bool spatial) = 0;
+    // The gain scales the cue, 1 being the clip as cooked.
+    virtual void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f) = 0;
     virtual void setListener(glm::dvec3 position, glm::quat rotation) = 0;
     virtual void setReverb(const ReverbSettings& settings) = 0;
 };

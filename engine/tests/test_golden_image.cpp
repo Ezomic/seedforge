@@ -530,7 +530,7 @@ TEST_CASE("golden image: the HUD over the sky")
     REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
     Hud hud(ui);
     REQUIRE(hud.ok());
-    hud.update(0.8f, 17.5f, 0.9f);
+    hud.update(0.8f, 17.5f, 0.9f, 70.0f, 100.0f);
     ui.update(0.0);
 
     RenderView view;

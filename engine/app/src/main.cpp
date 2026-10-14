@@ -3,6 +3,7 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/reverb.h"
+#include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/editor/panels.h"
@@ -21,6 +22,7 @@
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/save/save_slots.h"
+#include "ichor/save/settings.h"
 #include "ichor/script/chronicle_bindings.h"
 #include "ichor/script/world_bindings.h"
 #include "ichor/script/data_bindings.h"
@@ -52,6 +54,8 @@
 #include <vector>
 
 namespace {
+
+constexpr float kFovStepDegrees = 5.0f;
 
 struct Options {
     bool headless = false;
@@ -233,6 +237,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     for (const ichor::Mesh& mesh : actor.meshes) {
         pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
     }
+    ichor::SceneBundle splashSounds;
+    splashSounds.sounds.push_back(ichor::makeSplashClip());
+    audio.addBundle(splashSounds);
 
     // The forged world, if there is one: its splat layers go to the renderer
     // and its cells stream around the player. The arena sits on a plateau at
@@ -282,6 +289,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t armClip = animations.findClip("wave");
     const std::uint32_t windupCue = audio.findSound("A_WindupLight");
     const std::uint32_t tellCue = audio.findSound("A_Tell");
+    const std::uint32_t splashCue = audio.findSound("A_Splash");
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -297,6 +305,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         });
     }
     engine.setAudio(&audio);
+    // The player's splashes are heard, not simulated: this reads the scene and never writes it.
+    if (waterField) {
+        engine.scene().addSystem("wading_splash", [&, splash = ichor::WadingSplash{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
+            for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+                const glm::dvec3& feet = transform.position;
+                if (const auto cue = splash.step(feet.x, feet.z, waterField->at(feet.x, feet.z).depth)) {
+                    audio.play(splashCue, feet, false, cue->gain);
+                }
+            }
+        });
+    }
 
     // Content scripts and the data layer. A broken script or data file is
     // logged and the game runs on without it; the watcher below reloads both.
@@ -316,6 +335,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
     // Ironman keeps its own directory, so a normal run can never load its rolling slot.
     ichor::SaveSlots slots(options.saves / ((options.ironman ? "ironman-" : "campaign-") + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
+    // The player's settings live beside the campaigns, not in one, and never touch the simulation.
+    const std::filesystem::path settingsPath = options.saves / "settings.cfg";
+    ichor::Settings settings = ichor::loadSettings(settingsPath);
     ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
@@ -496,6 +518,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
     float hudWater = 0.0f;
+    // The app has no combatants yet, so the bar shows full health until the sim supplies one.
+    float hudHealth = 100.0f;
+    float hudMaxHealth = 100.0f;
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
@@ -508,6 +533,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             hud = std::make_unique<ichor::Hud>(*ui);
             ledger = std::make_unique<ichor::Ledger>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
+            pauseMenu->setFovDegrees(settings.fovDegrees);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !pauseMenu->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
@@ -523,7 +549,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         renderer.setUiHooks(
             [&](std::uint32_t width, std::uint32_t height) {
                 ui->setSize(width, height);
-                hud->update(hudHeading, hudHour, hudWater);
+                hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -542,6 +568,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
         view.camera = reference.camera;
+        view.camera.fovY = glm::radians(settings.fovDegrees);
         const float hour = editing && editorEnvironment.overrideTime ? editorEnvironment.hour : ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
         hudHour = hour;
         if (!heightfield.empty()) {
@@ -675,6 +702,14 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (pauseMenu->takeResume()) {
                 paused = false;
                 pauseMenu->setVisible(false);
+            }
+            if (const int steps = pauseMenu->takeFovSteps(); steps != 0) {
+                settings.fovDegrees += static_cast<float>(steps) * kFovStepDegrees;
+                settings = settings.clamped();
+                pauseMenu->setFovDegrees(settings.fovDegrees);
+                if (!ichor::saveSettings(settingsPath, settings)) {
+                    ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+                }
             }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();

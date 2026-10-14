@@ -174,6 +174,33 @@ bool nearLake(const Hydrology& hydrology, const Heightfield& heightfield, std::u
     return false;
 }
 
+// Widens the channel of the river at (rx, rz), whose bed is bedUnits: every sample that is not itself a
+// river, within the river's half width, is brought down to the bed if it stands higher. Never raises
+// anything, so where banks of two rivers overlap the lower bed wins whichever is carved first. The
+// samples of rivers, the map's edge and the lakes with their shores are left as they are.
+void cutBanks(const Hydrology& hydrology, const Heightfield& heightfield, const HydrologyParams& rivers, const WorldDesc& desc, std::uint32_t rx, std::uint32_t rz, std::uint16_t bedUnits, std::vector<std::uint16_t>& samples)
+{
+    const float half = riverHalfWidth(hydrology.accumulation[hydrology.index(rx, rz)], rivers);
+    const auto spacing = static_cast<float>(desc.metresPerSample);
+    const auto reach = static_cast<std::int64_t>(half / spacing);
+    for (std::int64_t dz = -reach; dz <= reach; ++dz) {
+        for (std::int64_t dx = -reach; dx <= reach; ++dx) {
+            const std::int64_t sx = static_cast<std::int64_t>(rx) + dx;
+            const std::int64_t sz = static_cast<std::int64_t>(rz) + dz;
+            const float across = static_cast<float>(dx) * spacing;
+            const float along = static_cast<float>(dz) * spacing;
+            if ((dx == 0 && dz == 0) || sx <= 0 || sz <= 0 || sx >= hydrology.side - 1 || sz >= hydrology.side - 1 || across * across + along * along > half * half) {
+                continue;
+            }
+            const std::size_t at = hydrology.index(static_cast<std::uint32_t>(sx), static_cast<std::uint32_t>(sz));
+            if (hydrology.lake[at] != 0 || isRiver(hydrology, at, rivers) || nearLake(hydrology, heightfield, static_cast<std::uint32_t>(sx), static_cast<std::uint32_t>(sz), rivers)) {
+                continue;
+            }
+            samples[at] = std::min(samples[at], bedUnits);
+        }
+    }
+}
+
 }
 
 Heightfield carveRivers(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const CarveParams& carve)
@@ -193,10 +220,24 @@ Heightfield carveRivers(const Heightfield& heightfield, const Hydrology& hydrolo
             const float ratio = static_cast<float>(hydrology.accumulation[i]) / static_cast<float>(std::max<std::uint32_t>(rivers.riverThreshold, 1));
             const float depth = std::min(carve.baseDepth + carve.depthPerDoubling * doublings(ratio), carve.maxDepth);
             const float lowered = (heightfield.heightAtSample(x, z) - depth - desc.minHeight) * unitsPerMetre;
-            samples[i] = static_cast<std::uint16_t>(std::lround(std::clamp(lowered, 0.0f, 65535.0f)));
+            const auto bed = static_cast<std::uint16_t>(std::lround(std::clamp(lowered, 0.0f, 65535.0f)));
+            samples[i] = bed;
+            if (hydrology.lake[i] == 0) {
+                cutBanks(hydrology, heightfield, rivers, desc, x, z, bed, samples);
+            }
         }
     }
     return Heightfield(desc, std::move(samples));
+}
+
+float riverHalfWidth(std::uint32_t accumulation, const HydrologyParams& params)
+{
+    if (params.riverThreshold == 0 || accumulation < params.riverThreshold || !(params.maxHalfWidth > 0.0f) || !(params.springHalfWidth > 0.0f)) {
+        return 0.0f;
+    }
+    const float ratio = static_cast<float>(accumulation) / static_cast<float>(params.riverThreshold);
+    const float ceiling = std::min(std::max(params.maxHalfWidth, params.springHalfWidth), kRiverHalfWidthCeiling);
+    return std::min(params.springHalfWidth * std::sqrt(ratio), ceiling);
 }
 
 bool isRiver(const Hydrology& hydrology, std::size_t sample, const HydrologyParams& params)

@@ -1,11 +1,43 @@
 #include "ichor/world/water_mesh.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <optional>
 
 namespace ichor {
 
 namespace {
+
+// The level of a river's water over a dry sample within the half width of a river, if one reaches it:
+// the highest river water that covers the sample's ground, but never more than riverSurface over it,
+// so a widened river is as shallow as its narrowest part and the bank is a slope, not a cliff.
+std::optional<float> widenedRiverAt(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const WaterMeshParams& params, std::uint32_t x, std::uint32_t z)
+{
+    const auto spacing = static_cast<float>(heightfield.desc().metresPerSample);
+    const float widest = riverHalfWidth(std::numeric_limits<std::uint32_t>::max(), rivers);
+    const auto reach = static_cast<std::int64_t>(widest / spacing);
+    const float ground = heightfield.heightAtSample(x, z);
+    float best = -std::numeric_limits<float>::infinity();
+    for (std::int64_t dz = std::max<std::int64_t>(-reach, -static_cast<std::int64_t>(z)); dz <= reach && z + dz < hydrology.side; ++dz) {
+        for (std::int64_t dx = std::max<std::int64_t>(-reach, -static_cast<std::int64_t>(x)); dx <= reach && x + dx < hydrology.side; ++dx) {
+            const std::size_t at = hydrology.index(static_cast<std::uint32_t>(x + dx), static_cast<std::uint32_t>(z + dz));
+            if (hydrology.lake[at] != 0 || !isRiver(hydrology, at, rivers)) {
+                continue;
+            }
+            const float across = static_cast<float>(dx) * spacing;
+            const float along = static_cast<float>(dz) * spacing;
+            const float half = riverHalfWidth(hydrology.accumulation[at], rivers);
+            if (across * across + along * along <= half * half) {
+                best = std::max(best, heightfield.heightAtSample(static_cast<std::uint32_t>(x + dx), static_cast<std::uint32_t>(z + dz)) + params.riverSurface);
+            }
+        }
+    }
+    if (!(best > ground)) {
+        return std::nullopt;
+    }
+    return std::min(best, ground + params.riverSurface);
+}
 
 // Water at a sample, if there is any: a lake at its filled level, a river a little over its bed.
 std::optional<float> waterAt(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const WaterMeshParams& params, std::int64_t gx, std::int64_t gz)
@@ -21,6 +53,9 @@ std::optional<float> waterAt(const Heightfield& heightfield, const Hydrology& hy
     // Over the floor of a basin too deep to be a lake there is no river either: it is dry ground.
     if (hydrology.lake[hydrology.index(x, z)] == 0 && isRiver(hydrology, hydrology.index(x, z), rivers)) {
         return heightfield.heightAtSample(x, z) + params.riverSurface;
+    }
+    if (hydrology.lake[hydrology.index(x, z)] == 0) {
+        return widenedRiverAt(heightfield, hydrology, rivers, params, x, z);
     }
     return std::nullopt;
 }

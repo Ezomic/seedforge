@@ -5,6 +5,7 @@
 #include "ichor/audio/null_audio.h"
 #include "ichor/sim/scene.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -80,6 +81,26 @@ TEST_CASE("a played cue makes sound and then stops")
     }
     REQUIRE(audio.mixer().activeVoices() == 0);
     REQUIRE(energy(audio.render(480), 0) == 0.0);
+}
+
+TEST_CASE("a cue's gain reaches the mixer, and playing without one is full volume")
+{
+    const auto played = [](float gain) {
+        NullAudio audio;
+        audio.addBundle(cuesBundle());
+        AudioHost& host = audio;
+        host.play(0, {0.0, 0.0, 0.0}, false, gain);
+        return energy(audio.render(2400), 0);
+    };
+    const double full = played(1.0f);
+    REQUIRE(played(0.5f) == Catch::Approx(full * 0.25).epsilon(1e-6));
+    REQUIRE(played(0.0f) == 0.0);
+
+    NullAudio audio;
+    audio.addBundle(cuesBundle());
+    AudioHost& host = audio;
+    host.play(0, {0.0, 0.0, 0.0}, false);
+    REQUIRE(energy(audio.render(2400), 0) == Catch::Approx(full).epsilon(1e-6));
 }
 
 TEST_CASE("spatial cues pan towards their side and fade with distance")

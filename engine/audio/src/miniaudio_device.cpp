@@ -51,9 +51,9 @@ bool MiniaudioDevice::init()
     return true;
 }
 
-void MiniaudioDevice::play(std::uint32_t sound, glm::dvec3 position, bool spatial)
+void MiniaudioDevice::play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain)
 {
-    mixer_.play(sound, position, 1.0f, spatial);
+    mixer_.play(sound, position, gain, spatial);
 }
 
 void MiniaudioDevice::setListener(glm::dvec3 position, glm::quat rotation)

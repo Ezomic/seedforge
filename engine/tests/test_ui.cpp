@@ -301,27 +301,105 @@ TEST_CASE("the HUD draws the compass and clock and only relays out when the text
     Hud hud(ui);
     REQUIRE(hud.ok());
 
-    hud.update(0.0f, 9.0f, 0.0f);
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
     frame(ui, renderer, 0.0);
     const std::size_t firstDraws = renderer.draws().size();
     REQUIRE(firstDraws >= 3); // the plate and its border, then text
 
     // Nothing changed: the same picture.
-    hud.update(0.0f, 9.0f, 0.0f);
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
     frame(ui, renderer, 0.1);
     REQUIRE(renderer.draws().size() == firstDraws);
 
-    hud.update(0.0f, 9.0f, 0.9f);
+    hud.update(0.0f, 9.0f, 0.9f, 100.0f, 100.0f);
     frame(ui, renderer, 0.15);
     REQUIRE(renderer.draws().size() > firstDraws);
-    hud.update(0.0f, 9.0f, 0.0f);
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
     frame(ui, renderer, 0.17);
     REQUIRE(renderer.draws().size() == firstDraws);
 
     // A turn to the south-west and a later hour: still a picture, with different text in it.
-    hud.update(3.9f, 17.5f, 0.0f);
+    hud.update(3.9f, 17.5f, 0.0f, 100.0f, 100.0f);
     frame(ui, renderer, 0.2);
     REQUIRE(renderer.draws().size() >= 3);
+}
+
+TEST_CASE("health is shown as a whole percent, clamped, and anything unusable reads as empty")
+{
+    REQUIRE(healthPercent(100.0f, 100.0f) == 100);
+    REQUIRE(healthPercent(50.0f, 100.0f) == 50);
+    REQUIRE(healthPercent(0.0f, 100.0f) == 0);
+    REQUIRE(healthPercent(33.4f, 100.0f) == 33);
+    REQUIRE(healthPercent(29.0f, 100.0f) == 29);
+    REQUIRE(healthPercent(57.0f, 100.0f) == 57);
+    REQUIRE(healthPercent(7.0f, 100.0f) == 7);
+    REQUIRE(healthPercent(1.0f, 3.0f) == 33);
+    REQUIRE(healthPercent(-20.0f, 100.0f) == 0);   // negative health
+    REQUIRE(healthPercent(250.0f, 100.0f) == 100); // above max
+    REQUIRE(healthPercent(50.0f, 0.0f) == 0);      // zero max
+    REQUIRE(healthPercent(50.0f, -10.0f) == 0);    // negative max
+    const float nan = std::nanf("");
+    const float inf = INFINITY;
+    REQUIRE(healthPercent(nan, 100.0f) == 0);
+    REQUIRE(healthPercent(50.0f, nan) == 0);
+    REQUIRE(healthPercent(inf, 100.0f) == 0);
+    REQUIRE(healthPercent(50.0f, inf) == 0);
+    REQUIRE(healthPercent(inf, inf) == 0);
+    REQUIRE(healthPercent(0.0f, 0.0f) == 0);
+}
+
+TEST_CASE("the HUD health bar follows health and survives bad values every frame")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Hud hud(ui);
+    REQUIRE(hud.ok());
+
+    hud.update(0.0f, 9.0f, 0.0f, 0.0f, 100.0f); // dead: an empty bar, the frame still draws
+    frame(ui, renderer, 0.0);
+    const std::size_t empty = renderer.draws().size();
+    REQUIRE(empty >= 3);
+
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
+    frame(ui, renderer, 0.1);
+    const std::size_t full = renderer.draws().size();
+    REQUIRE(full > empty);
+
+    hud.update(0.0f, 9.0f, 0.0f, 400.0f, 100.0f); // above max looks like full
+    frame(ui, renderer, 0.2);
+    REQUIRE(renderer.draws().size() == full);
+
+    hud.update(0.0f, 9.0f, 0.0f, -5.0f, 100.0f); // below zero looks like dead
+    frame(ui, renderer, 0.3);
+    REQUIRE(renderer.draws().size() == empty);
+
+    hud.update(0.0f, 9.0f, 0.0f, 50.0f, 0.0f); // zero max looks like dead
+    frame(ui, renderer, 0.4);
+    REQUIRE(renderer.draws().size() == empty);
+
+    hud.update(0.0f, 9.0f, 0.0f, 50.0f, 100.0f); // a half bar is drawn
+    frame(ui, renderer, 0.45);
+    REQUIRE(renderer.draws().size() == full);
+
+    hud.update(0.0f, 9.0f, 0.0f, std::nanf(""), 100.0f); // from a drawn bar to empty
+    frame(ui, renderer, 0.5);
+    REQUIRE(renderer.draws().size() == empty);
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
+    frame(ui, renderer, 0.55);
+    REQUIRE(renderer.draws().size() == full);
+    hud.update(0.0f, 9.0f, 0.0f, INFINITY, INFINITY);
+    frame(ui, renderer, 0.6);
+    REQUIRE(renderer.draws().size() == empty);
+
+    for (int i = 0; i <= 200; ++i) { // health changing every frame
+        hud.update(0.0f, 9.0f, 0.0f, static_cast<float>(i) * 0.5f, 100.0f);
+        frame(ui, renderer, 1.0 + i * 0.01);
+    }
+    REQUIRE(renderer.draws().size() == full);
 }
 
 TEST_CASE("the ledger escapes markup so an entry can never act as a document")
@@ -556,6 +634,28 @@ TEST_CASE("the pause menu draws nothing until shown, and its buttons report clic
     click(*quit, 0.3);
     REQUIRE(menu.takeQuit());
     REQUIRE_FALSE(menu.takeResume());
+
+    // The field of view buttons report their clicks as steps, once, and the label follows what the owner sets.
+    const auto fovDown = menu.fovDownCentre();
+    const auto fovUp = menu.fovUpCentre();
+    REQUIRE(fovDown.has_value());
+    REQUIRE(fovUp.has_value());
+    REQUIRE(fovDown->first < fovUp->first);
+    REQUIRE(menu.takeFovSteps() == 0);
+    click(*fovUp, 0.35);
+    click(*fovUp, 0.36);
+    click(*fovDown, 0.37);
+    REQUIRE(menu.takeFovSteps() == 1);
+    REQUIRE(menu.takeFovSteps() == 0);
+    click(*fovDown, 0.38);
+    REQUIRE(menu.takeFovSteps() == -1);
+    menu.setFovDegrees(std::numeric_limits<float>::quiet_NaN()); // ignored, not drawn
+    menu.setFovDegrees(85.0f);
+    frame(ui, renderer, 0.39);
+    click(*fovUp, 0.395);
+    menu.setVisible(false);
+    menu.setVisible(true);
+    REQUIRE(menu.takeFovSteps() == 0); // a click from an earlier showing is not a click now
 
     // A click left over from before the menu was hidden does not count when it is shown again.
     click(*quit, 0.4);
