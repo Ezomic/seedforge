@@ -667,3 +667,88 @@ TEST_CASE("the pause menu draws nothing until shown, and its buttons report clic
     frame(ui, renderer, 0.5);
     REQUIRE(renderer.draws().empty());
 }
+
+TEST_CASE("the target guide gives the compass point and a distance rounded more coarsely the further it is")
+{
+    // North is -Z, east is +X.
+    REQUIRE(targetGuide(0, 0, 0, -300) == "north, 300 m");
+    REQUIRE(targetGuide(0, 0, 300, 0) == "east, 300 m");
+    REQUIRE(targetGuide(0, 0, 0, 300) == "south, 300 m");
+    REQUIRE(targetGuide(0, 0, -300, 0) == "west, 300 m");
+    REQUIRE(targetGuide(0, 0, 300, -300) == "north-east, 400 m");
+    REQUIRE(targetGuide(0, 0, -300, 300) == "south-west, 400 m");
+    REQUIRE(targetGuide(100, 100, 100, 40) == "north, 60 m");
+
+    // Under 100 m to the nearest 10, under 1 km to the nearest 50, beyond to the nearest half kilometre.
+    REQUIRE(targetGuide(0, 0, 0, -34) == "north, 30 m");
+    REQUIRE(targetGuide(0, 0, 0, -36) == "north, 40 m");
+    REQUIRE(targetGuide(0, 0, 0, -130) == "north, 150 m");
+    REQUIRE(targetGuide(0, 0, 0, -124) == "north, 100 m");
+    REQUIRE(targetGuide(0, 0, 0, -1200) == "north, 1 km");
+    REQUIRE(targetGuide(0, 0, 0, -1300) == "north, 1.5 km");
+    REQUIRE(targetGuide(0, 0, 0, -12400) == "north, 12.5 km");
+    REQUIRE(targetGuide(0, 0, 0, -992) == "north, 1 km");
+}
+
+TEST_CASE("the target guide is stable on boundaries and at the target")
+{
+    // Under five metres you have arrived, and there is no direction to give.
+    REQUIRE(targetGuide(5, 5, 5, 5) == "here");
+    REQUIRE(targetGuide(-0.0, 0.0, 0.0, -0.0) == "here");
+    REQUIRE(targetGuide(0, 0, 3, 3) == "here");
+    REQUIRE(targetGuide(0, 0, 0, -5) == "north, 10 m");
+
+    // Either side of the line between two points picks the nearer one (the line itself is a coin toss in floating point).
+    const double tan22 = std::tan(22.5 * 3.14159265358979323846 / 180.0);
+    REQUIRE(targetGuide(0, 0, 1000.0 * tan22 * 1.0001, -1000.0) == "north-east, 1 km");
+    REQUIRE(targetGuide(0, 0, 1000.0 * tan22 * 0.9999, -1000.0) == "north, 1 km");
+    // Negative zero offsets are the same as zero.
+    REQUIRE(targetGuide(0, 0, -0.0, -500) == "north, 500 m");
+    REQUIRE(targetGuide(0, 0, 500, -0.0) == "east, 500 m");
+}
+
+TEST_CASE("the target guide says nothing for numbers that are not usable and gives up on huge distances")
+{
+    const double nan = std::nan("");
+    const double inf = INFINITY;
+    REQUIRE(targetGuide(nan, 0, 10, 10).empty());
+    REQUIRE(targetGuide(0, nan, 10, 10).empty());
+    REQUIRE(targetGuide(0, 0, nan, 10).empty());
+    REQUIRE(targetGuide(0, 0, 10, nan).empty());
+    REQUIRE(targetGuide(inf, 0, 10, 10).empty());
+    REQUIRE(targetGuide(0, 0, -inf, 10).empty());
+    REQUIRE(targetGuide(0, 0, 1e300, -1e300) == "north-east, far away");
+    REQUIRE(targetGuide(0, 0, 1e200, 0) == "east, far away");
+    REQUIRE(targetGuide(0, 0, 0, -99000) == "north, 99 km");
+    REQUIRE(targetGuide(0, 0, 0, -101000) == "north, far away");
+}
+
+TEST_CASE("the HUD shows the target line only while a target is set")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Hud hud(ui);
+    REQUIRE(hud.ok());
+
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
+    frame(ui, renderer, 0.0);
+    const std::size_t plain = renderer.draws().size();
+
+    hud.setGuide("north-east, 450 m");
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
+    frame(ui, renderer, 0.1);
+    REQUIRE(renderer.draws().size() > plain);
+    const std::size_t guided = renderer.draws().size();
+
+    hud.setGuide("north-east, 450 m"); // unchanged: the same picture
+    frame(ui, renderer, 0.2);
+    REQUIRE(renderer.draws().size() == guided);
+
+    hud.setGuide("");
+    frame(ui, renderer, 0.3);
+    REQUIRE(renderer.draws().size() == plain);
+}
