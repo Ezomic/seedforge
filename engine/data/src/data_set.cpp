@@ -95,6 +95,9 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
         if (json.is_discarded()) {
             return fail("not valid JSON");
         }
+        if (tableName == "axioms" && json.is_object()) {
+            continue; // one nested axiom per file: AxiomSet validates and loads these
+        }
         if (!json.is_array()) {
             return fail("expected an array of records");
         }

@@ -1,4 +1,5 @@
 #include "lighting.hlsli"
+#include "wetness.hlsli"
 
 // The three splat layers ride in the material set's three slots.
 [[vk::binding(0, 1)]] Texture2D grassTex;
@@ -36,6 +37,7 @@ float4 main(PSIn i) : SV_Target
         baseColor *= 1.0 - wet;
         baseColor = lerp(baseColor, frame.waterColor.rgb * 0.6, 1.0 - exp(-max(below, 0.0) * 0.35));
     }
-    const float roughness = lerp(0.95, 0.7, snow);
+    float roughness = lerp(0.95, 0.7, snow);
+    applyWetness(baseColor, roughness, 0.0);
     return toneMap(applyFog(shade(i.worldPos, n, n, baseColor, 0.0, roughness), i.worldPos, i.clip.xy));
 }

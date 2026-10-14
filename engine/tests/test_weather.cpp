@@ -6,6 +6,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 using namespace ichor;
 using Catch::Approx;
@@ -114,4 +116,98 @@ TEST_CASE("cloud thickens the sky's cover towards solid, and clear weather leave
     REQUIRE(view.cloudCover == 0.0f);
     applyAtmosphere(storm, view);
     REQUIRE(view.cloudCover == Approx(1.0f));
+}
+
+TEST_CASE("surfaces are wet in proportion to the rain, and dry with none")
+{
+    REQUIRE(wetnessTarget(0.0f) == 0.0f);
+    REQUIRE(wetnessTarget(1.0f) == 1.0f);
+    REQUIRE(wetnessTarget(0.1f) > 0.0f);
+    REQUIRE(wetnessTarget(0.1f) < wetnessTarget(0.2f));
+    REQUIRE(wetnessTarget(5.0f) == 1.0f);
+    REQUIRE(wetnessTarget(-3.0f) == 0.0f);
+    REQUIRE(wetnessTarget(std::nanf("")) == 0.0f);
+    REQUIRE(wetnessTarget(INFINITY) == 1.0f);
+}
+
+TEST_CASE("wetness rises faster than it dries and never leaves 0 to 1")
+{
+    const float wetting = wetnessStep(0.0f, 1.0f, 10.0) - 0.0f;
+    const float drying = 1.0f - wetnessStep(1.0f, 0.0f, 10.0);
+    REQUIRE(wetting > drying);
+    REQUIRE(wetting > 0.0f);
+    REQUIRE(wetting < 1.0f);
+
+    REQUIRE(wetnessStep(0.0f, 1.0f, 1.0e12) == Approx(1.0f));
+    REQUIRE(wetnessStep(1.0f, 0.0f, 1.0e12) == 0.0f);
+    REQUIRE(wetnessStep(0.3f, 0.5f, 0.0) == 0.3f);
+    REQUIRE(wetnessStep(0.3f, 0.5f, -5.0) == 0.3f);
+    REQUIRE(wetnessStep(0.3f, 0.5f, std::nan("")) == 0.3f);
+    REQUIRE(wetnessStep(std::nanf(""), 1.0f, 10.0) > 0.0f);
+    REQUIRE(wetnessStep(7.0f, 1.0f, 10.0) <= 1.0f);
+    REQUIRE(wetnessStep(-7.0f, 0.0f, 10.0) == 0.0f);
+    REQUIRE(wetnessStep(0.5f, std::nanf(""), 10.0) < 0.5f);
+}
+
+TEST_CASE("wetness follows the rain through the fixed ticks and is deterministic")
+{
+    const double dt = 1.0 / 60.0;
+    SurfaceWetness first;
+    REQUIRE(first.update(1.0f, 1000, dt) == 1.0f); // no previous state: the ground starts as wet as the rain says
+    SurfaceWetness dry;
+    REQUIRE(dry.update(0.0f, 1000, dt) == 0.0f);
+
+    SurfaceWetness a;
+    SurfaceWetness b;
+    a.update(0.0f, 0, dt);
+    b.update(0.0f, 0, dt);
+    float last = 0.0f;
+    for (std::uint64_t tick = 1; tick <= 600; ++tick) {
+        const float value = a.update(1.0f, tick, dt);
+        REQUIRE(value >= last);
+        REQUIRE(value <= 1.0f);
+        last = value;
+    }
+    REQUIRE(last == Approx(1.0f - std::exp(-10.0f / 20.0f)).margin(1e-3));
+    for (std::uint64_t tick = 1; tick <= 600; ++tick) {
+        b.update(1.0f, tick, dt);
+    }
+    REQUIRE(a.value == b.value);
+}
+
+TEST_CASE("light rain wets the ground a little at the fixed tick rate")
+{
+    const double dt = 1.0 / 60.0;
+    SurfaceWetness w;
+    w.update(0.0f, 0, dt);
+    for (std::uint64_t tick = 1; tick <= 600; ++tick) {
+        w.update(0.03f, tick, dt);
+    }
+    REQUIRE(w.value > 0.0f);
+    REQUIRE(w.value < wetnessTarget(0.03f));
+}
+
+TEST_CASE("wetness stays bounded when the rain flips every tick, across a jump in time, or going back")
+{
+    const double dt = 1.0 / 60.0;
+    SurfaceWetness w;
+    w.update(0.0f, 0, dt);
+    for (std::uint64_t tick = 1; tick <= 5000; ++tick) {
+        const float value = w.update(tick % 2 == 0 ? 1.0f : 0.0f, tick, dt);
+        REQUIRE(value >= 0.0f);
+        REQUIRE(value <= 1.0f);
+    }
+    REQUIRE(w.update(1.0f, std::numeric_limits<std::uint64_t>::max(), dt) == Approx(1.0f));
+    REQUIRE(w.update(0.0f, 10, dt) == 0.0f); // a restore to an earlier tick starts over
+    REQUIRE(w.update(std::nanf(""), 11, dt) == 0.0f);
+}
+
+TEST_CASE("the render view is dry by default and the weather alone does not wet it")
+{
+    RenderView view;
+    REQUIRE(view.wetness == 0.0f);
+    Atmosphere storm = atmosphereAt(12.0f);
+    applyWeather({1.0f, 1.0f}, storm);
+    applyAtmosphere(storm, view);
+    REQUIRE(view.wetness == 0.0f);
 }
