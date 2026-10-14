@@ -16,6 +16,9 @@
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/ui/ledger.h"
+#include "ichor/ui/journal_screen.h"
+#include "ichor/data/journal.h"
+#include "ichor/script/journal_bindings.h"
 #include "ichor/ui/map_screen.h"
 #include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ui_context.h"
@@ -344,6 +347,21 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
     }
     // The reverb of the places the listener walks into, from the "reverb" table of the data layer.
+    std::optional<ichor::JournalTemplates> journalTemplates;
+    const auto loadJournalTemplates = [&] {
+        const ichor::DataTable* table = data.table("journal");
+        std::string error = "there is no journal table";
+        std::optional<ichor::JournalTemplates> loaded;
+        if (table != nullptr) {
+            loaded = ichor::JournalTemplates::fromTable(*table, error);
+        }
+        if (loaded) {
+            journalTemplates = std::move(loaded);
+        } else {
+            ichor::logf(ichor::LogLevel::Warn, "data: journal prose templates not loaded: {}", error);
+        }
+    };
+    loadJournalTemplates();
     ichor::ReverbField reverbField;
     if (!ichor::loadReverbStamps(data, reverbField)) {
         ichor::log(ichor::LogLevel::Warn, "data: a reverb stamp is malformed, so none were loaded");
@@ -470,6 +488,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::bindScene(scripts, engine.scene());
     ichor::bindData(scripts, data);
     ichor::bindChronicle(scripts, chronicle, engine.scene());
+    ichor::bindJournal(scripts, chronicle, engine.scene(), journalTemplates);
     const auto weatherNow = [&] {
         return ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(engine.scene().tickCount()) * config.fixedDt / options.daySeconds * 24.0);
     };
@@ -543,6 +562,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::UiContext> ui;
     std::unique_ptr<ichor::Hud> hud;
     std::unique_ptr<ichor::Ledger> ledger;
+    std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     bool paused = false;
@@ -568,15 +588,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             }
             hud = std::make_unique<ichor::Hud>(*ui, hudLayout.layout);
             ledger = std::make_unique<ichor::Ledger>(*ui);
+            journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !mapScreen->ok() || !pauseMenu->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !pauseMenu->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             pauseMenu.reset();
             mapScreen.reset();
+            journalScreen.reset();
             ledger.reset();
             hud.reset();
             ui.reset();
@@ -599,6 +621,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                         rows.push_back({std::move(line.time), std::move(line.category), std::move(line.text)});
                     }
                     ledger->setRows(rows);
+                }
+                if (journalScreen->visible()) {
+                    std::vector<ichor::JournalRow> rows;
+                    for (auto& line : chronicle.recentIn(ichor::kJournalCategory, config.fixedDt, ichor::JournalScreen::kMaxRows)) {
+                        rows.push_back({std::move(line.time), std::move(line.text)});
+                    }
+                    journalScreen->setRows(rows);
                 }
                 if (mapScreen->visible()) {
                     const glm::dvec3 feet = playerPosition(engine.scene());
@@ -701,6 +730,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
     bool journalHeld = false;
+    bool notesHeld = false;
     bool mapHeld = false;
     bool menuHeld = false;
     bool pointerHeld = false;
@@ -742,6 +772,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ledger->setVisible(!ledger->visible());
         }
         journalHeld = journal;
+        const bool notes = (buttons & ichor::InputFrame::Notes) != 0;
+        if (notes && !notesHeld && journalScreen && !editing) {
+            journalScreen->setVisible(!journalScreen->visible());
+        }
+        notesHeld = notes;
         // The pointer drives the game UI (the game itself does not use the mouse); the editor's
         // own windows have it while they are up. Away from the window, or under the editor, a
         // press the UI still holds is let go and nothing stays hovered.
@@ -762,6 +797,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             }
             if (mapScreen->takeCloseRequest()) {
                 mapScreen->setVisible(false);
+            }
+            if (journalScreen->takeCloseRequest()) {
+                journalScreen->setVisible(false);
             }
             if (ledger->takeCloseRequest()) {
                 ledger->setVisible(false);
@@ -893,6 +931,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (reloadAllowed && dataChanged) {
                 if (data.loadDirectory(options.data)) {
                     ichor::logf(ichor::LogLevel::Info, "data reloaded, digest {:016x}", data.digest());
+                    loadJournalTemplates();
                     reverbField.clear();
                     if (!ichor::loadReverbStamps(data, reverbField)) {
                         ichor::log(ichor::LogLevel::Warn, "data: a reverb stamp is malformed, so none were loaded");

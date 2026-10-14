@@ -1,0 +1,20 @@
+[
+  {"id": "asked", "variants": [
+    "{who} met me at {where} and asked me to {what}.",
+    "At {where}, {who} asked me to {what}.",
+    "{who} found me near {where}, wanting me to {what}.",
+    "At {where} I heard {who} out: they wished me to {what}."
+  ]},
+  {"id": "decided", "variants": [
+    "{decided}.",
+    "In the end, {decided}.",
+    "I gave {who} my answer: {decided}.",
+    "I thought it over, and {decided}."
+  ]},
+  {"id": "undecided", "variants": [
+    "I have given no answer yet.",
+    "I have not decided what to tell {who}.",
+    "I left {where} without making up my mind."
+  ]},
+  {"id": "fallback", "who": "a stranger", "what": "help them", "where": "a place I cannot name"}
+]

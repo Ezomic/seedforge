@@ -6,6 +6,7 @@ add_library(ichor_ui
     src/hud.cpp
     src/hud_layout.cpp
     src/ledger.cpp
+    src/journal_screen.cpp
     src/map_screen.cpp
     src/pause_menu.cpp
     src/recording_renderer.cpp

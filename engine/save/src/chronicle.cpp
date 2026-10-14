@@ -121,6 +121,17 @@ std::vector<ChronicleLine> Chronicle::recent(double secondsPerTick, std::size_t 
     return lines;
 }
 
+std::vector<ChronicleLine> Chronicle::recentIn(std::string_view category, double secondsPerTick, std::size_t count) const
+{
+    std::vector<ChronicleLine> lines;
+    for (auto it = entries_.rbegin(); it != entries_.rend() && lines.size() < count; ++it) {
+        if (it->category == category) {
+            lines.push_back({playTime(it->tick, secondsPerTick), it->category, it->text});
+        }
+    }
+    return lines;
+}
+
 std::string Chronicle::exportText(double secondsPerTick) const
 {
     std::string out;
