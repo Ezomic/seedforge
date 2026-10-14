@@ -41,6 +41,7 @@ add_executable(ichor_tests
     test_hydrology_cache.cpp
     test_file_io.cpp
     test_validation.cpp
+    test_phase_pipeline.cpp
     test_water_mesh.cpp
     test_water_field.cpp
     test_reverb.cpp
