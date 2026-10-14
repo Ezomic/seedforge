@@ -1108,7 +1108,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     const float tanHalf = std::tan(view.camera.fovY * 0.5f);
     data.skyParams = glm::vec4(tanHalf * aspect, tanHalf, view.time, view.rainIntensity);
     data.wind = glm::vec4(view.windDirection, view.windStrength, view.fogHeightFalloff);
-    data.shaftParams = glm::vec4(view.lightShafts, kShaftAnisotropy, 0.0f, 0.0f);
+    data.shaftParams = glm::vec4(view.lightShafts, kShaftAnisotropy, view.cloudCover, 0.0f);
     data.waterColor = glm::vec4(view.waterColor, view.waterEnabled ? 1.0f : 0.0f);
     data.waterParams = glm::vec4(view.waterLevel, 0.0f, 0.0f, 0.0f);
     data.gradeParams = glm::vec4(view.grade.saturation, view.grade.contrast, view.grade.exposure, 0.0f);

@@ -74,6 +74,7 @@ Atmosphere atmosphereAt(float hour)
     a.fogDensity = glm::mix(0.0006f, 0.0009f, 1.0f - day);
     a.fogHeightFalloff = 0.006f;
     a.lightShafts = 0.6f;
+    a.cloudCover = 0.45f; // a few clouds on a fair day
 
     // The wind veers slowly through the day.
     const float heading = 0.5f + 0.35f * std::sin(hour * 0.26f);
@@ -98,6 +99,7 @@ void applyAtmosphere(const Atmosphere& atmosphere, RenderView& view)
     view.windStrength = atmosphere.windStrength;
     view.fogHeightFalloff = atmosphere.fogHeightFalloff;
     view.lightShafts = atmosphere.lightShafts;
+    view.cloudCover = atmosphere.cloudCover;
 }
 
 }

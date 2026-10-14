@@ -1,3 +1,4 @@
+#include "ichor/gfx/render_view.h"
 #include "ichor/world/atmosphere.h"
 #include "ichor/world/weather.h"
 
@@ -92,4 +93,25 @@ TEST_CASE("cloud takes the light shafts away in proportion")
     Atmosphere half = clear;
     applyWeather({0.5f, 0.0f}, half);
     REQUIRE(half.lightShafts == Approx(clear.lightShafts * 0.5f));
+}
+
+TEST_CASE("cloud thickens the sky's cover towards solid, and clear weather leaves it as it was")
+{
+    const Atmosphere clear = atmosphereAt(12.0f);
+    REQUIRE(clear.cloudCover > 0.0f);
+    REQUIRE(clear.cloudCover < 0.5f); // a fair day has a few clouds
+    Atmosphere none = clear;
+    applyWeather({0.0f, 0.0f}, none);
+    REQUIRE(none.cloudCover == Approx(clear.cloudCover));
+    Atmosphere half = clear;
+    applyWeather({0.5f, 0.0f}, half);
+    REQUIRE(half.cloudCover > clear.cloudCover);
+    REQUIRE(half.cloudCover < 1.0f);
+    Atmosphere storm = clear;
+    applyWeather({1.0f, 1.0f}, storm);
+    REQUIRE(storm.cloudCover == Approx(1.0f));
+    RenderView view;
+    REQUIRE(view.cloudCover == 0.0f);
+    applyAtmosphere(storm, view);
+    REQUIRE(view.cloudCover == Approx(1.0f));
 }
