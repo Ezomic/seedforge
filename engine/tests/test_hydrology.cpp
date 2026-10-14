@@ -450,6 +450,7 @@ TEST_CASE("rivers are wider downstream, and the same on every forge")
     HydrologyParams rivers;
     rivers.riverThreshold = 200;
     rivers.springHalfWidth = 6.0f;
+    rivers.maxHalfWidth = 40.0f;
 
     const Heightfield first = carveRivers(field, h, rivers, CarveParams{});
     const Heightfield again = carveRivers(forgeHeightfield(desc), computeHydrology(forgeHeightfield(desc)), rivers, CarveParams{});
