@@ -153,10 +153,12 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
             Vertex v{};
             v.position = {static_cast<float>(i) * spacing, level[at], static_cast<float>(j) * spacing};
             v.normal = {0.0f, 1.0f, 0.0f};
-            const glm::vec2 flow = riverFlowAtSample(heightfield, hydrology, rivers, static_cast<std::int64_t>(firstX) + i, static_cast<std::int64_t>(firstZ) + j);
+            // Sunk vertices are under the ground; they carry no flow, so the ripple fades out towards the bank.
+            const glm::vec2 flow = wet[at] ? riverFlowAtSample(heightfield, hydrology, rivers, static_cast<std::int64_t>(firstX) + i, static_cast<std::int64_t>(firstZ) + j) : glm::vec2{0.0f, 0.0f};
             const float strength = glm::length(flow);
-            const glm::vec2 along = strength > 1e-4f ? flow / strength : glm::vec2{1.0f, 0.0f};
-            v.tangent = {along.x, 0.0f, along.y, strength > 1e-4f ? strength : 0.0f};
+            const bool flowing = strength > 1e-4f;
+            const glm::vec2 along = flowing ? flow / strength : glm::vec2{1.0f, 0.0f};
+            v.tangent = {along.x, 0.0f, along.y, flowing ? strength : 0.0f};
             v.weights[0] = 65535;
             // How far the surface stands over the ground here, in metres; the shader fades, tints and foams the
             // shore from it. Negative where the surface is sunk below the bank.

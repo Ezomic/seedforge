@@ -417,6 +417,21 @@ TEST_CASE("the flow of a river points downstream, and is nothing on dry ground, 
     REQUIRE(riverFlowAtSample(basin, wet, lakesOnly, 8, 8) == glm::vec2(0.0f));
 }
 
+TEST_CASE("a river running south flows towards positive z")
+{
+    const Heightfield field = gridOf(17, [](std::uint32_t x, std::uint32_t z) {
+        const std::uint32_t across = x > 8 ? x - 8 : 8 - x;
+        return static_cast<std::uint16_t>(2000 + (16 - z) * 5 + across * 100);
+    });
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 3;
+    rivers.maxHalfWidth = 0.0f;
+    const glm::vec2 mid = riverFlowAtSample(field, h, rivers, 8, 8);
+    REQUIRE(mid.y > 0.9f);
+    REQUIRE(std::abs(mid.x) < 0.1f);
+}
+
 TEST_CASE("river vertices carry a finite unit flow direction and its strength; lakes carry none")
 {
     const Heightfield field = gridOf(17, valleyRunningEast);

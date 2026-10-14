@@ -17,9 +17,11 @@ float2 ripple(float2 p, float time, float distance)
 
 // Slope of a river's surface: ridges that run across the current and travel down it. `flow` is the
 // current on the ground plane, its length how much of a river there is (zero on lakes and sea).
-// Pure in the position, the flow and the time: a phase is kept in cycles and wrapped, so neither a
-// far camera nor a long session costs it precision, and the time the caller keeps under an hour
-// holds each layer's frequency to whole cycles, so it does not jump when that wraps. Each layer fades out
+// Pure in the position, the flow and the time. The time is wrapped in cycles, and the caller keeps
+// it under an hour, which holds each layer to whole cycles so it does not jump when that wraps.
+// The camera's world position enters as a wrapped phase, but the phase is taken along the flow
+// direction, which turns with the interpolated flow on bends; far from the origin that bends the
+// ridges in proportion to the distance, so very far from the origin they lose their shape. Each layer fades out
 // with distance, where it would only shimmer.
 float2 riverRipple(float2 relative, float2 cameraWorld, float2 flow, float time, float distance)
 {
