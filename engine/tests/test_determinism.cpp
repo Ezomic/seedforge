@@ -19,6 +19,7 @@
 #include <format>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -39,11 +40,9 @@ const std::filesystem::path kExpectedPath = std::filesystem::path(ICHOR_TEST_DAT
 constexpr const char* kRegenerate = "If the change was meant to alter worldgen or the simulation, regenerate the file with ICHOR_UPDATE_DETERMINISM=1 "
                                     "and commit it. If not, this is a determinism regression: do not regenerate.";
 
-struct Observed {
-    std::uint64_t heightfield = 0;
-    std::uint64_t hydrology = 0;
-    std::uint64_t state = 0;
-};
+// Named values, so a mismatch says which part of the world or the simulation moved and, for the walked
+// scene, at which tick it first did.
+using Observed = std::map<std::string, std::uint64_t>;
 
 using Observations = std::vector<std::pair<std::uint64_t, Observed>>;
 
@@ -64,7 +63,7 @@ std::uint64_t hashBytes(const std::vector<std::uint8_t>& bytes)
 
 // A scene with ground, a wall and a character, walked by seeded random input: physics, movement and
 // the scene's own state hash, which an empty scene would leave almost untouched.
-std::uint64_t walkedSceneHash(std::uint64_t seed)
+void walkScene(std::uint64_t seed, Observed& out)
 {
     Scene scene(seed);
     SpawnCommand ground;
@@ -91,11 +90,14 @@ std::uint64_t walkedSceneHash(std::uint64_t seed)
         frame.moveY = static_cast<float>(rng.range(0, 2)) - 1.0f;
         frame.buttons = rng.range(0, 1) * InputFrame::Sprint;
         scene.tick(1.0 / 60.0, frame);
+        const std::uint64_t ticks = scene.tickCount();
+        if (ticks == 1 || ticks == 30 || ticks == 60 || ticks == 120 || ticks == 240) {
+            out[std::format("physics_t{:03}", ticks)] = scene.stateHash();
+        }
     }
-    return scene.stateHash();
 }
 
-std::uint64_t headlessStateHash(std::uint64_t seed)
+void headlessRun(std::uint64_t seed, Observed& out)
 {
     NullPlatform platform;
     NullRenderer renderer;
@@ -107,7 +109,8 @@ std::uint64_t headlessStateHash(std::uint64_t seed)
     for (int i = 0; i < kFrames; ++i) {
         REQUIRE(engine.frame(config.fixedDt));
     }
-    return hashCombine(engine.scene().stateHash(), walkedSceneHash(seed));
+    out["engine"] = engine.scene().stateHash();
+    walkScene(seed, out);
 }
 
 Observed observe(std::uint64_t seed)
@@ -117,7 +120,11 @@ Observed observe(std::uint64_t seed)
     const Hydrology hydrology = computeHydrology(field);
     REQUIRE_FALSE(hydrology.empty());
     REQUIRE(*std::ranges::max_element(hydrology.accumulation) > 100); // a digest of a trivial result would pin nothing
-    return {field.digest(), hashBytes(encodeHydrologyCache(field, hydrology)), headlessStateHash(seed)};
+    Observed seen;
+    seen["heightfield"] = field.digest();
+    seen["hydrology"] = hashBytes(encodeHydrologyCache(field, hydrology));
+    headlessRun(seed, seen);
+    return seen;
 }
 
 Observations observeAll()
@@ -139,7 +146,9 @@ std::string render(const Observations& all)
     nlohmann::ordered_json root;
     root["frames"] = kFrames;
     for (const auto& [seed, seen] : all) {
-        root["seeds"][std::to_string(seed)] = {{"heightfield", hex(seen.heightfield)}, {"hydrology", hex(seen.hydrology)}, {"state", hex(seen.state)}};
+        for (const auto& [name, value] : seen) {
+            root["seeds"][std::to_string(seed)][name] = hex(value);
+        }
     }
     return root.dump(2) + "\n";
 }
@@ -162,13 +171,11 @@ std::vector<std::string> compare(const std::string& text, const Observations& al
             problems.push_back(std::format("seed {}: no expected values in determinism.json. {}", seed, kRegenerate));
             continue;
         }
-        const std::pair<const char*, std::uint64_t> values[] = {{"heightfield", seen.heightfield}, {"hydrology", seen.hydrology}, {"state", seen.state}};
-        for (const auto& [name, actual] : values) {
+        for (const auto& [name, actual] : seen) {
             const auto expected = entry->find(name);
             const std::string want = expected != entry->end() && expected->is_string() ? expected->get<std::string>() : "(missing)";
             if (want != hex(actual)) {
-                problems.push_back(std::format("seed {}: the {} {} moved: expected {} but got {}. {}", seed, name,
-                    std::string(name) == "state" ? "hash" : "digest", want, hex(actual), kRegenerate));
+                problems.push_back(std::format("seed {}: {} moved: expected {} but got {}. {}", seed, name, want, hex(actual), kRegenerate));
             }
         }
     }
@@ -222,15 +229,14 @@ TEST_CASE("determinism: observing a seed twice gives the same values")
     for (const std::uint64_t seed : kSeeds) {
         const Observed a = observe(seed);
         const Observed b = observe(seed);
-        REQUIRE(a.heightfield == b.heightfield);
-        REQUIRE(a.hydrology == b.hydrology);
-        REQUIRE(a.state == b.state);
+        REQUIRE(a == b);
     }
     const Observed one = observe(1);
     const Observed other = observe(42);
-    REQUIRE(one.heightfield != other.heightfield);
-    REQUIRE(one.hydrology != other.hydrology);
-    REQUIRE(one.state != other.state);
+    REQUIRE(one.size() == other.size());
+    for (const auto& [name, value] : one) {
+        REQUIRE(value != other.at(name));
+    }
 }
 
 TEST_CASE("determinism: a moved value, a missing seed and a broken file are each reported by name, not crashed on")
@@ -240,17 +246,17 @@ TEST_CASE("determinism: a moved value, a missing seed and a broken file are each
     REQUIRE(compare(good, all).empty());
 
     Observations moved = all;
-    moved[2].second.hydrology ^= 1;
+    moved[2].second["hydrology"] ^= 1;
     const auto movedProblems = compare(good, moved);
     REQUIRE(movedProblems.size() == 1);
-    REQUIRE(movedProblems[0].find("seed 42: the hydrology digest moved") != std::string::npos);
+    REQUIRE(movedProblems[0].find("seed 42: hydrology moved") != std::string::npos);
     REQUIRE(movedProblems[0].find("ICHOR_UPDATE_DETERMINISM=1") != std::string::npos);
 
     Observations drifted = all;
-    drifted[3].second.state ^= 1;
+    drifted[3].second["physics_t060"] ^= 1;
     const auto driftedProblems = compare(good, drifted);
     REQUIRE(driftedProblems.size() == 1);
-    REQUIRE(driftedProblems[0].find("seed 18446744073709551615: the state hash moved") != std::string::npos);
+    REQUIRE(driftedProblems[0].find("seed 18446744073709551615: physics_t060 moved") != std::string::npos);
 
     Observations extra = all;
     extra.emplace_back(7, all[0].second);
