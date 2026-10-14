@@ -13,6 +13,7 @@
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/ui/ledger.h"
+#include "ichor/ui/map_screen.h"
 #include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
@@ -74,6 +75,7 @@ struct Options {
     std::string loadSlot;
     bool ironman = false;
     bool editor = false;
+    bool showMap = false;
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -133,6 +135,8 @@ bool parse(int argc, char** argv, Options& options)
             options.screenshot = argv[++i];
         } else if (arg == "--editor") {
             options.editor = true;
+        } else if (arg == "--map") {
+            options.showMap = true;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -515,6 +519,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::UiContext> ui;
     std::unique_ptr<ichor::Hud> hud;
     std::unique_ptr<ichor::Ledger> ledger;
+    std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     bool paused = false;
     float hudHeading = 0.0f;
@@ -534,12 +539,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (fontsLoaded) {
             hud = std::make_unique<ichor::Hud>(*ui);
             ledger = std::make_unique<ichor::Ledger>(*ui);
+            mapScreen = std::make_unique<ichor::MapScreen>(*ui);
+            mapScreen->setImage(ichor::renderMapImage(heightfield));
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !pauseMenu->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !mapScreen->ok() || !pauseMenu->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             pauseMenu.reset();
+            mapScreen.reset();
             ledger.reset();
             hud.reset();
             ui.reset();
@@ -547,6 +555,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     if (ui) {
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
+        if (options.showMap && !editing) {
+            mapScreen->setVisible(true);
+        }
         // The simulation clock drives the UI, so a replay sees the same animations.
         renderer.setUiHooks(
             [&](std::uint32_t width, std::uint32_t height) {
@@ -558,6 +569,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                         rows.push_back({std::move(line.time), std::move(line.category), std::move(line.text)});
                     }
                     ledger->setRows(rows);
+                }
+                if (mapScreen->visible()) {
+                    const glm::dvec3 feet = playerPosition(engine.scene());
+                    mapScreen->setPlayer(ichor::mapPosition(heightfield.desc(), feet.x, feet.z), hudHeading);
                 }
                 ui->update(engine.scene().time());
             },
@@ -651,6 +666,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
     bool journalHeld = false;
+    bool mapHeld = false;
     bool menuHeld = false;
     bool pointerHeld = false;
     bool pickHeld = false;
@@ -671,10 +687,20 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         // The journal is only a view, so it works in a replay too.
         const bool menu = (buttons & ichor::InputFrame::Menu) != 0;
         if (menu && !menuHeld && pauseMenu) {
-            paused = !paused;
-            pauseMenu->setVisible(paused);
+            if (mapScreen && mapScreen->visible()) {
+                mapScreen->setVisible(false); // Esc first puts the map away
+            } else {
+                paused = !paused;
+                pauseMenu->setVisible(paused);
+            }
         }
         menuHeld = menu;
+        // A map in view holds the world still, as a pause does, so the player is not moved from behind it.
+        const bool mapKey = (buttons & ichor::InputFrame::Map) != 0;
+        if (mapKey && !mapHeld && mapScreen && !editing) {
+            mapScreen->setVisible(!mapScreen->visible());
+        }
+        mapHeld = mapKey;
         const bool journal = (buttons & ichor::InputFrame::Journal) != 0;
         // Tab moves between the editor's fields, so there it does not open the journal.
         if (journal && !journalHeld && ledger && !editing) {
@@ -698,6 +724,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     pointerHeld = false;
                 }
                 ui->mouseLeave();
+            }
+            if (mapScreen->takeCloseRequest()) {
+                mapScreen->setVisible(false);
             }
             if (ledger->takeCloseRequest()) {
                 ledger->setVisible(false);
@@ -779,7 +808,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
-        const double dt = options.headless ? config.fixedDt : paused ? 0.0 : now - last;
+        const double dt = options.headless ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) ? 0.0 : now - last;
         last = now;
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
@@ -872,7 +901,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor] [--map] [--screenshot file.png]");
         return 2;
     }
 

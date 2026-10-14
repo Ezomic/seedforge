@@ -11,6 +11,7 @@
 #include "ichor/ui/hud.h"
 #include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ledger.h"
+#include "ichor/ui/map_screen.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/world/atmosphere.h"
 #include "ichor/world/vegetation.h"
@@ -617,6 +618,60 @@ TEST_CASE("golden image: the ledger over the world")
     }
     const Diff diff = compare(actual, expected, 16);
     writePng(kOutDir / "ui_ledger.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the map over the world")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    Heightfield heightfield;
+    REQUIRE(readWorld(std::filesystem::path(ICHOR_CONTENT_DIR) / "world", heightfield));
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    MapScreen map(ui);
+    REQUIRE(map.ok());
+    map.setImage(renderMapImage(heightfield));
+    map.setPlayer(mapPosition(heightfield.desc(), heightfield.desc().sizeMetres * 0.4, heightfield.desc().sizeMetres * 0.6), 0.8f);
+    map.setVisible(true);
+    ui.update(0.0);
+
+    RenderView view;
+    applyAtmosphere(atmosphereAt(17.5f), view);
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(-0.5f, 0.15f, -1.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "ui_map.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "ui_map.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_map.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "ui_map.diff.png", kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);

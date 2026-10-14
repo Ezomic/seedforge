@@ -61,6 +61,7 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_F9]) frame.buttons |= InputFrame::QuickLoad;
     if (keys[SDL_SCANCODE_TAB]) frame.buttons |= InputFrame::Journal;
     if (keys[SDL_SCANCODE_ESCAPE]) frame.buttons |= InputFrame::Menu;
+    if (keys[SDL_SCANCODE_M]) frame.buttons |= InputFrame::Map;
 
     // The mouse is reported in window units; the UI works in drawable pixels, which differ on a scaled display.
     float mouseX = 0.0f;
