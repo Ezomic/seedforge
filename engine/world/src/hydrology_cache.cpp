@@ -1,21 +1,13 @@
 #include "ichor/world/hydrology_cache.h"
 
 #include "ichor/core/binary.h"
+#include "ichor/core/file_io.h"
 #include "ichor/core/hash.h"
 #include "ichor/core/log.h"
 
 #include <array>
-#include <atomic>
 #include <cstring>
-#include <fstream>
-#include <iterator>
 #include <string_view>
-
-#ifdef _WIN32
-#include <process.h>
-#else
-#include <unistd.h>
-#endif
 
 namespace ichor {
 
@@ -67,43 +59,6 @@ bool structurallySound(const Hydrology& h, std::uint32_t side)
         if (id > h.lakeDeepest.size()) {
             return false;
         }
-    }
-    return true;
-}
-
-std::filesystem::path uniqueTemp(const std::filesystem::path& path)
-{
-    static std::atomic<unsigned> counter{0};
-#ifdef _WIN32
-    const auto pid = static_cast<unsigned long>(_getpid());
-#else
-    const auto pid = static_cast<unsigned long>(getpid());
-#endif
-    return path.string() + "." + std::to_string(pid) + "." + std::to_string(counter++) + ".tmp";
-}
-
-bool writeAtomically(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes)
-{
-    const std::filesystem::path temp = uniqueTemp(path);
-    {
-        std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            return false;
-        }
-        out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        out.flush();
-        if (!out) {
-            out.close();
-            std::error_code ignored;
-            std::filesystem::remove(temp, ignored);
-            return false;
-        }
-    }
-    std::error_code ec;
-    std::filesystem::rename(temp, path, ec);
-    if (ec) {
-        std::filesystem::remove(temp, ec);
-        return false;
     }
     return true;
 }
@@ -162,23 +117,16 @@ bool decodeHydrologyCache(const std::vector<std::uint8_t>& bytes, const Heightfi
 Hydrology loadOrComputeHydrology(const std::filesystem::path& directory, const Heightfield& heightfield)
 {
     const std::filesystem::path path = directory / "hydrology.ihyd";
-    {
-        std::error_code ec;
-        std::ifstream in;
-        if (std::filesystem::is_regular_file(path, ec)) {
-            in.open(path, std::ios::binary);
+    std::vector<std::uint8_t> bytes;
+    if (readFileBytes(path, bytes)) {
+        Hydrology cached;
+        if (decodeHydrologyCache(bytes, heightfield, cached)) {
+            return cached;
         }
-        if (in) {
-            const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            Hydrology cached;
-            if (decodeHydrologyCache(bytes, heightfield, cached)) {
-                return cached;
-            }
-            logf(LogLevel::Warn, "{} is stale or damaged; computing the hydrology again", path.string());
-        }
+        logf(LogLevel::Warn, "{} is stale or damaged; computing the hydrology again", path.string());
     }
     Hydrology computed = computeHydrology(heightfield);
-    if (!computed.empty() && !writeAtomically(path, encodeHydrologyCache(heightfield, computed))) {
+    if (!computed.empty() && !writeFileAtomically(path, encodeHydrologyCache(heightfield, computed))) {
         logf(LogLevel::Warn, "cannot write {}; the hydrology will be computed again next run", path.string());
     }
     return computed;
