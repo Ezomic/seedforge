@@ -30,6 +30,7 @@
 #include "ichor/script/script_host.h"
 #include "ichor/sim/scene_io.h"
 #include "ichor/world/atmosphere.h"
+#include "ichor/world/hydrology_cache.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
 #include "ichor/world/weather.h"
@@ -275,7 +276,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::shared_ptr<const ichor::Hydrology> hydrology;
     std::unique_ptr<ichor::WaterField> waterField;
     if (!heightfield.empty()) {
-        hydrology = std::make_shared<const ichor::Hydrology>(ichor::computeHydrology(heightfield));
+        hydrology = std::make_shared<const ichor::Hydrology>(ichor::loadOrComputeHydrology(options.world, heightfield));
         waterField = std::make_unique<ichor::WaterField>(heightfield, hydrology, streaming.rivers, streaming.waterMesh);
         streaming.hydrology = hydrology;
     }
