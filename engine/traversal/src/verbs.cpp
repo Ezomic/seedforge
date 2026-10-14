@@ -28,12 +28,7 @@ constexpr std::array<std::pair<std::string_view, Terrain>, 5> kTerrainNames = {{
     {"deep_water", Terrain::DeepWater},
 }};
 
-float cleanMetres(float value)
-{
-    return value > 0.0f ? value : 0.0f;
-}
-
-float cleanDegrees(float value)
+float nonNegative(float value)
 {
     return value > 0.0f ? value : 0.0f;
 }
@@ -107,7 +102,7 @@ float Verb::speedFactor(float waterDepth) const
     if (!depthScaled) {
         return static_cast<float>(speedPermille) / 1000.0f;
     }
-    // The same operations, in the same order, as wadingSpeedFactor in world/water_field.cpp.
+    // The same operations, in the same order, as wadingSpeedFactor (world/water_field.h), which the wade verb must equal bit for bit.
     if (!(waterDepth > kWadeStart)) {
         return 1.0f;
     }
@@ -122,6 +117,13 @@ std::optional<VerbSet> VerbSet::fromTable(const DataTable& table, std::string& e
     for (const auto& [id, record] : table.records) {
         Verb verb;
         verb.id = id;
+
+        for (const auto& [name, value] : record.fields) {
+            if (name != "capability" && name != "terrain" && name != "speed_permille" && name != "stamina_per_second" && name != "depth_scaled") {
+                error = "verb '" + id + "': unknown field \"" + name + "\"";
+                return std::nullopt;
+            }
+        }
 
         const auto capability = record.fields.find("capability");
         if (capability != record.fields.end()) {
@@ -183,6 +185,10 @@ std::optional<VerbSet> VerbSet::fromVerbs(std::vector<Verb> verbs, std::string& 
             error = where(verb.id, "speed_permille") + "must be between 0 and " + std::to_string(kMaxSpeedPermille);
             return std::nullopt;
         }
+        if (verb.depthScaled && ((verb.terrain != Terrain::ShallowWater && verb.terrain != Terrain::Water) || verb.speedPermille > 1000)) {
+            error = where(verb.id, "depth_scaled") + "needs a water terrain and a speed_permille of at most 1000";
+            return std::nullopt;
+        }
         if (verb.staminaPerSecond < 0 || verb.staminaPerSecond > kMaxStaminaPerSecond) {
             error = where(verb.id, "stamina_per_second") + "must be between 0 and " + std::to_string(kMaxStaminaPerSecond);
             return std::nullopt;
@@ -195,8 +201,8 @@ std::optional<VerbSet> VerbSet::fromVerbs(std::vector<Verb> verbs, std::string& 
 
 bool terrainFits(Terrain terrain, const Situation& situation)
 {
-    const float depth = cleanMetres(situation.waterDepth);
-    const float slope = cleanDegrees(situation.slopeDegrees);
+    const float depth = nonNegative(situation.waterDepth);
+    const float slope = nonNegative(situation.slopeDegrees);
     const bool dry = !(depth > kWadeStart);
     switch (terrain) {
     case Terrain::Ground:
@@ -216,7 +222,7 @@ bool terrainFits(Terrain terrain, const Situation& situation)
 Availability availableVerbs(const VerbSet& set, const CapabilitySet& capabilities, const Situation& situation)
 {
     Availability result;
-    const float depth = cleanMetres(situation.waterDepth);
+    const float depth = nonNegative(situation.waterDepth);
     float bestSpeed = 0.0f;
     for (std::size_t i = 0; i < set.verbs().size(); ++i) {
         const Verb& verb = set.verbs()[i];

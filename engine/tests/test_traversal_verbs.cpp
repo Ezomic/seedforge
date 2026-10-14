@@ -125,7 +125,46 @@ TEST_CASE("a verb that is not depth scaled has the same speed at any depth")
     const VerbSet set = shippedSet();
     CHECK(verbNamed(set, "walk").speedFactor(0.0f) == 1.0f);
     CHECK(verbNamed(set, "walk").speedFactor(kNaN) == 1.0f);
-    CHECK(verbNamed(set, "swim").speedFactor(3.0f) == verbNamed(set, "swim").speedPermille / 1000.0f);
+    CHECK(verbNamed(set, "swim").speedFactor(3.0f) == 0.45f);
+    CHECK(verbNamed(set, "swim").staminaPerSecond == 8);
+}
+
+TEST_CASE("speed and the best verb follow the capability, and ties and zero speed are handled")
+{
+    const VerbSet set = shippedSet();
+    CapabilitySet boater;
+    boater.add(Capability::Boat);
+    const Availability onWater = availableVerbs(set, boater, { true, 0.5f, 0.0f });
+    REQUIRE(onWater.best.has_value());
+    CHECK(set.verbs()[*onWater.best].id == "boat");
+    CHECK(onWater.speedFactor == 1.4f);
+    CHECK(availableVerbs(set, CapabilitySet {}, { true, 0.5f, 0.0f }).speedFactor == wadingSpeedFactor(0.5f));
+
+    std::string error;
+    Verb a;
+    a.id = "a";
+    Verb b;
+    b.id = "b";
+    const auto tied = VerbSet::fromVerbs({ b, a }, error);
+    REQUIRE(tied.has_value());
+    CHECK(tied->verbs()[*availableVerbs(*tied, CapabilitySet {}, { true, 0.0f, 0.0f }).best].id == "a");
+
+    a.speedPermille = 0;
+    const auto stopped = VerbSet::fromVerbs({ a }, error);
+    REQUIRE(stopped.has_value());
+    const Availability still = availableVerbs(*stopped, CapabilitySet {}, { true, 0.0f, 0.0f });
+    REQUIRE(still.best.has_value());
+    CHECK(still.speedFactor == 0.0f);
+}
+
+TEST_CASE("an unknown field, or a depth scaled verb on dry ground, is an error")
+{
+    std::string error;
+    CHECK_FALSE(setFromJson(verbJson(kGoodFields + ", \"capabilty\": \"swim\""), error).has_value());
+    CHECK(error.find("capabilty") != std::string::npos);
+    CHECK_FALSE(setFromJson(verbJson(kGoodFields + ", \"depth_scaled\": true"), error).has_value());
+    CHECK(error.find("depth_scaled") != std::string::npos);
+    CHECK(CapabilitySet {}.has(Capability::None));
 }
 
 TEST_CASE("with no capabilities a player walks and wades but does not swim, dive, climb or boat")
