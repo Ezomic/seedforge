@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/assets/bundle.h"
+#include "ichor/audio/ducking.h"
 #include "ichor/audio/reverb.h"
 
 #include <glm/vec3.hpp>
@@ -29,7 +30,9 @@ public:
 
     // Positions stay double until the listener-relative offset is formed, so
     // far from the origin the panning does not jitter.
-    void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial);
+    // A categorised voice is capped by its ceiling and ducks the looping beds while it plays (see ducking.h). A NaN gain plays silent.
+    void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial,
+        SoundCategory category = SoundCategory::None);
     // One looping, non-spatial voice per clip, made on first use. The gain eases toward the target
     // (a time constant of about a quarter second) so a changing value never clicks; NaN counts as silence and the rest is clamped to 0..1.
     void setLoopGain(std::uint32_t clip, float gain);
@@ -55,6 +58,7 @@ private:
         glm::dvec3 position{0.0};
         float gain = 1.0f;
         bool spatial = false;
+        SoundCategory category = SoundCategory::None;
     };
 
     struct Loop {
@@ -69,6 +73,7 @@ private:
     std::vector<Voice> voices_;
     std::vector<Loop> loops_;
     Reverb reverb_;
+    float duck_ = 1.0f;
     glm::dvec3 listenerPosition_{0.0};
     glm::vec3 listenerForward_{0.0f, 0.0f, -1.0f};
     glm::vec3 listenerRight_{1.0f, 0.0f, 0.0f};

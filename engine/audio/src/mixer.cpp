@@ -39,7 +39,7 @@ std::uint32_t Mixer::findClip(std::string_view name) const
     return kNoSound;
 }
 
-void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial)
+void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial, SoundCategory category)
 {
     const std::lock_guard lock(mutex_);
     if (clip >= clips_.size() || clips_[clip].samples.empty()) {
@@ -51,7 +51,8 @@ void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spati
     if (voices_.capacity() < kMaxVoices) {
         voices_.reserve(kMaxVoices);
     }
-    voices_.push_back({clip, 0.0, position, gain, spatial});
+    voices_.push_back({clip, 0.0, position, voiceGain(category, gain),
+        spatial, category});
 }
 
 void Mixer::setLoopGain(std::uint32_t clip, float gain)
@@ -88,6 +89,17 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
 {
     const std::lock_guard lock(mutex_);
     std::fill(interleaved, interleaved + static_cast<std::size_t>(frames) * kChannels, 0.0f);
+    if (frames == 0) {
+        return;
+    }
+
+    CategoryActivity active{};
+    for (const Voice& voice : voices_) {
+        active[static_cast<std::size_t>(voice.category)] = true;
+    }
+    const float duckFrom = duck_;
+    duck_ = nextDuckGain(duckFrom, duckTarget(active), static_cast<float>(frames) / static_cast<float>(kRate));
+    const float duckStep = (duck_ - duckFrom) / static_cast<float>(frames);
 
     for (Voice& voice : voices_) {
         const Clip& clip = clips_[voice.clip];
@@ -116,7 +128,7 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
             const float t = static_cast<float>(voice.cursor - static_cast<double>(index));
             const float a = static_cast<float>(clip.samples[index]) / 32768.0f;
             const float b = static_cast<float>(clip.samples[index + 1]) / 32768.0f;
-            const float sample = a + (b - a) * t;
+            const float sample = (a + (b - a) * t);
             interleaved[f * 2] += sample * left;
             interleaved[f * 2 + 1] += sample * right;
             voice.cursor += step;
@@ -135,7 +147,7 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
                 const float t = static_cast<float>(loop.cursor - static_cast<double>(index));
                 const float a = static_cast<float>(clip.samples[index]) / 32768.0f;
                 const float b = static_cast<float>(clip.samples[next]) / 32768.0f;
-                const float sample = (a + (b - a) * t) * loop.gain;
+                const float sample = (a + (b - a) * t) * loop.gain * (duckFrom + duckStep * static_cast<float>(f + 1));
                 interleaved[f * 2] += sample;
                 interleaved[f * 2 + 1] += sample;
             }
