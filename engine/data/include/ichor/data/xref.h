@@ -41,9 +41,11 @@ struct XrefReport {
     // Rules whose target table has no records at all yet, listed as "source.field -> target".
     // They are not checked; the day the table appears they are enforced.
     std::vector<std::string> unchecked;
+    // Nested documents (conflicts/*.json, synergies/*.json) that could not be read or are not the expected shape, so their references could not be followed.
+    std::vector<std::string> unreadable;
     std::size_t checked = 0;
 
-    bool ok() const { return dangling.empty(); }
+    bool ok() const { return dangling.empty() && unreadable.empty(); }
 };
 
 XrefReport checkReferences(const DataSet& data, const AxiomSet& axioms, const std::filesystem::path& dataRoot);

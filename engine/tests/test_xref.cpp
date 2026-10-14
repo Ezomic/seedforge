@@ -3,6 +3,7 @@
 #include "ichor/data/xref.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -100,7 +101,8 @@ TEST_CASE("a set with no dangling reference passes and counts what it checked", 
     cleanSet(fixture);
     const Loaded loaded = run(fixture);
     CHECK(loaded.report.ok());
-    CHECK(loaded.report.checked >= 5);
+    CHECK(loaded.report.checked == 5);
+    CHECK(contains(loaded.report.unchecked, "axioms.poi.weights -> pois"));
 }
 
 TEST_CASE("a dangling biome is reported with its file, record, field and value", "[xref]")
@@ -187,6 +189,18 @@ TEST_CASE("custom rules read weight-map keys and string fields", "[xref]")
                            });
 }
 
+TEST_CASE("a nested document that cannot be read is reported, not skipped", "[xref]")
+{
+    Fixture fixture;
+    cleanSet(fixture);
+    fixture.write("synergies/broken.json", R"({"synergies": 5})");
+    fixture.write("conflicts/conflicts.json", R"({"pairs": "no"})");
+    const Loaded loaded = run(fixture);
+    CHECK_FALSE(loaded.report.ok());
+    CHECK(loaded.report.dangling.empty());
+    CHECK(loaded.report.unreadable == std::vector<std::string>{"conflicts/conflicts.json", "synergies/broken.json"});
+}
+
 TEST_CASE("the shipped data has no dangling reference", "[xref]")
 {
     const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
@@ -212,13 +226,12 @@ TEST_CASE("removing a real record from the shipped data turns the check red", "[
     // npcs/traits.json: "bitter" names "cheerful" as incompatible, so dropping "cheerful" strands it.
     const std::filesystem::path file = fixture.root() / "npcs" / "traits.json";
     std::ifstream in(file, std::ios::binary);
-    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    nlohmann::json traits = nlohmann::json::parse(in);
     in.close();
-    const std::size_t at = text.find("{\"id\": \"cheerful\"");
-    REQUIRE(at != std::string::npos);
-    const std::size_t end = text.find('\n', at);
-    REQUIRE(end != std::string::npos);
-    fixture.write("npcs/traits.json", text.substr(0, at) + text.substr(end + 1));
+    const auto before = traits.size();
+    traits.erase(std::remove_if(traits.begin(), traits.end(), [](const nlohmann::json& trait) { return trait["id"] == "cheerful"; }), traits.end());
+    REQUIRE(traits.size() == before - 1);
+    fixture.write("npcs/traits.json", traits.dump());
 
     DataSet data;
     AxiomSet axioms;

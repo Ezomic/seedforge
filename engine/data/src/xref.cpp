@@ -130,15 +130,15 @@ bool readJson(const std::filesystem::path& file, Json& out)
     return !out.is_discarded();
 }
 
-// A file that does not parse is the format loaders' problem; this only follows references.
-void checkConflictFiles(Checker& checker, const std::filesystem::path& dataRoot)
+void checkConflictFiles(Checker& checker, const std::filesystem::path& dataRoot, std::vector<std::string>& unreadable)
 {
     for (const std::filesystem::path& file : jsonFiles(dataRoot / "conflicts")) {
         Json json;
+        const std::string label = std::filesystem::relative(file, dataRoot).generic_string();
         if (!readJson(file, json) || !json.is_object() || !json.contains("pairs") || !json["pairs"].is_array()) {
+            unreadable.push_back(label);
             continue;
         }
-        const std::string label = std::filesystem::relative(file, dataRoot).generic_string();
         const Json& pairs = json["pairs"];
         for (std::size_t i = 0; i < pairs.size(); ++i) {
             if (!pairs[i].is_array()) {
@@ -154,14 +154,15 @@ void checkConflictFiles(Checker& checker, const std::filesystem::path& dataRoot)
     }
 }
 
-void checkSynergyFiles(Checker& checker, const std::filesystem::path& dataRoot)
+void checkSynergyFiles(Checker& checker, const std::filesystem::path& dataRoot, std::vector<std::string>& unreadable)
 {
     for (const std::filesystem::path& file : jsonFiles(dataRoot / "synergies")) {
         Json json;
+        const std::string label = std::filesystem::relative(file, dataRoot).generic_string();
         if (!readJson(file, json) || !json.is_object() || !json.contains("synergies") || !json["synergies"].is_array()) {
+            unreadable.push_back(label);
             continue;
         }
-        const std::string label = std::filesystem::relative(file, dataRoot).generic_string();
         const Json& synergies = json["synergies"];
         for (std::size_t i = 0; i < synergies.size(); ++i) {
             const Json& synergy = synergies[i];
@@ -210,7 +211,9 @@ XrefReport checkReferences(const DataSet& data, const AxiomSet& axioms, const st
                     checker.check(axiom.file, id, std::string(rule.field), rule.target, word);
                 }
             }
-        } else if (const DataTable* table = data.table(rule.source)) {
+        } else if (const DataTable* table = data.table(rule.source); table == nullptr) {
+            report.unchecked.push_back(std::string(rule.source) + "." + std::string(rule.field) + " (no such source table)");
+        } else {
             for (const auto& [id, record] : table->records) {
                 for (const std::string& word : recordWords(record, rule.field)) {
                     checker.check(record.file, id, std::string(rule.field), rule.target, word);
@@ -218,8 +221,8 @@ XrefReport checkReferences(const DataSet& data, const AxiomSet& axioms, const st
             }
         }
     }
-    checkConflictFiles(checker, dataRoot);
-    checkSynergyFiles(checker, dataRoot);
+    checkConflictFiles(checker, dataRoot, report.unreadable);
+    checkSynergyFiles(checker, dataRoot, report.unreadable);
 
     std::sort(checker.dangling.begin(), checker.dangling.end(), [](const DanglingRef& a, const DanglingRef& b) {
         return std::tie(a.file, a.record, a.field, a.value) < std::tie(b.file, b.record, b.field, b.value);
@@ -227,6 +230,7 @@ XrefReport checkReferences(const DataSet& data, const AxiomSet& axioms, const st
     report.dangling = std::move(checker.dangling);
     report.checked = checker.checked;
     std::sort(report.unchecked.begin(), report.unchecked.end());
+    std::sort(report.unreadable.begin(), report.unreadable.end());
     return report;
 }
 
