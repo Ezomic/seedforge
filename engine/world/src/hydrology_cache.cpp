@@ -163,7 +163,11 @@ Hydrology loadOrComputeHydrology(const std::filesystem::path& directory, const H
 {
     const std::filesystem::path path = directory / "hydrology.ihyd";
     {
-        std::ifstream in(path, std::ios::binary);
+        std::error_code ec;
+        std::ifstream in;
+        if (std::filesystem::is_regular_file(path, ec)) {
+            in.open(path, std::ios::binary);
+        }
         if (in) {
             const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             Hydrology cached;
