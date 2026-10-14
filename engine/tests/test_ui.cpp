@@ -330,6 +330,10 @@ TEST_CASE("health is shown as a whole percent, clamped, and anything unusable re
     REQUIRE(healthPercent(50.0f, 100.0f) == 50);
     REQUIRE(healthPercent(0.0f, 100.0f) == 0);
     REQUIRE(healthPercent(33.4f, 100.0f) == 33);
+    REQUIRE(healthPercent(29.0f, 100.0f) == 29);
+    REQUIRE(healthPercent(57.0f, 100.0f) == 57);
+    REQUIRE(healthPercent(7.0f, 100.0f) == 7);
+    REQUIRE(healthPercent(1.0f, 3.0f) == 33);
     REQUIRE(healthPercent(-20.0f, 100.0f) == 0);   // negative health
     REQUIRE(healthPercent(250.0f, 100.0f) == 100); // above max
     REQUIRE(healthPercent(50.0f, 0.0f) == 0);      // zero max
@@ -377,9 +381,16 @@ TEST_CASE("the HUD health bar follows health and survives bad values every frame
     frame(ui, renderer, 0.4);
     REQUIRE(renderer.draws().size() == empty);
 
-    hud.update(0.0f, 9.0f, 0.0f, std::nanf(""), 100.0f);
+    hud.update(0.0f, 9.0f, 0.0f, 50.0f, 100.0f); // a half bar is drawn
+    frame(ui, renderer, 0.45);
+    REQUIRE(renderer.draws().size() == full);
+
+    hud.update(0.0f, 9.0f, 0.0f, std::nanf(""), 100.0f); // from a drawn bar to empty
     frame(ui, renderer, 0.5);
     REQUIRE(renderer.draws().size() == empty);
+    hud.update(0.0f, 9.0f, 0.0f, 100.0f, 100.0f);
+    frame(ui, renderer, 0.55);
+    REQUIRE(renderer.draws().size() == full);
     hud.update(0.0f, 9.0f, 0.0f, INFINITY, INFINITY);
     frame(ui, renderer, 0.6);
     REQUIRE(renderer.draws().size() == empty);

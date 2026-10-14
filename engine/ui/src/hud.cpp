@@ -5,10 +5,10 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
-#include <algorithm>
 
 namespace ichor {
 
@@ -68,7 +68,7 @@ int healthPercent(float health, float maxHealth)
     if (!std::isfinite(health) || !std::isfinite(maxHealth) || !(maxHealth > 0.0f)) {
         return 0;
     }
-    return static_cast<int>(std::floor(std::clamp(health / maxHealth, 0.0f, 1.0f) * 100.0f));
+    return static_cast<int>(std::floor(std::clamp(health, 0.0f, maxHealth) * 100.0f / maxHealth));
 }
 
 std::string clockLabel(float hour)
