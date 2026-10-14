@@ -6,6 +6,7 @@
 #include <format>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <system_error>
 
 namespace ichor {
@@ -32,6 +33,10 @@ std::string_view trim(std::string_view text)
 bool parseFloat(std::string_view text, float& out)
 {
     const auto result = std::from_chars(text.data(), text.data() + text.size(), out);
+    if (result.ec == std::errc::result_out_of_range && result.ptr == text.data() + text.size()) {
+        out = text.front() == '-' ? -std::numeric_limits<float>::max() : std::numeric_limits<float>::max(); // too big a number is still a big number, so it clamps
+        return true;
+    }
     return result.ec == std::errc{} && result.ptr == text.data() + text.size();
 }
 

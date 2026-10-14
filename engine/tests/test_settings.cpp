@@ -86,7 +86,8 @@ TEST_CASE("one bad value costs only that field, and unknown keys are ignored")
     REQUIRE(parseSettings(head + "fov=-inf\nend\n") == kDefaults);
     REQUIRE(parseSettings(head + "fov=\nmouseSensitivity=3\nend\n") == Settings{Settings::kDefaultFovDegrees, 3.0f});
     REQUIRE(parseSettings(head + "fov=-5\nmouseSensitivity=0\nend\n") == Settings{Settings::kMinFovDegrees, Settings::kMinMouseSensitivity});
-    REQUIRE(parseSettings(head + "fov=1e40\nmouseSensitivity=99\nend\n") == Settings{Settings::kDefaultFovDegrees, Settings::kMaxMouseSensitivity});
+    REQUIRE(parseSettings(head + "fov=1e40\nmouseSensitivity=99\nend\n") == Settings{Settings::kMaxFovDegrees, Settings::kMaxMouseSensitivity});
+    REQUIRE(parseSettings(head + "fov=-1e40\nmouseSensitivity=-1e999\nend\n") == Settings{Settings::kMinFovDegrees, Settings::kMinMouseSensitivity});
     REQUIRE(parseSettings(head + "volume=11\nfov=80\nfuture key\nend\n") == Settings{80.0f, Settings::kDefaultMouseSensitivity});
     REQUIRE(parseSettings(head + "fov=70\r\nmouseSensitivity=2\r\nend\r\n") == Settings{70.0f, 2.0f});
     REQUIRE(parseSettings(head + "fov=70\nfov=80\nend\n") == Settings{80.0f, Settings::kDefaultMouseSensitivity});

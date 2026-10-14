@@ -10,8 +10,8 @@ namespace ichor {
 // when the picture is built and when look input is turned into motion, never hashed or saved
 // in a slot.
 struct Settings {
-    static constexpr float kDefaultFovDegrees = 60.0f;
-    static constexpr float kMinFovDegrees = 50.0f;
+    static constexpr float kDefaultFovDegrees = 45.0f;
+    static constexpr float kMinFovDegrees = 40.0f;
     static constexpr float kMaxFovDegrees = 110.0f;
     static constexpr float kDefaultMouseSensitivity = 1.0f;
     static constexpr float kMinMouseSensitivity = 0.1f;

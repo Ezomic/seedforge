@@ -27,7 +27,7 @@ constexpr const char* kPauseDocument = R"(<rml><head><style>
     .button:hover { color: #f4e8c0; background-color: #2a3242; border-color: #a08850; }
 </style></head><body>
     <div id="veil"></div>
-    <div id="card"><div id="title">PAUSED</div><div class="label">Field of view</div><div id="fov"><div id="fovdown" class="step">-</div><div id="fovup" class="step">+</div><div id="fovvalue">60 deg</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
+    <div id="card"><div id="title">PAUSED</div><div class="label">Field of view</div><div id="fov"><div id="fovdown" class="step">-</div><div id="fovup" class="step">+</div><div id="fovvalue">45 deg</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
 </body></rml>)";
 
 }
