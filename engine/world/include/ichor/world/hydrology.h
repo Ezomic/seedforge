@@ -26,14 +26,15 @@ struct HydrologyParams {
     float maxLakeDepth = 1.0e9f;
     // Half the width of a river where it begins, in metres. It grows with the square root of the
     // catchment over riverThreshold, the way real channels do, and stops at maxHalfWidth. A river is
-    // never narrower than one sample; a maxHalfWidth of zero keeps every river one sample wide.
+    // never narrower than the sample it runs through; a maxHalfWidth of zero keeps every river one sample wide.
     float springHalfWidth = 1.5f;
     float maxHalfWidth = 12.0f;
 };
 
 // How far from the middle of a river the water reaches, in metres, for a sample that this many
 // samples drain through: zero for a sample that is not a river, springHalfWidth where a river
-// begins, then wider with the catchment, never narrower downstream and never past maxHalfWidth.
+// begins, then wider with the catchment, never narrower downstream and never past maxHalfWidth (or
+// springHalfWidth where that is larger, or kRiverHalfWidthCeiling).
 // Not a number in the parameters counts as no widening. Plain float arithmetic and one correctly
 // rounded square root, so it is the same on every machine.
 float riverHalfWidth(std::uint32_t accumulation, const HydrologyParams& params);

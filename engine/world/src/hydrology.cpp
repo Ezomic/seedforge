@@ -193,7 +193,7 @@ void cutBanks(const Hydrology& hydrology, const Heightfield& heightfield, const 
                 continue;
             }
             const std::size_t at = hydrology.index(static_cast<std::uint32_t>(sx), static_cast<std::uint32_t>(sz));
-            if (isRiver(hydrology, at, rivers) || nearLake(hydrology, heightfield, static_cast<std::uint32_t>(sx), static_cast<std::uint32_t>(sz), rivers)) {
+            if (hydrology.lake[at] != 0 || isRiver(hydrology, at, rivers) || nearLake(hydrology, heightfield, static_cast<std::uint32_t>(sx), static_cast<std::uint32_t>(sz), rivers)) {
                 continue;
             }
             samples[at] = std::min(samples[at], bedUnits);
