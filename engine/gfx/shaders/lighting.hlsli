@@ -113,6 +113,8 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
 
     const float sky = n.y * 0.5 + 0.5;
     color += frame.ambient.rgb * lerp(0.35, 1.0, sky) * baseColor * (1.0 - metallic * 0.6);
+    // What a metal reflects of the sky: with no sun on it, a metal would otherwise be black.
+    color += frame.ambient.rgb * lerp(0.35, 1.0, sky) * lerp(1.0, 0.35, roughness) * fresnelSchlick(nDotV, f0) * metallic;
     return color;
 }
 

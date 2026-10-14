@@ -56,7 +56,7 @@ Atmosphere atmosphereAt(float hour)
         // The moon takes the shadows once the sun is down; it sits opposite the sun.
         a.sunDirection = glm::normalize(glm::vec3(-sun.x, std::max(0.35f, -sun.y), -sun.z));
         a.sunColor = moon;
-        a.sunIntensity = 0.35f * smooth(-0.05f, -0.2f, elevation);
+        a.sunIntensity = 0.8f * smooth(-0.05f, -0.2f, elevation);
     }
 
     const glm::vec3 nightZenith(0.012f, 0.02f, 0.06f);
@@ -69,7 +69,7 @@ Atmosphere atmosphereAt(float hour)
     const float glow = smooth(-0.15f, 0.0f, elevation) * (1.0f - smooth(0.0f, 0.35f, elevation));
     a.horizon = glm::mix(glm::mix(nightHorizon, dayHorizon, day), duskHorizon, glow * 0.85f);
 
-    a.ambient = glm::mix(glm::vec3(0.025f, 0.03f, 0.06f), glm::vec3(0.18f, 0.2f, 0.26f), day);
+    a.ambient = glm::mix(glm::vec3(0.05f, 0.06f, 0.11f), glm::vec3(0.18f, 0.2f, 0.26f), day);
     a.fogColor = a.horizon;
     a.fogDensity = glm::mix(0.0006f, 0.0009f, 1.0f - day);
     a.fogHeightFalloff = 0.006f;

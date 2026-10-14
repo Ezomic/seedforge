@@ -47,11 +47,11 @@ TEST_CASE("noon is bright and white, midnight is dark and lit by the moon")
     const Atmosphere midnight = atmosphereAt(0.0f);
     REQUIRE(midnight.sunElevation < -0.9f);
     REQUIRE(midnight.sunIntensity > 0.0f);
-    REQUIRE(midnight.sunIntensity < 0.5f);
+    REQUIRE(midnight.sunIntensity < 1.0f);
     REQUIRE(midnight.sunDirection.y > 0.0f); // shadows come from the moon, above the horizon
     REQUIRE(midnight.sunColor.b > midnight.sunColor.r); // cold light
     REQUIRE(midnight.zenith.b < noon.zenith.b * 0.2f);
-    REQUIRE(midnight.ambient.g < noon.ambient.g * 0.3f);
+    REQUIRE(midnight.ambient.g < noon.ambient.g * 0.4f);
 }
 
 TEST_CASE("the sun rises in the east, sets in the west, and the horizon reddens near it")
