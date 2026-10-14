@@ -175,6 +175,18 @@ TEST_CASE("wetness follows the rain through the fixed ticks and is deterministic
     REQUIRE(a.value == b.value);
 }
 
+TEST_CASE("light rain wets the ground a little at the fixed tick rate")
+{
+    const double dt = 1.0 / 60.0;
+    SurfaceWetness w;
+    w.update(0.0f, 0, dt);
+    for (std::uint64_t tick = 1; tick <= 600; ++tick) {
+        w.update(0.03f, tick, dt);
+    }
+    REQUIRE(w.value > 0.0f);
+    REQUIRE(w.value < wetnessTarget(0.03f));
+}
+
 TEST_CASE("wetness stays bounded when the rain flips every tick, across a jump in time, or going back")
 {
     const double dt = 1.0 / 60.0;

@@ -73,7 +73,10 @@ float wetnessStep(float wetness, float rain, double seconds)
     const float target = wetnessTarget(rain);
     const double time = target > from ? wettingSeconds : dryingSeconds;
     const float next = target + (from - target) * static_cast<float>(std::exp(-seconds / time));
-    return next < 1e-4f ? 0.0f : std::min(next, 1.0f);
+    if (target == 0.0f && next < 1e-4f) {
+        return 0.0f;
+    }
+    return std::clamp(next, 0.0f, 1.0f);
 }
 
 float SurfaceWetness::update(float rain, std::uint64_t currentTick, double fixedDt)
