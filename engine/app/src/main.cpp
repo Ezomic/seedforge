@@ -2,6 +2,7 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
+#include "ichor/audio/ambience_layers.h"
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/wading_splash.h"
@@ -306,6 +307,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t tellCue = audio.findSound("A_Tell");
     const std::uint32_t splashCue = audio.findSound("A_Splash");
     const std::uint32_t rainBed = audio.findSound("A_Rain");
+    ichor::AmbienceLayers ambience;
+    ambience.assign(ichor::AmbienceLayer::Weather, rainBed);
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -841,7 +844,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             audio.setReverb(reverb);
             lastReverb = reverb;
         }
-        audio.setAmbience(rainBed, ichor::rainAmbienceGain(weatherNow().rain));
+        ambience.setGain(ichor::AmbienceLayer::Weather, ichor::rainAmbienceGain(weatherNow().rain));
+        ambience.apply(audio);
         if (editing) {
             // New objects appear a few metres in front of the player.
             editorEnvironment.spawnAt = playerPosition(engine.scene()) + glm::dvec3(0.0, 0.0, -3.0);
