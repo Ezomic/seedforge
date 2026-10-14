@@ -5,6 +5,13 @@ file(MAKE_DIRECTORY ${ICHOR_CONTENT_DIR})
 
 set(sources ${CMAKE_SOURCE_DIR}/tests/data/kit.glb ${CMAKE_SOURCE_DIR}/tests/data/arm.glb)
 set(ICHOR_ART_DIR ${CMAKE_SOURCE_DIR}/../art CACHE INTERNAL "art sources")
+# A checkout without git-lfs holds pointer files, which only fail much later as a cook error.
+foreach(lfs_file ${sources} ${CMAKE_SOURCE_DIR}/../art/audio/A_Tell.wav)
+    file(READ ${lfs_file} lfs_head LIMIT 24)
+    if(lfs_head MATCHES "^version https://git-lfs")
+        message(FATAL_ERROR "${lfs_file} is a git-lfs pointer, not the real file. Run: git lfs pull")
+    endif()
+endforeach()
 # The three telegraph cues doc 18 asks for travel with the kit.
 set(kit_sounds ${ICHOR_ART_DIR}/audio/A_WindupLight.wav ${ICHOR_ART_DIR}/audio/A_WindupHeavy.wav ${ICHOR_ART_DIR}/audio/A_Tell.wav)
 set(outputs)

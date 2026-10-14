@@ -10,9 +10,12 @@ target_compile_definitions(ichor_miniaudio PUBLIC MA_NO_ENCODING MA_NO_GENERATIO
 
 add_library(ichor_audio
     src/mixer.cpp
+    src/ducking.cpp
     src/reverb.cpp
     src/null_audio.cpp
     src/wading_splash.cpp
+    src/rain_ambience.cpp
+    src/ambience_layers.cpp
     src/miniaudio_device.cpp
 )
 target_include_directories(ichor_audio PUBLIC include)

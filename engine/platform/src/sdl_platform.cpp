@@ -48,8 +48,9 @@ void SdlPlatform::pumpEvents()
     const bool* keys = SDL_GetKeyboardState(nullptr);
     const auto down = [&](SDL_Scancode a, SDL_Scancode b) { return keys[a] || keys[b]; };
     InputFrame frame;
-    frame.moveX = (down(SDL_SCANCODE_D, SDL_SCANCODE_RIGHT) ? 1.0f : 0.0f) - (down(SDL_SCANCODE_A, SDL_SCANCODE_LEFT) ? 1.0f : 0.0f);
-    frame.moveY = (down(SDL_SCANCODE_W, SDL_SCANCODE_UP) ? 1.0f : 0.0f) - (down(SDL_SCANCODE_S, SDL_SCANCODE_DOWN) ? 1.0f : 0.0f);
+    const auto walk = [&](SDL_Scancode letter, SDL_Scancode arrow) { return arrowsReserved_ ? keys[letter] : down(letter, arrow); };
+    frame.moveX = (walk(SDL_SCANCODE_D, SDL_SCANCODE_RIGHT) ? 1.0f : 0.0f) - (walk(SDL_SCANCODE_A, SDL_SCANCODE_LEFT) ? 1.0f : 0.0f);
+    frame.moveY = (walk(SDL_SCANCODE_W, SDL_SCANCODE_UP) ? 1.0f : 0.0f) - (walk(SDL_SCANCODE_S, SDL_SCANCODE_DOWN) ? 1.0f : 0.0f);
     if (down(SDL_SCANCODE_RETURN, SDL_SCANCODE_KP_ENTER)) frame.buttons |= InputFrame::Confirm;
     if (keys[SDL_SCANCODE_Q]) frame.buttons |= InputFrame::Cancel;
     if (down(SDL_SCANCODE_LSHIFT, SDL_SCANCODE_RSHIFT)) frame.buttons |= InputFrame::Sprint;

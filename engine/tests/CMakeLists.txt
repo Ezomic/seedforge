@@ -1,4 +1,5 @@
 find_package(Catch2 3 CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 include(Catch)
 
 add_executable(ichor_tests
@@ -7,6 +8,7 @@ add_executable(ichor_tests
     test_fixed_step.cpp
     test_headless_boot.cpp
     test_golden.cpp
+    test_determinism.cpp
     test_cooker.cpp
     test_bundle_render.cpp
     test_reflect_binary.cpp
@@ -17,15 +19,26 @@ add_executable(ichor_tests
     test_animation.cpp
     test_animation_system.cpp
     test_audio.cpp
+    test_ducking.cpp
     test_wading_splash.cpp
+    test_rain_ambience.cpp
+    test_ambience_layers.cpp
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
+    test_npc_schedule.cpp
+    test_npc_traits.cpp
+    test_npc_tiers.cpp
+    test_traversal_verbs.cpp
+    test_axiom.cpp
+    test_slot_roll.cpp
+    test_conflicts.cpp
     test_atmosphere.cpp
     test_vegetation.cpp
     test_hydrology.cpp
     test_hydrology_cache.cpp
     test_file_io.cpp
+    test_validation.cpp
     test_water_mesh.cpp
     test_water_field.cpp
     test_reverb.cpp
@@ -33,17 +46,33 @@ add_executable(ichor_tests
     test_picking.cpp
     test_nudge.cpp
     test_weather.cpp
+    test_cloud_shadow.cpp
     test_ui.cpp
     test_map_image.cpp
+    test_debug_images.cpp
+    test_forge_goldens.cpp
     test_map_screen.cpp
     test_save.cpp
     test_settings.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
-    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain
+    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
 )
-target_compile_definitions(ichor_tests PRIVATE ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_ART_DIR="${ICHOR_ART_DIR}")
+target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
 catch_discover_tests(ichor_tests)
+
+add_dependencies(ichor_tests ichor_forge)
+function(forge_data_test kind expect)
+    add_test(NAME forge_data_${kind}
+        COMMAND ${CMAKE_COMMAND} -DFORGE=$<TARGET_FILE:ichor_forge> -DKIND=${kind} "-DEXPECT_ERROR=${expect}" -DREPO_DATA=${CMAKE_SOURCE_DIR}/../data -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forge_data_check.cmake)
+endfunction()
+forge_data_test(repo "")
+forge_data_test(default "")
+forge_data_test(missing "no data directory")
+forge_data_test(empty "no tables")
+forge_data_test(file "no data directory")
+forge_data_test(malformed "b.json")
+forge_data_test(badrecord "non-empty string id")
 
 if(ENGINE_RUNTIME)
     add_executable(ichor_editor_ui_tests

@@ -2,6 +2,8 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
+#include "ichor/audio/ambience_layers.h"
+#include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
@@ -79,6 +81,7 @@ struct Options {
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
+    std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
@@ -127,6 +130,12 @@ bool parse(int argc, char** argv, Options& options)
             float level = 0.0f;
             if (!parseNumber(argv[++i], level)) return false;
             options.waterLevel = level;
+        } else if (arg == "--target" && i + 2 < argc) {
+            double x = 0.0;
+            double z = 0.0;
+            if (!parseNumber(argv[i + 1], x) || !parseNumber(argv[i + 2], z) || !std::isfinite(x) || !std::isfinite(z)) return false;
+            i += 2;
+            options.compassTarget = std::make_pair(x, z);
         } else if (arg == "--hour" && hasValue) {
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
@@ -245,6 +254,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     ichor::SceneBundle splashSounds;
     splashSounds.sounds.push_back(ichor::makeSplashClip());
+    splashSounds.sounds.push_back(ichor::makeRainClip());
     audio.addBundle(splashSounds);
 
     // The forged world, if there is one: its splat layers go to the renderer
@@ -296,6 +306,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t windupCue = audio.findSound("A_WindupLight");
     const std::uint32_t tellCue = audio.findSound("A_Tell");
     const std::uint32_t splashCue = audio.findSound("A_Splash");
+    const std::uint32_t rainBed = audio.findSound("A_Rain");
+    ichor::AmbienceLayers ambience;
+    ambience.assign(ichor::AmbienceLayer::Weather, rainBed);
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -525,6 +538,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
     float hudWater = 0.0f;
+    std::string hudGuide;
     // The app has no combatants yet, so the bar shows full health until the sim supplies one.
     float hudHealth = 100.0f;
     float hudMaxHealth = 100.0f;
@@ -563,6 +577,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             [&](std::uint32_t width, std::uint32_t height) {
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
+                hud->setGuide(hudGuide);
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -581,6 +596,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::PickCamera pickCamera;
+    ichor::SurfaceWetness surfaceWetness;
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
@@ -596,6 +612,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
+            view.wetness = surfaceWetness.update(atmosphere.rain, scene.tickCount(), config.fixedDt);
             ichor::applyPalette(palette, view);
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
@@ -625,6 +642,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
             hudWater = waterField ? waterField->at(feet.x, feet.z).depth : 0.0f;
+            if (options.compassTarget) {
+                hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
+            }
             view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
         }
         const double cellMetres = heightfield.desc().cellMetres;
@@ -760,7 +780,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // An arrow or page key moves the selection one step per press (shift: a long one),
             // unless a field has the keyboard.
             const ichor::NavKeys nav = platform.navKeys();
-            if (const auto selected = editorSession.selection(); selected && !editorPanels.wantsKeyboard()) {
+            const auto selected = editorSession.selection();
+            const bool nudging = selected && !editorPanels.wantsKeyboard();
+            platform.reserveArrowKeys(nudging);
+            if (nudging) {
                 const ichor::NudgeKeys pressed{.left = nav.left && !navHeld.left,
                     .right = nav.right && !navHeld.right,
                     .forward = nav.up && !navHeld.up,
@@ -823,6 +846,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             audio.setReverb(reverb);
             lastReverb = reverb;
         }
+        ambience.setGain(ichor::AmbienceLayer::Weather, ichor::rainAmbienceGain(weatherNow().rain));
+        ambience.apply(audio);
         if (editing) {
             // New objects appear a few metres in front of the player.
             editorEnvironment.spawnAt = playerPosition(engine.scene()) + glm::dvec3(0.0, 0.0, -3.0);
@@ -901,7 +926,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor] [--map] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--screenshot file.png]");
         return 2;
     }
 

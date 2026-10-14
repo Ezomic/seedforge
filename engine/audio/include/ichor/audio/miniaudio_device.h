@@ -17,7 +17,9 @@ public:
     bool init() override;
     void addBundle(const SceneBundle& bundle) override { mixer_.addBundle(bundle); }
     std::uint32_t findSound(std::string_view name) const override { return mixer_.findClip(name); }
-    void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f) override;
+    void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f,
+        SoundCategory category = SoundCategory::None) override;
+    void setAmbience(std::uint32_t sound, float gain) override { mixer_.setLoopGain(sound, gain); }
     void setListener(glm::dvec3 position, glm::quat rotation) override;
     void setReverb(const ReverbSettings& settings) override { mixer_.setReverb(settings); }
 
