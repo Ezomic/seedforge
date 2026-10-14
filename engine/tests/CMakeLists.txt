@@ -48,6 +48,7 @@ add_executable(ichor_tests
     test_weather.cpp
     test_cloud_shadow.cpp
     test_ui.cpp
+    test_hud_layout.cpp
     test_map_image.cpp
     test_debug_images.cpp
     test_forge_goldens.cpp

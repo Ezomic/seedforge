@@ -551,7 +551,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
         }
         if (fontsLoaded) {
-            hud = std::make_unique<ichor::Hud>(*ui);
+            const ichor::HudLayoutResult hudLayout = ichor::loadHudLayout(options.data / "ui" / "hud.json");
+            for (const std::string& problem : hudLayout.problems) {
+                ichor::logf(ichor::LogLevel::Warn, "the HUD layout is not used: {}", problem);
+            }
+            hud = std::make_unique<ichor::Hud>(*ui, hudLayout.layout);
             ledger = std::make_unique<ichor::Ledger>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
