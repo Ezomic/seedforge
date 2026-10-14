@@ -35,6 +35,14 @@ std::string readAxiomFile(const char* file)
     return std::string((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
 }
 
+const Axiom& require(const AxiomSet& set, const char* id)
+{
+    const Axiom* axiom = set.find(id);
+    INFO(id);
+    REQUIRE(axiom != nullptr);
+    return *axiom;
+}
+
 const AxiomBlock& block(const Axiom& axiom, const std::string& name)
 {
     return axiom.blocks.at(name);
@@ -83,7 +91,7 @@ TEST_CASE("the Powers axioms keep to the settled value ranges")
     AxiomSet set;
     REQUIRE(set.loadDirectory(ICHOR_REPO_DATA));
     for (const Expected& want : powers()) {
-        const Axiom& axiom = *set.find(want.id);
+        const Axiom& axiom = require(set, want.id);
         INFO(want.id);
         const double density = std::get<double>(block(axiom, "settlement").at("density_mult"));
         REQUIRE(density >= 0.5);
@@ -106,18 +114,18 @@ TEST_CASE("each Powers axiom carries the consequences doc 01 names")
     const auto has = [](const std::vector<std::string>& list, const std::string& item) { return std::find(list.begin(), list.end(), item) != list.end(); };
     const auto weights = [](const Axiom& axiom) { return std::get<std::map<std::string, double, std::less<>>>(block(axiom, "poi").at("weights")); };
 
-    const Axiom& league = *set.find("powers.league");
+    const Axiom& league = require(set, "powers.league");
     REQUIRE(has(words(league, "enemies", "roster_add"), "contract_sellsword"));
     REQUIRE(has(words(league, "economy", "abundant"), "silver"));
     REQUIRE(weights(league).count("harbour_emporium") == 1);
     REQUIRE(has(words(league, "traversal", "unlock"), "boat"));
 
-    const Axiom& satrapy = *set.find("powers.satrapy");
+    const Axiom& satrapy = require(set, "powers.satrapy");
     REQUIRE(weights(satrapy).count("collaborator_estate") == 1);
     REQUIRE(weights(satrapy).count("resistance_hideout") == 1);
     REQUIRE(weights(satrapy).count("garrison_fort") == 1);
 
-    const Axiom& hegemony = *set.find("powers.hegemony");
+    const Axiom& hegemony = require(set, "powers.hegemony");
     REQUIRE(weights(hegemony).count("ruined_frontier_fort") == 1);
     REQUIRE(weights(hegemony).count("imperial_road_station") == 1);
     REQUIRE(std::get<double>(block(hegemony, "settlement").at("density_mult")) < std::get<double>(block(league, "settlement").at("density_mult")));
