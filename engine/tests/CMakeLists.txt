@@ -51,10 +51,17 @@ target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOUR
 catch_discover_tests(ichor_tests)
 
 add_dependencies(ichor_tests ichor_forge)
-foreach(kind repo missing empty file malformed badrecord)
+function(forge_data_test kind expect)
     add_test(NAME forge_data_${kind}
-        COMMAND ${CMAKE_COMMAND} -DFORGE=$<TARGET_FILE:ichor_forge> -DKIND=${kind} -DREPO_DATA=${CMAKE_SOURCE_DIR}/../data -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forge_data_check.cmake)
-endforeach()
+        COMMAND ${CMAKE_COMMAND} -DFORGE=$<TARGET_FILE:ichor_forge> -DKIND=${kind} "-DEXPECT_ERROR=${expect}" -DREPO_DATA=${CMAKE_SOURCE_DIR}/../data -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forge_data_check.cmake)
+endfunction()
+forge_data_test(repo "")
+forge_data_test(default "")
+forge_data_test(missing "no data directory")
+forge_data_test(empty "no tables")
+forge_data_test(file "no data directory")
+forge_data_test(malformed "b.json")
+forge_data_test(badrecord "non-empty string id")
 
 if(ENGINE_RUNTIME)
     add_executable(ichor_editor_ui_tests
