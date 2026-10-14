@@ -126,7 +126,7 @@ TEST_CASE("a cache that is empty, cut short or has any bit flipped is recomputed
     }
     SECTION("one bit flipped anywhere")
     {
-        for (std::size_t at = 0; at < good.size(); at += 1 + at / 64) {
+        for (std::size_t at = 0; at < good.size(); at += at < 64 ? 1 : 1 + at / 64) {
             auto bad = good;
             bad[at] ^= static_cast<std::uint8_t>(1u << (at % 8));
             REQUIRE_FALSE(decodeHydrologyCache(bad, field, out));
@@ -251,5 +251,50 @@ TEST_CASE("concurrent writers leave one intact cache and no temporary files")
     REQUIRE(decodeHydrologyCache(slurp(dir.path / "hydrology.ihyd"), field, out));
     for (const auto& entry : std::filesystem::directory_iterator(dir.path)) {
         REQUIRE(entry.path().filename() == "hydrology.ihyd");
+    }
+}
+
+TEST_CASE("content that is malformed is refused even when its checksum is valid")
+{
+    const Heightfield field = forgeHeightfield(smallWorld(3));
+    const Hydrology good = computeHydrology(field);
+    Hydrology out;
+    REQUIRE(decodeHydrologyCache(encodeHydrologyCache(field, good), field, out));
+
+    SECTION("a direction that leaves the map")
+    {
+        Hydrology bad = good;
+        bad.direction[0] = 4; // west, from the top-left corner
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, bad), field, out));
+    }
+    SECTION("a direction that is not one of the eight")
+    {
+        Hydrology bad = good;
+        bad.direction[good.index(5, 5)] = 9;
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, bad), field, out));
+    }
+    SECTION("an accumulation of zero or more than the map holds")
+    {
+        Hydrology zero = good;
+        zero.accumulation[7] = 0;
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, zero), field, out));
+        Hydrology huge = good;
+        huge.accumulation[7] = static_cast<std::uint32_t>(good.filled.size()) + 1;
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, huge), field, out));
+    }
+    SECTION("a lake id with no lake")
+    {
+        Hydrology bad = good;
+        bad.lake[7] = static_cast<std::uint32_t>(good.lakeDeepest.size()) + 1;
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, bad), field, out));
+    }
+    SECTION("a side that does not match the world, or vectors of the wrong size")
+    {
+        Hydrology side = good;
+        side.side += 1;
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, side), field, out));
+        Hydrology shorter = good;
+        shorter.filled.pop_back();
+        REQUIRE_FALSE(decodeHydrologyCache(encodeHydrologyCache(field, shorter), field, out));
     }
 }

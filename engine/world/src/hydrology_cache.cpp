@@ -42,8 +42,24 @@ bool structurallySound(const Hydrology& h, std::uint32_t side)
     if (h.side != side || h.filled.size() != total || h.direction.size() != total || h.accumulation.size() != total || h.lake.size() != total) {
         return false;
     }
-    for (const std::uint8_t d : h.direction) {
-        if (d > 7 && d != Hydrology::kOutlet) {
+    constexpr std::array<int, 8> dx{1, 1, 0, -1, -1, -1, 0, 1};
+    constexpr std::array<int, 8> dz{0, 1, 1, 1, 0, -1, -1, -1};
+    for (std::size_t i = 0; i < total; ++i) {
+        const std::uint8_t d = h.direction[i];
+        if (h.accumulation[i] < 1 || h.accumulation[i] > total || !(h.filled[i] == h.filled[i])) {
+            return false;
+        }
+        if (d == Hydrology::kOutlet) {
+            continue;
+        }
+        const auto nx = static_cast<std::int64_t>(i % side) + (d < 8 ? dx[d] : 0);
+        const auto nz = static_cast<std::int64_t>(i / side) + (d < 8 ? dz[d] : 0);
+        if (d > 7 || nx < 0 || nz < 0 || nx >= side || nz >= side) {
+            return false;
+        }
+    }
+    for (const float depth : h.lakeDeepest) {
+        if (!(depth == depth)) {
             return false;
         }
     }
