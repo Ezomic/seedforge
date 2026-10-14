@@ -12,7 +12,7 @@ struct FrameData {
     float4 sunDirection;    // xyz towards the sun
     float4 sunColor;        // rgb, w intensity
     float4 ambient;         // rgb
-    float4 shadowParams;    // x texel size, y depth bias, z normal offset, w unused
+    float4 shadowParams;    // x texel size, y depth bias, z normal offset, w wetness of the surfaces, 0 dry to 1 soaked
     float4 cameraWorld;     // xyz world position of the camera, which is the origin of worldPos
     float4 skyZenith;       // rgb linear
     float4 skyHorizon;      // rgb linear

@@ -584,6 +584,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::PickCamera pickCamera;
+    ichor::SurfaceWetness surfaceWetness;
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
@@ -599,6 +600,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
+            view.wetness = surfaceWetness.update(atmosphere.rain, scene.tickCount(), config.fixedDt);
             ichor::applyPalette(palette, view);
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.

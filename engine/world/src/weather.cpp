@@ -53,6 +53,41 @@ Weather weatherAt(std::uint64_t worldSeed, double totalHours)
     return weather;
 }
 
+float wetnessTarget(float rain)
+{
+    if (!(rain > 0.0f)) {
+        return 0.0f;
+    }
+    return std::min(rain / 0.4f, 1.0f);
+}
+
+float wetnessStep(float wetness, float rain, double seconds)
+{
+    const float from = std::isfinite(wetness) ? std::clamp(wetness, 0.0f, 1.0f) : 0.0f;
+    if (!(seconds > 0.0)) {
+        return from;
+    }
+    // Rain soaks in over tens of seconds and the ground takes a couple of minutes to dry.
+    const double wettingSeconds = 20.0;
+    const double dryingSeconds = 120.0;
+    const float target = wetnessTarget(rain);
+    const double time = target > from ? wettingSeconds : dryingSeconds;
+    const float next = target + (from - target) * static_cast<float>(std::exp(-seconds / time));
+    return next < 1e-4f ? 0.0f : std::min(next, 1.0f);
+}
+
+float SurfaceWetness::update(float rain, std::uint64_t currentTick, double fixedDt)
+{
+    if (!primed || currentTick < tick) {
+        value = wetnessTarget(rain);
+    } else {
+        value = wetnessStep(value, rain, static_cast<double>(currentTick - tick) * fixedDt);
+    }
+    tick = currentTick;
+    primed = true;
+    return value;
+}
+
 void applyWeather(const Weather& weather, Atmosphere& atmosphere)
 {
     const float cloud = weather.overcast;

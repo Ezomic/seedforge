@@ -106,6 +106,7 @@ struct RenderView {
     glm::vec3 fogColor{0.55f, 0.7f, 0.85f};
     float fogDensity = 0.0f; // per metre; zero is no fog
     float rainIntensity = 0.0f; // 0 dry to 1 downpour; streaks are drawn over the picture
+    float wetness = 0.0f;       // 0 dry to 1 soaked; terrain, plants and props darken and gain a little gloss
     float time = 0.0f;          // seconds, for effects that move; the caller keeps it small
     glm::vec2 windDirection{1.0f, 0.0f}; // ground-plane unit vector; trees lean and sway along it
     float windStrength = 0.0f;           // 0 still to 1 gale
