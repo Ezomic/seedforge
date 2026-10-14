@@ -50,6 +50,12 @@ target_link_libraries(ichor_tests PRIVATE
 target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data")
 catch_discover_tests(ichor_tests)
 
+add_dependencies(ichor_tests ichor_forge)
+foreach(kind repo missing empty file malformed badrecord)
+    add_test(NAME forge_data_${kind}
+        COMMAND ${CMAKE_COMMAND} -DFORGE=$<TARGET_FILE:ichor_forge> -DKIND=${kind} -DREPO_DATA=${CMAKE_SOURCE_DIR}/../data -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forge_data_check.cmake)
+endforeach()
+
 if(ENGINE_RUNTIME)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp
