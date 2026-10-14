@@ -31,7 +31,7 @@ public:
     // far from the origin the panning does not jitter.
     void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial);
     // One looping, non-spatial voice per clip, made on first use. The gain eases toward the target
-    // so a changing value never clicks; NaN counts as silence and the rest is clamped to 0..1.
+    // (a time constant of about a quarter second) so a changing value never clicks; NaN counts as silence and the rest is clamped to 0..1.
     void setLoopGain(std::uint32_t clip, float gain);
     void setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right);
     void setReverb(const ReverbSettings& settings);

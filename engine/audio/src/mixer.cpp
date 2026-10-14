@@ -8,7 +8,7 @@ namespace ichor {
 namespace {
 
 constexpr float kReferenceDistance = 2.0f; // metres at which a spatial sound has fallen to half gain
-constexpr float kLoopEase = 1.0f / 12000.0f; // about a quarter of a second to settle at 48 kHz
+constexpr float kLoopEase = 1.0f / 12000.0f; // one-pole time constant of about a quarter second at 48 kHz
 constexpr float kLoopFloor = 1e-4f;
 constexpr float kCentreGain = 1.41421356f;   // undoes the equal-power pan at centre so spatial and flat cues match
 

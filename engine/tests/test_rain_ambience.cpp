@@ -78,8 +78,14 @@ TEST_CASE("the rain clip is deterministic and loops without a jump at the seam")
     for (std::size_t i = 1; i < a.samples.size(); ++i) {
         worstInside = std::max(worstInside, std::abs(a.samples[i] - a.samples[i - 1]));
     }
+    double total = 0.0;
+    for (std::size_t i = 1; i < a.samples.size(); ++i) {
+        total += std::abs(a.samples[i] - a.samples[i - 1]);
+    }
+    const double typical = total / static_cast<double>(a.samples.size() - 1);
     const int seam = std::abs(a.samples.front() - a.samples.back());
-    CHECK(seam <= worstInside);
+    CHECK(seam <= 3.0 * typical);
+    CHECK(worstInside > 0);
 }
 
 TEST_CASE("dry rain makes no sound and a downpour does")
@@ -138,32 +144,38 @@ TEST_CASE("the loop seam is not audible in the mixed output")
     const std::vector<float> run = audio.render(clipFrames * 3);
 
     float nearSeam = 0.0f;
-    float elsewhere = 0.0f;
+    double sum = 0.0;
+    std::size_t count = 0;
     for (std::size_t frame = 1; frame < run.size() / 2; ++frame) {
         const float step = std::abs(run[frame * 2] - run[(frame - 1) * 2]);
         const std::size_t offset = (frame + 480000 % clipFrames) % clipFrames;
-        float& bucket = offset < 4 || offset + 4 > clipFrames ? nearSeam : elsewhere;
-        bucket = std::max(bucket, step);
+        if (offset < 4 || offset + 4 > clipFrames) {
+            nearSeam = std::max(nearSeam, step);
+        } else {
+            sum += step;
+            ++count;
+        }
     }
-    CHECK(nearSeam <= elsewhere);
+    const float elsewhere = static_cast<float>(sum / static_cast<double>(count));
+    CHECK(nearSeam <= 4.0f * elsewhere);
 }
 
 TEST_CASE("a gain that flips around the threshold changes smoothly")
 {
     NullAudio audio;
     const std::uint32_t rain = addRain(audio);
-    audio.setAmbience(rain, 0.6f);
-    audio.render(48000);
+    audio.setAmbience(rain, 1.0f);
+    audio.render(48000 * 5);
     const std::vector<float> steady = audio.render(4800);
     const float steadyStep = largestStep(steady);
 
     std::vector<float> flipping;
     for (int i = 0; i < 200; ++i) {
-        audio.setAmbience(rain, i % 2 == 0 ? 0.0f : 0.6f);
-        const std::vector<float> block = audio.render(48);
+        audio.setAmbience(rain, i % 2 == 0 ? 0.0f : 1.0f);
+        const std::vector<float> block = audio.render(480);
         flipping.insert(flipping.end(), block.begin(), block.end());
     }
-    CHECK(largestStep(flipping) < steadyStep * 2.0f + 0.01f);
+    CHECK(largestStep(flipping) <= steadyStep * 1.05f);
 }
 
 TEST_CASE("bad gains cannot make the output blow up")
