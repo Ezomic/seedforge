@@ -1,6 +1,7 @@
 #include "ichor/core/rng.h"
 #include "ichor/sim/scene.h"
 #include "ichor/sim/scene_io.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -143,7 +144,7 @@ TEST_CASE("a snapshot restores bodies and the simulation continues identically")
     scene.enqueue(hero({0.0, 0.0, 0.0}));
     run(scene, inputs);
 
-    const auto path = std::filesystem::temp_directory_path() / "ichor_physics.isav";
+    const auto path = test::tempPath("ichor_physics.isav");
     REQUIRE(saveScene(path, scene));
     Scene loaded(9);
     REQUIRE(loadScene(path, loaded));
@@ -176,7 +177,7 @@ TEST_CASE("restore order does not matter: a character restored before its floor 
             scene.tick(kDt);
         }
         REQUIRE(heroBody(scene).onGround);
-        const auto path = std::filesystem::temp_directory_path() / "ichor_order.isav";
+        const auto path = test::tempPath("ichor_order.isav");
         REQUIRE(saveScene(path, scene));
         Scene loaded(4);
         REQUIRE(loadScene(path, loaded));
