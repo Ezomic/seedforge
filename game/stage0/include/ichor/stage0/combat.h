@@ -5,6 +5,7 @@
 #include "ichor/sim/physics.h"
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/recorder.h"
+#include "ichor/stage0/status_effect.h"
 
 #include <glm/vec3.hpp>
 
@@ -39,6 +40,7 @@ struct Combatant {
     glm::vec3 dodgeDirection{0.0f};
     std::uint8_t deathCause = 0;
     bool retryHeld = false; // edge detection for the retry button, part of the state so replay sees it
+    StatusSet status;
 
     CombatState combatState() const { return static_cast<CombatState>(state); }
     bool alive() const { return combatState() != CombatState::Dead; }
@@ -147,6 +149,7 @@ public:
     // Shared by both systems.
     bool tryAttack(Scene& scene, entt::entity who, AttackKind kind);
     bool tryDodge(Scene& scene, entt::entity who, glm::vec3 direction);
+    bool applyStatus(Scene& scene, entt::entity who, StatusId id, std::int32_t durationTicks = 0);
     void receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen);
     float allowedTurnRate(const Combatant& c) const;
 
@@ -154,6 +157,7 @@ private:
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
     void skirmisherSystem(Scene& scene, double dt);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
+    void tickStatus(Scene& scene, entt::entity who, Combatant& c);
     struct PendingHit {
         entt::entity victim;
         entt::entity attacker;
@@ -189,7 +193,7 @@ struct Reflect<stage0::Combatant> {
             field("state", &C::state), field("attack", &C::attack), field("stateTime", &C::stateTime),
             field("sinceStaminaSpend", &C::sinceStaminaSpend), field("sincePoiseDamage", &C::sincePoiseDamage),
             field("blocking", &C::blocking), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
-            field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause), field("retryHeld", &C::retryHeld));
+            field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause), field("retryHeld", &C::retryHeld), field("status", &C::status));
     }
 };
 

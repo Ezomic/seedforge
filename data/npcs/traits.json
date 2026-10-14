@@ -1,0 +1,22 @@
+[
+  {"id": "bitter", "name": "Bitter", "description": "Keeps a ledger of every wrong done to them and recites it unprompted.", "incompatible": ["cheerful"]},
+  {"id": "cheerful", "name": "Cheerful", "description": "Finds something to laugh at even when the grain runs short.", "incompatible": ["bitter", "melancholy"]},
+  {"id": "melancholy", "name": "Melancholy", "description": "Speaks of better days as if they were a country they were exiled from.", "incompatible": ["cheerful"]},
+  {"id": "pious", "name": "Pious", "description": "Pours the first of every cup to the gods and expects others to do the same.", "incompatible": ["skeptical"]},
+  {"id": "skeptical", "name": "Skeptical", "description": "Believes what can be weighed or counted and little else.", "incompatible": ["pious", "superstitious"]},
+  {"id": "superstitious", "name": "Superstitious", "description": "Reads omens in gulls, spilled salt and the order of footsteps.", "incompatible": ["skeptical"]},
+  {"id": "greedy", "name": "Greedy", "description": "Prices everything, including favours and silence.", "incompatible": ["generous"]},
+  {"id": "generous", "name": "Generous", "description": "Gives away more than they can afford and does not keep count.", "incompatible": ["greedy"]},
+  {"id": "proud", "name": "Proud", "description": "Will starve before asking for help and resents being offered it.", "incompatible": ["humble"]},
+  {"id": "humble", "name": "Humble", "description": "Deflects praise and credits the crew, the weather, the gods.", "incompatible": ["proud"]},
+  {"id": "brave", "name": "Brave", "description": "Steps toward trouble first and thinks about it afterwards.", "incompatible": ["cowardly"]},
+  {"id": "cowardly", "name": "Cowardly", "description": "Knows every back way out of town and uses them.", "incompatible": ["brave"]},
+  {"id": "secretive", "name": "Secretive", "description": "Answers questions with questions and keeps their own counsel.", "incompatible": ["gossipy"]},
+  {"id": "gossipy", "name": "Gossipy", "description": "Knows who owes whom and cannot help passing it on.", "incompatible": ["secretive"]},
+  {"id": "patient", "name": "Patient", "description": "Waits out tides, creditors and quarrels with equal calm.", "incompatible": ["hot_tempered"]},
+  {"id": "hot_tempered", "name": "Hot-tempered", "description": "Flares quickly, cools slowly, and apologises badly.", "incompatible": ["patient"]},
+  {"id": "stern", "name": "Stern", "description": "Speaks in short sentences and expects the same in return.", "incompatible": []},
+  {"id": "wry", "name": "Wry", "description": "Says the dry thing quietly and watches who hears it.", "incompatible": []},
+  {"id": "curious", "name": "Curious", "description": "Asks about strangers, cargo and anything that washes ashore.", "incompatible": []},
+  {"id": "loyal", "name": "Loyal", "description": "Sticks to family, crew and old promises past the point of sense.", "incompatible": []}
+]

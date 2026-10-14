@@ -1,4 +1,5 @@
 #include "lighting.hlsli"
+#include "wetness.hlsli"
 
 [[vk::binding(0, 1)]] Texture2D baseColorTex;
 [[vk::binding(1, 1)]] Texture2D metalRoughTex;
@@ -27,7 +28,8 @@ float4 main(PSIn i) : SV_Target
     }
     const float2 metalRough = metalRoughTex.Sample(materialSampler, i.uv).bg;
     const float metallic = saturate(metalRough.x * push.params.x);
-    const float roughness = clamp(metalRough.y * push.params.y, 0.04, 1.0);
+    float roughness = clamp(metalRough.y * push.params.y, 0.04, 1.0);
+    applyWetness(baseColor, roughness, metallic);
 
     float3 n = normalize(i.normal);
     if (push.params.z > 0.5) {
