@@ -69,6 +69,15 @@ public:
     using System = std::function<void(Scene& scene, double dt, const InputFrame& input)>;
     void addSystem(std::string name, System system);
 
+    // How much of its speed the player keeps where they stand: one loses nothing, zero is held
+    // still. It scales the player's walking and sprinting only: other entities and the travel a
+    // committed action takes from its animation (a lunge, a dodge) are not slowed. The caller supplies it (wading through water, say), the scene stays ignorant of the
+    // world around it. It must give the same answer for the same position on every run, or replays
+    // diverge; it is configuration, not state, so it is not saved. Answers that are not numbers
+    // count as one, and the rest are held between zero and one.
+    using SpeedModifier = std::function<double(const glm::dvec3& position)>;
+    void setSpeedModifier(SpeedModifier modifier) { speedModifier_ = std::move(modifier); }
+
     // A reflected game component the scene hashes and snapshots beside its own.
     // Register before any snapshot is loaded; names are part of the file.
     template <class T>
@@ -136,6 +145,7 @@ private:
     void animationSystem(double dt);
     void physicsSystem(double dt);
 
+    SpeedModifier speedModifier_;
     std::uint64_t seed_;
     entt::registry registry_;
     std::unordered_map<std::uint64_t, entt::entity> index_;

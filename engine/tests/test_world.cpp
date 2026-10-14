@@ -1,3 +1,5 @@
+#include <functional>
+#include <catch2/catch_approx.hpp>
 #include "ichor/core/rng.h"
 #include "ichor/sim/scene.h"
 #include "ichor/sim/scene_io.h"
@@ -11,6 +13,7 @@
 #include <limits>
 
 using namespace ichor;
+using Catch::Approx;
 
 namespace {
 
@@ -285,4 +288,79 @@ TEST_CASE("per-system generators are independent and seeded by name")
     b.rng("weather").nextU32();
     REQUIRE(b.rng("combat").nextU32() == x);
     REQUIRE(a.rng("weather").nextU32() != x);
+}
+
+TEST_CASE("a speed modifier slows the player where it says to, and odd answers are tamed")
+{
+    const auto walk = [](std::function<double(const glm::dvec3&)> modifier) {
+        Scene scene(3);
+        scene.enqueue(player());
+        scene.setSpeedModifier(std::move(modifier));
+        InputFrame forward;
+        forward.moveY = 1.0f;
+        for (int i = 0; i < 60; ++i) {
+            scene.tick(kDt, forward);
+        }
+        return scene.registry().get<Transform>(scene.find(StableId::of("player"))).position;
+    };
+    const glm::dvec3 free = walk({});
+    REQUIRE(free.z < -3.9); // four metres a second for a second, towards -z
+    REQUIRE(walk([](const glm::dvec3&) { return 1.0; }).z == free.z);
+    REQUIRE(walk([](const glm::dvec3&) { return 0.5; }).z == Approx(free.z * 0.5).margin(1e-6));
+    REQUIRE(walk([](const glm::dvec3&) { return 0.0; }).z == 0.0);
+    // More than all of the speed is not allowed, less than none is none, and what is not a number is ignored.
+    REQUIRE(walk([](const glm::dvec3&) { return 7.0; }).z == free.z);
+    REQUIRE(walk([](const glm::dvec3&) { return -3.0; }).z == 0.0);
+    REQUIRE(walk([](const glm::dvec3&) { return std::numeric_limits<double>::quiet_NaN(); }).z == free.z);
+    REQUIRE(walk([](const glm::dvec3&) { return std::numeric_limits<double>::infinity(); }).z == free.z);
+}
+
+TEST_CASE("the speed modifier is asked where the player stands, and is not part of the saved state")
+{
+    Scene scene(3);
+    scene.enqueue(player());
+    InputFrame forward;
+    forward.moveY = 1.0f;
+    double lastAskedZ = 1.0;
+    scene.setSpeedModifier([&](const glm::dvec3& position) {
+        lastAskedZ = position.z;
+        return position.z < -1.0 ? 0.5 : 1.0; // slower past one metre
+    });
+    for (int i = 0; i < 30; ++i) {
+        scene.tick(kDt, forward);
+    }
+    REQUIRE(lastAskedZ < 0.0);
+    // Past the line the steps are half as long.
+    const double before = scene.registry().get<Transform>(scene.find(StableId::of("player"))).position.z;
+    scene.tick(kDt, forward);
+    const double after = scene.registry().get<Transform>(scene.find(StableId::of("player"))).position.z;
+    REQUIRE(before - after == Approx(4.0 * 0.5 * kDt).margin(1e-6));
+}
+
+TEST_CASE("the speed modifier scales a character's intent and a sprint too, and leaves other entities alone")
+{
+    const auto intentOf = [](double kept, bool sprint) {
+        Scene scene(3);
+        SpawnCommand hero = player();
+        hero.character = CharacterBody{};
+        scene.enqueue(hero);
+        SpawnCommand other = piece("walker", 1, {0.0, 0.0, 0.0});
+        other.character = CharacterBody{};
+        scene.enqueue(other);
+        scene.setSpeedModifier([kept](const glm::dvec3&) { return kept; });
+        InputFrame forward;
+        forward.moveY = 1.0f;
+        if (sprint) forward.buttons |= InputFrame::Sprint;
+        scene.tick(kDt, forward);
+        return std::pair{scene.registry().get<CharacterBody>(scene.find(StableId::of("player"))).intent.z,
+            scene.registry().get<CharacterBody>(scene.find(StableId::of("walker", 1))).intent.z};
+    };
+    const auto [free, freeOther] = intentOf(1.0, false);
+    REQUIRE(free == Approx(-4.0f));
+    REQUIRE(intentOf(0.5, false).first == Approx(-2.0f));
+    REQUIRE(intentOf(0.5, true).first == Approx(-4.0f)); // a sprint doubles it, the water halves it
+    REQUIRE(intentOf(0.0, false).first == 0.0f);
+    // Only the player is slowed: nothing else follows the player's input.
+    REQUIRE(freeOther == 0.0f);
+    REQUIRE(intentOf(0.5, false).second == 0.0f);
 }

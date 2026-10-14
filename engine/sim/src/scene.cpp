@@ -159,7 +159,14 @@ void Scene::applyInput(const InputFrame& input, double dt)
         stick /= length;
     }
     for (auto [entity, id, player] : registry_.view<const StableId, const Player>().each()) {
-        const double speed = player.metresPerSecond * ((input.buttons & InputFrame::Sprint) != 0 ? 2.0 : 1.0);
+        double kept = 1.0;
+        if (speedModifier_) {
+            if (const auto* where = registry_.try_get<Transform>(entity)) {
+                const double answer = speedModifier_(where->position);
+                kept = std::isfinite(answer) ? std::clamp(answer, 0.0, 1.0) : 1.0;
+            }
+        }
+        const double speed = player.metresPerSecond * ((input.buttons & InputFrame::Sprint) != 0 ? 2.0 : 1.0) * kept;
         const glm::dvec3 velocity(stick.x * speed, 0.0, -stick.y * speed);
         if (auto* body = registry_.try_get<CharacterBody>(entity)) {
             body->intent = glm::vec3(velocity);
