@@ -8,8 +8,10 @@
 
 #include <charconv>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -51,19 +53,16 @@ bool dumpPngs(const std::filesystem::path& dir, std::uint32_t seed, const ichor:
     }
     const ichor::Hydrology hydrology = ichor::computeHydrology(heightfield);
     const std::string suffix = "-seed" + std::to_string(seed) + ".png";
-    const struct {
-        const char* name;
-        ichor::MapImage image;
-    } pictures[] = {
-        {"height", ichor::renderHeightImage(heightfield)},
-        {"flow", ichor::renderFlowImage(hydrology)},
-        {"water", ichor::renderWaterImage(heightfield, hydrology, rivers)},
+    const std::pair<const char*, std::function<ichor::MapImage()>> pictures[] = {
+        {"height", [&] { return ichor::renderHeightImage(heightfield); }},
+        {"flow", [&] { return ichor::renderFlowImage(hydrology); }},
+        {"water", [&] { return ichor::renderWaterImage(heightfield, hydrology, rivers); }},
     };
     bool ok = true;
-    for (const auto& picture : pictures) {
-        const std::filesystem::path path = dir / (std::string(picture.name) + suffix);
-        if (!writePngAtomically(path, picture.image)) {
-            ichor::logf(ichor::LogLevel::Error, "cannot write {}", path.string());
+    for (const auto& [name, render] : pictures) {
+        const std::filesystem::path path = dir / (std::string(name) + suffix);
+        if (!writePngAtomically(path, render())) {
+            ichor::logf(ichor::LogLevel::Error, "cannot write {} (the world files were written)", path.string());
             ok = false;
         }
     }
@@ -84,7 +83,10 @@ int main(int argc, char** argv)
     std::filesystem::path pngDir;
     for (int i = 1; i < argc; ++i) {
         if (std::string_view(argv[i]) == "--dump-png") {
-            if (i + 1 >= argc || !pngDir.empty()) return 2;
+            if (i + 1 >= argc || !pngDir.empty()) {
+                ichor::log(ichor::LogLevel::Error, "--dump-png takes one directory");
+                return 2;
+            }
             pngDir = argv[++i];
         } else {
             positional.push_back(argv[i]);

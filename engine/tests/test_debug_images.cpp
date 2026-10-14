@@ -72,11 +72,38 @@ TEST_CASE("a level world is mid grey, not a division by zero")
 TEST_CASE("a picture is shrunk to the cap, and a block shows the biggest river in it")
 {
     std::vector<std::uint32_t> accumulation(9, 1);
-    accumulation[4] = 100;
-    const MapImage image = renderFlowImage(hydrologyOf(accumulation), 1);
-    REQUIRE(image.width == 1);
-    CHECK(pixel(image, 0, 0)[2] == 255);
-    CHECK(renderHeightImage(ramp(), 2).width == 2);
+    accumulation[0] = 100;
+    const MapImage one = renderFlowImage(hydrologyOf(accumulation), 1);
+    REQUIRE(one.width == 1);
+    CHECK(pixel(one, 0, 0)[2] == 255);
+
+    accumulation[8] = 10;
+    const MapImage two = renderFlowImage(hydrologyOf(accumulation), 2);
+    REQUIRE(two.width == 2);
+    CHECK(pixel(two, 0, 0)[2] == 255);
+    CHECK(pixel(two, 1, 0)[2] == 38);
+    CHECK(pixel(two, 1, 1)[2] == 147);
+}
+
+TEST_CASE("a shrunk height picture shows the mean of each block")
+{
+    const MapImage image = renderHeightImage(ramp(), 2);
+    REQUIRE(image.width == 2);
+    CHECK(pixel(image, 0, 0)[0] == 0);
+    CHECK(pixel(image, 1, 1)[0] == 64);
+}
+
+TEST_CASE("a shrunk water picture shows a lake over a river in the same block")
+{
+    Hydrology hydrology = hydrologyOf(std::vector<std::uint32_t>(9, 1));
+    hydrology.accumulation[4] = 5000;
+    hydrology.lake[8] = 1;
+    hydrology.filled[8] = 150.0f;
+    hydrology.lakeDeepest = {5.0f};
+    const MapImage image = renderWaterImage(ramp(), hydrology, HydrologyParams{}, 2);
+    REQUIRE(image.width == 2);
+    CHECK(pixel(image, 1, 1)[2] == 168);
+    CHECK(pixel(image, 0, 0)[2] != 168);
 }
 
 TEST_CASE("flow is black-blue where nothing gathers and white at the biggest river, on a log scale")
@@ -88,9 +115,7 @@ TEST_CASE("flow is black-blue where nothing gathers and white at the biggest riv
     CHECK(pixel(image, 2, 2)[0] == 255);
     CHECK(pixel(image, 2, 2)[2] == 255);
     const std::uint8_t middle = pixel(image, 1, 1)[2];
-    CHECK(middle > pixel(image, 0, 0)[2]);
-    CHECK(middle < 255);
-    CHECK(middle > 140); // 10 of 100 is halfway on a log scale, which a linear scale would put near the bottom
+    CHECK(middle == 147); // 10 of 100 is halfway on a log scale, which a linear scale would put near the bottom
 }
 
 TEST_CASE("a flow with no gathering at all draws without a divide by zero")
