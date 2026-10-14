@@ -90,6 +90,7 @@ TEST_CASE("the panels draw a window with the controls where they can be clicked"
     }
     REQUIRE(ImGui::GetDrawData()->CmdListsCount > 0);
     REQUIRE_FALSE(panels.centreOf("position").has_value()); // nothing selected, so no inspector fields
+    REQUIRE_FALSE(panels.centreOf("Selected").has_value());
 }
 
 TEST_CASE("clicking Spawn makes an entity, selects it, and the outliner lists it")
@@ -112,6 +113,11 @@ TEST_CASE("clicking Spawn makes an entity, selects it, and the outliner lists it
     REQUIRE(scene.registry().get<Transform>(scene.find(*editor.selection())).position == glm::dvec3(3.0, 1.0, -2.0));
     REQUIRE(panels.centreOf("object 1").has_value());
     REQUIRE(panels.centreOf("position").has_value()); // the inspector has something to show
+    REQUIRE(panels.centreOf("Selected").has_value()); // and says which entity it is
+
+    editor.select(std::nullopt); // a click on empty space does this
+    gui.settle(panels);
+    REQUIRE_FALSE(panels.centreOf("Selected").has_value());
 
     gui.click(panels, where(panels, "Spawn"));
     scene.tick(kDt);

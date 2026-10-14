@@ -40,6 +40,9 @@ public:
     // wins the plain name.
     std::optional<ImVec2> centreOf(const std::string& label) const;
 
+    // Whether the pointer is over one of the editor's windows, so a click there is not a pick.
+    bool wantsPointer() const { return ImGui::GetIO().WantCaptureMouse; }
+
 private:
     void remember(const std::string& label);
     void toolbar();

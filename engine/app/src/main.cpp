@@ -6,6 +6,7 @@
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/editor/panels.h"
+#include "ichor/editor/picking.h"
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
@@ -223,6 +224,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     audio.addBundle(bundle);
+    // Mesh indices run across the bundles in upload order, which is what a MeshRef holds.
+    std::vector<ichor::PickBounds> pickBounds;
+    for (const ichor::Mesh& mesh : bundle.meshes) {
+        pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
+    }
+    pickBounds.resize(armMesh);
+    for (const ichor::Mesh& mesh : actor.meshes) {
+        pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
+    }
 
     // The forged world, if there is one: its splat layers go to the renderer
     // and its cells stream around the player. The arena sits on a plateau at
@@ -527,6 +537,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
+    ichor::PickCamera pickCamera;
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
@@ -591,6 +602,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             const glm::vec3 forward = view.camera.rotation * glm::vec3(0.0f, 0.0f, -1.0f);
             hudHeading = ichor::headingOf(forward.x, forward.z);
         }
+        pickCamera = {view.camera.position, view.camera.rotation, view.camera.fovY};
         std::vector<ichor::LineSegment> colliders;
         scene.physics().debugLines(colliders);
         for (const ichor::LineSegment& line : colliders) {
@@ -612,6 +624,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool journalHeld = false;
     bool menuHeld = false;
     bool pointerHeld = false;
+    bool pickHeld = false;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
     for (;;) {
@@ -666,6 +679,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
             }
+        }
+        // A click in the editor picks what is under the cursor; one on empty space clears the pick.
+        // A press that began on an editor window is not a pick, nor is the rest of its drag.
+        if (editing) {
+            const ichor::Pointer pointer = platform.pointer();
+            if (pointer.primary && !pickHeld && pointer.inside && !editorPanels.wantsPointer()) {
+                const ichor::Extent size = platform.drawableSize();
+                const auto ray = ichor::pickRay({static_cast<double>(pointer.x), static_cast<double>(pointer.y)}, {static_cast<double>(size.width), static_cast<double>(size.height)}, pickCamera);
+                editorSession.select(ray ? ichor::pickEntity(engine.scene(), *ray, pickBounds) : std::nullopt);
+            }
+            pickHeld = pointer.primary;
         }
         // Saving over the player's quicksave while a replay drives the run would be a surprise.
         if (quickSave && !quickSaveHeld && options.replay.empty()) {
