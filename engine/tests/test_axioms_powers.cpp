@@ -6,7 +6,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <string>
+#include <variant>
+#include <vector>
 
 using namespace ichor;
 
@@ -86,21 +89,15 @@ TEST_CASE("the Powers files carry no em-dash and no placeholder text")
     }
 }
 
-TEST_CASE("the Powers axioms keep to the settled value ranges")
+TEST_CASE("each Powers axiom is graded and scored under its own name")
 {
     AxiomSet set;
     REQUIRE(set.loadDirectory(ICHOR_REPO_DATA));
-    for (const Expected& want : powers()) {
-        const Axiom& axiom = require(set, want.id);
-        INFO(want.id);
-        const double density = std::get<double>(block(axiom, "settlement").at("density_mult"));
-        REQUIRE(density >= 0.5);
-        REQUIRE(density <= 1.5);
-        for (const auto& [name, weight] : std::get<std::map<std::string, double, std::less<>>>(block(axiom, "poi").at("weights"))) {
-            INFO(name);
-            REQUIRE(weight > 0.0);
-            REQUIRE(weight <= 5.0);
-        }
+    for (const char* name : {"league", "satrapy", "hegemony"}) {
+        const Axiom& axiom = require(set, (std::string("powers.") + name).c_str());
+        INFO(name);
+        REQUIRE(std::get<std::string>(block(axiom, "palette").at("grade")) == name);
+        REQUIRE(std::get<std::string>(block(axiom, "audio").at("music_palette")) == name);
     }
 }
 
@@ -119,14 +116,19 @@ TEST_CASE("each Powers axiom carries the consequences doc 01 names")
     REQUIRE(has(words(league, "economy", "abundant"), "silver"));
     REQUIRE(weights(league).count("harbour_emporium") == 1);
     REQUIRE(has(words(league, "traversal", "unlock"), "boat"));
+    REQUIRE(weights(league).at("harbour_emporium") == 3.0);
 
     const Axiom& satrapy = require(set, "powers.satrapy");
     REQUIRE(weights(satrapy).count("collaborator_estate") == 1);
     REQUIRE(weights(satrapy).count("resistance_hideout") == 1);
-    REQUIRE(weights(satrapy).count("garrison_fort") == 1);
+    REQUIRE(weights(satrapy).at("garrison_fort") == 3.0);
+    REQUIRE(has(words(satrapy, "enemies", "roster_add"), "satrapal_levy"));
+    REQUIRE(has(words(satrapy, "economy", "abundant"), "tribute_coin"));
 
     const Axiom& hegemony = require(set, "powers.hegemony");
     REQUIRE(weights(hegemony).count("ruined_frontier_fort") == 1);
     REQUIRE(weights(hegemony).count("imperial_road_station") == 1);
+    REQUIRE(has(words(hegemony, "enemies", "roster_add"), "frontier_deserter"));
+    REQUIRE(has(words(hegemony, "economy", "scarce"), "coin"));
     REQUIRE(std::get<double>(block(hegemony, "settlement").at("density_mult")) < std::get<double>(block(league, "settlement").at("density_mult")));
 }

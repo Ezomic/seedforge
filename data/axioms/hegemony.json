@@ -7,7 +7,7 @@
 
   "settlement": { "prefer_slope": "gentle", "density_mult": 0.8 },
   "poi": { "weights": { "imperial_road_station": 2.5, "ruined_frontier_fort": 2.5, "archonate_depot": 2.0, "hegemonic_monument": 1.5, "abandoned_waystation": 1.5 } },
-  "enemies": { "roster_add": ["frontier_deserter", "tax_bandit"], "roster_remove": ["partisan_raider"] },
+  "enemies": { "roster_add": ["frontier_deserter", "tax_bandit"] },
   "economy": { "scarce": ["coin"], "abundant": ["road_stone"] },
   "palette": { "grade": "hegemony", "fog_density": 1.1 },
   "audio": { "bed_overrides": ["wind_over_ruins"], "music_palette": "hegemony" }
