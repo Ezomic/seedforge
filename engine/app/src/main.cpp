@@ -4,6 +4,7 @@
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
 #include "ichor/audio/rain_ambience.h"
+#include "ichor/audio/weather_ambience.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
@@ -255,6 +256,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::SceneBundle splashSounds;
     splashSounds.sounds.push_back(ichor::makeSplashClip());
     splashSounds.sounds.push_back(ichor::makeRainClip());
+    splashSounds.sounds.push_back(ichor::makeWindClip());
     audio.addBundle(splashSounds);
 
     // The forged world, if there is one: its splat layers go to the renderer
@@ -309,6 +311,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t rainBed = audio.findSound("A_Rain");
     ichor::AmbienceLayers ambience;
     ambience.assign(ichor::AmbienceLayer::Weather, rainBed);
+    // No biome beds exist yet, so the wind takes the bed layer.
+    ambience.assign(ichor::AmbienceLayer::Bed, audio.findSound("A_Wind"));
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -846,7 +850,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             audio.setReverb(reverb);
             lastReverb = reverb;
         }
-        ambience.setGain(ichor::AmbienceLayer::Weather, ichor::rainAmbienceGain(weatherNow().rain));
+        const ichor::Weather sky = weatherNow();
+        const ichor::WeatherAudioTargets weatherAudio = ichor::weatherAudioTargets(sky.overcast, sky.rain);
+        ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
+        ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
         ambience.apply(audio);
         if (editing) {
             // New objects appear a few metres in front of the player.
