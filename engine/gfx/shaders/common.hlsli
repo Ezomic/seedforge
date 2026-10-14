@@ -12,7 +12,7 @@ struct FrameData {
     float4 sunDirection;    // xyz towards the sun
     float4 sunColor;        // rgb, w intensity
     float4 ambient;         // rgb
-    float4 shadowParams;    // x texel size, y depth bias, z normal offset, w unused
+    float4 shadowParams;    // x texel size, y depth bias, z normal offset, w wetness of the surfaces, 0 dry to 1 soaked
     float4 cameraWorld;     // xyz world position of the camera, which is the origin of worldPos
     float4 skyZenith;       // rgb linear
     float4 skyHorizon;      // rgb linear
@@ -27,6 +27,7 @@ struct FrameData {
     float4 gradeHighlights; // rgb multiplier on the bright end
     float4 materialParams;  // x roughness min, y roughness max, z albedo min, w albedo max
     float4 groundParams;    // rgb colour of the ground at the foot of objects, w metres it reaches up (0 is off)
+    float4 cloudShadow;     // x strength of the shadows clouds throw (0 is off), yz the camera's place in the cloud plane
 };
 
 struct PushData {

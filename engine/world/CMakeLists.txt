@@ -1,5 +1,6 @@
 add_library(ichor_world
     src/atmosphere.cpp
+    src/debug_images.cpp
     src/forge.cpp
     src/heightfield.cpp
     src/map_image.cpp

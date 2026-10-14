@@ -18,6 +18,7 @@ const char* causeName(DeathCause cause)
     case DeathCause::MistimedBlock: return "mistimed_block";
     case DeathCause::OffScreen: return "offscreen";
     case DeathCause::Unreadable: return "unreadable";
+    case DeathCause::Bleed: return "bleed";
     default: return "unknown";
     }
 }

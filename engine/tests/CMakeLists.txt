@@ -25,6 +25,8 @@ add_executable(ichor_tests
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
+    test_npc_traits.cpp
+    test_axiom.cpp
     test_atmosphere.cpp
     test_vegetation.cpp
     test_hydrology.cpp
@@ -36,8 +38,10 @@ add_executable(ichor_tests
     test_picking.cpp
     test_nudge.cpp
     test_weather.cpp
+    test_cloud_shadow.cpp
     test_ui.cpp
     test_map_image.cpp
+    test_debug_images.cpp
     test_map_screen.cpp
     test_save.cpp
     test_settings.cpp
@@ -45,7 +49,7 @@ add_executable(ichor_tests
 target_link_libraries(ichor_tests PRIVATE
     ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
 )
-target_compile_definitions(ichor_tests PRIVATE ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_ART_DIR="${ICHOR_ART_DIR}" _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
 catch_discover_tests(ichor_tests)
 
 if(ENGINE_RUNTIME)
