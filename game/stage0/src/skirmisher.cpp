@@ -173,7 +173,7 @@ void Stage0::skirmisherSystem(Scene& scene, double dt)
         body.intent = glm::vec3(0.0f);
     } else {
         const float len = glm::length(move);
-        body.intent = len > 1e-4f ? move / std::max(len, 1.0f) * tuning_.walkSpeed * speedScale : glm::vec3(0.0f);
+        body.intent = len > 1e-4f ? move / std::max(len, 1.0f) * tuning_.walkSpeed * speedScale * combat.status.moveScale() : glm::vec3(0.0f);
     }
 }
 

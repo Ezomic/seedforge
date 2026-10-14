@@ -52,6 +52,7 @@ const char* name(DeathCause cause)
     case DeathCause::MistimedBlock: return "mistimed_block";
     case DeathCause::OffScreen: return "offscreen";
     case DeathCause::Unreadable: return "unreadable";
+    case DeathCause::Bleed: return "bleed";
     default: return "unknown";
     }
 }
@@ -212,6 +213,29 @@ bool Stage0::tryDodge(Scene& scene, entt::entity who, glm::vec3 direction)
     return true;
 }
 
+bool Stage0::applyStatus(Scene& scene, entt::entity who, StatusId id, std::int32_t durationTicks)
+{
+    Combatant& c = scene.registry().get<Combatant>(who);
+    return c.alive() && c.status.apply(id, durationTicks);
+}
+
+void Stage0::tickStatus(Scene& scene, entt::entity who, Combatant& c)
+{
+    const std::int64_t milli = c.status.tick();
+    if (milli <= 0) {
+        return;
+    }
+    c.health = std::max(0.0f, c.health - static_cast<float>(milli) / 1000.0f);
+    if (c.health > 0.0f) {
+        return;
+    }
+    c.deathCause = static_cast<std::uint8_t>(DeathCause::Bleed);
+    enterState(scene, who, c, CombatState::Dead);
+    const Combatant& playerC = scene.registry().get<Combatant>(scene.find(player_));
+    const Combatant& foeC = scene.registry().get<Combatant>(scene.find(foe_));
+    recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time());
+}
+
 void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen)
 {
     Combatant& c = scene.registry().get<Combatant>(victim);
@@ -352,6 +376,13 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
         c.sinceStaminaSpend += fdt;
         c.sincePoiseDamage += fdt;
 
+        tickStatus(scene, entity, c);
+        if (!c.alive()) {
+            body.intent = glm::vec3(0.0f);
+            return;
+        }
+        const float moveScale = c.status.moveScale();
+
         if (c.sinceStaminaSpend >= tuning_.staminaRegenDelay && !c.blocking) {
             const float regen = c.side == 1 ? tuning_.foeStaminaRegenPerSec : tuning_.staminaRegenPerSec;
             c.stamina = std::min(tuning_.maxStamina, c.stamina + regen * fdt);
@@ -384,7 +415,7 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
             if (elapsed(c.stateTime, heavy ? tuning_.heavyRecovery : tuning_.lightRecovery, fdt)) enterState(scene, entity, c, CombatState::Idle);
             break;
         case CombatState::Dodging:
-            body.intent = c.dodgeDirection * tuning_.dodgeSpeed;
+            body.intent = c.dodgeDirection * tuning_.dodgeSpeed * moveScale;
             if (elapsed(c.stateTime, tuning_.dodgeDuration, fdt)) enterState(scene, entity, c, CombatState::Idle);
             break;
         case CombatState::Staggered:
@@ -398,6 +429,8 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
             break;
         default:
             if (c.blocking) body.intent *= 0.5f;
+            // The foe's intent is rebuilt by the skirmisher after this, which applies the scale itself.
+            if (c.side == 0) body.intent *= moveScale;
             break;
         }
     }
