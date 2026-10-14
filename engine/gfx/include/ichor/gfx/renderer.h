@@ -63,6 +63,10 @@ public:
     // windows. Renderers without a UI ignore it.
     virtual void setGuiHook(std::function<void()> hook) { (void)hook; }
 
+    // Saves the next frame that is presented, exactly as the player would see it (the scene, the UI
+    // and the overlays), to a PNG at this path. A renderer with no window ignores it.
+    virtual void requestScreenshot(std::string path) { (void)path; }
+
     // The game UI: the interface RmlUi draws through, null where there is no window. Each
     // frame `update` is called with the size of what is drawn into, outside any pass, so the
     // caller can resize and lay out its UI context (which may upload textures); then `render`

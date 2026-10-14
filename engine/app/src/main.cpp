@@ -65,6 +65,7 @@ struct Options {
     std::string loadSlot;
     bool ironman = false;
     bool editor = false;
+    std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     double daySeconds = 1200.0; // simulated seconds in a whole day
@@ -119,6 +120,8 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
+        } else if (arg == "--screenshot" && hasValue) {
+            options.screenshot = argv[++i];
         } else if (arg == "--editor") {
             options.editor = true;
         } else if (arg == "--ironman") {
@@ -664,6 +667,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const double now = platform.now();
         const double dt = options.headless ? config.fixedDt : now - last;
         last = now;
+        // With a frame count, the screenshot is of the last frame, as the player would see it.
+        if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
+            renderer.requestScreenshot(options.screenshot);
+        }
         if (!engine.frame(dt)) {
             break;
         }
@@ -747,7 +754,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor] [--screenshot file.png]");
         return 2;
     }
 

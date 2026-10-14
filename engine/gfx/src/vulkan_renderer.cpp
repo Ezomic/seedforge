@@ -1,5 +1,6 @@
 #include "ichor/gfx/vulkan_renderer.h"
 
+#include "ichor/assets/image.h"
 #include "ichor/core/log.h"
 #include "ichor/gfx/vk_context.h"
 #include "ichor/gfx/vk_scene.h"
@@ -13,6 +14,8 @@
 #include <tracy/Tracy.hpp>
 
 #include <array>
+#include <cstring>
+#include <utility>
 #include <vector>
 
 namespace ichor {
@@ -62,6 +65,7 @@ struct VulkanRenderer::Impl {
     {
     }
 
+    bool canScreenshot = false;
     bool createSwapchain();
     void destroySwapchain();
     bool recreateSwapchain();
@@ -76,7 +80,14 @@ bool VulkanRenderer::Impl::createSwapchain()
     if (size.width <= 0 || size.height <= 0) {
         return false;
     }
+    // Screenshots copy out of the swapchain image, which needs the surface to allow it.
+    VkSurfaceCapabilitiesKHR capabilities{};
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx.physicalDevice(), ctx.surface(), &capabilities);
+    canScreenshot = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
     vkb::SwapchainBuilder builder{ctx.vkbDevice(), ctx.surface()};
+    if (canScreenshot) {
+        builder.add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    }
     auto result = builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
                       .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
                       .set_desired_extent(static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height))
@@ -401,9 +412,28 @@ void VulkanRenderer::endFrame()
             ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), overlayCmd);
         });
 
-    transitionImage(cmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_NONE, 0);
+    // A screenshot copies the finished image into a host buffer on its way to the display.
+    GpuBuffer shot;
+    const bool capturing = !screenshotPath_.empty() && v.canScreenshot;
+    if (capturing) {
+        shot = v.ctx.createBuffer(static_cast<VkDeviceSize>(v.swapchain.extent.width) * v.swapchain.extent.height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VulkanContext::HostAccess::Read);
+    }
+    if (capturing && shot.mapped != nullptr) {
+        transitionImage(cmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {v.swapchain.extent.width, v.swapchain.extent.height, 1};
+        vkCmdCopyImageToBuffer(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shot.buffer, 1, &region);
+        transitionImage(cmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_2_NONE, 0);
+    } else {
+        transitionImage(cmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_NONE, 0);
+    }
     vkEndCommandBuffer(cmd);
 
     const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -415,7 +445,40 @@ void VulkanRenderer::endFrame()
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &v.renderFinished[v.imageIndex];
-    if (!vkCheck(vkQueueSubmit(v.ctx.queue(), 1, &submit, v.inFlight[v.frame]), "vkQueueSubmit")) {
+    const bool submitted = vkCheck(vkQueueSubmit(v.ctx.queue(), 1, &submit, v.inFlight[v.frame]), "vkQueueSubmit");
+    if (submitted && !screenshotPath_.empty()) {
+        if (shot.mapped == nullptr) {
+            log(LogLevel::Warn, "screenshot: the window cannot be captured here (no transfer usage on the swapchain, or no memory for it)");
+        } else {
+            vkWaitForFences(v.ctx.device(), 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX);
+            vmaInvalidateAllocation(v.ctx.allocator(), shot.allocation, 0, VK_WHOLE_SIZE);
+            const std::uint32_t width = v.swapchain.extent.width;
+            const std::uint32_t height = v.swapchain.extent.height;
+            std::vector<std::uint8_t> rgba(static_cast<std::size_t>(width) * height * 4);
+            std::memcpy(rgba.data(), shot.mapped, rgba.size());
+            if (v.swapchain.image_format == VK_FORMAT_B8G8R8A8_UNORM) {
+                for (std::size_t i = 0; i < rgba.size(); i += 4) {
+                    std::swap(rgba[i], rgba[i + 2]);
+                }
+            }
+            for (std::size_t i = 3; i < rgba.size(); i += 4) {
+                rgba[i] = 255; // the window is opaque whatever the target's alpha holds
+            }
+            if (writePng(screenshotPath_, width, height, rgba.data())) {
+                logf(LogLevel::Info, "screenshot: {}x{} saved to {}", width, height, screenshotPath_);
+            } else {
+                logf(LogLevel::Error, "screenshot: could not write {}", screenshotPath_);
+            }
+        }
+    }
+    if (shot.buffer != VK_NULL_HANDLE) {
+        if (submitted) {
+            vkWaitForFences(v.ctx.device(), 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX);
+        }
+        v.ctx.destroyBuffer(shot);
+    }
+    screenshotPath_.clear();
+    if (!submitted) {
         // The fence would never signal; put it back so the next wait returns.
         VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
