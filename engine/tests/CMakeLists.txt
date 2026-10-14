@@ -32,6 +32,7 @@ add_executable(ichor_tests
     test_traversal_verbs.cpp
     test_axiom.cpp
     test_slot_roll.cpp
+    test_axioms_anomaly.cpp
     test_conflicts.cpp
     test_atmosphere.cpp
     test_vegetation.cpp
