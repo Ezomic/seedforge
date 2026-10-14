@@ -8,6 +8,8 @@ namespace ichor {
 namespace {
 
 constexpr float kReferenceDistance = 2.0f; // metres at which a spatial sound has fallen to half gain
+constexpr float kLoopEase = 1.0f / 12000.0f; // one-pole time constant of about a quarter second at 48 kHz
+constexpr float kLoopFloor = 1e-4f;
 constexpr float kCentreGain = 1.41421356f;   // undoes the equal-power pan at centre so spatial and flat cues match
 
 }
@@ -50,6 +52,22 @@ void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spati
         voices_.reserve(kMaxVoices);
     }
     voices_.push_back({clip, 0.0, position, gain, spatial});
+}
+
+void Mixer::setLoopGain(std::uint32_t clip, float gain)
+{
+    const std::lock_guard lock(mutex_);
+    if (clip >= clips_.size() || clips_[clip].samples.empty()) {
+        return;
+    }
+    const float target = std::isnan(gain) ? 0.0f : std::clamp(gain, 0.0f, 1.0f);
+    for (Loop& loop : loops_) {
+        if (loop.clip == clip) {
+            loop.target = target;
+            return;
+        }
+    }
+    loops_.push_back({clip, 0.0, 0.0f, target});
 }
 
 void Mixer::setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right)
@@ -105,6 +123,32 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
         }
     }
 
+    for (Loop& loop : loops_) {
+        const Clip& clip = clips_[loop.clip];
+        const double step = static_cast<double>(clip.sampleRate) / static_cast<double>(kRate);
+        const double length = static_cast<double>(clip.samples.size());
+        for (std::uint32_t f = 0; f < frames; ++f) {
+            loop.gain += (loop.target - loop.gain) * kLoopEase;
+            if (loop.gain < kLoopFloor && loop.target == 0.0f) {
+                loop.gain = 0.0f;
+            }
+            if (loop.gain > 0.0f) {
+                const auto index = static_cast<std::size_t>(loop.cursor);
+                const std::size_t next = index + 1 < clip.samples.size() ? index + 1 : 0;
+                const float t = static_cast<float>(loop.cursor - static_cast<double>(index));
+                const float a = static_cast<float>(clip.samples[index]) / 32768.0f;
+                const float b = static_cast<float>(clip.samples[next]) / 32768.0f;
+                const float sample = (a + (b - a) * t) * loop.gain;
+                interleaved[f * 2] += sample;
+                interleaved[f * 2 + 1] += sample;
+            }
+            loop.cursor += step;
+            if (loop.cursor >= length) {
+                loop.cursor -= length;
+            }
+        }
+    }
+
     std::erase_if(voices_, [&](const Voice& voice) { return voice.cursor >= static_cast<double>(clips_[voice.clip].samples.size()); });
     reverb_.process(interleaved, frames);
     for (std::uint32_t i = 0; i < frames * kChannels; ++i) {
@@ -116,6 +160,12 @@ std::size_t Mixer::activeVoices() const
 {
     const std::lock_guard lock(mutex_);
     return voices_.size();
+}
+
+std::size_t Mixer::activeLoops() const
+{
+    const std::lock_guard lock(mutex_);
+    return loops_.size();
 }
 
 }

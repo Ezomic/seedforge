@@ -30,6 +30,9 @@ public:
     // Positions stay double until the listener-relative offset is formed, so
     // far from the origin the panning does not jitter.
     void play(std::uint32_t clip, glm::dvec3 position, float gain, bool spatial);
+    // One looping, non-spatial voice per clip, made on first use. The gain eases toward the target
+    // (a time constant of about a quarter second) so a changing value never clicks; NaN counts as silence and the rest is clamped to 0..1.
+    void setLoopGain(std::uint32_t clip, float gain);
     void setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right);
     void setReverb(const ReverbSettings& settings);
 
@@ -38,6 +41,7 @@ public:
     void mix(float* interleaved, std::uint32_t frames);
 
     std::size_t activeVoices() const;
+    std::size_t activeLoops() const;
 
 private:
     struct Clip {
@@ -53,9 +57,17 @@ private:
         bool spatial = false;
     };
 
+    struct Loop {
+        std::uint32_t clip = 0;
+        double cursor = 0.0;
+        float gain = 0.0f;
+        float target = 0.0f;
+    };
+
     mutable std::mutex mutex_;
     std::vector<Clip> clips_;
     std::vector<Voice> voices_;
+    std::vector<Loop> loops_;
     Reverb reverb_;
     glm::dvec3 listenerPosition_{0.0};
     glm::vec3 listenerForward_{0.0f, 0.0f, -1.0f};
