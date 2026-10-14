@@ -52,6 +52,18 @@ TEST_CASE("an edit is visible to the session at once and to the scene after a ti
     REQUIRE(editor.outliner().size() == 1);
 }
 
+TEST_CASE("the session names an entity, also before the tick, and not after it is gone")
+{
+    Scene scene(1);
+    EditorSession editor(scene);
+    const auto id = editor.spawn("altar", {0.0, 0.0, 0.0});
+    REQUIRE(id.has_value());
+    REQUIRE(editor.nameOf(*id) == "altar");
+    REQUIRE_FALSE(editor.nameOf(StableId::of("missing")).has_value());
+    editor.destroy(*id);
+    REQUIRE_FALSE(editor.nameOf(*id).has_value());
+}
+
 TEST_CASE("a name that is empty or already taken is refused")
 {
     Scene scene(1);

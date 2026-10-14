@@ -37,6 +37,7 @@ public:
     void select(std::optional<StableId> id);
     bool exists(StableId id) const;
     std::optional<Transform> transformOf(StableId id) const;
+    std::optional<std::string> nameOf(StableId id) const;
 
     // Each is one undo step, or part of the open transaction. spawn returns the
     // new entity's id, or nothing when the name is empty or already taken.

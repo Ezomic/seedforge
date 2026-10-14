@@ -103,6 +103,12 @@ std::optional<Transform> EditorSession::transformOf(StableId id) const
     return state ? std::optional<Transform>(state->transform) : std::nullopt;
 }
 
+std::optional<std::string> EditorSession::nameOf(StableId id) const
+{
+    const auto state = stateOf(id);
+    return state ? std::optional<std::string>(state->name) : std::nullopt;
+}
+
 std::vector<OutlinerEntry> EditorSession::outliner() const
 {
     forgetPendingIfTicked();

@@ -28,6 +28,7 @@ add_executable(ichor_tests
     test_water_field.cpp
     test_reverb.cpp
     test_editor.cpp
+    test_picking.cpp
     test_weather.cpp
     test_ui.cpp
     test_save.cpp

@@ -127,6 +127,10 @@ void EditorPanels::inspector()
         dragged_.reset();
     }
 
+    const std::string name = session_.nameOf(*selected).value_or("");
+    ImGui::Text("Selected: %s (id %llu)", name.c_str(), static_cast<unsigned long long>(selected->value));
+    remember("Selected");
+
     // Dragging a field sends a transform per frame; the drag as a whole is one undo step.
     Transform edited = *current;
     const auto field = [&](const char* label, auto&& widget) {

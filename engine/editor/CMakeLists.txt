@@ -1,4 +1,5 @@
 add_library(ichor_editor
+    src/picking.cpp
     src/session.cpp
 )
 target_include_directories(ichor_editor PUBLIC include)
