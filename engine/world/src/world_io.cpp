@@ -5,8 +5,7 @@
 #include "ichor/core/log.h"
 
 #include <array>
-#include <fstream>
-#include <iterator>
+#include <cstring>
 
 namespace ichor {
 
@@ -37,12 +36,11 @@ bool writeWorld(const std::filesystem::path& directory, const Heightfield& heigh
 
 bool readWorld(const std::filesystem::path& directory, Heightfield& heightfield)
 {
-    std::ifstream manifest(directory / "manifest.iworld", std::ios::binary);
-    if (!manifest) {
+    std::vector<std::uint8_t> bytes;
+    if (!readFileBytes(directory / "manifest.iworld", bytes)) {
         logf(LogLevel::Error, "no world manifest in {}", directory.string());
         return false;
     }
-    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(manifest)), std::istreambuf_iterator<char>());
     BinaryReader r(bytes);
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
@@ -53,20 +51,19 @@ bool readWorld(const std::filesystem::path& directory, Heightfield& heightfield)
         return false;
     }
 
-    std::ifstream raw(directory / "heightmap.r16", std::ios::binary | std::ios::ate);
-    if (!raw) {
+    std::vector<std::uint8_t> raw;
+    if (!readFileBytes(directory / "heightmap.r16", raw)) {
         logf(LogLevel::Error, "no heightmap in {}", directory.string());
         return false;
     }
-    const auto size = static_cast<std::size_t>(raw.tellg());
+    const std::size_t size = raw.size();
     const std::size_t expected = static_cast<std::size_t>(desc.samplesPerSide()) * desc.samplesPerSide() * sizeof(std::uint16_t);
     if (size != expected) {
         logf(LogLevel::Error, "heightmap in {} has {} bytes, the manifest expects {}", directory.string(), size, expected);
         return false;
     }
     std::vector<std::uint16_t> samples(size / sizeof(std::uint16_t));
-    raw.seekg(0);
-    raw.read(reinterpret_cast<char*>(samples.data()), static_cast<std::streamsize>(size));
+    std::memcpy(samples.data(), raw.data(), size);
     heightfield = Heightfield(desc, std::move(samples));
     if (heightfield.digest() != digest) {
         logf(LogLevel::Error, "heightmap in {} does not match its manifest", directory.string());
