@@ -7,8 +7,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -34,20 +36,6 @@ std::filesystem::path uniqueRoot()
     return root;
 }
 
-std::optional<TraitPool> poolFromFile(const std::filesystem::path& file, std::string& error)
-{
-    const auto root = uniqueRoot();
-    std::filesystem::copy_file(file, root / "npcs" / "traits.json");
-    DataSet data;
-    const bool loaded = data.loadDirectory(root);
-    std::filesystem::remove_all(root);
-    if (!loaded) {
-        error = data.lastError();
-        return std::nullopt;
-    }
-    return TraitPool::fromTable(*data.table("npcs"), error);
-}
-
 std::optional<TraitPool> poolFromJson(const std::string& json, std::string& error)
 {
     const auto root = uniqueRoot();
@@ -70,7 +58,10 @@ std::optional<TraitPool> poolFromJson(const std::string& json, std::string& erro
 TraitPool shippedPool()
 {
     std::string error;
-    auto pool = poolFromFile(std::filesystem::path(ICHOR_GAME_DATA_DIR) / "npcs" / "traits.json", error);
+    std::ifstream file(std::filesystem::path(ICHOR_GAME_DATA_DIR) / "npcs" / "traits.json", std::ios::binary);
+    REQUIRE(file.good());
+    const std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    auto pool = poolFromJson(json, error);
     INFO(error);
     REQUIRE(pool.has_value());
     return *pool;
@@ -192,6 +183,30 @@ TEST_CASE("a pool where every pair conflicts terminates and says it is incomplet
         CHECK(result.ids.size() == 1);
         CHECK_FALSE(result.complete());
     }
+}
+
+TEST_CASE("a pool that can place only two of three reports it as incomplete")
+{
+    std::string error;
+    auto pool = TraitPool::fromTraits({ trait("a", { "c" }), trait("b", { "c" }), trait("c", { "a", "b" }) }, error);
+    REQUIRE(pool.has_value());
+    int wantedThree = 0;
+    for (std::uint64_t id = 0; id < 200; ++id) {
+        const NpcTraits result = assignTraits(5, id, *pool);
+        if (result.wanted == 3) {
+            ++wantedThree;
+            CHECK(result.ids.size() < 3);
+            CHECK_FALSE(result.complete());
+        }
+    }
+    CHECK(wantedThree > 0);
+}
+
+TEST_CASE("golden: known inputs give known traits")
+{
+    const TraitPool pool = shippedPool();
+    CHECK(assignTraits(42, 7, pool).ids == std::vector<std::string> { "loyal", "gossipy" });
+    CHECK(assignTraits(0, 0, pool).ids == std::vector<std::string> { "greedy", "secretive" });
 }
 
 TEST_CASE("an invalid pool is refused with a reason")
