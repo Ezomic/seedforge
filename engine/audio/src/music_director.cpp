@@ -130,7 +130,7 @@ MusicDecision MusicDirector::onEvent(MusicEvent event, double now)
             return {MusicVerdict::Busy, npos, 0.0};
         }
         double end = current_->end;
-        if (current_->cutFade == 0.0) {
+        if (!current_->cut) {
             const double faded = now + static_cast<double>(cues_[current_->cue].fadeOut);
             if (faded < end) {
                 cut = true;
@@ -160,6 +160,7 @@ MusicDecision MusicDirector::onEvent(MusicEvent event, double now)
     if (cut) {
         current_->cutAt = now;
         current_->cutFade = cutEnd - now;
+        current_->cut = true;
         current_->end = cutEnd;
         cutToReport_ = static_cast<float>(current_->cutFade);
     }
@@ -171,11 +172,14 @@ MusicUpdate MusicDirector::update(double now)
 {
     advance(now);
     MusicUpdate result;
-    result.cutFadeSeconds = cutToReport_;
-    cutToReport_ = 0.0f;
+    if (cutToReport_) {
+        result.cut = true;
+        result.cutFadeSeconds = *cutToReport_;
+        cutToReport_.reset();
+    }
     if (pending_ && now >= pending_->startAt && !current_) {
         const MusicCue& cue = cues_[pending_->cue];
-        current_ = Playing{pending_->cue, now, now + static_cast<double>(cue.duration), 0.0, 0.0};
+        current_ = Playing{pending_->cue, now, now + static_cast<double>(cue.duration), 0.0, 0.0, false};
         lastStart_[pending_->cue] = now;
         result.start = MusicStart{pending_->cue, static_cast<double>(cue.duration)};
         pending_.reset();
@@ -189,7 +193,7 @@ float MusicDirector::level(double now) const
         return 0.0f;
     }
     float level = cueEnvelope(cues_[current_->cue], now - current_->start);
-    if (current_->cutFade > 0.0) {
+    if (current_->cut && current_->cutFade > 0.0) {
         level *= static_cast<float>(1.0 - std::clamp((now - current_->cutAt) / current_->cutFade, 0.0, 1.0));
     }
     return level;

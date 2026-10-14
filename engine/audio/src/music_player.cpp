@@ -29,7 +29,7 @@ void MusicPlayer::bind(const AudioHost& host)
 void MusicPlayer::update(double now, AudioHost& host)
 {
     const MusicUpdate update = director_.update(now);
-    if (update.cutFadeSeconds > 0.0f) {
+    if (update.cut) {
         host.fadeOutMusic(update.cutFadeSeconds);
     }
     if (update.start && update.start->cue < sounds_.size() && sounds_[update.start->cue] != Mixer::kNoSound) {

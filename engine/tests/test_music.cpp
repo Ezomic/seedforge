@@ -138,6 +138,7 @@ TEST_CASE("death cuts a combat cue, which fades out before the death cue starts"
     REQUIRE(decision.startAt == 4.0 + 2.0 + 0.5);
 
     const MusicUpdate cut = director.update(4.0);
+    REQUIRE(cut.cut);
     REQUIRE(cut.cutFadeSeconds == 2.0f);
     REQUIRE_FALSE(cut.start.has_value());
     REQUIRE(director.level(5.0) < director.level(4.1));
@@ -149,6 +150,19 @@ TEST_CASE("death cuts a combat cue, which fades out before the death cue starts"
     REQUIRE(started.start.has_value());
     REQUIRE(started.start->cue == 3);
     REQUIRE(director.playing(6.6));
+}
+
+TEST_CASE("cutting a cue with no fade-out ends it at once and is still reported")
+{
+    std::vector<MusicCue> cues = oneOfEach();
+    cues[2].fadeOut = 0.0f;
+    MusicDirector director(cues, config(), 1);
+    REQUIRE(startNow(director, MusicEvent::Combat, 0.0) == 2);
+    REQUIRE(director.onEvent(MusicEvent::Death, 4.0).verdict == MusicVerdict::Accepted);
+    const MusicUpdate cut = director.update(4.0);
+    REQUIRE(cut.cut);
+    REQUIRE(cut.cutFadeSeconds == 0.0f);
+    REQUIRE_FALSE(director.playing(4.0));
 }
 
 TEST_CASE("combat beats discovery and death beats combat, but never the other way")

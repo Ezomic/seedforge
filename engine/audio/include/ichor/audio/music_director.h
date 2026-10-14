@@ -74,7 +74,8 @@ struct MusicStart {
 
 struct MusicUpdate {
     std::optional<MusicStart> start;
-    float cutFadeSeconds = 0.0f; // above 0 once, when the playing cue must fade out early
+    bool cut = false;            // true once, when the playing cue must fade out early
+    float cutFadeSeconds = 0.0f; // over this long; 0 ends it at once
 };
 
 // Event in, decision out. No audio, no clock: the caller passes the time in seconds, which must not go
@@ -102,7 +103,8 @@ private:
         double start = 0.0;
         double end = 0.0;
         double cutAt = 0.0;
-        double cutFade = 0.0; // 0 means not cut
+        double cutFade = 0.0;
+        bool cut = false;
     };
     struct Pending {
         std::size_t cue = npos;
@@ -120,7 +122,7 @@ private:
     std::optional<Pending> pending_;
     double lastEnd_ = -std::numeric_limits<double>::infinity();
     int lastPriority_ = -1;
-    float cutToReport_ = 0.0f;
+    std::optional<float> cutToReport_;
 };
 
 }
