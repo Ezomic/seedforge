@@ -1,0 +1,14 @@
+{
+  "id": "law.last_favour",
+  "slot": "law",
+  "title": "The Last Favour",
+  "tags": ["FINITE", "DEFLATION", "SCARCITY", "CONSERVATION"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["dimmed_grove"] },
+  "poi": { "weights": { "cold_altar": 2.5, "thesauros": 2.0, "pilgrim_road": 0.6 } },
+  "enemies": { "roster_add": ["hollow_votary", "treasury_guard"] },
+  "economy": { "scarce": ["divine_charge", "votive_offering"], "abundant": ["tarnished_idol"] },
+  "palette": { "grade": "last_favour", "fog_density": 0.8 },
+  "audio": { "bed_overrides": ["guttering_flame"], "music_palette": "last_favour" }
+}
