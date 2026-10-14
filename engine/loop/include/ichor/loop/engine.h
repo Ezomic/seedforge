@@ -61,6 +61,9 @@ public:
     bool frame(double frameSeconds);
 
     std::uint64_t frameCount() const { return frameCount_; }
+    // The time a frame takes, smoothed over the last few dozen, in milliseconds; zero before the first. A paused
+    // frame, which has no time of its own, leaves it as it was.
+    double frameMilliseconds() const { return frameMillis_; }
     const Scene& scene() const { return scene_; }
     Scene& scene() { return scene_; }
 
@@ -84,6 +87,7 @@ private:
     bool recording_ = false;
     bool replaying_ = false;
     std::uint64_t frameCount_ = 0;
+    double frameMillis_ = 0.0;
 };
 
 }

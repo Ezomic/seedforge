@@ -4,6 +4,7 @@
 #include "ichor/gfx/renderer.h"
 #include "ichor/platform/platform.h"
 
+#include <cmath>
 #include <format>
 
 namespace ichor {
@@ -45,6 +46,10 @@ bool Engine::frame(double frameSeconds)
     if (platform_.quitRequested()) {
         return false;
     }
+    if (std::isfinite(frameSeconds) && frameSeconds > 0.0) {
+        const double millis = frameSeconds * 1000.0;
+        frameMillis_ = frameMillis_ == 0.0 ? millis : frameMillis_ * 0.95 + millis * 0.05;
+    }
 
     if (audio_ != nullptr) {
         // Cues raised this frame are heard from where the camera was last drawn.
@@ -73,7 +78,7 @@ bool Engine::frame(double frameSeconds)
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
     }
-    renderer_.debugText(std::format("frame {}  tick {}  sim {:.2f} s{}{}", frameCount_, scene_.tickCount(), scene_.time(),
+    renderer_.debugText(std::format("frame {}  {:.1f} ms  tick {}  sim {:.2f} s{}{}", frameCount_, frameMillis_, scene_.tickCount(), scene_.time(),
         replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
     renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
     if (overlayBuilder_) {

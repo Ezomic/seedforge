@@ -4,6 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
+
 using namespace ichor;
 
 namespace {
@@ -64,4 +66,28 @@ TEST_CASE("two runs with the same seed end in the same state")
     const auto b = runFrames(99, 120, 1.0 / 60.0);
     REQUIRE(a == b);
     REQUIRE(a != runFrames(100, 120, 1.0 / 60.0));
+}
+
+TEST_CASE("the engine reports a smoothed frame time, ignoring frames that have none")
+{
+    NullPlatform platform;
+    NullRenderer renderer;
+    REQUIRE(platform.init({}));
+    REQUIRE(renderer.init());
+    Engine engine(platform, renderer, EngineConfig{});
+    REQUIRE(engine.frameMilliseconds() == 0.0);
+
+    REQUIRE(engine.frame(0.020));
+    REQUIRE(engine.frameMilliseconds() == 20.0); // the first frame is the whole average
+    for (int i = 0; i < 200; ++i) {
+        REQUIRE(engine.frame(0.010));
+    }
+    REQUIRE(engine.frameMilliseconds() > 9.99);
+    REQUIRE(engine.frameMilliseconds() < 10.1); // the 20 ms has all but washed out
+
+    const double before = engine.frameMilliseconds();
+    REQUIRE(engine.frame(0.0));                  // a paused frame
+    REQUIRE(engine.frame(-1.0));
+    REQUIRE(engine.frame(std::nan("")));
+    REQUIRE(engine.frameMilliseconds() == before);
 }
