@@ -19,6 +19,10 @@ std::string compassLabel(float headingRadians);
 // north, and growing clockwise, so +X is a quarter turn.
 float headingOf(float forwardX, float forwardZ);
 
+// What wading is called at this depth of water in metres: nothing over dry land or a puddle
+// (see core/wading.h), then ankle, knee, waist and chest deep in equal steps up to chest height. A depth that is not a number reads as none.
+std::string waterLabel(float depth);
+
 // A time of day as HH:MM. Hours run 0 to 24 and wrap.
 std::string clockLabel(float hour);
 
@@ -35,15 +39,17 @@ public:
     bool ok() const { return document_ != nullptr; }
 
     // Only changed text is rewritten, so a steady heading costs no layout.
-    void update(float headingRadians, float hour);
+    void update(float headingRadians, float hour, float wadingDepth);
 
 private:
     UiContext& ui_;
     Rml::ElementDocument* document_ = nullptr;
     Rml::Element* compass_ = nullptr;
     Rml::Element* clock_ = nullptr;
+    Rml::Element* water_ = nullptr;
     std::string compassText_;
     std::string clockText_;
+    std::string waterText_;
 };
 
 }

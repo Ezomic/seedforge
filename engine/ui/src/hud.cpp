@@ -1,5 +1,7 @@
 #include "ichor/ui/hud.h"
 
+#include "ichor/core/wading.h"
+
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 
@@ -19,8 +21,9 @@ constexpr const char* kHudDocument = R"(<rml><head><style>
     #plate { position: absolute; top: 14px; left: 50%; margin-left: -90px; width: 180px; padding: 6px 0px 8px 0px; text-align: center; background-color: #10141acc; border: 2px #a08850; }
     #compass { font-family: Cinzel; font-size: 30px; color: #e8d8a8; letter-spacing: 3px; }
     #clock { font-family: Alegreya Sans; font-size: 18px; color: #d8d8d8; }
+    #water { font-family: Alegreya Sans; font-size: 16px; color: #8fc0d0; }
 </style></head><body>
-    <div id="plate"><div id="compass">N</div><div id="clock">09:00</div></div>
+    <div id="plate"><div id="compass">N</div><div id="clock">09:00</div><div id="water"></div></div>
 </body></rml>)";
 
 }
@@ -42,6 +45,19 @@ std::string compassLabel(float headingRadians)
     }
     const auto index = static_cast<std::size_t>(std::floor(turns / kTwoPi * 8.0f + 0.5f)) % kPoints.size();
     return kPoints[index];
+}
+
+std::string waterLabel(float depth)
+{
+    if (!(depth > kWadeStart)) {
+        return {};
+    }
+    // Four equal bands from the ankles to chest height, the range over which wading slows the walker.
+    const float through = (depth - kWadeStart) / (kWadeFull - kWadeStart);
+    if (through < 0.25f) return "Ankle deep";
+    if (through < 0.5f) return "Knee deep";
+    if (through < 0.75f) return "Waist deep";
+    return "Chest deep";
 }
 
 std::string clockLabel(float hour)
@@ -68,6 +84,7 @@ Hud::Hud(UiContext& ui)
     }
     compass_ = document_->GetElementById("compass");
     clock_ = document_->GetElementById("clock");
+    water_ = document_->GetElementById("water");
     document_->Show();
 }
 
@@ -78,9 +95,9 @@ Hud::~Hud()
     }
 }
 
-void Hud::update(float headingRadians, float hour)
+void Hud::update(float headingRadians, float hour, float wadingDepth)
 {
-    if (compass_ == nullptr || clock_ == nullptr) {
+    if (compass_ == nullptr || clock_ == nullptr || water_ == nullptr) {
         return;
     }
     const std::string compass = compassLabel(headingRadians);
@@ -92,6 +109,11 @@ void Hud::update(float headingRadians, float hour)
     if (clock != clockText_) {
         clockText_ = clock;
         clock_->SetInnerRML(clock);
+    }
+    const std::string water = waterLabel(wadingDepth);
+    if (water != waterText_) {
+        waterText_ = water;
+        water_->SetInnerRML(water);
     }
 }
 

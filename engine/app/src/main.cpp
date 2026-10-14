@@ -464,6 +464,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::Ledger> ledger;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
+    float hudWater = 0.0f;
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
@@ -488,7 +489,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         renderer.setUiHooks(
             [&](std::uint32_t width, std::uint32_t height) {
                 ui->setSize(width, height);
-                hud->update(hudHeading, hudHour);
+                hud->update(hudHeading, hudHour, hudWater);
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -541,8 +542,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
             const glm::dvec3 target = anchor + glm::dvec3(0.0, 0.55, 0.0);
-            const glm::dvec3 eye = blend(previous, transform).first + glm::dvec3(0.0, 1.6, 0.0);
+            const glm::dvec3 feet = blend(previous, transform).first;
+            const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
+            hudWater = waterField ? waterField->at(feet.x, feet.z).depth : 0.0f;
             view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
         }
         const double cellMetres = heightfield.desc().cellMetres;
