@@ -95,8 +95,8 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
         if (json.is_discarded()) {
             return fail("not valid JSON");
         }
-        if ((tableName == "axioms" || tableName == "conflicts") && json.is_object()) {
-            continue; // nested documents that AxiomSet and ConflictList validate and load themselves
+        if ((tableName == "axioms" || tableName == "conflicts" || tableName == "synergies") && json.is_object()) {
+            continue; // nested documents that AxiomSet, ConflictList and the synergy loader validate and load themselves
         }
         if (!json.is_array()) {
             return fail("expected an array of records");
@@ -111,6 +111,7 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
             }
             DataRecord record;
             record.id = item["id"].get<std::string>();
+            record.file = relative.generic_string();
             if (table.records.contains(record.id)) {
                 return fail("duplicate id '" + record.id + "' in table '" + tableName + "'");
             }
