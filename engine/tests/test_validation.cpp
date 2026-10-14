@@ -1,3 +1,4 @@
+#include "ichor/core/hash.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/validation.h"
 
@@ -44,7 +45,7 @@ TEST_CASE("the first attempt uses the seed as given and later ones a derived see
     CHECK(attemptSeed(77, 0) == 77);
     CHECK(attemptSeed(77, 1) != 77);
     CHECK(attemptSeed(77, 1) != attemptSeed(77, 2));
-    CHECK(attemptSeed(77, 3) == attemptSeed(77, 3));
+    CHECK(attemptSeed(77, 3) == hashCombine(77, 3));
 }
 
 TEST_CASE("a world that passes is exactly the world the forge makes without gates", "[validation]")
@@ -56,8 +57,9 @@ TEST_CASE("a world that passes is exactly the world the forge makes without gate
         REQUIRE(validated.passed);
         CHECK(validated.attempt == 0);
         CHECK(validated.rejected.empty());
-        const ForgedWorld plain = forgeWorld(request);
-        CHECK(validated.world.heightfield.digest() == plain.heightfield.digest());
+        const Heightfield raw = forgeHeightfield(request.desc);
+        const Heightfield oldPipeline = carveRivers(raw, computeHydrology(raw), request.rivers, CarveParams{});
+        CHECK(validated.world.heightfield.digest() == oldPipeline.digest());
     }
 }
 
@@ -91,7 +93,7 @@ TEST_CASE("the number of rerolls is bounded, even when asked for the most", "[va
     request.desc.cellMetres = 64;
     const ValidatedWorld validated = forgeValidated(request, {kAlwaysFails}, std::numeric_limits<std::uint32_t>::max());
     CHECK_FALSE(validated.passed);
-    CHECK(validated.rejected.size() <= 65);
+    CHECK(validated.rejected.size() == 65);
 }
 
 TEST_CASE("no rerolls allowed means one attempt", "[validation]")
@@ -188,4 +190,21 @@ TEST_CASE("a requested river must exist", "[validation]")
         flagged = flagged || failure.gate == "has-river";
     }
     CHECK(flagged);
+}
+
+TEST_CASE("hydrology that does not agree with itself is flagged", "[validation]")
+{
+    const ForgeRequest request = smallRequest(3);
+    const Gate agrees = defaultGates().back();
+    REQUIRE(agrees.name == "hydrology-agrees");
+    ForgedWorld world = forgeWorld(request);
+    CHECK_FALSE(agrees.check(world, request).has_value());
+
+    ForgedWorld wrongSize = world;
+    wrongSize.hydrology.accumulation.pop_back();
+    CHECK(agrees.check(wrongSize, request).has_value());
+
+    ForgedWorld badLake = world;
+    badLake.hydrology.lake[0] = static_cast<std::uint32_t>(badLake.hydrology.lakeDeepest.size()) + 1;
+    CHECK(agrees.check(badLake, request).has_value());
 }

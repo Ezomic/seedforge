@@ -148,6 +148,8 @@ int main(int argc, char** argv)
         return 1;
     }
     // The manifest keeps the seed as given; a reroll's number sits beside it, and attempt 0 leaves nothing extra.
+    std::error_code staleEc;
+    std::filesystem::remove(out / "forge-attempt.txt", staleEc);
     if (validated.attempt > 0) {
         const std::string text = std::to_string(validated.attempt) + "\n";
         if (!ichor::writeFileAtomically(out / "forge-attempt.txt", std::vector<std::uint8_t>(text.begin(), text.end()))) {
