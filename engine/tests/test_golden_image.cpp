@@ -317,7 +317,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false, float cloudCover = -1.0f)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false, float cloudCover = -1.0f, float wetness = 0.0f)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -359,6 +359,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     Atmosphere atmosphere = atmosphereAt(hour);
     applyWeather(weather, atmosphere);
     applyAtmosphere(atmosphere, view);
+    view.wetness = wetness;
     if (cloudCover >= 0.0f) {
         view.cloudCover = cloudCover;
     }
@@ -442,6 +443,11 @@ TEST_CASE("golden image: cloud shadows drifting over the land")
 TEST_CASE("golden image: a downpour")
 {
     checkTerrainAtHour(15.0f, "terrain_rain", true, {1.0f, 1.0f});
+}
+
+TEST_CASE("golden image: soaked ground under cloud")
+{
+    checkTerrainAtHour(15.0f, "terrain_wet", true, {0.8f, 0.0f}, false, false, false, -1.0f, 1.0f);
 }
 
 TEST_CASE("golden image: flooded hollows")

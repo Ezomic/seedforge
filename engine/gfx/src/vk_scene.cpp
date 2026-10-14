@@ -1103,7 +1103,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.sunDirection = glm::vec4(sun, 0.0f);
     data.sunColor = glm::vec4(view.sunColor, view.sunIntensity);
     data.ambient = glm::vec4(view.ambient, 0.0f);
-    data.shadowParams = glm::vec4(1.0f / static_cast<float>(kShadowSize), 0.0008f, 0.02f, 0.0f);
+    data.shadowParams = glm::vec4(1.0f / static_cast<float>(kShadowSize), 0.0008f, 0.02f, view.wetness > 0.0f ? std::min(view.wetness, 1.0f) : 0.0f);
     data.cameraWorld = glm::vec4(glm::vec3(view.camera.position), 1.0f);
     data.skyZenith = glm::vec4(view.skyZenith, 0.0f);
     data.skyHorizon = glm::vec4(view.skyHorizon, 0.0f);
