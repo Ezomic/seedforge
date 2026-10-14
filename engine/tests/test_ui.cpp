@@ -1,3 +1,4 @@
+#include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/hud.h"
 #include "ichor/ui/recording_renderer.h"
@@ -512,4 +513,57 @@ TEST_CASE("a pointer that leaves the window unhovers the button, and a ledger ca
     ui.mouseButton(0, false);
     frame(ui, renderer, 0.5);
     SUCCEED("no listener called after the ledger went");
+}
+
+TEST_CASE("the pause menu draws nothing until shown, and its buttons report clicks once")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    PauseMenu menu(ui);
+    REQUIRE(menu.ok());
+    REQUIRE_FALSE(menu.visible());
+    REQUIRE_FALSE(menu.resumeCentre().has_value());
+
+    frame(ui, renderer, 0.0);
+    REQUIRE(renderer.draws().empty());
+
+    menu.setVisible(true);
+    frame(ui, renderer, 0.1);
+    REQUIRE(renderer.draws().size() >= 5); // veil, card, two buttons, text
+    const auto resume = menu.resumeCentre();
+    const auto quit = menu.quitCentre();
+    REQUIRE(resume.has_value());
+    REQUIRE(quit.has_value());
+    REQUIRE(resume->second < quit->second); // Resume above Quit
+    REQUIRE(std::abs(resume->first - 640.0f) < 2.0f); // centred
+
+    const auto click = [&](std::pair<float, float> at, double time) {
+        ui.mouseMove(static_cast<int>(at.first), static_cast<int>(at.second));
+        frame(ui, renderer, time);
+        ui.mouseButton(0, true);
+        frame(ui, renderer, time + 0.01);
+        ui.mouseButton(0, false);
+        frame(ui, renderer, time + 0.02);
+    };
+    click(*resume, 0.2);
+    REQUIRE(menu.takeResume());
+    REQUIRE_FALSE(menu.takeResume()); // once
+    REQUIRE_FALSE(menu.takeQuit());
+    click(*quit, 0.3);
+    REQUIRE(menu.takeQuit());
+    REQUIRE_FALSE(menu.takeResume());
+
+    // A click left over from before the menu was hidden does not count when it is shown again.
+    click(*quit, 0.4);
+    menu.setVisible(false);
+    menu.setVisible(true);
+    REQUIRE_FALSE(menu.takeQuit());
+
+    menu.setVisible(false);
+    frame(ui, renderer, 0.5);
+    REQUIRE(renderer.draws().empty());
 }

@@ -9,6 +9,7 @@
 #include "ichor/gfx/vk_offscreen.h"
 #include "ichor/gfx/vulkan_ui.h"
 #include "ichor/ui/hud.h"
+#include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/world/atmosphere.h"
@@ -777,6 +778,56 @@ TEST_CASE("golden image: the biggest river of the forged world")
     }
     const Diff diff = compare(actual, expected, 16);
     writePng(kOutDir / "terrain_river.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the pause menu over the world")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    PauseMenu menu(ui);
+    REQUIRE(menu.ok());
+    menu.setVisible(true);
+    ui.update(0.0);
+
+    RenderView view;
+    applyAtmosphere(atmosphereAt(15.0f), view);
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(-0.5f, 0.15f, -1.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "ui_pause.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "ui_pause.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_pause.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "ui_pause.diff.png", kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);

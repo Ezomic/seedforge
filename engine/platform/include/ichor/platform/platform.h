@@ -32,6 +32,9 @@ public:
     virtual bool init(const WindowDesc& desc) = 0;
     virtual void pumpEvents() = 0;
     virtual bool quitRequested() const = 0;
+    virtual void requestQuit() = 0;
+    // Whether Esc ends the run outright. The app turns it off once it has a menu for Esc to open.
+    virtual void setEscapeQuits(bool quits) { (void)quits; }
     virtual double now() const = 0;
     virtual Extent drawableSize() const = 0;
 

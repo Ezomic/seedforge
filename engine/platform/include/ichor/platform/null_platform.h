@@ -16,7 +16,7 @@ public:
     Extent drawableSize() const override { return {}; }
     InputFrame input() const override { return input_; }
 
-    void requestQuit() { quit_ = true; }
+    void requestQuit() override { quit_ = true; }
     void setInput(const InputFrame& input) { input_ = input; }
     unsigned pumpCount() const { return pumps_; }
 

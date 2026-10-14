@@ -17,6 +17,8 @@ public:
     bool init(const WindowDesc& desc) override;
     void pumpEvents() override;
     bool quitRequested() const override { return quit_; }
+    void requestQuit() override { quit_ = true; }
+    void setEscapeQuits(bool quits) override { escapeQuits_ = quits; }
     double now() const override;
     Extent drawableSize() const override;
     InputFrame input() const override { return input_; }
@@ -30,6 +32,7 @@ public:
 private:
     SDL_Window* window_ = nullptr;
     bool quit_ = false;
+    bool escapeQuits_ = true;
     InputFrame input_;
     Pointer pointer_;
     std::function<void(const SDL_Event&)> hook_;

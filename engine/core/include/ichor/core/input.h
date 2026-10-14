@@ -22,6 +22,7 @@ struct InputFrame {
         QuickSave = 1u << 7,
         QuickLoad = 1u << 8,
         Journal = 1u << 9,
+        Menu = 1u << 10,
     };
     std::uint32_t buttons = 0;
     float moveX = 0.0f; // right positive
