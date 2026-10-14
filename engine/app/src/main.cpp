@@ -81,6 +81,7 @@ struct Options {
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
+    std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
@@ -129,6 +130,12 @@ bool parse(int argc, char** argv, Options& options)
             float level = 0.0f;
             if (!parseNumber(argv[++i], level)) return false;
             options.waterLevel = level;
+        } else if (arg == "--target" && i + 2 < argc) {
+            double x = 0.0;
+            double z = 0.0;
+            if (!parseNumber(argv[i + 1], x) || !parseNumber(argv[i + 2], z) || !std::isfinite(x) || !std::isfinite(z)) return false;
+            i += 2;
+            options.compassTarget = std::make_pair(x, z);
         } else if (arg == "--hour" && hasValue) {
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
@@ -531,6 +538,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
     float hudWater = 0.0f;
+    std::string hudGuide;
     // The app has no combatants yet, so the bar shows full health until the sim supplies one.
     float hudHealth = 100.0f;
     float hudMaxHealth = 100.0f;
@@ -569,6 +577,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             [&](std::uint32_t width, std::uint32_t height) {
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
+                hud->setGuide(hudGuide);
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -633,6 +642,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
             hudWater = waterField ? waterField->at(feet.x, feet.z).depth : 0.0f;
+            if (options.compassTarget) {
+                hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
+            }
             view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
         }
         const double cellMetres = heightfield.desc().cellMetres;
@@ -914,7 +926,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--editor] [--map] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--screenshot file.png]");
         return 2;
     }
 

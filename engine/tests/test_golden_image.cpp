@@ -317,7 +317,7 @@ namespace {
 
 // The terrain at the world's centre under the sky of a given hour, looking
 // towards where the sun sets, so the dusk glow and the fog are in view.
-void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false, float wetness = 0.0f)
+void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, Weather weather = {}, bool water = false, bool submerged = false, bool graded = false, float cloudCover = -1.0f, float wetness = 0.0f)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -360,6 +360,9 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     applyWeather(weather, atmosphere);
     applyAtmosphere(atmosphere, view);
     view.wetness = wetness;
+    if (cloudCover >= 0.0f) {
+        view.cloudCover = cloudCover;
+    }
     view.time = 1.25f;
     if (graded) {
         applyPalette(defaultPalette(), view);
@@ -432,6 +435,11 @@ TEST_CASE("golden image: an overcast day")
     checkTerrainAtHour(15.0f, "terrain_overcast", true, {0.8f, 0.0f});
 }
 
+TEST_CASE("golden image: cloud shadows drifting over the land")
+{
+    checkTerrainAtHour(13.0f, "terrain_cloud_shadows", true, {}, false, false, false, 0.65f);
+}
+
 TEST_CASE("golden image: a downpour")
 {
     checkTerrainAtHour(15.0f, "terrain_rain", true, {1.0f, 1.0f});
@@ -439,7 +447,7 @@ TEST_CASE("golden image: a downpour")
 
 TEST_CASE("golden image: soaked ground under cloud")
 {
-    checkTerrainAtHour(15.0f, "terrain_wet", true, {0.8f, 0.0f}, false, false, false, 1.0f);
+    checkTerrainAtHour(15.0f, "terrain_wet", true, {0.8f, 0.0f}, false, false, false, -1.0f, 1.0f);
 }
 
 TEST_CASE("golden image: flooded hollows")
@@ -567,6 +575,58 @@ TEST_CASE("golden image: the HUD over the sky")
     }
     const Diff diff = compare(actual, expected, 16);
     writePng(kOutDir / "ui_hud.diff.png", kWidth, kHeight, diff.image.data());
+    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
+    CHECK(diff.meanAbs < 1.5);
+    CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the HUD pointing at a target")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        SKIP("no Vulkan 1.3 device available");
+    }
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Bold.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    Hud hud(ui);
+    REQUIRE(hud.ok());
+    hud.update(0.8f, 17.5f, 0.9f, 70.0f, 100.0f);
+    hud.setGuide(targetGuide(0.0, 0.0, 300.0, -300.0));
+    ui.update(0.0);
+
+    RenderView view;
+    applyAtmosphere(atmosphereAt(17.5f), view);
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(-0.5f, 0.15f, -1.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "ui_hud_target.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = kGoldenDir / "ui_hud_target.png";
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud_target.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+    }
+    const Diff diff = compare(actual, expected, 16);
+    writePng(kOutDir / "ui_hud_target.diff.png", kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);

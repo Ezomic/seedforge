@@ -1,5 +1,6 @@
 #include "ichor/gfx/vk_scene.h"
 
+#include "ichor/gfx/cloud_shadow.h"
 #include "ichor/gfx/renderer.h"
 
 #include "ichor/assets/bundle.h"
@@ -48,8 +49,9 @@ struct FrameData {
     glm::vec4 gradeHighlights;
     glm::vec4 materialParams;
     glm::vec4 groundParams;
+    glm::vec4 cloudShadow;
 };
-static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 19));
+static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 20));
 
 struct InstanceGpu {
     glm::vec4 positionScale; // xyz relative to the cell origin, w scale
@@ -1117,6 +1119,8 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.gradeHighlights = glm::vec4(view.grade.highlights, 0.0f);
     data.materialParams = glm::vec4(view.response.roughnessMin, view.response.roughnessMax, view.response.albedoMin, view.response.albedoMax);
     data.groundParams = glm::vec4(view.groundColor, view.groundBlendHeight);
+    const CloudShadow cloudShadow = cloudShadowFor(sun, view.cloudCover, view.camera.position, view.windDirection, view.time);
+    data.cloudShadow = glm::vec4(cloudShadow.strength, cloudShadow.offset, 0.0f);
     std::memcpy(frame.frameUbo.mapped, &data, sizeof(data));
     vmaFlushAllocation(ctx_.allocator(), frame.frameUbo.allocation, 0, sizeof(data));
 
