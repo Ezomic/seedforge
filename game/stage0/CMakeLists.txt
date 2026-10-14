@@ -6,6 +6,7 @@ add_library(ichor_stage0
     src/status_effect.cpp
     src/skirmisher.cpp
     src/recorder.cpp
+    src/swarm.cpp
 )
 target_include_directories(ichor_stage0 PUBLIC include)
 target_link_libraries(ichor_stage0 PUBLIC ichor_loop ichor_audio)
@@ -33,6 +34,7 @@ if(BUILD_TESTING)
     add_executable(stage0_tests
         tests/test_fight.cpp
         tests/test_status_effect.cpp
+        tests/test_swarm.cpp
     )
     target_link_libraries(stage0_tests PRIVATE ichor_stage0 ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain)
     catch_discover_tests(stage0_tests)

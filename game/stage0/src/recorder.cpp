@@ -101,6 +101,17 @@ void FightRecorder::noteStagger(bool playerSide)
     if (running_) side(playerSide).staggers += 1;
 }
 
+void FightRecorder::noteSwarmGrant()
+{
+    swarmGrants_ += 1;
+}
+
+void FightRecorder::noteSwarmStrike(double now)
+{
+    swarmStrikes_ += 1;
+    noteAttack(false, now);
+}
+
 void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now)
 {
     if (!running_) {
