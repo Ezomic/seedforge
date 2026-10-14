@@ -18,6 +18,8 @@ if(ENGINE_RUNTIME)
     file(MAKE_DIRECTORY ${ICHOR_SHADER_DIR})
 
     set(shaders pbr.vert pbr_skinned.vert pbr_instanced.vert pbr.frag terrain.frag shadow.vert shadow_skinned.vert shadow_instanced.vert debug.vert debug.frag ui.vert ui.frag sky.vert sky.frag rain.frag water.frag watermesh.frag)
+    # Every shader may include any of these, so a change to one rebuilds them all.
+    file(GLOB shader_includes CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.hlsli)
     set(shader_outputs)
     foreach(shader ${shaders})
         if(shader MATCHES "\.vert$")
@@ -30,7 +32,7 @@ if(ENGINE_RUNTIME)
         add_custom_command(
             OUTPUT ${out}
             COMMAND ${DIRECTX_DXC_TOOL} -spirv -fspv-target-env=vulkan1.3 -T ${profile} -E main -I ${CMAKE_CURRENT_SOURCE_DIR}/shaders -Fo ${out} ${src}
-            DEPENDS ${src} ${CMAKE_CURRENT_SOURCE_DIR}/shaders/common.hlsli ${CMAKE_CURRENT_SOURCE_DIR}/shaders/lighting.hlsli
+            DEPENDS ${src} ${shader_includes}
             COMMENT "dxc: ${shader}"
             VERBATIM
         )
