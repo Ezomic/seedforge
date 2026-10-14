@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <string>
 
 using namespace ichor;
@@ -18,7 +19,8 @@ public:
     Fixture()
     {
         static int counter = 0;
-        root_ = std::filesystem::temp_directory_path() / ("ichor_data_test_" + std::to_string(counter++));
+        static const unsigned process = std::random_device{}();
+        root_ = std::filesystem::temp_directory_path() / ("ichor_data_test_" + std::to_string(process) + "_" + std::to_string(counter++));
         std::filesystem::remove_all(root_);
         std::filesystem::create_directories(root_);
     }
@@ -160,4 +162,88 @@ TEST_CASE("scripts read the data layer and see a reload")
 
     REQUIRE_FALSE(host.run("bad", "ichor.data(1, 2, 3)"));
     REQUIRE(host.lastError().find("data") != std::string::npos);
+}
+
+TEST_CASE("the repo data digest is the same through the game path and the forge path")
+{
+    DataSet game;
+    DataSet forge;
+    REQUIRE(game.loadDirectory(ICHOR_GAME_DATA_DIR));
+    REQUIRE(forge.loadDirectory(std::filesystem::path(ICHOR_REPO_DATA) / ""));
+    REQUIRE(game.tableCount() > 0);
+    REQUIRE(game.digest() != 0);
+    REQUIRE(game.digest() == forge.digest());
+}
+
+TEST_CASE("a trailing slash does not change the digest")
+{
+    const Fixture fixture;
+    fixture.write("catalogue/weapons.json", kWeapons);
+    DataSet plain;
+    DataSet slashed;
+    REQUIRE(plain.loadDirectory(fixture.root()));
+    REQUIRE(slashed.loadDirectory(fixture.root().string() + "/"));
+    REQUIRE(plain.digest() == slashed.digest());
+}
+
+TEST_CASE("CRLF and LF checkouts of a data file give the same digest")
+{
+    const std::string lf = "[\n  {\"id\": \"a\", \"name\": \"x\", \"n\": 1.5},\n  {\"id\": \"b\", \"tags\": [\"t\"]}\n]\n";
+    std::string crlf;
+    for (const char c : lf) {
+        if (c == '\n') crlf += '\r';
+        crlf += c;
+    }
+    const Fixture first;
+    const Fixture second;
+    first.write("catalogue/a.json", lf);
+    second.write("catalogue/a.json", crlf);
+    DataSet a;
+    DataSet b;
+    REQUIRE(a.loadDirectory(first.root()));
+    REQUIRE(b.loadDirectory(second.root()));
+    REQUIRE(a.digest() == b.digest());
+}
+
+TEST_CASE("files created in a different order give the same digest")
+{
+    const Fixture first;
+    const Fixture second;
+    first.write("catalogue/a.json", R"([{"id": "one", "n": 1}])");
+    first.write("catalogue/b.json", R"([{"id": "two", "n": 2}])");
+    first.write("npcs/c.json", R"([{"id": "three", "n": 3}])");
+    second.write("npcs/c.json", R"([{"id": "three", "n": 3}])");
+    second.write("catalogue/b.json", R"([{"id": "two", "n": 2}])");
+    second.write("catalogue/a.json", R"([{"id": "one", "n": 1}])");
+    DataSet a;
+    DataSet b;
+    REQUIRE(a.loadDirectory(first.root()));
+    REQUIRE(b.loadDirectory(second.root()));
+    REQUIRE(a.digest() == b.digest());
+}
+
+TEST_CASE("a missing directory, a plain file and a malformed file are refused with a message")
+{
+    const Fixture fixture;
+    DataSet data;
+    REQUIRE_FALSE(data.loadDirectory(fixture.root() / "nothing"));
+    REQUIRE_FALSE(data.lastError().empty());
+
+    fixture.write("plain.txt", "x");
+    REQUIRE_FALSE(data.loadDirectory(fixture.root() / "plain.txt"));
+    REQUIRE_FALSE(data.lastError().empty());
+
+    fixture.write("catalogue/good.json", R"([{"id": "one"}])");
+    fixture.write("catalogue/bad.json", "[{\"id\": ");
+    REQUIRE_FALSE(data.loadDirectory(fixture.root()));
+    REQUIRE(data.lastError().find("bad.json") != std::string::npos);
+    REQUIRE(data.tableCount() == 0);
+}
+
+TEST_CASE("an empty directory loads as no tables")
+{
+    const Fixture fixture;
+    DataSet data;
+    REQUIRE(data.loadDirectory(fixture.root()));
+    REQUIRE(data.tableCount() == 0);
 }
