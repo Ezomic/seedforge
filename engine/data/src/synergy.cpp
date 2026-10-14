@@ -4,6 +4,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <system_error>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -314,7 +317,12 @@ bool parseSynergies(std::string_view label, std::string_view text, const AxiomPo
 
 bool loadSynergyFile(const std::filesystem::path& file, const AxiomPool& pool, std::vector<Synergy>& out, std::vector<std::string>& problems)
 {
-    const std::string label = file.generic_string();
+    std::string label;
+    try {
+        label = file.generic_string();
+    } catch (const std::exception&) {
+        label = "<unprintable path>";
+    }
     std::error_code code;
     const std::uintmax_t size = std::filesystem::file_size(file, code);
     if (code) {

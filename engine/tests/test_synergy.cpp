@@ -122,6 +122,20 @@ TEST_CASE("the tier has to match the slots of the axioms")
     REQUIRE(mentions(problemsOf(file(entry("a", "triple", "\"cataclysm.flood\",\"cataclysm.unbinding\",\"law.oath\""))), "synergies[0].tier: triple needs"));
 }
 
+TEST_CASE("more slot rules, and nothing is output on failure")
+{
+    REQUIRE(mentions(problemsOf(file(entry("a", "pressure", "\"pressure.return\",\"pressure.opening\""))), "synergies[0].tier: pressure needs"));
+    REQUIRE(problemsOf(file(entry("a", "anomaly", "\"anomaly.tiresias\",\"law.oath\""))).empty());
+    REQUIRE(mentions(problemsOf(file(entry("a", "triple", "\"cataclysm.flood\",\"cataclysm.unbinding\",\"law.oath\""))), "triple needs"));
+    REQUIRE(mentions(problemsOf(file(entry("a", "mythic", "\"law.oath\",\"law.mysteries\",\"powers.league\",\"powers.satrapy\""))), "expected 2 or 3 axioms"));
+    REQUIRE(mentions(problemsOf("{\"synergies\":[[[[[[[[[[1]]]]]]]]]]}"), "nested deeper"));
+    std::vector<Synergy> defs = {make("keep", SynergyTier::Pressure, {"law.oath", "pressure.return"})};
+    std::vector<std::string> problems;
+    REQUIRE_FALSE(parseSynergies("t", file(entry("Bad", "pressure", "\"law.oath\",\"pressure.return\"")), pool(), defs, problems));
+    REQUIRE(defs.size() == 1);
+    REQUIRE(defs[0].id == "keep");
+}
+
 TEST_CASE("structural garbage is refused without throwing")
 {
     REQUIRE(mentions(problemsOf(""), "empty file"));
@@ -188,6 +202,7 @@ TEST_CASE("at most two fire and the lower tiers are never reached")
     };
     REQUIRE(detectSynergies({"law.oath", "powers.league", "pressure.return", "anomaly.tiresias"}, defs) == Ids{"lp", "pr"});
     REQUIRE(detectSynergies({"law.oath", "pressure.return", "anomaly.tiresias"}, defs) == Ids{"pr", "an"});
+    REQUIRE(detectSynergies({"anomaly.tiresias", "pressure.return", "powers.league", "law.oath"}, defs) == Ids{"lp", "pr"});
 }
 
 TEST_CASE("a triple resolves first and its pairs still fire if there is room")
@@ -232,11 +247,11 @@ TEST_CASE("a definition naming an axiom nobody rolled simply does not fire")
     REQUIRE(detectSynergies({"cataclysm.flood", "law.oath"}, defs).empty());
 }
 
-TEST_CASE("detection scales to a large definition set")
+TEST_CASE("one match among many definitions is found")
 {
     std::vector<Synergy> defs;
     for (int i = 0; i < 20000; ++i) {
-        defs.push_back(make("s" + std::to_string(1000000 + i), SynergyTier::Pressure, {"law.oath", "pressure.x" + std::to_string(i)}));
+        defs.push_back(make("s" + std::to_string(1000000 + i), SynergyTier::Pressure, {"law.oath", "pressure.other"}));
     }
     defs.push_back(make("hit", SynergyTier::Pressure, {"law.oath", "pressure.return"}));
     REQUIRE(detectSynergies({"law.oath", "pressure.return"}, defs) == Ids{"hit"});
