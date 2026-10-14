@@ -20,6 +20,7 @@
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/save/save_slots.h"
+#include "ichor/save/settings.h"
 #include "ichor/script/chronicle_bindings.h"
 #include "ichor/script/world_bindings.h"
 #include "ichor/script/data_bindings.h"
@@ -51,6 +52,8 @@
 #include <vector>
 
 namespace {
+
+constexpr float kFovStepDegrees = 5.0f;
 
 struct Options {
     bool headless = false;
@@ -306,6 +309,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
     // Ironman keeps its own directory, so a normal run can never load its rolling slot.
     ichor::SaveSlots slots(options.saves / ((options.ironman ? "ironman-" : "campaign-") + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
+    // The player's settings live beside the campaigns, not in one, and never touch the simulation.
+    const std::filesystem::path settingsPath = options.saves / "settings.cfg";
+    ichor::Settings settings = ichor::loadSettings(settingsPath);
     ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
@@ -498,6 +504,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             hud = std::make_unique<ichor::Hud>(*ui);
             ledger = std::make_unique<ichor::Ledger>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
+            pauseMenu->setFovDegrees(settings.fovDegrees);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !pauseMenu->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
@@ -531,6 +538,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
         view.camera = reference.camera;
+        view.camera.fovY = glm::radians(settings.fovDegrees);
         const float hour = editing && editorEnvironment.overrideTime ? editorEnvironment.hour : ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
         hudHour = hour;
         if (!heightfield.empty()) {
@@ -662,6 +670,14 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (pauseMenu->takeResume()) {
                 paused = false;
                 pauseMenu->setVisible(false);
+            }
+            if (const int steps = pauseMenu->takeFovSteps(); steps != 0) {
+                settings.fovDegrees += static_cast<float>(steps) * kFovStepDegrees;
+                settings = settings.clamped();
+                pauseMenu->setFovDegrees(settings.fovDegrees);
+                if (!ichor::saveSettings(settingsPath, settings)) {
+                    ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+                }
             }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
