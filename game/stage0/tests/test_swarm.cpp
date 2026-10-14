@@ -1,3 +1,4 @@
+#include "ichor/core/dmath.h"
 #include "ichor/stage0/recorder.h"
 #include "ichor/stage0/swarm.h"
 
@@ -32,7 +33,7 @@ SwarmGroup ring(int count, float radius = 6.0f)
         SwarmMember m;
         m.id = static_cast<std::uint64_t>(i + 1);
         const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(std::max(count, 1));
-        m.pos = {radius * std::cos(a), radius * std::sin(a)};
+        m.pos = {radius * dmath::cos(a), radius * dmath::sin(a)};
         group.members.push_back(m);
     }
     return group;
@@ -53,6 +54,7 @@ std::uint64_t hashGroup(const SwarmGroup& g)
         mix(m.brain.state);
         mix(static_cast<std::uint64_t>(m.brain.stateTicks));
         mix(m.brain.token);
+        mix(static_cast<std::uint64_t>(m.brain.cooldownTicks));
         mix(static_cast<std::uint64_t>(m.brain.strikes));
     }
     return h;
@@ -228,8 +230,56 @@ TEST_CASE("a group of 24 never has more than K committed, never strikes on the s
     }
     CHECK(maxCommitted <= kTuning.maxAttackers);
     CHECK(maxCommitted >= 1);
-    const int served = static_cast<int>(std::count_if(struck.begin() + 1, struck.end(), [](int n) { return n > 0; }));
-    CHECK(served == 24);
+    const auto [lo, hi] = std::minmax_element(struck.begin() + 1, struck.end());
+    CHECK(*lo >= 1);
+    CHECK(*hi - *lo <= 1);
+}
+
+TEST_CASE("two token holders in range on the same tick cannot both begin a wind-up")
+{
+    SwarmGroup group;
+    for (std::uint64_t id = 1; id <= 2; ++id) {
+        SwarmMember m;
+        m.id = id;
+        m.pos = {1.0f, static_cast<float>(id) * 0.1f};
+        m.brain.state = static_cast<std::uint8_t>(SwarmState::Surround);
+        m.brain.token = true;
+        group.members.push_back(m);
+    }
+    group.ticksSinceGrant = 0;
+    tickSwarm(group, {{0, 0}, true}, kTuning);
+    const int striking = static_cast<int>(std::count_if(group.members.begin(), group.members.end(),
+        [](const SwarmMember& m) { return m.brain.swarmState() == SwarmState::Strike; }));
+    CHECK(striking == 1);
+    CHECK(group.members[0].brain.swarmState() == SwarmState::Strike); // lower id first
+}
+
+TEST_CASE("duplicate ids and non-finite members do not take tokens or ring slots")
+{
+    SwarmGroup group = ring(4, 3.0f);
+    group.members.push_back(group.members[0]);
+    SwarmMember bad;
+    bad.id = 99;
+    bad.pos = {kNaN, 0.0f};
+    group.members.push_back(bad);
+    SwarmMember huge;
+    huge.id = 100;
+    huge.pos = {3e38f, 0.0f};
+    group.members.push_back(huge);
+    for (int t = 0; t < 600; ++t) {
+        tickSwarm(group, {{0.0f, 0.0f}, true}, kTuning);
+    }
+    for (std::size_t i = 0; i < 4; ++i) CHECK(std::isfinite(group.members[i].pos.x));
+    CHECK(group.members[4].brain.strikes == 0); // the duplicate never acts
+    CHECK(group.members[5].brain.swarmState() == SwarmState::Unaware);
+    CHECK(group.members[6].brain.swarmState() == SwarmState::Unaware);
+}
+
+TEST_CASE("a unit that is not yet in position is not handed a token")
+{
+    std::vector<SwarmUnit> units{unit(1, 1, 0), unit(2, 2, 0)};
+    units[0].engaged = false;
+    CHECK(assignAttackTokens(units, {0, 0}, kTuning, 100).newHolder == 2);
 }
 
 TEST_CASE("groups of 0 and 1 tick cleanly")

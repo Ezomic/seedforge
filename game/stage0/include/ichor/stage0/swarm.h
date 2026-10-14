@@ -11,10 +11,12 @@ namespace ichor::stage0 {
 
 // Swarm: individually trivial, dangerous in numbers. All timing is whole ticks
 // and all ordering is by id, so a group steps identically on every platform.
+constexpr std::int32_t kSwarmNeverGranted = 1 << 20;
+
 struct SwarmTuning {
     int maxAttackers = 2;         // attack tokens: at most this many units are committed at once
     int tokenGapTicks = 20;       // minimum ticks between two token grants, so strikes never start together
-    int attackCooldownTicks = 90; // a unit that has struck waits this long before it is eligible again
+    int attackCooldownTicks = 90; // counted from the end of recovery before the unit is eligible for a token again
     int windupTicks = 30;
     int recoveryTicks = 40;
     float aggroRange = 14.0f;
@@ -43,6 +45,7 @@ struct SwarmUnit {
     glm::vec2 pos{0.0f};
     bool alive = true;
     bool holdsToken = false;
+    bool engaged = true; // only units already in position are handed a token
     std::int32_t cooldownTicks = 0;
     std::int32_t strikes = 0; // strikes so far: the unit with fewest goes first, so nobody starves
 };
@@ -56,8 +59,8 @@ struct TokenResult {
 // Pure: group state in, token holders out. Independent of the order of `units`.
 // Live holders keep their token (the lowest ids if there are more than the cap);
 // one new token is granted when a slot is free and the gap since the last grant
-// has passed, to the eligible unit with the fewest strikes (then nearest, then lower id). Dead and
-// non-finite units never hold one; a repeated id counts once.
+// has passed, to the eligible unit with the fewest strikes (then nearest, then
+// lower id). Dead and non-finite units never hold one; a repeated id counts once.
 TokenResult assignAttackTokens(const std::vector<SwarmUnit>& units, glm::vec2 target, const SwarmTuning& tuning, std::int32_t ticksSinceGrant);
 
 // Position on the ring around the target for the unit ranked `rank` of `count`
@@ -94,7 +97,7 @@ struct SwarmTarget {
 
 struct SwarmGroup {
     std::vector<SwarmMember> members;
-    std::int32_t ticksSinceGrant = 1 << 20;
+    std::int32_t ticksSinceGrant = kSwarmNeverGranted;
 };
 
 struct SwarmEvents {

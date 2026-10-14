@@ -41,6 +41,9 @@ glm::vec2 walkToward(glm::vec2 from, glm::vec2 to, const SwarmTuning& tuning)
     if (len <= 1e-4f) {
         return glm::vec2(0.0f);
     }
+    if (!std::isfinite(len)) {
+        return glm::vec2(0.0f);
+    }
     const float speed = std::min(tuning.walkSpeed, len / tuning.tickSeconds);
     return delta / len * speed;
 }
@@ -84,7 +87,7 @@ TokenResult assignAttackTokens(const std::vector<SwarmUnit>& units, glm::vec2 ta
     float bestDistance = 0.0f;
     const float rangeSq = tuning.tokenRange * tuning.tokenRange;
     for (const SwarmUnit* u : live) {
-        if (u->holdsToken || u->cooldownTicks > 0) continue;
+        if (u->holdsToken || !u->engaged || u->cooldownTicks > 0) continue;
         const float d = distanceSq(u->pos, target);
         // Strict less-than over ascending ids: the lower id wins a tie.
         if (d <= rangeSq && (best == nullptr || u->strikes < best->strikes || (u->strikes == best->strikes && d < bestDistance))) {
@@ -172,21 +175,23 @@ SwarmEvents tickSwarm(SwarmGroup& group, SwarmTarget target, const SwarmTuning& 
     SwarmEvents events;
     std::vector<std::size_t> order;
     for (std::size_t i = 0; i < group.members.size(); ++i) {
-        if (group.members[i].alive) order.push_back(i);
+        if (group.members[i].alive && finite(group.members[i].pos)) order.push_back(i);
     }
-    std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
         const SwarmMember& l = group.members[a];
         const SwarmMember& r = group.members[b];
         if (l.id != r.id) return l.id < r.id;
         if (l.pos.x != r.pos.x) return l.pos.x < r.pos.x;
         return l.pos.y < r.pos.y;
     });
+    // A repeated id counts once, the same rule assignAttackTokens applies.
+    order.erase(std::unique(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return group.members[a].id == group.members[b].id; }), order.end());
 
-    if (group.ticksSinceGrant < (1 << 20)) group.ticksSinceGrant += 1;
+    if (group.ticksSinceGrant < kSwarmNeverGranted) group.ticksSinceGrant += 1;
     if (target.alive) {
         std::vector<SwarmUnit> units;
         for (const SwarmMember& m : group.members) {
-            units.push_back({m.id, m.pos, m.alive, m.brain.token, m.brain.cooldownTicks, m.brain.strikes});
+            units.push_back({m.id, m.pos, m.alive, m.brain.token, m.brain.swarmState() == SwarmState::Surround || m.brain.token, m.brain.cooldownTicks, m.brain.strikes});
         }
         const TokenResult tokens = assignAttackTokens(units, target.pos, tuning, group.ticksSinceGrant);
         for (std::size_t i : order) {
