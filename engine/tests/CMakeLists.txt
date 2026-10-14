@@ -28,6 +28,7 @@ add_executable(ichor_tests
     test_data.cpp
     test_npc_schedule.cpp
     test_npc_traits.cpp
+    test_npc_tiers.cpp
     test_traversal_verbs.cpp
     test_axiom.cpp
     test_slot_roll.cpp
