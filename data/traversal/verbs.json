@@ -1,0 +1,9 @@
+[
+  {"id": "walk", "terrain": "ground", "speed_permille": 1000, "stamina_per_second": 0},
+  {"id": "wade", "terrain": "shallow_water", "speed_permille": 350, "stamina_per_second": 0, "depth_scaled": true},
+  {"id": "swim", "capability": "swim", "terrain": "deep_water", "speed_permille": 450, "stamina_per_second": 8},
+  {"id": "dive", "capability": "dive", "terrain": "deep_water", "speed_permille": 350, "stamina_per_second": 12},
+  {"id": "climb", "capability": "climb", "terrain": "steep", "speed_permille": 250, "stamina_per_second": 10},
+  {"id": "descend", "capability": "descend", "terrain": "steep", "speed_permille": 500, "stamina_per_second": 4},
+  {"id": "boat", "capability": "boat", "terrain": "water", "speed_permille": 1400, "stamina_per_second": 0}
+]

@@ -2,10 +2,10 @@
 
 namespace ichor {
 
-void NullAudio::play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain)
+void NullAudio::play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain, SoundCategory category)
 {
     ++plays_;
-    mixer_.play(sound, position, gain, spatial);
+    mixer_.play(sound, position, gain, spatial, category);
 }
 
 void NullAudio::setListener(glm::dvec3 position, glm::quat rotation)
