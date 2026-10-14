@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <exception>
 #include <format>
+#include <string_view>
 #include <utility>
 
 namespace ichor {
@@ -28,6 +29,14 @@ std::uint64_t hydrologyDigest(const Hydrology& h)
     w.write(h.lakeDeepest);
     const std::vector<std::uint8_t> bytes = w.take();
     return hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+}
+
+std::uint64_t heightfieldDigest(const Heightfield& h)
+{
+    BinaryWriter w;
+    w.write(h.desc());
+    const std::vector<std::uint8_t> bytes = w.take();
+    return hashCombine(h.digest(), hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size())));
 }
 
 std::optional<std::string> landAboveWater(const ForgedWorld& world, const ForgeRequest& request)
@@ -104,7 +113,7 @@ PhasePipeline forgePipeline(const ForgeRequest& request)
 {
     return PhasePipeline({
         makePhase<Heightfield>(
-            kPhaseTerrain, [request](const PhaseView&) { return forgeHeightfield(request.desc); }, [](const Heightfield& h) { return h.digest(); }),
+            kPhaseTerrain, [request](const PhaseView&) { return forgeHeightfield(request.desc); }, heightfieldDigest),
         makePhase<Heightfield>(
             kPhaseRivers,
             [request](const PhaseView& earlier) {
@@ -114,7 +123,7 @@ PhasePipeline forgePipeline(const ForgeRequest& request)
                 }
                 return carveRivers(terrain, computeHydrology(terrain), request.rivers, CarveParams{});
             },
-            [](const Heightfield& h) { return h.digest(); }),
+            heightfieldDigest),
         makePhase<Hydrology>(
             kPhaseHydrology, [](const PhaseView& earlier) { return computeHydrology(earlier.get<Heightfield>(kPhaseRivers)); }, hydrologyDigest),
     });

@@ -93,11 +93,11 @@ TEST_CASE("an artifact can only be read, never changed, through the API", "[phas
     const std::vector<int>& a = run.get<std::vector<int>>("a");
     const std::uint64_t digestBefore = run.artifact("a").digest();
 
-    SECTION("later phases ran and left the earlier artifact as it was")
+    SECTION("a re-run from a later phase leaves the earlier artifact in place")
     {
-        REQUIRE(counts.c == 1);
-        CHECK(a == std::vector<int>{1, 7});
-        CHECK(digestOf(a) == digestBefore);
+        const PhaseRun again = numbers(1, 3, counts).runFrom(run, 1);
+        CHECK(&again.get<std::vector<int>>("a") == &a);
+        CHECK(again.artifact("a").digest() == digestBefore);
     }
 
     SECTION("copies of an artifact are the same value, not a way to a second one")
@@ -242,7 +242,7 @@ TEST_CASE("the forge's phases give the world forgeWorld gives", "[phase][forge]"
     CHECK(run.artifacts()[2].phase() == kPhaseHydrology);
 
     const ForgedWorld world = forgeWorld(request);
-    CHECK(world.heightfield.digest() == run.artifact(kPhaseRivers).digest());
+    CHECK(world.heightfield.digest() == run.get<Heightfield>(kPhaseRivers).digest());
     CHECK(world.heightfield.samples() == run.get<Heightfield>(kPhaseRivers).samples());
     CHECK(world.hydrology.accumulation == run.get<Hydrology>(kPhaseHydrology).accumulation);
     CHECK(run.get<Heightfield>(kPhaseTerrain).samples() != run.get<Heightfield>(kPhaseRivers).samples());
@@ -279,6 +279,17 @@ TEST_CASE("the forge diff names the phase a request change first touches", "[pha
         const auto diff = firstDivergence(base, forgePipeline(dry).run());
         REQUIRE(diff);
         CHECK(diff->phase == kPhaseRivers);
+    }
+
+    SECTION("a change that leaves every sample alone but moves the water is still a difference")
+    {
+        ForgeRequest wetter = smallRequest(5);
+        wetter.desc.waterHeight = 40.0f;
+        const PhaseRun other = forgePipeline(wetter).run();
+        REQUIRE(other.get<Heightfield>(kPhaseTerrain).samples() == base.get<Heightfield>(kPhaseTerrain).samples());
+        const auto diff = firstDivergence(base, other);
+        REQUIRE(diff);
+        CHECK(diff->phase == kPhaseTerrain);
     }
 
     SECTION("the same request does not differ")
