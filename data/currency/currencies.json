@@ -1,0 +1,4 @@
+[
+  {"id": "coin", "name": "Coin", "symbol": "c", "earn": ["loot", "quest", "trade"], "spend": ["trade", "repair", "toll"], "cap": 999999999},
+  {"id": "hard", "name": "Charge", "symbol": "ch", "earn": ["loot", "quest"], "spend": ["power", "trade"], "cap": 99999}
+]
