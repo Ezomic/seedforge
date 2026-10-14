@@ -207,6 +207,50 @@ TEST_CASE("tier documents report every problem with a path", "[standing]")
     CHECK_FALSE(tierProblems(R"([{"id": "a", "id": "b", "name": "n", "threshold": -1000}])").empty());
 }
 
+TEST_CASE("tier names reject em-dashes and control characters", "[standing]")
+{
+    const auto named = [](const std::string& name) { return tierProblems(R"([{"id": "a", "name": ")" + name + R"(", "threshold": -1000}])"); };
+    CHECK(named("Wary").empty());
+    CHECK(mentions(named("a \xE2\x80\x94 b"), "em-dash"));
+    CHECK(mentions(named("a\\nb"), "control"));
+    CHECK(mentions(named("a\\u0000b"), "control"));
+}
+
+TEST_CASE("threshold bounds are inclusive", "[standing]")
+{
+    const auto two = [](const std::string& second) { return tierProblems(R"([{"id": "a", "name": "A", "threshold": -1000}, {"id": "b", "name": "B", "threshold": )" + second + "}]"); };
+    CHECK(two("1000").empty());
+    CHECK_FALSE(two("1001").empty());
+    CHECK_FALSE(two("18446744073709551615").empty());
+    CHECK_FALSE(two("-1001").empty());
+}
+
+TEST_CASE("a bad first threshold does not blame the next tier", "[standing]")
+{
+    const auto problems = tierProblems(R"([{"id": "a", "name": "A", "threshold": null}, {"id": "b", "name": "B", "threshold": -1000}])");
+    CHECK_FALSE(mentions(problems, "[1]"));
+}
+
+TEST_CASE("the lowest tier gate is always open and the top tier gate flips at its threshold", "[standing]")
+{
+    std::vector<StandingGate> open = {{"open", "archonate", "hostile"}};
+    FactionStanding low(kFactions, tiers(), open);
+    low.change("archonate", -5000);
+    CHECK(low.standing("archonate") == kStandingMin);
+    CHECK(low.allowed("open"));
+
+    auto standing = make();
+    standing.change("mnemones", 749);
+    CHECK_FALSE(standing.allowed("base_access"));
+    standing.change("mnemones", 1);
+    CHECK(standing.allowed("base_access"));
+    standing.change("mnemones", 5000);
+    CHECK(standing.allowed("base_access"));
+    standing.change("mnemones", -5000);
+    CHECK_FALSE(standing.allowed("base_access"));
+    CHECK_FALSE(standing.allowed("trainer_basic"));
+}
+
 TEST_CASE("gates must name a known faction and tier", "[standing]")
 {
     CHECK(gateProblems(kGatesJson).empty());
@@ -301,7 +345,18 @@ TEST_CASE("binary with out of range values or foreign factions is refused", "[st
     high[high.size() - 1] = 0x7F;
     CHECK_FALSE(standing.deserialise(high));
 
-    const std::vector<Faction> others = {{"zzz", "Z", FactionRole::Herald}};
+    auto low = good;
+    low[low.size() - 1] = 0x80;
+    CHECK_FALSE(standing.deserialise(low));
+
+    standing.change("archaists", 10);
+    auto bytes = make().serialise();
+    bytes[bytes.size() - 1] = 0x7F;
+    CHECK_FALSE(standing.deserialise(bytes));
+    CHECK(standing.standing("archaists") == 10);
+    standing.change("archaists", -10);
+
+    const std::vector<Faction> others ={{"zzz", "Z", FactionRole::Herald}};
     FactionStanding other(others, tiers(), {});
     CHECK_FALSE(standing.deserialise(other.serialise()));
     CHECK_FALSE(other.deserialise(good));

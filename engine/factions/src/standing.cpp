@@ -212,6 +212,10 @@ bool readName(const Json& item, const std::string& at, Report& report, std::stri
         report.add(at + ".name", "must not be empty");
         return false;
     }
+    if (std::any_of(name.begin(), name.end(), [](unsigned char c) { return c < 0x20 || c == 0x7F; })) {
+        report.add(at + ".name", "must not contain control characters");
+        return false;
+    }
     if (name.size() > kMaxName) {
         report.add(at + ".name", "longer than " + std::to_string(kMaxName) + " bytes");
         return false;
@@ -292,7 +296,7 @@ bool parseStandingTiers(std::string_view label, std::string_view text, std::vect
             }
             if (havePrevious && value <= previous) {
                 report.add(at + ".threshold", "thresholds must be strictly ascending");
-            } else if (!havePrevious && value != kStandingMin) {
+            } else if (i == 0 && value != kStandingMin) {
                 report.add(at + ".threshold", "the first tier must start at " + std::to_string(kStandingMin));
             }
             havePrevious = true;
