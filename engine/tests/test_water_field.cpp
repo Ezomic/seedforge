@@ -310,3 +310,84 @@ TEST_CASE("a player walking into a lake slows down as the water deepens and spee
     REQUIRE(deepStep == Approx(4.0 * 0.35 * kDt).margin(1e-6)); // chest deep in the middle
     REQUIRE(lastX >= 15.0);                                      // and out the other side
 }
+
+TEST_CASE("a wide river is wet across its half width and shallow at the banks, and the water field agrees with the mesh")
+{
+    WorldDesc desc;
+    desc.seed = 11;
+    desc.sizeMetres = 1024;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 256;
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    rivers.springHalfWidth = 6.0f;
+    rivers.maxLakeDepth = kPlayableLakeDepth;
+    const Heightfield forged = forgeHeightfield(desc);
+    const Heightfield field = carveRivers(forged, computeHydrology(forged), rivers, CarveParams{});
+    const auto hydrology = hydrologyOf(field);
+    WaterMeshParams mesh;
+    const WaterField water(field, hydrology, rivers, mesh);
+
+    HydrologyParams narrow = rivers;
+    narrow.maxHalfWidth = 0.0f;
+    const WaterField thin(field, hydrology, narrow, mesh);
+
+    std::size_t extra = 0;
+    for (std::uint32_t z = 1; z < 128; ++z) {
+        for (std::uint32_t x = 1; x < 128; ++x) {
+            const std::size_t i = hydrology->index(x, z);
+            const WaterField::Sample wide = water.at(x * 8.0, z * 8.0);
+            const WaterField::Sample centre = thin.at(x * 8.0, z * 8.0);
+            const WaterLevel level = waterLevelAtSample(field, *hydrology, rivers, mesh, x, z);
+            REQUIRE(level.wet == wide.wet());
+            if (centre.wet()) {
+                REQUIRE(wide.depth == Approx(centre.depth).margin(0.001f));
+                continue;
+            }
+            if (wide.wet()) {
+                ++extra;
+                REQUIRE(hydrology->lake[i] == 0);
+                REQUIRE(wide.depth <= mesh.riverSurface + 0.001f);
+                REQUIRE(wide.depth > 0.0f);
+            }
+        }
+    }
+    REQUIRE(extra > 0);
+}
+
+TEST_CASE("a wide river never stands deeper than a thin one, and the water at the map's edge is finite")
+{
+    WorldDesc desc;
+    desc.seed = 11;
+    desc.sizeMetres = 1024;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 256;
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    rivers.springHalfWidth = 6.0f;
+    rivers.maxLakeDepth = kPlayableLakeDepth;
+    const Heightfield forged = forgeHeightfield(desc);
+    const Heightfield field = carveRivers(forged, computeHydrology(forged), rivers, CarveParams{});
+    const auto hydrology = hydrologyOf(field);
+    const WaterField water(field, hydrology, rivers);
+    HydrologyParams narrow = rivers;
+    narrow.maxHalfWidth = 0.0f;
+    const WaterField thin(field, hydrology, narrow);
+    for (std::uint32_t i = 0; i < 129; ++i) {
+        for (const double edge : {0.0, 1024.0}) {
+            REQUIRE(std::isfinite(water.at(edge, i * 8.0).surface));
+            REQUIRE(std::isfinite(water.at(i * 8.0, edge).surface));
+        }
+    }
+    float deepest = 0.0f;
+    float deepestThin = 0.0f;
+    for (double z = 0.0; z <= 1024.0; z += 4.0) {
+        for (double x = 0.0; x <= 1024.0; x += 4.0) {
+            if (hydrology->lake[hydrology->index(static_cast<std::uint32_t>(x / 8.0 + 0.5), static_cast<std::uint32_t>(z / 8.0 + 0.5))] != 0) continue;
+            deepest = std::max(deepest, water.at(x, z).depth);
+            deepestThin = std::max(deepestThin, thin.at(x, z).depth);
+        }
+    }
+    REQUIRE(deepestThin > 0.0f);
+    REQUIRE(deepest <= deepestThin + 0.001f);
+}
