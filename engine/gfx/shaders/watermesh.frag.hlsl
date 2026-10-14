@@ -13,5 +13,6 @@ struct PSIn {
 // the rasteriser does the depth test against the land.
 float4 main(PSIn i) : SV_Target
 {
-    return shadeWater(i.worldPos, i.clip.xy, i.uv.x);
+    // The current rides in the tangent: a direction on the ground plane, its strength in w.
+    return shadeWater(i.worldPos, i.clip.xy, i.uv.x, i.tangent.xz * i.tangent.w);
 }

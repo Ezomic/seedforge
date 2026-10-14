@@ -1,4 +1,5 @@
 add_library(ichor_editor
+    src/nudge.cpp
     src/picking.cpp
     src/session.cpp
 )

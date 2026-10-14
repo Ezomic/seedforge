@@ -44,6 +44,9 @@ public:
     std::optional<StableId> spawn(std::string_view name, glm::dvec3 position, std::optional<MeshRef> mesh = std::nullopt);
     bool destroy(StableId id);
     bool setTransform(StableId id, const Transform& transform);
+    // Moves the entity by an offset from where the session last put it, so two nudges in one tick add up.
+    // Nothing changes for an entity that is gone or an offset that is not finite.
+    bool nudge(StableId id, glm::dvec3 offset);
 
     // Everything between begin and end is one undo step: a drag sends many
     // transforms and should take one undo to take back.

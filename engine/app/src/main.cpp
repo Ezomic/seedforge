@@ -6,6 +6,7 @@
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
+#include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
 #include "ichor/ui/hud.h"
@@ -668,6 +669,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool menuHeld = false;
     bool pointerHeld = false;
     bool pickHeld = false;
+    ichor::NavKeys navHeld;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
     for (;;) {
@@ -754,6 +756,22 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 editorSession.select(ray ? ichor::pickEntity(engine.scene(), *ray, pickBounds) : std::nullopt);
             }
             pickHeld = pointer.primary;
+            // An arrow or page key moves the selection one step per press (shift: a long one),
+            // unless a field has the keyboard.
+            const ichor::NavKeys nav = platform.navKeys();
+            if (const auto selected = editorSession.selection(); selected && !editorPanels.wantsKeyboard()) {
+                const ichor::NudgeKeys pressed{.left = nav.left && !navHeld.left,
+                    .right = nav.right && !navHeld.right,
+                    .forward = nav.up && !navHeld.up,
+                    .back = nav.down && !navHeld.down,
+                    .up = nav.pageUp && !navHeld.pageUp,
+                    .down = nav.pageDown && !navHeld.pageDown,
+                    .fast = nav.shift};
+                if (const auto offset = ichor::nudgeOffset(pressed, pickCamera)) {
+                    editorSession.nudge(*selected, *offset);
+                }
+            }
+            navHeld = nav;
         }
         // Saving over the player's quicksave while a replay drives the run would be a surprise.
         if (quickSave && !quickSaveHeld && options.replay.empty()) {

@@ -23,6 +23,7 @@ public:
     Extent drawableSize() const override;
     InputFrame input() const override { return input_; }
     Pointer pointer() const override { return pointer_; }
+    NavKeys navKeys() const override { return navKeys_; }
 
     SDL_Window* window() const { return window_; }
 
@@ -35,6 +36,7 @@ private:
     bool escapeQuits_ = true;
     InputFrame input_;
     Pointer pointer_;
+    NavKeys navKeys_;
     std::function<void(const SDL_Event&)> hook_;
 };
 

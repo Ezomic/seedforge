@@ -753,7 +753,9 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
     CHECK(diff.fractionBad < 0.005);
 }
 
-TEST_CASE("golden image: the biggest river of the forged world")
+// The biggest river of the forged world seen from `eyeOffset` metres (x, z) from its wettest sample and
+// `eyeHeight` over the ground there, looking at that sample.
+static void checkRiver(const char* name, glm::dvec2 eyeOffset, double eyeHeight)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
@@ -808,7 +810,7 @@ TEST_CASE("golden image: the biggest river of the forged world")
     view.time = 1.25f;
     applyPalette(defaultPalette(), view);
     const glm::dvec3 target(targetX, heightfield.heightAt(targetX, targetZ), targetZ);
-    const glm::dvec3 eye(targetX - 16.0, heightfield.heightAt(targetX - 16.0, targetZ + 16.0) + 7.0, targetZ + 16.0);
+    const glm::dvec3 eye(targetX + eyeOffset.x, heightfield.heightAt(targetX + eyeOffset.x, targetZ + eyeOffset.y) + eyeHeight, targetZ + eyeOffset.y);
     view.camera.position = eye;
     view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
     view.camera.farPlane = 2500.0f;
@@ -816,9 +818,9 @@ TEST_CASE("golden image: the biggest river of the forged world")
     std::vector<std::uint8_t> actual;
     REQUIRE(renderer.render(view, actual));
     std::filesystem::create_directories(kOutDir);
-    REQUIRE(writePng(kOutDir / "terrain_river.actual.png", kWidth, kHeight, actual.data()));
+    REQUIRE(writePng(kOutDir / std::format("{}.actual.png", name), kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "terrain_river.png";
+    const std::filesystem::path goldenPath = kGoldenDir / std::format("{}.png", name);
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -829,13 +831,23 @@ TEST_CASE("golden image: the biggest river of the forged world")
     std::uint32_t h = 0;
     std::vector<std::uint8_t> expected;
     if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect terrain_river.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
+        FAIL("no golden image at " << goldenPath.string() << "; inspect " << name << ".actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
     const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "terrain_river.diff.png", kWidth, kHeight, diff.image.data());
+    writePng(kOutDir / std::format("{}.diff.png", name), kWidth, kHeight, diff.image.data());
     INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
     CHECK(diff.meanAbs < 1.5);
     CHECK(diff.fractionBad < 0.005);
+}
+
+TEST_CASE("golden image: the biggest river of the forged world")
+{
+    checkRiver("terrain_river", {-16.0, 16.0}, 7.0);
+}
+
+TEST_CASE("golden image: ripples running down a river")
+{
+    checkRiver("terrain_river_ripples", {-6.0, 5.0}, 3.0);
 }
 
 TEST_CASE("golden image: the pause menu over the world")

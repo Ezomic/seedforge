@@ -25,6 +25,17 @@ struct Pointer {
     bool inside = false;  // the window has the mouse
 };
 
+// The arrow and page keys as of the last pump. The editor reads them; the simulation never does.
+struct NavKeys {
+    bool left = false;
+    bool right = false;
+    bool up = false;
+    bool down = false;
+    bool pageUp = false;
+    bool pageDown = false;
+    bool shift = false;
+};
+
 class Platform {
 public:
     virtual ~Platform() = default;
@@ -43,6 +54,7 @@ public:
 
     // For the UI only: the simulation never reads it. Platforms without a mouse report none.
     virtual Pointer pointer() const { return {}; }
+    virtual NavKeys navKeys() const { return {}; }
 };
 
 }
