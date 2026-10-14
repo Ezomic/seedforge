@@ -1,4 +1,5 @@
 add_library(ichor_npc
+    src/relationships.cpp
     src/schedule.cpp
 )
 target_include_directories(ichor_npc PUBLIC include)

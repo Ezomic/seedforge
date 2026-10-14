@@ -26,6 +26,7 @@ add_executable(ichor_tests
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
+    test_npc_relationships.cpp
     test_npc_schedule.cpp
     test_npc_traits.cpp
     test_npc_tiers.cpp
