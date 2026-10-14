@@ -3,6 +3,9 @@
 #include "ichor/core/hash.h"
 
 #include <algorithm>
+#include <iterator>
+#include <utility>
+#include <variant>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -46,10 +49,19 @@ double clampNumber(double value, double low)
 // Candidates for one field, in priority order.
 using Candidates = std::vector<std::pair<AxiomSlot, const AxiomValue*>>;
 
+// Non-finite numbers and empty lists or maps count as not set, so they never fix the field's type.
 bool usable(const AxiomValue& value)
 {
-    const double* number = std::get_if<double>(&value);
-    return number == nullptr || std::isfinite(*number);
+    if (const double* number = std::get_if<double>(&value)) {
+        return std::isfinite(*number);
+    }
+    if (const Words* list = std::get_if<Words>(&value)) {
+        return !list->empty();
+    }
+    if (const Weights* weights = std::get_if<Weights>(&value)) {
+        return !weights->empty();
+    }
+    return true;
 }
 
 const AxiomValue* findValue(const Axiom& axiom, std::string_view block, std::string_view key)
@@ -139,7 +151,12 @@ MergeResult mergeDirectives(std::span<const Axiom> axioms)
     for (const Axiom& axiom : axioms) {
         ranked.push_back(&axiom);
     }
-    std::sort(ranked.begin(), ranked.end(), [](const Axiom* l, const Axiom* r) { return l->slot != r->slot ? l->slot < r->slot : l->id < r->id; });
+    std::sort(ranked.begin(), ranked.end(), [](const Axiom* l, const Axiom* r) {
+        if (l->slot != r->slot) {
+            return l->slot < r->slot;
+        }
+        return l->id != r->id ? l->id < r->id : axiomDigest(*l) < axiomDigest(*r);
+    });
     std::vector<const Axiom*> kept;
     for (const Axiom* axiom : ranked) {
         if (!kept.empty() && kept.back()->slot == axiom->slot) {
@@ -248,7 +265,8 @@ void appendQuoted(std::string& out, std::string_view text)
 // Six decimals as integers: the same text on every platform, no float formatting.
 void appendFixed(std::string& out, double value)
 {
-    const std::int64_t micro = static_cast<std::int64_t>(std::llround(value * 1.0e6));
+    const double scaled = value * 1.0e6;
+    const std::int64_t micro = static_cast<std::int64_t>(scaled < 0.0 ? scaled - 0.5 : scaled + 0.5);
     const std::uint64_t magnitude = micro < 0 ? static_cast<std::uint64_t>(-micro) : static_cast<std::uint64_t>(micro);
     std::string fraction = std::to_string(magnitude % 1000000);
     out += micro < 0 ? "-" : "";
@@ -300,7 +318,10 @@ std::string mergedCanonicalText(const MergeResult& result)
     }
     out += "}|";
     for (const FieldSource& source : result.provenance) {
-        out += source.block + "." + source.key + ":";
+        appendQuoted(out, source.block);
+        out += '.';
+        appendQuoted(out, source.key);
+        out += ':';
         for (const AxiomSlot slot : source.slots) {
             out += axiomSlotLetter(slot);
         }

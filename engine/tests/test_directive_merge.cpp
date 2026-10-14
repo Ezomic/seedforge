@@ -210,5 +210,57 @@ TEST_CASE("the canonical text is pinned", "[directive_merge]")
 {
     const Axiom a = make(AxiomSlot::Cataclysm, "a", {{"terrain", {{"coastal_erosion", 2.4}, {"sea_level_offset_m", -5.0}}}, {"biomes", {{"inject", Words{"b", "a"}}}}});
     const MergeResult r = mergeDirectives(std::vector<Axiom>{a});
-    CHECK(mergedCanonicalText(r) == R"({"biomes":{"inject":["a","b"]},"terrain":{"coastal_erosion":2.400000,"sea_level_offset_m":-5.000000}}|biomes.inject:A;terrain.coastal_erosion:A;terrain.sea_level_offset_m:A;)");
+    const Axiom z = make(AxiomSlot::Law, "z", {{"palette", {{"grade", std::string("a\"b")}}}, {"poi", {{"weights", Weights{{"p", 0.0000005}, {"q", -0.0000004}, {"r", -1.5}}}}}});
+    const std::string expected = "{\"palette\":{\"grade\":\"a\\\"b\"},\"poi\":{\"weights\":{\"p\":0.000001,\"q\":0.000000,\"r\":0.000000}}}|\"palette\".\"grade\":B;\"poi\".\"weights\":B;";
+    CHECK(mergedCanonicalText(mergeDirectives(std::vector<Axiom>{z})) == expected);
+    CHECK(mergedCanonicalText(r) == R"({"biomes":{"inject":["a","b"]},"terrain":{"coastal_erosion":2.400000,"sea_level_offset_m":-5.000000}}|"biomes"."inject":A;"terrain"."coastal_erosion":A;"terrain"."sea_level_offset_m":A;)");
+}
+
+TEST_CASE("the lower clamp bound holds", "[directive_merge]")
+{
+    const Axiom a = make(AxiomSlot::Cataclysm, "a", {{"terrain", {{"sea_level_offset_m", -1e300}}}});
+    CHECK(std::get<double>(*field(mergeDirectives(std::vector<Axiom>{a}), "terrain", "sea_level_offset_m")) == -kDirectiveMaxMagnitude);
+}
+
+TEST_CASE("enemies and economy pairs follow slot priority whatever the input order", "[directive_merge]")
+{
+    const Axiom a = make(AxiomSlot::Cataclysm, "a", {{"enemies", {{"roster_remove", Words{"bandit"}}}}, {"economy", {{"abundant", Words{"salt"}}}}});
+    const Axiom c = make(AxiomSlot::Powers, "c", {{"enemies", {{"roster_add", Words{"bandit", "drowned"}}}}, {"economy", {{"scarce", Words{"salt", "grain"}}}}});
+    const MergeResult r = mergeDirectives(std::vector<Axiom>{c, a});
+    CHECK(std::get<Words>(*field(r, "enemies", "roster_add")) == Words{"drowned"});
+    CHECK(std::get<Words>(*field(r, "enemies", "roster_remove")) == Words{"bandit"});
+    CHECK(std::get<Words>(*field(r, "economy", "abundant")) == Words{"salt"});
+    CHECK(std::get<Words>(*field(r, "economy", "scarce")) == Words{"grain"});
+}
+
+TEST_CASE("weight priority and provenance do not depend on input order", "[directive_merge]")
+{
+    const Axiom a = make(AxiomSlot::Cataclysm, "a", {{"poi", {{"weights", Weights{{"pharos", 2.0}}}}}});
+    const Axiom c = make(AxiomSlot::Powers, "c", {{"poi", {{"weights", Weights{{"pharos", 9.0}, {"agora", 1.5}}}}}});
+    const MergeResult r = mergeDirectives(std::vector<Axiom>{c, a});
+    CHECK(std::get<Weights>(*field(r, "poi", "weights")) == Weights{{"agora", 1.5}, {"pharos", 2.0}});
+    CHECK(source(r, "poi", "weights")->slots == std::vector<AxiomSlot>{AxiomSlot::Cataclysm, AxiomSlot::Powers});
+    const Axiom shadowed = make(AxiomSlot::Pressure, "d", {{"poi", {{"weights", Weights{{"pharos", 1.0}}}}}});
+    CHECK(source(mergeDirectives(std::vector<Axiom>{a, shadowed}), "poi", "weights")->slots == std::vector<AxiomSlot>{AxiomSlot::Cataclysm});
+}
+
+TEST_CASE("an empty or mismatched top-slot value does not hide a lower slot", "[directive_merge]")
+{
+    const Axiom a = make(AxiomSlot::Cataclysm, "a", {{"palette", {{"grade", Words{}}}}, {"poi", {{"weights", Weights{}}}}});
+    const Axiom b = make(AxiomSlot::Law, "b", {{"palette", {{"grade", std::string("dusk")}}}, {"poi", {{"weights", Weights{{"x", 1.0}}}}}});
+    const MergeResult r = mergeDirectives(std::vector<Axiom>{b, a});
+    CHECK(std::get<std::string>(*field(r, "palette", "grade")) == "dusk");
+    CHECK(std::get<Weights>(*field(r, "poi", "weights")) == Weights{{"x", 1.0}});
+    const Axiom list = make(AxiomSlot::Cataclysm, "a", {{"poi", {{"weights", Words{"x"}}}}});
+    CHECK(std::get<Words>(*field(mergeDirectives(std::vector<Axiom>{b, list}), "poi", "weights")) == Words{"x"});
+}
+
+TEST_CASE("two axioms with the same slot and id merge the same whatever the input order", "[directive_merge]")
+{
+    const Axiom x = make(AxiomSlot::Law, "same", {{"terrain", {{"coastal_erosion", 1.0}}}});
+    const Axiom y = make(AxiomSlot::Law, "same", {{"terrain", {{"coastal_erosion", 2.0}}}});
+    const MergeResult one = mergeDirectives(std::vector<Axiom>{x, y});
+    const MergeResult two = mergeDirectives(std::vector<Axiom>{y, x});
+    CHECK(one.problems.size() == 1);
+    CHECK(mergedCanonicalText(one) == mergedCanonicalText(two));
 }
