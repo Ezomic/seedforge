@@ -287,12 +287,15 @@ TEST_CASE("every violation is returned at once", "[factions]")
 
 TEST_CASE("an oversized list is refused at parse time", "[factions]")
 {
-    std::string many = "[";
-    for (int i = 0; i < 65; ++i) {
-        many += (i == 0 ? "" : ",") + entry("f" + std::to_string(i), "herald");
-    }
-    CHECK(mentions(parseProblems(many + "]"), "more than 64"));
-    CHECK(parseProblems(many.substr(0, many.rfind(",")) + "]").empty());
+    const auto list = [](int count) {
+        std::string text = "[";
+        for (int i = 0; i < count; ++i) {
+            text += (i == 0 ? "" : ",") + entry("f" + std::to_string(i), "herald");
+        }
+        return text + "]";
+    };
+    CHECK(mentions(parseProblems(list(65)), "more than 64"));
+    CHECK(parseProblems(list(64)).empty());
 
     std::string empties = "[{}";
     for (int i = 0; i < 100000; ++i) {
