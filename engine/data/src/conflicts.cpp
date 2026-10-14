@@ -40,6 +40,10 @@ bool ConflictList::loadDataRoot(const std::filesystem::path& dataRoot, const Axi
         return false;
     }
     std::ifstream stream(file, std::ios::binary);
+    if (!stream) {
+        problems_ = {label + ": cannot read file"};
+        return false;
+    }
     const std::string text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
     return loadText(label, text, pool);
 }

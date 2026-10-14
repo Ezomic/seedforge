@@ -1,3 +1,4 @@
+#include "ichor/core/hash.h"
 #include "ichor/data/axiom.h"
 #include "ichor/data/conflicts.h"
 
@@ -215,6 +216,8 @@ TEST_CASE("pair order, listing order and layout do not change the digest")
     REQUIRE(load(c, pool, R"({ "pairs": [["cataclysm.flood", "cataclysm.demeters_grief"]] })"));
     REQUIRE(a.digest() == b.digest());
     REQUIRE(a.canonicalJson() == b.canonicalJson());
+    REQUIRE(a.canonicalJson() == R"({"pairs":[["cataclysm.demeters_grief","cataclysm.flood"],["cataclysm.fire","cataclysm.plague"]]})");
+    REQUIRE(a.digest() == hash64(a.canonicalJson()));
     REQUIRE(a.digest() != c.digest());
     ConflictList none;
     REQUIRE(load(none, pool, R"({ "pairs": [] })"));
@@ -273,10 +276,13 @@ TEST_CASE("a huge list loads and answers symmetrically")
     INFO((list.problems().empty() ? std::string() : list.problems().front()));
     REQUIRE(loaded);
     REQUIRE(list.size() == count);
-    REQUIRE_FALSE(list.mayCoexist(ids[0], ids[1]));
-    REQUIRE_FALSE(list.mayCoexist(ids[1], ids[0]));
-    REQUIRE(list.mayCoexist(ids[0], ids[2]));
-    REQUIRE(list.mayCoexist(ids[2], ids[0]));
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        for (std::size_t j = i + 1; j < ids.size(); ++j) {
+            const bool blocked = (j - i) % 2 == 1;
+            REQUIRE(list.mayCoexist(ids[i], ids[j]) == !blocked);
+            REQUIRE(list.mayCoexist(ids[j], ids[i]) == !blocked);
+        }
+    }
 }
 
 TEST_CASE("an oversized file is refused")
@@ -298,4 +304,20 @@ TEST_CASE("the shipped data/conflicts file validates against the shipped axioms"
     const bool ok = list.loadDataRoot(root, pool);
     INFO((list.problems().empty() ? std::string() : list.problems().front()));
     REQUIRE(ok);
+}
+
+TEST_CASE("a later good load replaces the list and clears the problems")
+{
+    Fixture fixture;
+    const AxiomSet pool = poolOf(fixture, kIds);
+    ConflictList list;
+    REQUIRE_FALSE(load(list, pool, "{"));
+    REQUIRE(list.size() == 0);
+    REQUIRE(list.mayCoexist("cataclysm.flood", "cataclysm.demeters_grief"));
+    REQUIRE(load(list, pool, kDoc));
+    REQUIRE(list.problems().empty());
+    REQUIRE(load(list, pool, R"({ "pairs": [["cataclysm.fire", "cataclysm.plague"]] })"));
+    REQUIRE(list.size() == 1);
+    REQUIRE(list.mayCoexist("cataclysm.flood", "cataclysm.demeters_grief"));
+    REQUIRE_FALSE(list.mayCoexist("cataclysm.fire", "cataclysm.plague"));
 }
