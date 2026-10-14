@@ -51,6 +51,7 @@ jobs:
           } else {
             Write-Host "::warning::sccache could not be installed, building without a compiler cache"
           }
+          exit 0 # the last choco run may have left a failing exit code behind
       - name: Restore sccache
         uses: actions/cache@v4
         with:
