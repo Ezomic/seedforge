@@ -21,6 +21,7 @@
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/save/save_slots.h"
 #include "ichor/script/chronicle_bindings.h"
+#include "ichor/script/world_bindings.h"
 #include "ichor/script/data_bindings.h"
 #include "ichor/script/scene_bindings.h"
 #include "ichor/script/script_host.h"
@@ -407,6 +408,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::bindScene(scripts, engine.scene());
     ichor::bindData(scripts, data);
     ichor::bindChronicle(scripts, chronicle, engine.scene());
+    // The hour is read from the tick, as the sky is, so a script sees what the player sees.
+    ichor::bindWorld(scripts, {
+        [&](double x, double z) { return waterField ? static_cast<double>(waterField->at(x, z).depth) : 0.0; },
+        [&]() { return static_cast<double>(ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour)); },
+    });
     const auto loadScript = [&] {
         if (!scripts.runFile(options.script)) {
             ichor::logf(ichor::LogLevel::Warn, "script: {}", scripts.lastError());

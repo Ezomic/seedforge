@@ -1,3 +1,4 @@
+#include "ichor/script/world_bindings.h"
 #include "ichor/script/scene_bindings.h"
 #include "ichor/script/chronicle_bindings.h"
 #include "ichor/save/chronicle.h"
@@ -6,6 +7,8 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
 
 #include <filesystem>
 #include <fstream>
@@ -379,4 +382,53 @@ TEST_CASE("scripts write the chronicle at the current tick")
     REQUIRE_FALSE(host.run("bad", "ichor.chronicle('Not Plain', 'x')"));
     REQUIRE_FALSE(host.run("few", "ichor.chronicle('quest')"));
     REQUIRE(story.entries().size() == 1);
+}
+
+TEST_CASE("scripts can ask the world how deep the water is and what the hour is")
+{
+    ScriptHost host(1);
+    double asked_x = 0.0;
+    double asked_z = 0.0;
+    bindWorld(host, {
+        [&](double x, double z) {
+            asked_x = x;
+            asked_z = z;
+            return x < 10.0 ? 0.75 : 0.0;
+        },
+        [] { return 17.5; },
+    });
+    ScriptValue result;
+    REQUIRE(host.run("w", "function depth(x, z) return ichor.water_depth(x, z) end function hour() return ichor.hour() end"));
+    REQUIRE(host.call("depth", {4.0, -2.5}, &result));
+    REQUIRE(std::get<double>(result) == 0.75);
+    REQUIRE(asked_x == 4.0);
+    REQUIRE(asked_z == -2.5);
+    REQUIRE(host.call("depth", {50.0, 0.0}, &result));
+    REQUIRE(std::get<double>(result) == 0.0);
+    REQUIRE(host.call("hour", {}, &result));
+    REQUIRE(std::get<double>(result) == 17.5);
+
+    // Bad coordinates are Lua errors, not answers.
+    REQUIRE_FALSE(host.run("few", "ichor.water_depth(1)"));
+    REQUIRE_FALSE(host.run("text", "ichor.water_depth('a', 'b')"));
+    REQUIRE_FALSE(host.run("nan", "ichor.water_depth(0/0, 1)"));
+    REQUIRE_FALSE(host.run("inf", "ichor.water_depth(1, math.huge)"));
+    REQUIRE_FALSE(host.run("far", "ichor.water_depth(1e12, 1)"));
+}
+
+TEST_CASE("queries left empty answer zero, and an answer that is not a number is an error")
+{
+    ScriptHost empty(1);
+    bindWorld(empty, {});
+    ScriptValue result;
+    REQUIRE(empty.run("f", "function depth() return ichor.water_depth(1, 1) end function hour() return ichor.hour() end"));
+    REQUIRE(empty.call("depth", {}, &result));
+    REQUIRE(std::get<double>(result) == 0.0);
+    REQUIRE(empty.call("hour", {}, &result));
+    REQUIRE(std::get<double>(result) == 0.0);
+
+    ScriptHost broken(1);
+    bindWorld(broken, {[](double, double) { return std::nan(""); }, [] { return INFINITY; }});
+    REQUIRE_FALSE(broken.run("d", "ichor.water_depth(1, 1)"));
+    REQUIRE_FALSE(broken.run("h", "ichor.hour()"));
 }
