@@ -31,7 +31,7 @@ public:
     std::uint32_t meshCount() const { return static_cast<std::uint32_t>(meshes_.size()); }
 
     bool setTerrainMaterials(const SceneBundle& layers);
-    bool setVegetationMeshes(const SceneBundle& trees);
+    bool setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds = 0);
     std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants);
     void removeVegetationCell(std::uint32_t cell);
     std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods);
@@ -122,6 +122,7 @@ private:
     std::uint32_t nextTerrainCell_ = 0;
     std::map<std::uint32_t, GpuMesh> waterCells_;
     std::uint32_t nextWaterCell_ = 0;
+    std::uint32_t vegetationUnblended_ = 0; // a bit per vegetation kind that is not blended into the ground
     // Removed cells wait here until every frame that could read them has retired.
     struct RetiredMesh {
         std::uint64_t frame = 0;

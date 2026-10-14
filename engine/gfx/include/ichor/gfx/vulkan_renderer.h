@@ -25,7 +25,7 @@ public:
     void removeTerrainCell(std::uint32_t cell) override;
     std::uint32_t uploadWaterCell(const Mesh& surface) override;
     void removeWaterCell(std::uint32_t cell) override;
-    bool setVegetationMeshes(const SceneBundle& trees) override;
+    bool setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds = 0) override;
     std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) override;
     void removeVegetationCell(std::uint32_t cell) override;
     bool reloadShaders() override;

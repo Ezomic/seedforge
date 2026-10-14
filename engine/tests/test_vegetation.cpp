@@ -59,6 +59,9 @@ TEST_CASE("trees stand inside their cell, on ground that allows them")
             scatterVegetation(field, {x, z}, params, trees);
             total += trees.size();
             for (const VegetationInstance& tree : trees) {
+                if (tree.kind == static_cast<std::uint32_t>(VegetationKind::Rock)) {
+                    continue; // rocks have rules of their own, below
+                }
                 REQUIRE(tree.position.x >= 0.0f);
                 REQUIRE(tree.position.x < 512.0f);
                 REQUIRE(tree.position.z >= 0.0f);
@@ -136,14 +139,17 @@ TEST_CASE("the tree meshes are closed over valid indices and face outward")
 {
     const SceneBundle bundle = treeBundle();
     REQUIRE(bundle.meshes.size() == static_cast<std::size_t>(VegetationKind::Count));
-    REQUIRE(bundle.materials.size() == 3);
+    REQUIRE(bundle.materials.size() == 4); // trunk, conifer, broadleaf, rock
     for (const Mesh& mesh : bundle.meshes) {
         INFO(mesh.name);
+        const bool rock = mesh.name == "rock";
         REQUIRE(mesh.indices.size() % 3 == 0);
-        REQUIRE(mesh.submeshes.size() == 2);
+        REQUIRE(mesh.submeshes.size() == (rock ? 1u : 2u)); // a rock is all one material
         REQUIRE(mesh.submeshes[0].firstIndex == 0);
-        REQUIRE(mesh.submeshes[0].firstIndex + mesh.submeshes[0].indexCount == mesh.submeshes[1].firstIndex);
-        REQUIRE(mesh.submeshes[1].firstIndex + mesh.submeshes[1].indexCount == mesh.indices.size());
+        if (!rock) {
+            REQUIRE(mesh.submeshes[0].firstIndex + mesh.submeshes[0].indexCount == mesh.submeshes[1].firstIndex);
+        }
+        REQUIRE(mesh.submeshes.back().firstIndex + mesh.submeshes.back().indexCount == mesh.indices.size());
         for (const Submesh& submesh : mesh.submeshes) {
             REQUIRE(submesh.material < bundle.materials.size());
             REQUIRE(submesh.indexCount > 0);
@@ -161,7 +167,113 @@ TEST_CASE("the tree meshes are closed over valid indices and face outward")
             }
             REQUIRE(glm::dot(geometric, a.normal + b.normal + c.normal) > 0.0f);
         }
-        REQUIRE(mesh.boundsMin.y >= 0.0f);
-        REQUIRE(mesh.boundsMax.y > 3.0f);
+        if (rock) {
+            // Half buried: it reaches below the ground it is set on, and stands a little over it.
+            REQUIRE(mesh.boundsMin.y < 0.0f);
+            REQUIRE(mesh.boundsMax.y > 0.4f);
+            REQUIRE(mesh.boundsMax.y < 1.2f);
+        } else {
+            REQUIRE(mesh.boundsMin.y >= 0.0f);
+            REQUIRE(mesh.boundsMax.y > 3.0f);
+        }
     }
+}
+
+TEST_CASE("rocks sit on the ground inside their cell, never in the water, and leave the trees as they were")
+{
+    const Heightfield field = world();
+    VegetationParams withRocks;
+    VegetationParams noRocks;
+    noRocks.rockChance = 0.0f;
+    noRocks.rockSteepBoost = 0.0f;
+    const auto rockKind = static_cast<std::uint32_t>(VegetationKind::Rock);
+    std::size_t rocks = 0;
+    for (int z = 0; z < 4; ++z) {
+        for (int x = 0; x < 4; ++x) {
+            std::vector<VegetationInstance> all;
+            std::vector<VegetationInstance> trees;
+            scatterVegetation(field, {x, z}, withRocks, all);
+            scatterVegetation(field, {x, z}, noRocks, trees);
+            std::vector<VegetationInstance> justTrees;
+            for (const VegetationInstance& plant : all) {
+                if (plant.kind == rockKind) {
+                    ++rocks;
+                    REQUIRE(plant.position.x >= 0.0f);
+                    REQUIRE(plant.position.x < 512.0f);
+                    REQUIRE(plant.position.z >= 0.0f);
+                    REQUIRE(plant.position.z < 512.0f);
+                    const double wx = field.cellOriginX({x, z}) + plant.position.x;
+                    const double wz = field.cellOriginZ({x, z}) + plant.position.z;
+                    REQUIRE(plant.position.y == field.heightAt(wx, wz));
+                    REQUIRE(plant.scale >= 0.4f);
+                    REQUIRE(plant.scale <= 2.8f);
+                } else {
+                    justTrees.push_back(plant);
+                }
+            }
+            // Asking for rocks changes no tree: same trees, in the same order, with the rocks after them.
+            REQUIRE(justTrees.size() == trees.size());
+            for (std::size_t i = 0; i < trees.size(); ++i) {
+                REQUIRE(justTrees[i].position == trees[i].position);
+                REQUIRE(justTrees[i].kind == trees[i].kind);
+            }
+            for (std::size_t i = justTrees.size(); i < all.size(); ++i) {
+                REQUIRE(all[i].kind == rockKind); // rocks come last
+            }
+        }
+    }
+    REQUIRE(rocks > 100);
+
+    // Not under a lake.
+    WorldDesc desc = field.desc();
+    desc.waterHeight = 120.0f;
+    const Heightfield flooded(desc, field.samples());
+    std::vector<VegetationInstance> plants;
+    scatterVegetation(flooded, {1, 1}, withRocks, plants);
+    for (const VegetationInstance& plant : plants) {
+        REQUIRE(plant.position.y >= desc.waterLevel());
+    }
+}
+
+TEST_CASE("rocks gather on steep ground, and a cell grows the same rocks every time")
+{
+    const Heightfield field = world();
+    const VegetationParams params;
+    const auto rockKind = static_cast<std::uint32_t>(VegetationKind::Rock);
+    std::size_t rocks = 0;
+    std::size_t steepRocks = 0;
+    for (int z = 0; z < 4; ++z) {
+        for (int x = 0; x < 4; ++x) {
+            std::vector<VegetationInstance> first;
+            std::vector<VegetationInstance> again;
+            scatterVegetation(field, {x, z}, params, first);
+            scatterVegetation(field, {x, z}, params, again);
+            REQUIRE(first.size() == again.size());
+            for (std::size_t i = 0; i < first.size(); ++i) {
+                REQUIRE(first[i].position == again[i].position);
+                REQUIRE(first[i].scale == again[i].scale);
+            }
+            for (const VegetationInstance& plant : first) {
+                if (plant.kind != rockKind) continue;
+                ++rocks;
+                const double wx = field.cellOriginX({x, z}) + plant.position.x;
+                const double wz = field.cellOriginZ({x, z}) + plant.position.z;
+                steepRocks += 1.0f - field.normalAt(wx, wz).y > 0.2f ? 1 : 0;
+            }
+        }
+    }
+    std::size_t ground = 0;
+    std::size_t steepGround = 0;
+    for (double z = 8.0; z < 2040.0; z += 16.0) {
+        for (double x = 8.0; x < 2040.0; x += 16.0) {
+            ++ground;
+            steepGround += 1.0f - field.normalAt(x, z).y > 0.2f ? 1 : 0;
+        }
+    }
+    REQUIRE(steepGround > 0);
+    REQUIRE(rocks > 0);
+    const double rockShare = static_cast<double>(steepRocks) / static_cast<double>(rocks);
+    const double groundShare = static_cast<double>(steepGround) / static_cast<double>(ground);
+    REQUIRE(rockShare > groundShare * 1.5); // rock shows where the slope is
+    REQUIRE(vegetationUnblendedKinds() == (1u << rockKind));
 }

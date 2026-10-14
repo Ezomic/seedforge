@@ -44,7 +44,8 @@ public:
 
     // Vegetation: the meshes of the kinds once (mesh i is kind i), then one set of
     // instances per cell, drawn instanced with one buffer per cell.
-    virtual bool setVegetationMeshes(const SceneBundle& trees) = 0;
+    // `unblendedKinds` has a bit for each kind whose base is not blended into the ground colour.
+    virtual bool setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds = 0) = 0;
     virtual std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) = 0;
     virtual void removeVegetationCell(std::uint32_t cell) = 0;
 

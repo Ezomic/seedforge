@@ -235,7 +235,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             return 1;
         }
         // Trees are decoration: without them the world is bare, not broken.
-        if (!renderer.setVegetationMeshes(ichor::treeBundle())) {
+        if (!renderer.setVegetationMeshes(ichor::treeBundle(), ichor::vegetationUnblendedKinds())) {
             ichor::log(ichor::LogLevel::Warn, "the tree meshes could not be uploaded; the world has no trees");
         }
         const double centre = heightfield.desc().sizeMetres * 0.5;
