@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <limits>
+#include <vector>
 
 using namespace ichor;
 using Catch::Approx;
