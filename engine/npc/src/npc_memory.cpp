@@ -6,7 +6,7 @@ namespace ichor {
 
 bool witnessedByTagOrPlace(const MemorySubject& subject, const ChronicleEntry& entry)
 {
-    if (std::binary_search(entry.npcs.begin(), entry.npcs.end(), subject.npc)) {
+    if (std::find(entry.npcs.begin(), entry.npcs.end(), subject.npc) != entry.npcs.end()) {
         return true;
     }
     return subject.place != 0 && entry.place == subject.place;
