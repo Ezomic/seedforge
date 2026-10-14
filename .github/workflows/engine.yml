@@ -19,8 +19,6 @@ jobs:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
-      CMAKE_C_COMPILER_LAUNCHER: sccache
-      CMAKE_CXX_COMPILER_LAUNCHER: sccache
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +33,25 @@ jobs:
       - name: MSVC developer environment
         uses: ilammy/msvc-dev-cmd@v1.13.0
       - name: Install sccache
-        run: choco install sccache -y --no-progress
+        # The download is the one step here that depends on a service we do not run. A failed install costs
+        # speed, not correctness: retry, and only switch the compiler cache on once it is really there.
+        shell: pwsh
+        run: |
+          $installed = $false
+          foreach ($attempt in 1..3) {
+            choco install sccache -y --no-progress
+            # Chocolatey can report success after installing nothing, so look for the program itself.
+            if (Get-Command sccache -ErrorAction SilentlyContinue) { $installed = $true; break }
+            Start-Sleep -Seconds (10 * $attempt)
+          }
+          if ($installed) {
+            "CMAKE_C_COMPILER_LAUNCHER=sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "CMAKE_CXX_COMPILER_LAUNCHER=sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "SCCACHE_READY=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            Write-Host "::warning::sccache could not be installed, building without a compiler cache"
+          }
+          exit 0 # the last choco run may have left a failing exit code behind
       - name: Restore sccache
         uses: actions/cache@v4
         with:
@@ -55,6 +71,7 @@ jobs:
         run: cmake --build --preset windows-ci
         working-directory: engine
       - name: Compiler cache stats
+        if: env.SCCACHE_READY == '1'
         run: sccache --show-stats
       - name: Test
         run: ctest --preset windows-ci
