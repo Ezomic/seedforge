@@ -486,7 +486,7 @@ void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const
 {
     for (auto [entity, c] : scene.registry().view<const Combatant>().each()) {
         lines.push_back(std::format("{:<10} {:<10} HP {:5.1f}  ST {:5.1f}  PO {:5.1f}  t {:4.2f}{}",
-            c.side == 0 ? "PLAYER" : "SKIRM", name(c.combatState()), c.health, c.stamina, c.poise, c.stateTime, c.blocking ? "  [block]" : ""));
+            c.side == 0 ? "PLAYER" : (scene.registry().all_of<ControllerBrain>(entity) ? "CTRL" : "SKIRM"), name(c.combatState()), c.health, c.stamina, c.poise, c.stateTime, c.blocking ? "  [block]" : ""));
         if (const auto* brain = scene.registry().try_get<ControllerBrain>(entity)) {
             lines.push_back(std::format("           {:<10} cooldown {}t  casts {}", name(brain->controllerState()), brain->cooldownTicks, brain->casts));
         }

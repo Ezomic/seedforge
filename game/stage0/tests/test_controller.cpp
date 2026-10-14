@@ -272,3 +272,29 @@ TEST_CASE("a retry puts the controller back at full health in its first state")
     REQUIRE(a.brain().casts == 0);
     REQUIRE(a.foe().health == Catch::Approx(a.stage.tuning().controllerMaxHealth));
 }
+
+TEST_CASE("loaded brain state is sanitised: a bad cooldown, state or strafe sign still casts")
+{
+    Arena a;
+    a.brain().cooldownTicks = -5;
+    a.brain().state = 9;
+    a.brain().strafeSign = std::numeric_limits<float>::quiet_NaN();
+    REQUIRE(a.tickUntil(ControllerState::Cast, 60 * 10));
+    REQUIRE(std::isfinite(a.brain().strafeSign));
+    REQUIRE(std::isfinite(a.foeTransform().position.x));
+}
+
+TEST_CASE("an expired cooldown does not cast while the slow still holds well past the recast threshold")
+{
+    Arena a;
+    REQUIRE(a.player().status.apply(StatusId::Slow, 60 * 60));
+    a.brain().cooldownTicks = 0;
+    for (int i = 0; i < 60 * 5; ++i) {
+        a.scene.tick(kDt);
+    }
+    REQUIRE(a.brain().cooldownTicks == 0);
+    REQUIRE(a.brain().casts == 0);
+    a.player().status.find(StatusId::Slow);
+    a.player().status.effects.clear();
+    REQUIRE(a.tickUntil(ControllerState::Cast, 5));
+}

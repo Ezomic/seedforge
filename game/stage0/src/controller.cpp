@@ -47,6 +47,9 @@ void Stage0::controllerSystem(Scene& scene)
 
     // Loaded state is data: a negative cooldown or a runaway counter is pulled back in.
     brain.cooldownTicks = std::clamp(brain.cooldownTicks, 0, tuning_.controllerCooldownTicks);
+    brain.stateTicks = std::clamp(brain.stateTicks, 0, 1 << 20);
+    if (brain.state > static_cast<std::uint8_t>(ControllerState::Cast)) enter(brain, ControllerState::Unaware);
+    if (!std::isfinite(brain.strafeSign) || brain.strafeSign == 0.0f) brain.strafeSign = 1.0f;
 
     if (!combat.alive() || combat.health <= 0.0f) {
         body.intent = glm::vec3(0.0f);
