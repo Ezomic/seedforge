@@ -14,6 +14,7 @@ add_library(ichor_audio
     src/null_audio.cpp
     src/wading_splash.cpp
     src/rain_ambience.cpp
+    src/ambience_layers.cpp
     src/miniaudio_device.cpp
 )
 target_include_directories(ichor_audio PUBLIC include)
