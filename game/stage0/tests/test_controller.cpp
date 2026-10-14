@@ -294,7 +294,6 @@ TEST_CASE("an expired cooldown does not cast while the slow still holds well pas
     }
     REQUIRE(a.brain().cooldownTicks == 0);
     REQUIRE(a.brain().casts == 0);
-    a.player().status.find(StatusId::Slow);
     a.player().status.effects.clear();
     REQUIRE(a.tickUntil(ControllerState::Cast, 5));
 }
