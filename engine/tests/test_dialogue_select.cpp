@@ -175,7 +175,52 @@ TEST_CASE("many lines at the maximum weight neither overflow nor skew", "[dialog
     for (int i = 0; i < 6400; ++i) {
         ++hits[selectLine(pool, ctx(1), atCounter(static_cast<std::uint64_t>(i)), 1)->id];
     }
-    CHECK(hits.size() == 64);
+    REQUIRE(hits.size() == 64);
+    for (const auto& [id, count] : hits) {
+        INFO(id);
+        CHECK(std::abs(count - 100) < 50);
+    }
+}
+
+TEST_CASE("the line just spoken is the fallback only when nothing else qualifies", "[dialogue]")
+{
+    const auto pool = poolOf({line("a", 1), line("b", 1, {"mood=sour"}), line("c", 1, {}, 50)});
+    DialogueHistory h;
+    h.now = 10;
+    h.record("c");
+    h.now = 20;
+    for (std::uint64_t i = 0; i < 50; ++i) {
+        h.counter = i;
+        CHECK(selectLine(pool, ctx(1), h, 3)->id == "a");
+    }
+    h.record("a");
+    h.now = 21;
+    for (std::uint64_t i = 0; i < 50; ++i) {
+        h.counter = i;
+        CHECK(selectLine(pool, ctx(1), h, 3)->id == "a");
+        CHECK(selectLine(pool, ctx(1, {{"mood", "sour"}}), h, 3)->id == "b");
+    }
+}
+
+TEST_CASE("a cooldown lifts exactly when the ticks have passed", "[dialogue]")
+{
+    const auto pool = poolOf({line("a", 1, {}, 7)});
+    DialogueHistory h;
+    h.now = 100;
+    h.record("a");
+    h.lastId.clear();
+    h.now = 106;
+    CHECK(selectLine(pool, ctx(1), h, 1) == nullptr);
+    h.now = 107;
+    CHECK(selectLine(pool, ctx(1), h, 1) != nullptr);
+}
+
+TEST_CASE("a line without text is rejected by the pool", "[dialogue]")
+{
+    DialogueLine l = line("a");
+    l.text = " ";
+    std::string error;
+    CHECK_FALSE(DialoguePool::fromLines({l}, error).has_value());
 }
 
 TEST_CASE("weights outside the range, empty ids and duplicate ids are rejected", "[dialogue]")

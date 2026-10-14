@@ -138,6 +138,10 @@ std::optional<DialoguePool> DialoguePool::fromLines(std::vector<DialogueLine> li
             error = "duplicate dialogue line id '" + line.id + "'";
             return std::nullopt;
         }
+        if (line.text.find_first_not_of(" \t\r\n") == std::string::npos) {
+            error = "line '" + line.id + "' has no text";
+            return std::nullopt;
+        }
         if (line.weight < 0 || line.weight > kMaxDialogueWeight) {
             error = "line '" + line.id + "': weight " + std::to_string(line.weight) + " is outside 0 to " + std::to_string(kMaxDialogueWeight);
             return std::nullopt;
