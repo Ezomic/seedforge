@@ -5,6 +5,7 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -22,8 +23,10 @@ constexpr const char* kHudDocument = R"(<rml><head><style>
     #compass { font-family: Cinzel; font-size: 30px; color: #e8d8a8; letter-spacing: 3px; }
     #clock { font-family: Alegreya Sans; font-size: 18px; color: #d8d8d8; }
     #water { font-family: Alegreya Sans; font-size: 16px; color: #8fc0d0; }
+    #health { width: 150px; height: 10px; margin: 6px 0px 0px 15px; background-color: #1a0d0d; border: 1px #a08850; }
+    #healthfill { width: 0%; height: 10px; background-color: #a83232; }
 </style></head><body>
-    <div id="plate"><div id="compass">N</div><div id="clock">09:00</div><div id="water"></div></div>
+    <div id="plate"><div id="compass">N</div><div id="clock">09:00</div><div id="water"></div><div id="health"><div id="healthfill"></div></div></div>
 </body></rml>)";
 
 }
@@ -60,6 +63,14 @@ std::string waterLabel(float depth)
     return "Chest deep";
 }
 
+int healthPercent(float health, float maxHealth)
+{
+    if (!std::isfinite(health) || !std::isfinite(maxHealth) || !(maxHealth > 0.0f)) {
+        return 0;
+    }
+    return static_cast<int>(std::floor(std::clamp(health, 0.0f, maxHealth) * 100.0f / maxHealth));
+}
+
 std::string clockLabel(float hour)
 {
     if (!std::isfinite(hour)) {
@@ -85,6 +96,7 @@ Hud::Hud(UiContext& ui)
     compass_ = document_->GetElementById("compass");
     clock_ = document_->GetElementById("clock");
     water_ = document_->GetElementById("water");
+    healthFill_ = document_->GetElementById("healthfill");
     document_->Show();
 }
 
@@ -95,9 +107,9 @@ Hud::~Hud()
     }
 }
 
-void Hud::update(float headingRadians, float hour, float wadingDepth)
+void Hud::update(float headingRadians, float hour, float wadingDepth, float health, float maxHealth)
 {
-    if (compass_ == nullptr || clock_ == nullptr || water_ == nullptr) {
+    if (compass_ == nullptr || clock_ == nullptr || water_ == nullptr || healthFill_ == nullptr) {
         return;
     }
     const std::string compass = compassLabel(headingRadians);
@@ -114,6 +126,11 @@ void Hud::update(float headingRadians, float hour, float wadingDepth)
     if (water != waterText_) {
         waterText_ = water;
         water_->SetInnerRML(water);
+    }
+    const int percent = healthPercent(health, maxHealth);
+    if (percent != healthPercent_) {
+        healthPercent_ = percent;
+        healthFill_->SetProperty("width", std::to_string(percent) + "%");
     }
 }
 

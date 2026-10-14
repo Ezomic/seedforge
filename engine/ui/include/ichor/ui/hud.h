@@ -23,10 +23,14 @@ float headingOf(float forwardX, float forwardZ);
 // (see core/wading.h), then ankle, knee, waist and chest deep in equal steps up to chest height. A depth that is not a number reads as none.
 std::string waterLabel(float depth);
 
+// How full the health bar is, as a whole percent from 0 to 100. Health below nothing or above
+// the maximum is clamped; a maximum that is not a positive number, or a value that is not finite, reads as empty.
+int healthPercent(float health, float maxHealth);
+
 // A time of day as HH:MM. Hours run 0 to 24 and wrap.
 std::string clockLabel(float hour);
 
-// The always-on screen furniture: the compass and the clock, in the game's fonts. The
+// The always-on screen furniture: the compass, the clock and the health bar, in the game's fonts. The
 // context must have the Cinzel and Alegreya Sans faces loaded. There are no waypoints and no
 // minimap (doc 18), so this is how the player finds their way.
 class Hud {
@@ -39,7 +43,7 @@ public:
     bool ok() const { return document_ != nullptr; }
 
     // Only changed text is rewritten, so a steady heading costs no layout.
-    void update(float headingRadians, float hour, float wadingDepth);
+    void update(float headingRadians, float hour, float wadingDepth, float health, float maxHealth);
 
 private:
     UiContext& ui_;
@@ -47,9 +51,11 @@ private:
     Rml::Element* compass_ = nullptr;
     Rml::Element* clock_ = nullptr;
     Rml::Element* water_ = nullptr;
+    Rml::Element* healthFill_ = nullptr;
     std::string compassText_;
     std::string clockText_;
     std::string waterText_;
+    int healthPercent_ = -1;
 };
 
 }

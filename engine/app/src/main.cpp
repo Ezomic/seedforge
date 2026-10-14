@@ -502,6 +502,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
     float hudWater = 0.0f;
+    // The app has no combatants yet, so the bar shows full health until the sim supplies one.
+    float hudHealth = 100.0f;
+    float hudMaxHealth = 100.0f;
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
@@ -529,7 +532,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         renderer.setUiHooks(
             [&](std::uint32_t width, std::uint32_t height) {
                 ui->setSize(width, height);
-                hud->update(hudHeading, hudHour, hudWater);
+                hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
