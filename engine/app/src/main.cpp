@@ -348,13 +348,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // The reverb of the places the listener walks into, from the "reverb" table of the data layer.
     std::optional<ichor::JournalTemplates> journalTemplates;
     const auto loadJournalTemplates = [&] {
-        journalTemplates.reset();
         const ichor::DataTable* table = data.table("journal");
         std::string error = "there is no journal table";
+        std::optional<ichor::JournalTemplates> loaded;
         if (table != nullptr) {
-            journalTemplates = ichor::JournalTemplates::fromTable(*table, error);
+            loaded = ichor::JournalTemplates::fromTable(*table, error);
         }
-        if (!journalTemplates) {
+        if (loaded) {
+            journalTemplates = std::move(loaded);
+        } else {
             ichor::logf(ichor::LogLevel::Warn, "data: journal prose templates not loaded: {}", error);
         }
     };

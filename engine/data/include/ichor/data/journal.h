@@ -58,6 +58,9 @@ private:
 // drawn. Names and places go in exactly as written, and text that looks like a
 // placeholder is not expanded. A missing who, what or where is replaced by the
 // template set's fallback words, and a missing decision by an "undecided" sentence.
+// `decided` must be a clause without its final full stop, as the templates add it. The
+// chronicle keeps at most Chronicle::kMaxTextBytes of the result, so very long fields cost
+// the end of the prose (the decision) when stored.
 std::string composeJournal(const JournalEntry& entry, const JournalTemplates& templates);
 
 }
