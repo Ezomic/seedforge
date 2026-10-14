@@ -1,0 +1,15 @@
+{
+  "id": "pressure.unburied",
+  "slot": "pressure",
+  "title": "The Unburied",
+  "tags": ["DEATH", "RITE", "ESCALATION"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["unquiet_barrow", "grave_field"] },
+  "settlement": { "density_mult": 0.9 },
+  "poi": { "weights": { "unmarked_grave": 3.0, "barrow": 2.5, "cemetery_road": 2.0, "sanctuary": 1.5 } },
+  "enemies": { "roster_add": ["restless_dead", "shade", "unburied_hoplite"] },
+  "economy": { "scarce": ["funerary_oil"], "abundant": ["grave_goods", "bone"] },
+  "palette": { "grade": "unburied", "fog_density": 1.2 },
+  "audio": { "bed_overrides": ["grave_wind"], "music_palette": "unburied" }
+}

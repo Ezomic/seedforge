@@ -1,0 +1,15 @@
+{
+  "id": "pressure.miasma",
+  "slot": "pressure",
+  "title": "The Miasma",
+  "tags": ["POLLUTION", "RITUAL", "PURIFICATION"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["miasma_fen", "blighted_grove"], "suppress": ["clear_spring"] },
+  "settlement": { "density_mult": 0.85 },
+  "poi": { "weights": { "polluted_well": 2.5, "purification_spring": 3.0, "sanctuary": 2.0, "farmstead": 0.8 } },
+  "enemies": { "roster_add": ["afflicted", "miasma_wraith"] },
+  "economy": { "scarce": ["clean_water"], "abundant": ["sulphur", "laurel"] },
+  "palette": { "grade": "miasma", "fog_density": 1.3 },
+  "audio": { "bed_overrides": ["low_drone", "distant_keening"], "music_palette": "miasma" }
+}

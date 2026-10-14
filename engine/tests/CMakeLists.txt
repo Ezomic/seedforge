@@ -31,6 +31,7 @@ add_executable(ichor_tests
     test_npc_tiers.cpp
     test_traversal_verbs.cpp
     test_axiom.cpp
+    test_axioms_pressure.cpp
     test_slot_roll.cpp
     test_conflicts.cpp
     test_atmosphere.cpp
