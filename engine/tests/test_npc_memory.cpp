@@ -106,7 +106,7 @@ TEST_CASE("a hundred thousand entries are answered and bounded")
     }
     const auto got = memoryOf({3, 0}, story.entries(), Chronicle::kMaxEntries);
     REQUIRE(got.size() == kMaxRemembered);
-    REQUIRE(memoryOf({3, 0}, story.entries(), ~0ull).size() == kMaxRemembered);
+    REQUIRE(memoryOf({3, 0}, story.entries(), ~0ull).empty()); // everything has faded
 }
 
 TEST_CASE("memory matches after a save round trip and a custom rule is used")
