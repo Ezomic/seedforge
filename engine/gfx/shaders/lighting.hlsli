@@ -1,7 +1,7 @@
 #ifndef ICHOR_LIGHTING_HLSLI
 #define ICHOR_LIGHTING_HLSLI
 
-#include "common.hlsli"
+#include "cloud.hlsli"
 
 [[vk::binding(1, 0)]] Texture2DArray<float> shadowMap;
 [[vk::binding(2, 0)]] SamplerComparisonState shadowSampler;
@@ -108,7 +108,7 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
     const float3 diffuse = kd * baseColor / PI;
 
     const float shadow = nDotL > 0.0 ? sampleShadow(worldPos, geometricNormal, nDotL) : 0.0;
-    const float3 radiance = frame.sunColor.rgb * frame.sunColor.w;
+    const float3 radiance = frame.sunColor.rgb * frame.sunColor.w * (nDotL > 0.0 ? cloudShadowFactor(worldPos) : 1.0);
     float3 color = (diffuse + specular) * radiance * nDotL * shadow;
 
     const float sky = n.y * 0.5 + 0.5;

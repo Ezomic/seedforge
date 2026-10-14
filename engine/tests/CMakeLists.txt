@@ -19,6 +19,7 @@ add_executable(ichor_tests
     test_audio.cpp
     test_wading_splash.cpp
     test_rain_ambience.cpp
+    test_ambience_layers.cpp
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
@@ -34,6 +35,7 @@ add_executable(ichor_tests
     test_picking.cpp
     test_nudge.cpp
     test_weather.cpp
+    test_cloud_shadow.cpp
     test_ui.cpp
     test_map_image.cpp
     test_map_screen.cpp
