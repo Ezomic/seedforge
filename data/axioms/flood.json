@@ -1,0 +1,17 @@
+{
+  "id": "cataclysm.flood",
+  "slot": "cataclysm",
+  "title": "Deukalion's Flood",
+  "tags": ["WATER", "RUIN", "SCARCITY", "VERTICAL_LIMIT"],
+  "conflicts": ["cataclysm.demeters_grief"],
+
+  "terrain": { "sea_level_offset_m": 200, "coastal_erosion": 2.4 },
+  "settlement": { "min_elevation_m": 210, "prefer_slope": "gentle", "density_mult": 0.7 },
+  "biomes": { "inject": ["salt_blight", "tidal_ruin"], "suppress": ["lowland_farm"] },
+  "poi": { "weights": { "drowned_polis": 3.0, "pharos": 2.0, "farmstead": 0.2 } },
+  "enemies": { "roster_add": ["drowned", "salt_kin"], "roster_remove": ["bandit_farmer"] },
+  "traversal": { "unlock": ["swim_deep", "boat"] },
+  "economy": { "scarce": ["grain", "timber"], "abundant": ["salvage", "salt"] },
+  "palette": { "grade": "flood", "fog_density": 1.4 },
+  "audio": { "bed_overrides": ["surf_distant"], "music_palette": "flood" }
+}
