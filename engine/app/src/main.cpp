@@ -731,7 +731,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // An arrow or page key moves the selection one step per press (shift: a long one),
             // unless a field has the keyboard.
             const ichor::NavKeys nav = platform.navKeys();
-            if (const auto selected = editorSession.selection(); selected && !editorPanels.wantsKeyboard()) {
+            const auto selected = editorSession.selection();
+            const bool nudging = selected && !editorPanels.wantsKeyboard();
+            platform.reserveArrowKeys(nudging);
+            if (nudging) {
                 const ichor::NudgeKeys pressed{.left = nav.left && !navHeld.left,
                     .right = nav.right && !navHeld.right,
                     .forward = nav.up && !navHeld.up,

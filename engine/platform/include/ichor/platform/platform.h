@@ -55,6 +55,8 @@ public:
     // For the UI only: the simulation never reads it. Platforms without a mouse report none.
     virtual Pointer pointer() const { return {}; }
     virtual NavKeys navKeys() const { return {}; }
+    // While set, the arrow keys are not the player's movement (the editor nudges with them).
+    virtual void reserveArrowKeys(bool reserved) { (void)reserved; }
 };
 
 }
