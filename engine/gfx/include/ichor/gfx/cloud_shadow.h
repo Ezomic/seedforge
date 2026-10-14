@@ -10,7 +10,6 @@ namespace ichor {
 // Cloud shadows read the same drifting cloud field the sky draws. The shader works in the
 // sky's plane units, with the same function and the same drift; these constants tie the ground to that
 // plane and are mirrored in cloud.hlsli.
-inline constexpr double kCloudHeight = 1200.0;                    // metres over the sea, where the layer sits
 inline constexpr double kCloudPlanePerMetre = 0.005;              // plane units per ground metre: a cell is 200 m, so patches fit in a view
 inline constexpr float kCloudDrift = 0.03f;                       // plane units per second, along the wind
 inline constexpr float kCloudTimeWrap = 3600.0f;                  // seconds; the drift phase restarts here

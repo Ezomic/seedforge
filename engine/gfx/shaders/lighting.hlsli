@@ -108,7 +108,7 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
     const float3 diffuse = kd * baseColor / PI;
 
     const float shadow = nDotL > 0.0 ? sampleShadow(worldPos, geometricNormal, nDotL) : 0.0;
-    const float3 radiance = frame.sunColor.rgb * frame.sunColor.w * cloudShadowFactor(worldPos);
+    const float3 radiance = frame.sunColor.rgb * frame.sunColor.w * (nDotL > 0.0 ? cloudShadowFactor(worldPos) : 1.0);
     float3 color = (diffuse + specular) * radiance * nDotL * shadow;
 
     const float sky = n.y * 0.5 + 0.5;
