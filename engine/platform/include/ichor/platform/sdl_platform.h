@@ -24,6 +24,7 @@ public:
     InputFrame input() const override { return input_; }
     Pointer pointer() const override { return pointer_; }
     NavKeys navKeys() const override { return navKeys_; }
+    void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
 
     SDL_Window* window() const { return window_; }
 
@@ -37,6 +38,7 @@ private:
     InputFrame input_;
     Pointer pointer_;
     NavKeys navKeys_;
+    bool arrowsReserved_ = false;
     std::function<void(const SDL_Event&)> hook_;
 };
 
