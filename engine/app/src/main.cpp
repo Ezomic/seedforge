@@ -408,10 +408,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::bindScene(scripts, engine.scene());
     ichor::bindData(scripts, data);
     ichor::bindChronicle(scripts, chronicle, engine.scene());
+    const auto weatherNow = [&] {
+        return ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(engine.scene().tickCount()) * config.fixedDt / options.daySeconds * 24.0);
+    };
     // The hour is read from the tick, as the sky is, so a script sees what the player sees.
     ichor::bindWorld(scripts, {
         [&](double x, double z) { return waterField ? static_cast<double>(waterField->at(x, z).depth) : 0.0; },
         [&]() { return static_cast<double>(ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour)); },
+        [&]() { return static_cast<double>(weatherNow().overcast); },
+        [&]() { return static_cast<double>(weatherNow().rain); },
     });
     const auto loadScript = [&] {
         if (!scripts.runFile(options.script)) {

@@ -416,6 +416,18 @@ TEST_CASE("scripts can ask the world how deep the water is and what the hour is"
     REQUIRE_FALSE(host.run("far", "ichor.water_depth(1e12, 1)"));
 }
 
+TEST_CASE("scripts can ask the world how overcast it is and whether it rains")
+{
+    ScriptHost host(1);
+    bindWorld(host, {{}, {}, [] { return 0.8; }, [] { return 0.25; }});
+    ScriptValue result;
+    REQUIRE(host.run("w", "function overcast() return ichor.overcast() end function rain() return ichor.rain() end"));
+    REQUIRE(host.call("overcast", {}, &result));
+    REQUIRE(std::get<double>(result) == 0.8);
+    REQUIRE(host.call("rain", {}, &result));
+    REQUIRE(std::get<double>(result) == 0.25);
+}
+
 TEST_CASE("queries left empty answer zero, and an answer that is not a number is an error")
 {
     ScriptHost empty(1);
@@ -426,9 +438,14 @@ TEST_CASE("queries left empty answer zero, and an answer that is not a number is
     REQUIRE(std::get<double>(result) == 0.0);
     REQUIRE(empty.call("hour", {}, &result));
     REQUIRE(std::get<double>(result) == 0.0);
+    REQUIRE(empty.run("w", "function weather() return ichor.overcast() + ichor.rain() end"));
+    REQUIRE(empty.call("weather", {}, &result));
+    REQUIRE(std::get<double>(result) == 0.0);
 
     ScriptHost broken(1);
-    bindWorld(broken, {[](double, double) { return std::nan(""); }, [] { return INFINITY; }});
+    bindWorld(broken, {[](double, double) { return std::nan(""); }, [] { return INFINITY; }, [] { return std::nan(""); }, [] { return INFINITY; }});
     REQUIRE_FALSE(broken.run("d", "ichor.water_depth(1, 1)"));
     REQUIRE_FALSE(broken.run("h", "ichor.hour()"));
+    REQUIRE_FALSE(broken.run("o", "ichor.overcast()"));
+    REQUIRE_FALSE(broken.run("r", "ichor.rain()"));
 }
