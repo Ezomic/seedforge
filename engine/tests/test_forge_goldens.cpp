@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -60,6 +61,9 @@ Verdict checkGolden(const std::string& phase, const MapImage& image, const std::
     std::uint32_t h = 0;
     std::vector<std::uint8_t> expected;
     if (!readPng(golden, w, h, expected)) {
+        if (std::filesystem::exists(golden)) {
+            return {false, std::format("forge phase '{}': {} exists but is not a readable PNG (run 'git lfs pull'; do not regenerate over it)", phase, golden.string())};
+        }
         return {false, std::format("forge phase '{}': no golden image at {}. Rerun with ICHOR_UPDATE_GOLDEN=1 to create it, and LOOK at it before committing", phase, golden.string())};
     }
     if (w != image.width || h != image.height || expected.size() != image.rgba.size()) {
@@ -194,6 +198,16 @@ TEST_CASE("forge golden: update mode creates the directory, and only update mode
     CHECK_FALSE(checkGolden("water", grey(4, 200), dir.path / "golden", dir.path / "out", false, 0).ok);
     CHECK(std::filesystem::last_write_time(dir.path / "golden" / "forge_water.png") == before);
     CHECK(checkGolden("water", image, dir.path / "golden", dir.path / "out", false, 0).ok);
+}
+
+TEST_CASE("forge golden: a golden that is not a PNG, like an LFS pointer, says to pull rather than regenerate")
+{
+    const TempDir dir("pointer");
+    std::filesystem::create_directories(dir.path / "golden");
+    std::ofstream(dir.path / "golden" / "forge_height.png") << "version https://git-lfs.github.com/spec/v1\n";
+    const Verdict verdict = checkGolden("height", grey(4, 10), dir.path / "golden", dir.path / "out", false, 0);
+    CHECK_FALSE(verdict.ok);
+    CHECK(verdict.message.find("git lfs pull") != std::string::npos);
 }
 
 TEST_CASE("forge golden: a golden of the wrong size fails and names both sizes")
