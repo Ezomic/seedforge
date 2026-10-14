@@ -37,6 +37,12 @@ struct Problems {
     }
 };
 
+std::string label(const std::filesystem::path& path)
+{
+    const auto text = path.generic_u8string();
+    return std::string(reinterpret_cast<const char*>(text.data()), text.size());
+}
+
 HudLayoutResult failed(std::vector<std::string> problems)
 {
     HudLayoutResult result;
@@ -148,18 +154,19 @@ HudLayoutResult parseHudLayout(std::string_view json)
 HudLayoutResult loadHudLayout(const std::filesystem::path& path)
 {
     std::error_code code;
-    if (!std::filesystem::exists(path, code)) {
+    const bool exists = std::filesystem::exists(path, code);
+    if (!exists && !code) {
         HudLayoutResult result;
         result.layout = HudLayout::defaultLayout();
         return result;
     }
     std::vector<std::uint8_t> bytes;
     if (!readFileBytes(path, bytes, kMaxLayoutBytes)) {
-        return failed({path.generic_string() + ": cannot be read as a layout file"});
+        return failed({label(path) + ": cannot be read as a layout file"});
     }
     HudLayoutResult result = parseHudLayout(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
     for (std::string& problem : result.problems) {
-        problem = path.generic_string() + ": " + problem;
+        problem = label(path) + ": " + problem;
     }
     return result;
 }
