@@ -2,6 +2,7 @@
 
 #include "ichor/world/heightfield.h"
 #include "ichor/world/hydrology.h"
+#include "ichor/world/phase_pipeline.h"
 #include "ichor/world/world_desc.h"
 
 #include <cstdint>
@@ -47,6 +48,19 @@ struct AttemptReport {
 // The seed attempt `attempt` forges with: the world seed itself for attempt 0, hashCombine(seed, attempt) after.
 std::uint64_t attemptSeed(std::uint64_t worldSeed, std::uint32_t attempt);
 
+// The names of the forge's phases, in order. Each artifact is final once made: "rivers" is a copy of
+// "terrain" when rivers are not carved, never terrain edited in place.
+constexpr const char* kPhaseTerrain = "terrain";     // Heightfield
+constexpr const char* kPhaseRivers = "rivers";       // Heightfield
+constexpr const char* kPhaseHydrology = "hydrology"; // Hydrology
+
+// The forge as phases over the request. Run it whole, or from a phase on with the earlier artifacts
+// of a run made from the same description (to re-run only the hydrology, say, or to diff two seeds).
+PhasePipeline forgePipeline(const ForgeRequest& request);
+
+ForgedWorld forgedWorld(const PhaseRun& run);
+
+// The same as forgedWorld(forgePipeline(request).run()).
 ForgedWorld forgeWorld(const ForgeRequest& request);
 
 // Runs every gate and lists all that fail.
