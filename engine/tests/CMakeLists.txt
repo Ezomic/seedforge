@@ -35,6 +35,7 @@ add_executable(ichor_tests
     test_weather.cpp
     test_ui.cpp
     test_map_image.cpp
+    test_debug_images.cpp
     test_map_screen.cpp
     test_save.cpp
     test_settings.cpp
