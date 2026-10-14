@@ -34,7 +34,7 @@ std::string clockLabel(float hour);
 // metres on the ground (x east, z south). The direction is the compass point the target is in,
 // not relative to where the player faces, so it reads against the compass above it. The
 // distance is deliberately rough: to the nearest 10 m under 100 m, 50 m under 1 km, and 0.5 km
-// from there to 99 km, beyond which it is "far away". Within 5 m it is just "here". Any
+// from there up to 99.5 km, beyond which it is "far away". Within 5 m it is just "here". Any
 // position that is not finite gives an empty string.
 std::string targetGuide(double playerX, double playerZ, double targetX, double targetZ);
 

@@ -132,7 +132,7 @@ bool parse(int argc, char** argv, Options& options)
         } else if (arg == "--target" && i + 2 < argc) {
             double x = 0.0;
             double z = 0.0;
-            if (!parseNumber(argv[i + 1], x) || !parseNumber(argv[i + 2], z)) return false;
+            if (!parseNumber(argv[i + 1], x) || !parseNumber(argv[i + 2], z) || !std::isfinite(x) || !std::isfinite(z)) return false;
             i += 2;
             options.compassTarget = std::make_pair(x, z);
         } else if (arg == "--hour" && hasValue) {
