@@ -1,0 +1,14 @@
+{
+  "id": "cataclysm.artemis_withdrew",
+  "slot": "cataclysm",
+  "title": "Artemis Withdrew",
+  "tags": ["STILLNESS", "SCARCITY", "ABSENCE", "NO_MOUNTS"],
+  "conflicts": [],
+
+  "biomes": { "suppress": ["game_forest", "wild_pasture"] },
+  "poi": { "weights": { "hunting_lodge": 0.0, "herd_pasture": 0.0, "huntress_shrine": 2.0 } },
+  "enemies": { "roster_remove": ["wolf", "boar", "stag", "hare", "hunting_hound", "horse", "mule"] },
+  "economy": { "scarce": ["hides", "meat", "mounts"], "abundant": ["grain"] },
+  "palette": { "grade": "still" },
+  "audio": { "bed_overrides": ["no_birdsong"], "music_palette": "single_voice" }
+}
