@@ -24,11 +24,12 @@ foreach(src ${sources})
     )
     list(APPEND outputs ${out})
 endforeach()
-# A forged test world: 4 km at 4 m per sample in 512 m cells, seed 7.
+# A forged test world: 4 km at 4 m per sample in 512 m cells, seed 7, with its rivers carved.
 set(ICHOR_WORLD_DIR ${ICHOR_CONTENT_DIR}/world CACHE INTERNAL "forged test world")
 add_custom_command(
     OUTPUT ${ICHOR_WORLD_DIR}/manifest.iworld ${ICHOR_WORLD_DIR}/heightmap.r16 ${ICHOR_WORLD_DIR}/terrain.iscene
-    COMMAND ichor_forge ${ICHOR_WORLD_DIR} 7 4096 4 512
+    # No lake of its own, and channels cut along every river that gathers 2000 samples of rain.
+    COMMAND ichor_forge ${ICHOR_WORLD_DIR} 7 4096 4 512 0 2000
     DEPENDS ichor_forge
     COMMENT "forge: test world"
     VERBATIM
