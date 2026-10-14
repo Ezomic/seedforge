@@ -267,10 +267,15 @@ TEST_CASE("wading is named by depth, and over dry land or the ankles it is not n
     REQUIRE(waterLabel(0.1f).empty());
     REQUIRE(waterLabel(-2.0f).empty());
     REQUIRE(waterLabel(std::nanf("")).empty());
-    REQUIRE(waterLabel(0.2f) == "Ankle deep");
-    REQUIRE(waterLabel(0.6f) == "Knee deep");
-    REQUIRE(waterLabel(1.0f) == "Waist deep");
-    REQUIRE(waterLabel(1.2f) == "Chest deep");
+    REQUIRE(waterLabel(0.1001f) == "Ankle deep");
+    // Four equal bands between the first wading depth (0.1 m) and chest height (1.5 m): edges at 0.45, 0.8 and 1.15.
+    REQUIRE(waterLabel(0.44f) == "Ankle deep");
+    REQUIRE(waterLabel(0.46f) == "Knee deep");
+    REQUIRE(waterLabel(0.79f) == "Knee deep");
+    REQUIRE(waterLabel(0.81f) == "Waist deep");
+    REQUIRE(waterLabel(1.14f) == "Waist deep");
+    REQUIRE(waterLabel(1.16f) == "Chest deep");
+    REQUIRE(waterLabel(1.5f) == "Chest deep");
     REQUIRE(waterLabel(30.0f) == "Chest deep");
 }
 
@@ -295,17 +300,16 @@ TEST_CASE("the HUD draws the compass and clock and only relays out when the text
     Hud hud(ui);
     REQUIRE(hud.ok());
 
-    hud.update(0.0f, 9.0f);
+    hud.update(0.0f, 9.0f, 0.0f);
     frame(ui, renderer, 0.0);
     const std::size_t firstDraws = renderer.draws().size();
     REQUIRE(firstDraws >= 3); // the plate and its border, then text
 
     // Nothing changed: the same picture.
-    hud.update(0.0f, 9.0f);
+    hud.update(0.0f, 9.0f, 0.0f);
     frame(ui, renderer, 0.1);
     REQUIRE(renderer.draws().size() == firstDraws);
 
-    // Wading adds a line, and wading out takes it away again.
     hud.update(0.0f, 9.0f, 0.9f);
     frame(ui, renderer, 0.15);
     REQUIRE(renderer.draws().size() > firstDraws);
@@ -314,7 +318,7 @@ TEST_CASE("the HUD draws the compass and clock and only relays out when the text
     REQUIRE(renderer.draws().size() == firstDraws);
 
     // A turn to the south-west and a later hour: still a picture, with different text in it.
-    hud.update(3.9f, 17.5f);
+    hud.update(3.9f, 17.5f, 0.0f);
     frame(ui, renderer, 0.2);
     REQUIRE(renderer.draws().size() >= 3);
 }

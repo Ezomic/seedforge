@@ -1,5 +1,7 @@
 #include "ichor/world/water_field.h"
 
+#include "ichor/core/wading.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -9,10 +11,10 @@ namespace ichor {
 
 float wadingSpeedFactor(float depth)
 {
-    if (!(depth > 0.1f)) {
+    if (!(depth > kWadeStart)) {
         return 1.0f;
     }
-    const float t = std::min((depth - 0.1f) / 1.4f, 1.0f); // over the ankles, up to chest height
+    const float t = std::min((depth - kWadeStart) / (kWadeFull - kWadeStart), 1.0f);
     return 1.0f - 0.65f * (t * t * (3.0f - 2.0f * t));
 }
 

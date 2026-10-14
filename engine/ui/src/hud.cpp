@@ -1,5 +1,7 @@
 #include "ichor/ui/hud.h"
 
+#include "ichor/core/wading.h"
+
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 
@@ -47,12 +49,14 @@ std::string compassLabel(float headingRadians)
 
 std::string waterLabel(float depth)
 {
-    if (!(depth > 0.1f)) {
+    if (!(depth > kWadeStart)) {
         return {};
     }
-    if (depth < 0.4f) return "Ankle deep";
-    if (depth < 0.8f) return "Knee deep";
-    if (depth < 1.2f) return "Waist deep";
+    // Four equal bands from the ankles to chest height, the range over which wading slows the walker.
+    const float through = (depth - kWadeStart) / (kWadeFull - kWadeStart);
+    if (through < 0.25f) return "Ankle deep";
+    if (through < 0.5f) return "Knee deep";
+    if (through < 0.75f) return "Waist deep";
     return "Chest deep";
 }
 
