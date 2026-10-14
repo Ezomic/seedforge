@@ -294,9 +294,9 @@ void VulkanRenderer::removeWaterCell(std::uint32_t cell)
     impl_->scene->removeWaterCell(cell);
 }
 
-bool VulkanRenderer::setVegetationMeshes(const SceneBundle& trees)
+bool VulkanRenderer::setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds)
 {
-    return impl_->scene->setVegetationMeshes(trees);
+    return impl_->scene->setVegetationMeshes(trees, unblendedKinds);
 }
 
 std::uint32_t VulkanRenderer::uploadVegetationCell(const std::vector<PlantInstance>& plants)

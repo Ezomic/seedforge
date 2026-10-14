@@ -331,7 +331,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
 
     RenderView view;
     if (vegetation) {
-        REQUIRE(renderer.setVegetationMeshes(treeBundle()));
+        REQUIRE(renderer.setVegetationMeshes(treeBundle(), vegetationUnblendedKinds()));
     }
     const double centre = heightfield.desc().sizeMetres * 0.5;
     const CellId home = heightfield.cellAt(centre, centre);

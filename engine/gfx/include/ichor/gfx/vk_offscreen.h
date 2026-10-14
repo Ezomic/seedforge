@@ -26,7 +26,7 @@ public:
     bool setTerrainMaterials(const SceneBundle& layers) { return scene_->setTerrainMaterials(layers); }
     std::uint32_t uploadTerrainCell(const std::vector<Mesh>& lods) { return scene_->uploadTerrainCell(lods); }
     std::uint32_t uploadWaterCell(const Mesh& surface) { return scene_->uploadWaterCell(surface); }
-    bool setVegetationMeshes(const SceneBundle& trees) { return scene_->setVegetationMeshes(trees); }
+    bool setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds = 0) { return scene_->setVegetationMeshes(trees, unblendedKinds); }
     std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) { return scene_->uploadVegetationCell(plants); }
     // The overlay, when given, records inside the scene's pass after everything else, with an upright viewport.
     using Overlay = std::function<void(VkCommandBuffer, VkExtent2D)>;

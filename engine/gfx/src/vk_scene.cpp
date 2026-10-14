@@ -890,7 +890,7 @@ void SceneRenderer::removeTerrainCell(std::uint32_t handle)
     terrainCells_.erase(found);
 }
 
-bool SceneRenderer::setVegetationMeshes(const SceneBundle& trees)
+bool SceneRenderer::setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds)
 {
     // Once: a second set would append the meshes again and strand the cells already uploaded.
     if (vegetationKinds_ != 0 || trees.meshes.empty()) {
@@ -901,6 +901,7 @@ bool SceneRenderer::setVegetationMeshes(const SceneBundle& trees)
         return false;
     }
     vegetationBase_ = base;
+    vegetationUnblended_ = unblendedKinds;
     vegetationKinds_ = static_cast<std::uint32_t>(trees.meshes.size());
     return true;
 }
@@ -1184,12 +1185,12 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
             PushData push{};
             push.model = glm::mat4(1.0f);
             push.model[3] = glm::vec4(glm::vec3(draw.origin - view.camera.position), 1.0f);
-            push.skin = glm::uvec4(0u, 0u, 1u, 0u); // trees stand on the ground
             for (std::uint32_t kind = 0; kind < vegetationKinds_; ++kind) {
                 if (cell.count[kind] == 0 || vegetationBase_ + kind >= meshes_.size()) {
                     continue;
                 }
                 const GpuMesh& mesh = meshes_[vegetationBase_ + kind];
+                push.skin = glm::uvec4(0u, 0u, ((vegetationUnblended_ >> kind) & 1u) != 0u ? 0u : 1u, 0u);
                 const std::array<VkBuffer, 2> buffers{mesh.vertices.buffer, cell.buffer.buffer};
                 const std::array<VkDeviceSize, 2> offsets{0, static_cast<VkDeviceSize>(cell.first[kind]) * sizeof(InstanceGpu)};
                 vkCmdBindVertexBuffers(cmd, 0, 2, buffers.data(), offsets.data());

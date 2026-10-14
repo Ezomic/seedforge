@@ -21,19 +21,27 @@ struct VegetationParams {
     float minHeight = 2.0f;   // metres above the height range's floor
     float maxHeight = 220.0f; // above this is the snow line
     float forestScale = 600.0f; // metres across a forest patch or a clearing
+    float rockSpacing = 9.0f;    // metres between the jittered grid points that rock candidates come from
+    float rockChance = 0.07f;    // the chance a candidate on level ground holds a rock
+    float rockSteepBoost = 0.55f; // added chance on steep ground, where rock shows through
     float bankMargin = 1.0f;  // metres above the world's water that trees keep clear of
 };
 
 // Kinds of vegetation, in the order of the meshes in treeBundle().
-enum class VegetationKind : std::uint32_t { Conifer = 0, Broadleaf = 1, Count };
+enum class VegetationKind : std::uint32_t { Conifer = 0, Broadleaf = 1, Rock = 2, Count };
 
-// Plants a cell. The result depends only on the world seed, the cell and the
+// The kinds whose bases are not blended into the ground colour when drawn: a rock is not a plant
+// rooted in the grass. A bit per kind, for the renderer.
+constexpr std::uint32_t vegetationUnblendedKinds() { return 1u << static_cast<std::uint32_t>(VegetationKind::Rock); }
+
+// Plants a cell: trees first, then rocks. The trees come out as they always did, whether or not
+// rocks are wanted, because each candidate has a generator of its own. The result depends only on the world seed, the cell and the
 // parameters, never on the order cells are asked for in, so a cell streamed in
 // twice grows the same trees and neighbours need not be loaded.
 void scatterVegetation(const Heightfield& heightfield, CellId id, const VegetationParams& params, std::vector<VegetationInstance>& out);
 
-// The tree meshes and their materials, built in code: a conifer of stacked cones
-// and a broadleaf crown, each over a trunk. Mesh index i is VegetationKind i.
+// The meshes and their materials, built in code: a conifer of stacked cones and a broadleaf
+// crown, each over a trunk, and a half-buried boulder. Mesh index i is VegetationKind i.
 SceneBundle treeBundle();
 
 }

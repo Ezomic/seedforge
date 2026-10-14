@@ -27,6 +27,14 @@ float forestDensity(double x, double z, float scale)
     return std::clamp((value - 0.25f) * 1.8f, 0.0f, 1.0f);
 }
 
+// Stone is never smooth: each corner of a rounded blob is pushed in or out by a repeatable amount.
+float rockiness(glm::vec3 corner)
+{
+    const auto q = [](float v) { return static_cast<std::uint64_t>(static_cast<std::int64_t>(std::lround(v * 1000.0f)) + 100000); };
+    const std::uint64_t h = hashCombine(hashCombine(q(corner.x), q(corner.y)), q(corner.z));
+    return 0.8f + 0.35f * static_cast<float>(h % 1000) / 999.0f;
+}
+
 struct Builder {
     Mesh mesh;
 
@@ -60,6 +68,30 @@ struct Builder {
         for (int i = 0; i < sides; ++i) {
             const std::uint32_t a = first + static_cast<std::uint32_t>(i) * 2;
             mesh.indices.insert(mesh.indices.end(), {a, a + 1, a + 2, a + 2, a + 1, a + 3});
+        }
+    }
+
+    // A boulder: the same rounded blob as a crown, lumpy, flattened, and set so it is half buried.
+    void boulder(float radius)
+    {
+        const glm::vec3 axes[6] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        const int faces[8][3] = {{0, 2, 4}, {4, 2, 1}, {1, 2, 5}, {5, 2, 0}, {4, 3, 0}, {1, 3, 4}, {5, 3, 1}, {0, 3, 5}};
+        for (const auto& face : faces) {
+            const glm::vec3 p0 = axes[face[0]];
+            const glm::vec3 p1 = axes[face[1]];
+            const glm::vec3 p2 = axes[face[2]];
+            const glm::vec3 m01 = glm::normalize(p0 + p1);
+            const glm::vec3 m12 = glm::normalize(p1 + p2);
+            const glm::vec3 m20 = glm::normalize(p2 + p0);
+            const glm::vec3 tris[4][3] = {{p0, m01, m20}, {m01, p1, m12}, {m20, m12, p2}, {m01, m12, m20}};
+            for (const auto& tri : tris) {
+                const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
+                for (const glm::vec3& corner : tri) {
+                    const float lump = rockiness(corner);
+                    vertex({corner.x * radius * lump, radius * 0.25f + corner.y * radius * 0.62f * lump, corner.z * radius * lump}, corner);
+                }
+                mesh.indices.insert(mesh.indices.end(), {base, base + 1, base + 2});
+            }
         }
     }
 
@@ -157,6 +189,41 @@ void scatterVegetation(const Heightfield& heightfield, CellId id, const Vegetati
             out.push_back(tree);
         }
     }
+
+    // Rocks, on a grid of their own with their own generators: more of them where the ground is steep.
+    const auto rockSteps = static_cast<int>(std::ceil(static_cast<float>(desc.cellMetres) / params.rockSpacing));
+    const std::uint64_t rockSeed = hashCombine(cellSeed, 0x726f636bULL);
+    for (int gz = 0; gz < rockSteps; ++gz) {
+        for (int gx = 0; gx < rockSteps; ++gx) {
+            Rng rng(hashCombine(rockSeed, static_cast<std::uint64_t>(gz) * 4096 + static_cast<std::uint64_t>(gx)));
+            const float localX = (static_cast<float>(gx) + rng.nextFloat()) * params.rockSpacing;
+            const float localZ = (static_cast<float>(gz) + rng.nextFloat()) * params.rockSpacing;
+            const float acceptRoll = rng.nextFloat();
+            const float yaw = rng.nextFloat() * kTwoPi;
+            const float sizeRoll = rng.nextFloat();
+            if (localX >= static_cast<float>(desc.cellMetres) || localZ >= static_cast<float>(desc.cellMetres)) {
+                continue;
+            }
+            const double worldX = originX + localX;
+            const double worldZ = originZ + localZ;
+            const float height = heightfield.heightAt(worldX, worldZ);
+            if (desc.hasWater() && height < desc.waterLevel() + params.bankMargin) {
+                continue;
+            }
+            const float slope = 1.0f - heightfield.normalAt(worldX, worldZ).y;
+            const float steep = std::clamp((slope - 0.12f) / 0.28f, 0.0f, 1.0f);
+            if (acceptRoll > params.rockChance + params.rockSteepBoost * steep * steep * (3.0f - 2.0f * steep)) {
+                continue;
+            }
+            VegetationInstance rock;
+            rock.position = {localX, height, localZ};
+            rock.yaw = yaw;
+            // Many small stones and a few big ones.
+            rock.scale = 0.4f + sizeRoll * sizeRoll * 2.4f;
+            rock.kind = static_cast<std::uint32_t>(VegetationKind::Rock);
+            out.push_back(rock);
+        }
+    }
 }
 
 SceneBundle treeBundle()
@@ -173,6 +240,7 @@ SceneBundle treeBundle()
     material("trunk", {0.30f, 0.19f, 0.10f}, 0.95f);
     material("conifer", {0.06f, 0.22f, 0.10f}, 0.9f);
     material("broadleaf", {0.16f, 0.34f, 0.08f}, 0.85f);
+    material("rock", {0.34f, 0.33f, 0.31f}, 0.95f);
 
     {
         Builder b = start("conifer");
@@ -189,6 +257,13 @@ SceneBundle treeBundle()
         const auto trunk = static_cast<std::uint32_t>(b.mesh.indices.size());
         b.crown(3.6f, 2.0f);
         bundle.meshes.push_back(finish(b, trunk, 2));
+    }
+    {
+        Builder b = start("rock");
+        b.boulder(1.0f);
+        Mesh mesh = std::move(b.mesh);
+        mesh.submeshes.push_back({0, static_cast<std::uint32_t>(mesh.indices.size()), 3});
+        bundle.meshes.push_back(std::move(mesh));
     }
     return bundle;
 }

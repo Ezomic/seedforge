@@ -30,8 +30,9 @@ void NullRenderer::removeTerrainCell(std::uint32_t cell)
     cells_.erase(cell);
 }
 
-bool NullRenderer::setVegetationMeshes(const SceneBundle& trees)
+bool NullRenderer::setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds)
 {
+    (void)unblendedKinds;
     return !trees.meshes.empty();
 }
 
