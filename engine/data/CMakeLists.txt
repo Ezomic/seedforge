@@ -4,6 +4,7 @@ add_library(ichor_data
     src/data_set.cpp
     src/npc_traits.cpp
     src/axiom.cpp
+    src/slot_roll.cpp
     src/conflicts.cpp
 )
 target_include_directories(ichor_data PUBLIC include)
