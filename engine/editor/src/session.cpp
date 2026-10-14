@@ -231,6 +231,17 @@ bool EditorSession::setTransform(StableId id, const Transform& transform)
     return true;
 }
 
+bool EditorSession::nudge(StableId id, glm::dvec3 offset)
+{
+    const auto before = stateOf(id);
+    if (!before || !std::isfinite(offset.x) || !std::isfinite(offset.y) || !std::isfinite(offset.z)) {
+        return false;
+    }
+    Transform moved = before->transform;
+    moved.position += offset;
+    return setTransform(id, moved);
+}
+
 void EditorSession::beginTransaction()
 {
     if (depth_++ == 0) {
