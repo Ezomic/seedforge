@@ -2,6 +2,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(ichor_data
     src/data_set.cpp
+    src/npc_traits.cpp
     src/axiom.cpp
 )
 target_include_directories(ichor_data PUBLIC include)
