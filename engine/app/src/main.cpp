@@ -2,6 +2,7 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
+#include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
@@ -239,6 +240,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     ichor::SceneBundle splashSounds;
     splashSounds.sounds.push_back(ichor::makeSplashClip());
+    splashSounds.sounds.push_back(ichor::makeRainClip());
     audio.addBundle(splashSounds);
 
     // The forged world, if there is one: its splat layers go to the renderer
@@ -290,6 +292,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t windupCue = audio.findSound("A_WindupLight");
     const std::uint32_t tellCue = audio.findSound("A_Tell");
     const std::uint32_t splashCue = audio.findSound("A_Splash");
+    const std::uint32_t rainBed = audio.findSound("A_Rain");
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -775,6 +778,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             audio.setReverb(reverb);
             lastReverb = reverb;
         }
+        audio.setAmbience(rainBed, ichor::rainAmbienceGain(weatherNow().rain));
         if (editing) {
             // New objects appear a few metres in front of the player.
             editorEnvironment.spawnAt = playerPosition(engine.scene()) + glm::dvec3(0.0, 0.0, -3.0);

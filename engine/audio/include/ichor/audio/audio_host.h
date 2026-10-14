@@ -24,6 +24,9 @@ public:
 
     // The gain scales the cue, 1 being the clip as cooked.
     virtual void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f) = 0;
+    // A looping, non-spatial bed under everything else. Calling it again only retargets the gain,
+    // which eases in, so it can be called every frame.
+    virtual void setAmbience(std::uint32_t sound, float gain) = 0;
     virtual void setListener(glm::dvec3 position, glm::quat rotation) = 0;
     virtual void setReverb(const ReverbSettings& settings) = 0;
 };
