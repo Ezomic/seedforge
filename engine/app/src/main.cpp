@@ -3,6 +3,7 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/reverb.h"
+#include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/editor/panels.h"
@@ -223,6 +224,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     audio.addBundle(bundle);
+    ichor::SceneBundle splashSounds;
+    splashSounds.sounds.push_back(ichor::makeSplashClip());
+    audio.addBundle(splashSounds);
 
     // The forged world, if there is one: its splat layers go to the renderer
     // and its cells stream around the player. The arena sits on a plateau at
@@ -272,6 +276,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t armClip = animations.findClip("wave");
     const std::uint32_t windupCue = audio.findSound("A_WindupLight");
     const std::uint32_t tellCue = audio.findSound("A_Tell");
+    const std::uint32_t splashCue = audio.findSound("A_Splash");
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -287,6 +292,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         });
     }
     engine.setAudio(&audio);
+    // The player's splashes are heard, not simulated: this reads the scene and never writes it.
+    if (waterField) {
+        engine.scene().addSystem("wading_splash", [&, splash = ichor::WadingSplash{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
+            for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+                const glm::dvec3& feet = transform.position;
+                if (const auto cue = splash.step(feet.x, feet.z, waterField->at(feet.x, feet.z).depth)) {
+                    audio.play(splashCue, feet, false, cue->gain);
+                }
+            }
+        });
+    }
 
     // Content scripts and the data layer. A broken script or data file is
     // logged and the game runs on without it; the watcher below reloads both.

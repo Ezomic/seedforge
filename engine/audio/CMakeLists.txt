@@ -12,6 +12,7 @@ add_library(ichor_audio
     src/mixer.cpp
     src/reverb.cpp
     src/null_audio.cpp
+    src/wading_splash.cpp
     src/miniaudio_device.cpp
 )
 target_include_directories(ichor_audio PUBLIC include)
