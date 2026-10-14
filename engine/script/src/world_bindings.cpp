@@ -43,6 +43,12 @@ void bindWorld(ScriptHost& host, WorldQueries queries)
     host.bind("hour", [shared](const std::vector<ScriptValue>&) -> ScriptValue {
         return shared->hour ? finite(shared->hour(), "hour") : 0.0;
     });
+    host.bind("overcast", [shared](const std::vector<ScriptValue>&) -> ScriptValue {
+        return shared->overcast ? finite(shared->overcast(), "overcast") : 0.0;
+    });
+    host.bind("rain", [shared](const std::vector<ScriptValue>&) -> ScriptValue {
+        return shared->rain ? finite(shared->rain(), "rain") : 0.0;
+    });
 }
 
 }
