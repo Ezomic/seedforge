@@ -13,5 +13,5 @@ struct PSIn {
 // the rasteriser does the depth test against the land.
 float4 main(PSIn i) : SV_Target
 {
-    return shadeWater(i.worldPos, i.clip.xy);
+    return shadeWater(i.worldPos, i.clip.xy, i.uv.x);
 }

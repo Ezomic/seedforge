@@ -16,8 +16,9 @@ float2 ripple(float2 p, float time, float distance)
 }
 
 // The colour and opacity of a point on a water surface. `position` is camera-relative, which is
-// also the view ray from the camera to the point.
-float4 shadeWater(float3 position, float2 pixel)
+// also the view ray from the camera to the point; `depth` is how far the surface stands over the
+// ground there, which softens the shore: clear and pale in the shallows, a thin band of foam at the edge.
+float4 shadeWater(float3 position, float2 pixel, float depth)
 {
     const float travelled = length(position);
     const float3 direction = position / max(travelled, 1e-4);
@@ -41,10 +42,19 @@ float4 shadeWater(float3 position, float2 pixel)
     const float3 reflection = sky + sunlight * glint * 40.0;
 
     // What lies below: the deep colour, lit by the sky and, a little, the sun.
-    const float3 body = frame.waterColor.rgb * (frame.ambient.rgb * 2.0 + sunlight * 0.06 * saturate(frame.sunDirection.y));
+    const float3 light = frame.ambient.rgb * 2.0 + sunlight * 0.06 * saturate(frame.sunDirection.y);
+    const float3 deep = frame.waterColor.rgb * light;
+    const float3 pale = frame.waterColor.rgb * 3.0 * light + float3(0.02, 0.035, 0.03) * light;
+    const float3 body = lerp(pale, deep, smoothstep(0.0, 2.0, depth));
 
-    float4 color = toneMap(applyFog(lerp(body, reflection, fresnel), position, pixel));
-    color.a = lerp(0.7, 1.0, fresnel);
+    float3 surface = lerp(body, reflection, fresnel);
+    // A band of foam where the water meets the bank.
+    const float foam = smoothstep(0.0, 0.04, depth) * (1.0 - smoothstep(0.08, 0.22, depth));
+    surface = lerp(surface, float3(0.9, 0.95, 1.0) * (frame.ambient.rgb * 3.0 + sunlight * 0.12), foam * 0.55);
+
+    float4 color = toneMap(applyFog(surface, position, pixel));
+    // Open water is nearly opaque at a glance; the shallows and the very edge clear to the bed.
+    color.a = lerp(0.7, 1.0, fresnel) * lerp(0.65, 1.0, smoothstep(0.0, 0.8, depth)) * smoothstep(0.0, 0.05, depth + 0.02);
     return color;
 }
 

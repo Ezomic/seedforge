@@ -25,7 +25,8 @@ WaterLevel waterLevelAtSample(const Heightfield& heightfield, const Hydrology& h
 // terrain's. Lakes lie at the level the flood filled them to, rivers a little over the channel
 // bed. Every quad with water at any corner is drawn; its dry corners are sunk below the ground,
 // so the surface ends where it meets the bank, at the true shoreline and not on the sample grid.
-// A cell with no water comes back with no vertices. The hydrology must be of this heightfield,
+// Each vertex carries in uv.x how far the surface stands over the ground there, zero or less at the
+// waterline and beyond. A cell with no water comes back with no vertices. The hydrology must be of this heightfield,
 // or the result is empty. A pure function of the ground, so a cell built twice is the same, and
 // neighbours agree along their shared edge.
 Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, CellId id, const WaterMeshParams& params = {});

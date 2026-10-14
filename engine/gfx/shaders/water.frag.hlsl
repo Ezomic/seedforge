@@ -30,7 +30,7 @@ PSOut main(PSIn i)
     }
 
     PSOut o;
-    o.color = shadeWater(position, i.clip.xy);
+    o.color = shadeWater(position, i.clip.xy, 100.0); // the sea is deep as far as the eye can tell
     o.depth = depth;
     return o;
 }

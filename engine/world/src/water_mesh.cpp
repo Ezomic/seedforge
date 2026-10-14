@@ -83,6 +83,9 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
             v.normal = {0.0f, 1.0f, 0.0f};
             v.tangent = {1.0f, 0.0f, 0.0f, 1.0f};
             v.weights[0] = 65535;
+            // How far the surface stands over the ground here, in metres; the shader fades, tints and foams the
+            // shore from it. Negative where the surface is sunk below the bank.
+            v.uv = {level[at] - heightfield.heightAtSample(firstX + i, firstZ + j), 0.0f};
             vertexOf[at] = static_cast<std::int64_t>(mesh.vertices.size());
             mesh.vertices.push_back(v);
         }
