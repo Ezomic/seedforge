@@ -3,6 +3,7 @@
 
 add_library(ichor_stage0
     src/combat.cpp
+    src/status_effect.cpp
     src/skirmisher.cpp
     src/recorder.cpp
 )
@@ -31,6 +32,7 @@ if(BUILD_TESTING)
     include(Catch)
     add_executable(stage0_tests
         tests/test_fight.cpp
+        tests/test_status_effect.cpp
     )
     target_link_libraries(stage0_tests PRIVATE ichor_stage0 ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain)
     catch_discover_tests(stage0_tests)

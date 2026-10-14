@@ -8,7 +8,7 @@ namespace ichor::stage0 {
 
 // Stamped by the state machine at the killing blow, never reconstructed later.
 // The distribution is the diagnosis (doc 18, stage0-log.md section 4).
-enum class DeathCause : std::uint8_t { Unknown, OutOfStamina, WhiffPunished, Cornered, MistimedBlock, OffScreen, Unreadable };
+enum class DeathCause : std::uint8_t { Unknown, OutOfStamina, WhiffPunished, Cornered, MistimedBlock, OffScreen, Unreadable, Bleed };
 
 struct SideRecord {
     float healthLeft = 0.0f;
