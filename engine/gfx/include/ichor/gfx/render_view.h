@@ -114,6 +114,7 @@ struct RenderView {
     glm::vec3 groundColor{0.1f, 0.16f, 0.06f}; // linear colour of the ground, for blending objects into it
     float groundBlendHeight = 0.0f;            // metres up an object the blend reaches; zero is off
     MaterialResponse response;
+    float cloudCover = 0.0f;             // 0 is a clear sky, 1 solid cloud; the sky draws a drifting layer of it
     float lightShafts = 0.0f;            // how strongly the sun scatters in the fog where the shadows let it through; zero is off
     // A flat sheet of water at one height, over the whole world. Seen only from above.
     bool waterEnabled = false;

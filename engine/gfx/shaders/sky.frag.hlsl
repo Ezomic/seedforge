@@ -5,6 +5,31 @@ struct PSIn {
     float3 direction : TEXCOORD0;
 };
 
+float hash12(float2 p)
+{
+    return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+}
+
+float valueNoise(float2 p)
+{
+    const float2 cell = floor(p);
+    const float2 f = frac(p);
+    const float2 u = f * f * (3.0 - 2.0 * f);
+    return lerp(lerp(hash12(cell), hash12(cell + float2(1, 0)), u.x), lerp(hash12(cell + float2(0, 1)), hash12(cell + float2(1, 1)), u.x), u.y);
+}
+
+float cloudNoise(float2 p)
+{
+    float sum = 0.0;
+    float amplitude = 0.5;
+    for (int octave = 0; octave < 5; ++octave) {
+        sum += valueNoise(p) * amplitude;
+        p = p * 2.03 + 17.0;
+        amplitude *= 0.5;
+    }
+    return sum;
+}
+
 float hash13(float3 p)
 {
     return frac(sin(dot(p, float3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -40,9 +65,23 @@ float4 main(PSIn i) : SV_Target
     float3 color = lerp(frame.skyHorizon.rgb, frame.skyZenith.rgb, pow(saturate(up), 0.45));
     color = lerp(color, frame.skyHorizon.rgb * 0.45, saturate(-up * 3.0));
 
-    // Stars come out as the zenith darkens, and fade into the haze towards the horizon.
+    // How dark the sky is: zero by day, one in the dead of night.
     const float zenithLuma = dot(frame.skyZenith.rgb, float3(0.2126, 0.7152, 0.0722));
     const float night = 1.0 - smoothstep(0.02, 0.12, zenithLuma);
+
+    // A layer of cloud, seen in perspective so it thins to the horizon, drifting with the wind.
+    const float cover = frame.shaftParams.z;
+    if (cover > 0.0 && up > 0.0) {
+        const float2 plane = dir.xz / (up + 0.2) * 0.9 + frame.wind.xy * frame.skyParams.z * 0.03;
+        const float shape = cloudNoise(plane);
+        const float density = smoothstep(1.0 - cover, 1.0 - cover + 0.18, shape) * smoothstep(0.0, 0.3, up);
+        // Lit from above by the sun and the sky, so it is white by day, dark under a storm and at night.
+        const float3 lit = frame.sunColor.rgb * frame.sunColor.w * 0.18 * saturate(frame.sunDirection.y + 0.2) + frame.ambient.rgb * 1.6 + 0.04;
+        const float3 cloudColor = lit * lerp(1.0, 0.55, saturate(density * cover)) * lerp(1.0, 0.3, night);
+        color = lerp(color, cloudColor, density * 0.92);
+    }
+
+    // Stars come out as the zenith darkens, and fade into the haze towards the horizon.
     if (night > 0.0 && up > 0.0) {
         color += stars(dir, frame.skyParams.z) * night * smoothstep(0.0, 0.2, up) * 2.5;
     }

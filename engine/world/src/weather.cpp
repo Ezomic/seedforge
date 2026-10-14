@@ -72,6 +72,7 @@ void applyWeather(const Weather& weather, Atmosphere& atmosphere)
     atmosphere.fogDensity *= 1.0f + 3.0f * cloud + 5.0f * weather.rain;
     atmosphere.rain = weather.rain;
     atmosphere.lightShafts *= 1.0f - cloud;
+    atmosphere.cloudCover += (1.0f - atmosphere.cloudCover) * cloud;
     // Storms blow: the breeze of a clear day grows to a gale under solid cloud.
     atmosphere.windStrength = std::clamp(atmosphere.windStrength + (1.0f - atmosphere.windStrength) * cloud * cloud, 0.0f, 1.0f);
 }
