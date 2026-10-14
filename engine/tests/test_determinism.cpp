@@ -1,7 +1,10 @@
 #include "ichor/core/hash.h"
+#include "ichor/core/input.h"
+#include "ichor/core/rng.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
+#include "ichor/sim/scene.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/hydrology.h"
 #include "ichor/world/hydrology_cache.h"
@@ -9,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -47,15 +51,48 @@ WorldDesc worldFor(std::uint64_t seed)
 {
     WorldDesc desc;
     desc.seed = seed;
-    desc.sizeMetres = 512;
+    desc.sizeMetres = 1024;
     desc.metresPerSample = 8;
-    desc.cellMetres = 128;
+    desc.cellMetres = 256;
     return desc;
 }
 
 std::uint64_t hashBytes(const std::vector<std::uint8_t>& bytes)
 {
     return hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+}
+
+// A scene with ground, a wall and a character, walked by seeded random input: physics, movement and
+// the scene's own state hash, which an empty scene would leave almost untouched.
+std::uint64_t walkedSceneHash(std::uint64_t seed)
+{
+    Scene scene(seed);
+    SpawnCommand ground;
+    ground.id = StableId::of("ground");
+    ground.transform.position = {0.0, -0.5, 0.0};
+    ground.staticBox = StaticBox{glm::vec3(20.0f, 0.5f, 20.0f)};
+    scene.enqueue(ground);
+    SpawnCommand wall;
+    wall.id = StableId::of("wall");
+    wall.transform.position = {3.0, 1.0, 0.0};
+    wall.staticBox = StaticBox{glm::vec3(0.5f, 1.0f, 10.0f)};
+    scene.enqueue(wall);
+    SpawnCommand hero;
+    hero.id = StableId::of("hero");
+    hero.transform.position = {0.0, 3.0, 0.0};
+    hero.player = Player{4.0f};
+    hero.character = CharacterBody{0.3f, 0.6f};
+    scene.enqueue(hero);
+
+    Rng rng(seed);
+    for (int i = 0; i < kFrames * 2; ++i) {
+        InputFrame frame;
+        frame.moveX = static_cast<float>(rng.range(0, 2)) - 1.0f;
+        frame.moveY = static_cast<float>(rng.range(0, 2)) - 1.0f;
+        frame.buttons = rng.range(0, 1) * InputFrame::Sprint;
+        scene.tick(1.0 / 60.0, frame);
+    }
+    return scene.stateHash();
 }
 
 std::uint64_t headlessStateHash(std::uint64_t seed)
@@ -70,7 +107,7 @@ std::uint64_t headlessStateHash(std::uint64_t seed)
     for (int i = 0; i < kFrames; ++i) {
         REQUIRE(engine.frame(config.fixedDt));
     }
-    return engine.scene().stateHash();
+    return hashCombine(engine.scene().stateHash(), walkedSceneHash(seed));
 }
 
 Observed observe(std::uint64_t seed)
@@ -79,6 +116,7 @@ Observed observe(std::uint64_t seed)
     REQUIRE_FALSE(field.empty());
     const Hydrology hydrology = computeHydrology(field);
     REQUIRE_FALSE(hydrology.empty());
+    REQUIRE(*std::ranges::max_element(hydrology.accumulation) > 100); // a digest of a trivial result would pin nothing
     return {field.digest(), hashBytes(encodeHydrologyCache(field, hydrology)), headlessStateHash(seed)};
 }
 
@@ -113,9 +151,8 @@ std::vector<std::string> compare(const std::string& text, const Observations& al
     if (root.is_discarded() || !root.is_object() || !root.contains("seeds") || !root["seeds"].is_object()) {
         return {std::format("determinism.json is not a valid expectations file. {}", kRegenerate)};
     }
-    const int recordedFrames = root.value("frames", 0);
-    if (recordedFrames != kFrames) {
-        return {std::format("determinism.json was recorded for {} frames but the test runs {}. {}", recordedFrames, kFrames, kRegenerate)};
+    if (!root.contains("frames") || !root["frames"].is_number_integer() || root["frames"].get<int>() != kFrames) {
+        return {std::format("determinism.json was not recorded for {} frames. {}", kFrames, kRegenerate)};
     }
 
     std::vector<std::string> problems;
@@ -133,6 +170,12 @@ std::vector<std::string> compare(const std::string& text, const Observations& al
                 problems.push_back(std::format("seed {}: the {} {} moved: expected {} but got {}. {}", seed, name,
                     std::string(name) == "state" ? "hash" : "digest", want, hex(actual), kRegenerate));
             }
+        }
+    }
+    for (const auto& [key, value] : root["seeds"].items()) {
+        const bool known = std::ranges::any_of(all, [&](const auto& seen) { return std::to_string(seen.first) == key; });
+        if (!known) {
+            problems.push_back(std::format("seed {}: determinism.json has values for a seed the test no longer runs. {}", key, kRegenerate));
         }
     }
     return problems;
@@ -155,6 +198,7 @@ TEST_CASE("determinism: the forged world and the simulation match the checked-in
 
     const char* update = std::getenv("ICHOR_UPDATE_DETERMINISM");
     if (update != nullptr && update[0] == '1') {
+        REQUIRE(std::getenv("CI") == nullptr); // CI must compare, never rewrite the expectations
         std::ofstream out(kExpectedPath, std::ios::binary | std::ios::trunc);
         out << render(all);
         REQUIRE(static_cast<bool>(out));
@@ -182,7 +226,11 @@ TEST_CASE("determinism: observing a seed twice gives the same values")
         REQUIRE(a.hydrology == b.hydrology);
         REQUIRE(a.state == b.state);
     }
-    REQUIRE(observe(1).heightfield != observe(42).heightfield);
+    const Observed one = observe(1);
+    const Observed other = observe(42);
+    REQUIRE(one.heightfield != other.heightfield);
+    REQUIRE(one.hydrology != other.hydrology);
+    REQUIRE(one.state != other.state);
 }
 
 TEST_CASE("determinism: a moved value, a missing seed and a broken file are each reported by name, not crashed on")
@@ -208,10 +256,15 @@ TEST_CASE("determinism: a moved value, a missing seed and a broken file are each
     extra.emplace_back(7, all[0].second);
     REQUIRE(compare(good, extra)[0].find("seed 7: no expected values") != std::string::npos);
 
+    Observations fewer = all;
+    fewer.pop_back();
+    REQUIRE(compare(good, fewer)[0].find("no longer runs") != std::string::npos);
+
     REQUIRE(compare("", all).size() == 1);
     REQUIRE(compare("{not json", all).size() == 1);
     REQUIRE(compare("[]", all).size() == 1);
     REQUIRE(compare("{\"seeds\": 3}", all).size() == 1);
     REQUIRE_FALSE(compare("{\"frames\": 120, \"seeds\": {\"0\": {\"heightfield\": 5}}}", all).empty());
-    REQUIRE(compare("{\"frames\": 7, \"seeds\": {}}", all)[0].find("recorded for 7 frames") != std::string::npos);
+    REQUIRE(compare("{\"frames\": \"120\", \"seeds\": {}}", all).size() == 1);
+    REQUIRE(compare("{\"frames\": 7, \"seeds\": {}}", all)[0].find("not recorded for 120 frames") != std::string::npos);
 }
