@@ -209,10 +209,13 @@ public:
         if (!expect(json, path, json.is_number(), "a number")) {
             return false;
         }
-        const double value = json.get<double>();
+        double value = json.get<double>();
         if (!std::isfinite(value)) {
             add(path, "must be finite");
             return false;
+        }
+        if (value == 0.0) {
+            value = 0.0; // -0.0 would digest differently from 0.0
         }
         if (nonNegative && value < 0.0) {
             add(path, "must not be negative");
@@ -501,9 +504,26 @@ bool parseAxiom(std::string_view label, std::string_view text, Axiom& out, std::
     if (nestsTooDeep(text)) {
         return fail("nested deeper than " + std::to_string(kMaxDepth) + " levels");
     }
-    const Json json = Json::parse(text.begin(), text.end(), nullptr, false);
+    // The parser keeps the last of two equal keys; a duplicate is an authoring mistake, so it is refused.
+    std::vector<std::set<std::string>> keysByDepth;
+    std::string duplicate;
+    const Json json = Json::parse(
+        text.begin(), text.end(),
+        [&](int depth, Json::parse_event_t event, Json& parsed) {
+            if (event == Json::parse_event_t::object_start) {
+                keysByDepth.resize(std::max(keysByDepth.size(), static_cast<std::size_t>(depth) + 2));
+                keysByDepth[static_cast<std::size_t>(depth) + 1].clear();
+            } else if (event == Json::parse_event_t::key && !keysByDepth[static_cast<std::size_t>(depth)].insert(parsed.get<std::string>()).second && duplicate.empty()) {
+                duplicate = parsed.get<std::string>().substr(0, 40);
+            }
+            return true;
+        },
+        false);
     if (json.is_discarded()) {
         return fail("not valid JSON");
+    }
+    if (!duplicate.empty()) {
+        return fail("duplicate key \"" + duplicate + "\"");
     }
     if (!json.is_object()) {
         return fail("expected an object, got " + std::string(typeName(json)));
@@ -564,8 +584,9 @@ bool parseAxiom(std::string_view label, std::string_view text, Axiom& out, std::
             check.block(*it, spec, axiom);
         }
     }
-    if (axiom.blocks.size() < kMinBlocks) {
-        check.add("blocks", "an axiom must touch at least " + std::to_string(kMinBlocks) + " directive blocks, found " + std::to_string(axiom.blocks.size()));
+    const auto present = static_cast<std::size_t>(std::count_if(blockSpecs().begin(), blockSpecs().end(), [&](const BlockSpec& spec) { return json.contains(spec.name); }));
+    if (present < kMinBlocks) {
+        check.add("blocks", "an axiom must touch at least " + std::to_string(kMinBlocks) + " directive blocks, found " + std::to_string(present));
     }
 
     if (problems.size() != before) {

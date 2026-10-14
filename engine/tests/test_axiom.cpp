@@ -221,11 +221,34 @@ TEST_CASE("every field missing and every field mistyped reports every problem")
     REQUIRE(missing.size() == 6);
 
     const auto wrong = check(R"({"id": 1, "slot": 2, "title": 3, "tags": 4, "conflicts": 5, "terrain": 6, "settlement": [], "biomes": "x", "poi": null})");
-    REQUIRE(wrong.size() >= 9);
+    REQUIRE(wrong.size() == 9);
     REQUIRE(mentions(wrong, "id: expected a string, got number"));
     REQUIRE(mentions(wrong, "conflicts: expected an array, got number"));
     REQUIRE(mentions(wrong, "settlement: expected an object, got array"));
     REQUIRE(mentions(wrong, "poi: expected an object, got null"));
+}
+
+TEST_CASE("a bad key in a block does not also trigger the block count rule")
+{
+    const auto problems = check(with("\"coastal_erosion\"", "\"erosion\""));
+    REQUIRE(problems.size() == 1);
+}
+
+TEST_CASE("duplicate keys are errors at every level")
+{
+    REQUIRE(mentions(check(with("\"slot\": \"cataclysm\",", "\"slot\": \"law\", \"slot\": \"cataclysm\",")), "duplicate key \"slot\""));
+    REQUIRE(mentions(check(with("\"palette\":", "\"terrain\": {\"coastal_erosion\": 1}, \"palette\":")), "duplicate key \"terrain\""));
+    REQUIRE(mentions(check(with("\"pharos\": 2.0,", "\"pharos\": 2.0, \"pharos\": 3.0,")), "duplicate key \"pharos\""));
+    REQUIRE(check(with("\"inject\"", "\"inject\"")).empty());
+}
+
+TEST_CASE("negative zero digests like zero")
+{
+    Axiom a;
+    Axiom b;
+    REQUIRE(check(with("\"coastal_erosion\": 2.4", "\"coastal_erosion\": 0"), &a).empty());
+    REQUIRE(check(with("\"coastal_erosion\": 2.4", "\"coastal_erosion\": -0.0"), &b).empty());
+    REQUIRE(axiomDigest(a) == axiomDigest(b));
 }
 
 TEST_CASE("files that are not an axiom object are rejected cleanly")
