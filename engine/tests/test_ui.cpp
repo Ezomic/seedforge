@@ -635,6 +635,28 @@ TEST_CASE("the pause menu draws nothing until shown, and its buttons report clic
     REQUIRE(menu.takeQuit());
     REQUIRE_FALSE(menu.takeResume());
 
+    // The field of view buttons report their clicks as steps, once, and the label follows what the owner sets.
+    const auto fovDown = menu.fovDownCentre();
+    const auto fovUp = menu.fovUpCentre();
+    REQUIRE(fovDown.has_value());
+    REQUIRE(fovUp.has_value());
+    REQUIRE(fovDown->first < fovUp->first);
+    REQUIRE(menu.takeFovSteps() == 0);
+    click(*fovUp, 0.35);
+    click(*fovUp, 0.36);
+    click(*fovDown, 0.37);
+    REQUIRE(menu.takeFovSteps() == 1);
+    REQUIRE(menu.takeFovSteps() == 0);
+    click(*fovDown, 0.38);
+    REQUIRE(menu.takeFovSteps() == -1);
+    menu.setFovDegrees(std::numeric_limits<float>::quiet_NaN()); // ignored, not drawn
+    menu.setFovDegrees(85.0f);
+    frame(ui, renderer, 0.39);
+    click(*fovUp, 0.395);
+    menu.setVisible(false);
+    menu.setVisible(true);
+    REQUIRE(menu.takeFovSteps() == 0); // a click from an earlier showing is not a click now
+
     // A click left over from before the menu was hidden does not count when it is shown again.
     click(*quit, 0.4);
     menu.setVisible(false);

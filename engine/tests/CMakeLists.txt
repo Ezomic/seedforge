@@ -31,6 +31,7 @@ add_executable(ichor_tests
     test_weather.cpp
     test_ui.cpp
     test_save.cpp
+    test_settings.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
     ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain
