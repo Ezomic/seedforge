@@ -15,14 +15,41 @@ float2 ripple(float2 p, float time, float distance)
     return slope * 0.05 * rcp(1.0 + distance * 0.02);
 }
 
+// Slope of a river's surface: ridges that run across the current and travel down it. `flow` is the
+// current on the ground plane, its length how much of a river there is (zero on lakes and sea).
+// Pure in the position, the flow and the time: a phase is kept in cycles and wrapped, so neither a
+// far camera nor a long session costs it precision, and the time the caller keeps under an hour
+// holds each layer's frequency to whole cycles, so it does not jump when that wraps. Each layer fades out
+// with distance, where it would only shimmer.
+float2 riverRipple(float2 relative, float2 cameraWorld, float2 flow, float time, float distance)
+{
+    const float strength = saturate(length(flow));
+    // The finer ridges give out sooner than the coarse ones, which are wider than a pixel for longer.
+    const float coarseFade = 1.0 - smoothstep(6.0, 40.0, distance);
+    const float fineFade = 1.0 - smoothstep(2.0, 14.0, distance);
+    if (strength * coarseFade <= 0.0) {
+        return 0.0;
+    }
+    const float2 along = flow / max(length(flow), 1e-4);
+    const float2 across = float2(-along.y, along.x);
+    // A swell cycle every 1.6 m moving 0.8 m/s, and a finer one every 0.9 m moving a little slower.
+    const float coarse = dot(relative, along) / 1.6 + frac(dot(cameraWorld, along) / 1.6) - frac(time * 0.5);
+    const float fine = dot(relative, along) / 0.9 + frac(dot(cameraWorld, along) / 0.9) - frac(time * 0.75);
+    // The ridges are broken up across the current, so they read as water and not as corduroy.
+    const float breakup = 0.65 + 0.35 * sin(6.2831853 * (dot(relative, across) / 3.1 + frac(dot(cameraWorld, across) / 3.1)));
+    const float wave = cos(6.2831853 * coarse) * 0.7 * coarseFade + cos(6.2831853 * fine) * 0.4 * fineFade;
+    return along * wave * breakup * strength * 0.3;
+}
+
 // The colour and opacity of a point on a water surface. `position` is camera-relative, which is
 // also the view ray from the camera to the point; `depth` is how far the surface stands over the
 // ground there, which softens the shore: clear and pale in the shallows, a thin band of foam at the edge.
-float4 shadeWater(float3 position, float2 pixel, float depth)
+float4 shadeWater(float3 position, float2 pixel, float depth, float2 flow = 0.0)
 {
     const float travelled = length(position);
     const float3 direction = position / max(travelled, 1e-4);
-    const float2 slope = ripple(position.xz + frame.cameraWorld.xz, frame.skyParams.z, travelled);
+    float2 slope = ripple(position.xz + frame.cameraWorld.xz, frame.skyParams.z, travelled);
+    slope += riverRipple(position.xz, frame.cameraWorld.xz, flow, frame.skyParams.z, travelled);
     float3 normal = normalize(float3(-slope.x, 1.0, -slope.y));
     const float3 view = -direction;
     // A surface seen from underneath, such as a river on a hillside above the viewer, is shaded

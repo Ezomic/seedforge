@@ -383,3 +383,70 @@ TEST_CASE("each vertex carries how far the surface stands over the ground: over 
     }
     REQUIRE(riverVertices > 0);
 }
+
+namespace {
+
+std::uint16_t valleyRunningEast(std::uint32_t x, std::uint32_t z)
+{
+    const std::uint32_t across = z > 8 ? z - 8 : 8 - z;
+    return static_cast<std::uint16_t>(2000 + (16 - x) * 5 + across * 100);
+}
+
+}
+
+TEST_CASE("the flow of a river points downstream, and is nothing on dry ground, lakes and outside the world")
+{
+    const Heightfield field = gridOf(17, valleyRunningEast);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 3;
+    rivers.maxHalfWidth = 0.0f;
+    const glm::vec2 mid = riverFlowAtSample(field, h, rivers, 8, 8);
+    REQUIRE(mid.x > 0.9f);
+    REQUIRE(std::abs(mid.y) < 0.1f);
+    REQUIRE(glm::length(mid) <= 1.0f + 1e-5f);
+    REQUIRE(riverFlowAtSample(field, h, rivers, 8, 1) == glm::vec2(0.0f));
+    REQUIRE(riverFlowAtSample(field, h, rivers, -1, 8) == glm::vec2(0.0f));
+    REQUIRE(riverFlowAtSample(field, h, rivers, 8, 17) == glm::vec2(0.0f));
+    REQUIRE(riverFlowAtSample(field, Hydrology{}, rivers, 8, 8) == glm::vec2(0.0f));
+
+    const Heightfield basin = gridOf(17, basinWorld);
+    const Hydrology wet = computeHydrology(basin);
+    HydrologyParams lakesOnly;
+    lakesOnly.riverThreshold = 100000;
+    REQUIRE(riverFlowAtSample(basin, wet, lakesOnly, 8, 8) == glm::vec2(0.0f));
+}
+
+TEST_CASE("river vertices carry a finite unit flow direction and its strength; lakes carry none")
+{
+    const Heightfield field = gridOf(17, valleyRunningEast);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 3;
+    const Mesh river = buildWaterMesh(field, h, rivers, {0, 0});
+    REQUIRE_FALSE(river.vertices.empty());
+    bool flowing = false;
+    for (const Vertex& v : river.vertices) {
+        REQUIRE(v.tangent.y == 0.0f);
+        REQUIRE(std::isfinite(v.tangent.x));
+        REQUIRE(std::isfinite(v.tangent.w));
+        REQUIRE(std::hypot(v.tangent.x, v.tangent.z) == Approx(1.0f).margin(1e-5));
+        REQUIRE(v.tangent.w >= 0.0f);
+        REQUIRE(v.tangent.w <= 1.0f + 1e-5f);
+        if (v.tangent.w > 0.5f) {
+            flowing = true;
+            REQUIRE(v.tangent.x > 0.5f);
+        }
+    }
+    REQUIRE(flowing);
+
+    const Heightfield basin = gridOf(17, basinWorld);
+    HydrologyParams lakesOnly;
+    lakesOnly.riverThreshold = 100000;
+    const Mesh lake = buildWaterMesh(basin, computeHydrology(basin), lakesOnly, {0, 0});
+    REQUIRE_FALSE(lake.vertices.empty());
+    for (const Vertex& v : lake.vertices) {
+        REQUIRE(v.tangent.w == 0.0f);
+        REQUIRE(std::hypot(v.tangent.x, v.tangent.z) == Approx(1.0f).margin(1e-5));
+    }
+}

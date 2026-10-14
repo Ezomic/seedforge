@@ -62,6 +62,43 @@ std::optional<float> waterAt(const Heightfield& heightfield, const Hydrology& hy
 
 }
 
+glm::vec2 riverFlowAtSample(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, std::int64_t gx, std::int64_t gz)
+{
+    if (hydrology.empty() || gx < 0 || gz < 0 || gx >= hydrology.side || gz >= hydrology.side) {
+        return {0.0f, 0.0f};
+    }
+    const auto x = static_cast<std::uint32_t>(gx);
+    const auto z = static_cast<std::uint32_t>(gz);
+    if (hydrology.lake[hydrology.index(x, z)] != 0 || isLake(hydrology, heightfield, x, z, rivers)) {
+        return {0.0f, 0.0f};
+    }
+    const auto spacing = static_cast<float>(heightfield.desc().metresPerSample);
+    const auto reach = static_cast<std::int64_t>(riverHalfWidth(std::numeric_limits<std::uint32_t>::max(), rivers) / spacing);
+    glm::vec2 sum{0.0f, 0.0f};
+    int covering = 0;
+    for (std::int64_t dz = std::max<std::int64_t>(-reach, -gz); dz <= reach && gz + dz < hydrology.side; ++dz) {
+        for (std::int64_t dx = std::max<std::int64_t>(-reach, -gx); dx <= reach && gx + dx < hydrology.side; ++dx) {
+            const std::size_t at = hydrology.index(static_cast<std::uint32_t>(gx + dx), static_cast<std::uint32_t>(gz + dz));
+            if (hydrology.lake[at] != 0 || !isRiver(hydrology, at, rivers)) {
+                continue;
+            }
+            const float across = static_cast<float>(dx) * spacing;
+            const float along = static_cast<float>(dz) * spacing;
+            const float half = riverHalfWidth(hydrology.accumulation[at], rivers);
+            if (across * across + along * along > half * half) {
+                continue;
+            }
+            ++covering;
+            const std::size_t next = hydrology.downstream(at);
+            const glm::vec2 step{static_cast<float>(static_cast<std::int64_t>(next % hydrology.side) - (gx + dx)), static_cast<float>(static_cast<std::int64_t>(next / hydrology.side) - (gz + dz))};
+            if (glm::dot(step, step) > 0.0f) {
+                sum += glm::normalize(step);
+            }
+        }
+    }
+    return covering == 0 ? glm::vec2{0.0f, 0.0f} : sum / static_cast<float>(covering);
+}
+
 WaterLevel waterLevelAtSample(const Heightfield& heightfield, const Hydrology& hydrology, const HydrologyParams& rivers, const WaterMeshParams& params, std::int64_t gx, std::int64_t gz)
 {
     if (const auto water = waterAt(heightfield, hydrology, rivers, params, gx, gz)) {
@@ -116,7 +153,10 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
             Vertex v{};
             v.position = {static_cast<float>(i) * spacing, level[at], static_cast<float>(j) * spacing};
             v.normal = {0.0f, 1.0f, 0.0f};
-            v.tangent = {1.0f, 0.0f, 0.0f, 1.0f};
+            const glm::vec2 flow = riverFlowAtSample(heightfield, hydrology, rivers, static_cast<std::int64_t>(firstX) + i, static_cast<std::int64_t>(firstZ) + j);
+            const float strength = glm::length(flow);
+            const glm::vec2 along = strength > 1e-4f ? flow / strength : glm::vec2{1.0f, 0.0f};
+            v.tangent = {along.x, 0.0f, along.y, strength > 1e-4f ? strength : 0.0f};
             v.weights[0] = 65535;
             // How far the surface stands over the ground here, in metres; the shader fades, tints and foams the
             // shore from it. Negative where the surface is sunk below the bank.
