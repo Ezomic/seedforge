@@ -41,10 +41,11 @@ ScheduleParse parseSchedule(const std::vector<std::string>& entries);
 // Reads the "entries" list field of a record in the "schedules" table.
 ScheduleParse scheduleFromRecord(const DataRecord& record);
 
-ScheduleState stateAtMinute(const Schedule& schedule, int minuteOfDay);
+// The minute wraps modulo a day. An empty schedule has no answer.
+std::optional<ScheduleState> stateAtMinute(const Schedule& schedule, int minuteOfDay);
 
 // The hour wraps modulo 24, negative and huge values included. An hour that
-// is not finite has no answer.
+// is not finite, or an empty schedule, has no answer.
 std::optional<ScheduleState> stateAt(const Schedule& schedule, double hour);
 
 std::string canonicalForm(const Schedule& schedule);

@@ -19,7 +19,7 @@ std::string inQuotes(std::string_view text)
 
 bool parseDigits(std::string_view text, int& out)
 {
-    if (text.empty() || text.size() > 2) {
+    if (text.size() != 2) {
         return false;
     }
     int value = 0;
@@ -120,9 +120,12 @@ ScheduleParse scheduleFromRecord(const DataRecord& record)
     return result;
 }
 
-ScheduleState stateAtMinute(const Schedule& schedule, int minuteOfDay)
+std::optional<ScheduleState> stateAtMinute(const Schedule& schedule, int minuteOfDay)
 {
-    const int minute = std::clamp(minuteOfDay, 0, kMinutesPerDay - 1);
+    if (schedule.entries.empty()) {
+        return std::nullopt;
+    }
+    const int minute = ((minuteOfDay % kMinutesPerDay) + kMinutesPerDay) % kMinutesPerDay;
     const auto after = std::upper_bound(schedule.entries.begin(), schedule.entries.end(), minute,
         [](int value, const ScheduleEntry& entry) { return value < entry.startMinute; });
     return after == schedule.entries.begin() ? schedule.entries.back().state : std::prev(after)->state;
@@ -137,6 +140,9 @@ std::optional<ScheduleState> stateAt(const Schedule& schedule, double hour)
     double wrapped = std::fmod(hour, 24.0);
     if (wrapped < 0.0) {
         wrapped += 24.0;
+    }
+    if (wrapped >= 24.0) {
+        wrapped = 0.0; // a tiny negative hour rounds up to exactly 24
     }
     return stateAtMinute(schedule, static_cast<int>(wrapped * 60.0));
 }
