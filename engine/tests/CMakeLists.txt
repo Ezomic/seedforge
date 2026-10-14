@@ -4,6 +4,7 @@ include(Catch)
 
 add_executable(ichor_tests
     test_hash.cpp
+    test_entity_id.cpp
     test_rng.cpp
     test_fixed_step.cpp
     test_headless_boot.cpp
