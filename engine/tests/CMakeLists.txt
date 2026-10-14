@@ -33,6 +33,7 @@ add_executable(ichor_tests
     test_axiom.cpp
     test_slot_roll.cpp
     test_conflicts.cpp
+    test_directive_merge.cpp
     test_atmosphere.cpp
     test_vegetation.cpp
     test_hydrology.cpp
