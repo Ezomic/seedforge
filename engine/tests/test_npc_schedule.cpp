@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <string>
 #include <vector>
@@ -205,7 +206,7 @@ TEST_CASE("the state depends only on the hour, never on history", "[npc][schedul
     REQUIRE(transitions > 15);
 
     // Arriving after a skip evaluates the same as having watched every tick.
-    for (std::uint64_t arrival : {0ull, 1ull, 4999ull, 123456ull, kTicks}) {
+    for (std::uint64_t arrival : std::initializer_list<std::uint64_t>{0, 1, 4999, 123456, kTicks}) {
         REQUIRE(*stateAt(day, hourAt(arrival)) == reference(hourAt(arrival)));
     }
 }
