@@ -162,6 +162,7 @@ MapScreen::MapScreen(UiContext& ui)
         || dynamic_cast<MapMarker*>(marker_) == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
+        close_ = frame_ = picture_ = marker_ = empty_ = nullptr;
         return;
     }
     close_->AddEventListener("click", &click_);

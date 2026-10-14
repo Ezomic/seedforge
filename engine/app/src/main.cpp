@@ -553,7 +553,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     if (ui) {
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
-        if (options.showMap) {
+        if (options.showMap && !editing) {
             mapScreen->setVisible(true);
         }
         // The simulation clock drives the UI, so a replay sees the same animations.
@@ -684,8 +684,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         // The journal is only a view, so it works in a replay too.
         const bool menu = (buttons & ichor::InputFrame::Menu) != 0;
         if (menu && !menuHeld && pauseMenu) {
-            paused = !paused;
-            pauseMenu->setVisible(paused);
+            if (mapScreen && mapScreen->visible()) {
+                mapScreen->setVisible(false); // Esc first puts the map away
+            } else {
+                paused = !paused;
+                pauseMenu->setVisible(paused);
+            }
         }
         menuHeld = menu;
         // A map in view holds the world still, as a pause does, so the player is not moved from behind it.

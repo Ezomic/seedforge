@@ -146,6 +146,10 @@ TEST_CASE("moving the marker while shown keeps drawing, and a steady one costs n
     map.setPlayer({0.8f, 0.4f}, 2.0f);
     frame(f.ui, f.renderer, 0.1);
     REQUIRE(f.renderer.draws().size() == first);
+    const float moved = map.markerPoint().u;
+    REQUIRE(moved == Approx(0.8f));
+    map.setPlayer({0.8f, 0.4f}, 2.0f);
+    REQUIRE(map.markerPoint().u == moved);
     REQUIRE(f.renderer.liveGeometry() > 0);
 }
 

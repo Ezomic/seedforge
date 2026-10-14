@@ -92,6 +92,12 @@ TEST_CASE("a world with no heightfield, or one that does not match its descripti
     WorldDesc nan = smallDesc();
     nan.heightRange = std::numeric_limits<float>::quiet_NaN();
     REQUIRE(renderMapImage(ramp(nan)).empty());
+    WorldDesc infinite = smallDesc();
+    infinite.heightRange = std::numeric_limits<float>::infinity();
+    REQUIRE(renderMapImage(ramp(infinite)).empty());
+    WorldDesc lost = smallDesc();
+    lost.minHeight = std::numeric_limits<float>::quiet_NaN();
+    REQUIRE(renderMapImage(ramp(lost)).empty());
 }
 
 TEST_CASE("the smallest worlds still make a picture")

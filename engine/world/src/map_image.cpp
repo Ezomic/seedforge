@@ -37,7 +37,7 @@ Rgb waterColour(float depth)
 
 std::uint8_t byteOf(float v)
 {
-    return static_cast<std::uint8_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+    return std::isfinite(v) ? static_cast<std::uint8_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f)) : 0;
 }
 
 }
@@ -46,7 +46,7 @@ MapImage renderMapImage(const Heightfield& heightfield, std::uint32_t maxSide)
 {
     const WorldDesc& desc = heightfield.desc();
     MapImage map;
-    if (maxSide == 0 || !desc.valid() || !std::isfinite(desc.minHeight)) {
+    if (maxSide == 0 || !desc.valid() || !std::isfinite(desc.minHeight) || !std::isfinite(desc.heightRange)) {
         return map;
     }
     const std::uint32_t samplesPerSide = desc.samplesPerSide();
