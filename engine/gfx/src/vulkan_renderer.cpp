@@ -83,9 +83,9 @@ bool VulkanRenderer::Impl::createSwapchain()
     // Screenshots copy out of the swapchain image, which needs the surface to allow it.
     VkSurfaceCapabilitiesKHR capabilities{};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx.physicalDevice(), ctx.surface(), &capabilities);
-    canScreenshot = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
+    const bool screenshotUsage = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
     vkb::SwapchainBuilder builder{ctx.vkbDevice(), ctx.surface()};
-    if (canScreenshot) {
+    if (screenshotUsage) {
         builder.add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     }
     auto result = builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
@@ -106,6 +106,7 @@ bool VulkanRenderer::Impl::createSwapchain()
     destroySwapchain();
     vkb::destroy_swapchain(swapchain);
     swapchain = result.value();
+    canScreenshot = screenshotUsage;
     swapchainImages = swapchain.get_images().value();
     swapchainViews = swapchain.get_image_views().value();
 
@@ -450,7 +451,9 @@ void VulkanRenderer::endFrame()
         if (shot.mapped == nullptr) {
             log(LogLevel::Warn, "screenshot: the window cannot be captured here (no transfer usage on the swapchain, or no memory for it)");
         } else {
-            vkWaitForFences(v.ctx.device(), 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX);
+            if (!vkCheck(vkWaitForFences(v.ctx.device(), 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX), "vkWaitForFences (screenshot)")) {
+                vkDeviceWaitIdle(v.ctx.device());
+            }
             vmaInvalidateAllocation(v.ctx.allocator(), shot.allocation, 0, VK_WHOLE_SIZE);
             const std::uint32_t width = v.swapchain.extent.width;
             const std::uint32_t height = v.swapchain.extent.height;
@@ -466,16 +469,18 @@ void VulkanRenderer::endFrame()
             }
             if (writePng(screenshotPath_, width, height, rgba.data())) {
                 logf(LogLevel::Info, "screenshot: {}x{} saved to {}", width, height, screenshotPath_);
+                screenshotSaved_ = true;
             } else {
                 logf(LogLevel::Error, "screenshot: could not write {}", screenshotPath_);
             }
         }
     }
     if (shot.buffer != VK_NULL_HANDLE) {
-        if (submitted) {
-            vkWaitForFences(v.ctx.device(), 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX);
-        }
+        // The copy has finished by now when one was recorded and submitted; a buffer nothing ever wrote to needs no wait.
         v.ctx.destroyBuffer(shot);
+    }
+    if (!screenshotPath_.empty() && !screenshotSaved_) {
+        log(LogLevel::Warn, "screenshot: the frame was not saved");
     }
     screenshotPath_.clear();
     if (!submitted) {

@@ -441,6 +441,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // A reload mid-replay or mid-recording would change what the script asks
     // for from that tick on, and the recording keeps no record of the version.
     const bool reloadAllowed = options.replay.empty() && options.record.empty();
+    if (!options.screenshot.empty() && (options.headless || options.frames == 0)) {
+        ichor::log(ichor::LogLevel::Error, "--screenshot needs a window and a frame count: it saves the last of --frames N frames");
+        return 1;
+    }
 
     // The editor's edits are scene commands: they would diverge from a recording, and a
     // headless run has no window to show them in.
@@ -728,6 +732,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     renderer.setGuiHook({}); // the panels are about to go out of scope
     renderer.setUiHooks({}, {}); // and so are the UI, the HUD and the ledger
+    if (!options.screenshot.empty() && renderer.screenshotPending()) {
+        ichor::logf(ichor::LogLevel::Error, "the screenshot {} was asked for and not saved", options.screenshot);
+        return 1;
+    }
     if (!options.record.empty() && !engine.recordedInputs().save(options.record)) {
         return 1;
     }

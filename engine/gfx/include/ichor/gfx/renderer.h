@@ -64,8 +64,11 @@ public:
     virtual void setGuiHook(std::function<void()> hook) { (void)hook; }
 
     // Saves the next frame that is presented, exactly as the player would see it (the scene, the UI
-    // and the overlays), to a PNG at this path. A renderer with no window ignores it.
+    // and the overlays), to a PNG at this path. A renderer with no window ignores it, and
+    // screenshotPending() then stays true: asked for, and never saved. The frame can also be skipped
+    // (a minimised window, a lost swapchain), which leaves it pending too.
     virtual void requestScreenshot(std::string path) { (void)path; }
+    virtual bool screenshotPending() const { return false; }
 
     // The game UI: the interface RmlUi draws through, null where there is no window. Each
     // frame `update` is called with the size of what is drawn into, outside any pass, so the
