@@ -262,6 +262,36 @@ TEST_CASE("canonical form and digest do not depend on key order or whitespace")
     CHECK(npcDigest(a[0]) != npcDigest(d[0]));
 }
 
+TEST_CASE("duplicate keys are refused at every level")
+{
+    CHECK(mentions(parse(R"([{"id":"a","tier":"crowd","ambience":"x","ambience":"y"}])"), "duplicate key \"ambience\""));
+    CHECK(mentions(parse(R"([{"id":"a","tier":"crowd","tier":"resident","ambience":"x"}])"), "duplicate key \"tier\""));
+    CHECK(mentions(parse(array({replaced(kRegular, R"({"kind":"family","target":"harl"})", R"({"kind":"family","kind":"rival","target":"harl"})")})), "duplicate key \"kind\""));
+}
+
+TEST_CASE("a missing id and an em-dash in any text field are refused")
+{
+    CHECK(mentions(parse(array({replaced(kHarl, R"("id":"harl",)", "")})), "[0].id: missing"));
+    CHECK(mentions(parse(array({replaced(kRegular, "Wants her brother", "Wants \xE2\x80\x94 her brother")})), "[0].want: must not contain an em-dash"));
+    CHECK(mentions(parse(array({replaced(kRegular, "Drowning", "Drowning \xE2\x80\x94")})), "[0].fear: must not contain an em-dash"));
+}
+
+TEST_CASE("canonical form is key-sorted and pinned, and the roster digest is pinned")
+{
+    std::vector<NpcRecord> records;
+    REQUIRE(parse(array({kPrincipal, kRegular, kHarl, kCrowd}), &records).empty());
+    CHECK(npcCanonicalJson(records[0]) == R"({"arc":"ledger_truth","cast_roles":["faction_leader","ledger_keeper"],"face":"auditor_face","id":"auditor","name":"Teles the Auditor","tier":"principal","vo":"auditor_vo","voice":"auditor_dry"})");
+    CHECK(npcCanonicalJson(records[1]) == R"({"fear":"Drowning like her father.","home":"saltmarsh","id":"ilse","memory":"ledger_ilse","name":"Ilse Vance","relationships":[{"kind":"family","target":"harl"},{"kind":"creditor","target":"auditor"},{"kind":"rival","target":"maren"}],"role":"salt_panner","tier":"regular","traits":["bitter","proud"],"want":"Wants her brother off the dive crews."})");
+    CHECK(npcCanonicalJson(records[2]) == R"({"id":"harl","location":"saltmarsh","name":"Harl Vance","tier":"resident"})");
+    CHECK(npcCanonicalJson(records[3]) == R"({"ambience":"market_chatter","id":"market_murmur","tier":"crowd"})");
+
+    Fixture fixture;
+    fixture.write("a.json", array({kPrincipal, kRegular, kHarl, kMaren, kCrowd}));
+    NpcRoster roster;
+    REQUIRE(roster.loadDirectory(fixture.root()));
+    CHECK(roster.digest() == 0x88a428eb1c5ec5b2ULL);
+}
+
 TEST_CASE("a roster loads every file, counts tiers and digests independent of file layout")
 {
     Fixture one;

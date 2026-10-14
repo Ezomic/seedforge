@@ -1,6 +1,7 @@
 #include "ichor/data/npc_tiers.h"
 
 #include "ichor/core/hash.h"
+#include "ichor/data/npc_traits.h"
 
 #include <nlohmann/json.hpp>
 
@@ -22,8 +23,6 @@ constexpr std::size_t kMaxRecords = 5000;
 constexpr std::size_t kMaxWord = 64;
 constexpr std::size_t kMaxName = 80;
 constexpr std::size_t kMaxSentence = 160;
-constexpr std::size_t kMinTraits = 2;
-constexpr std::size_t kMaxTraits = 3;
 constexpr std::size_t kMaxCastRoles = 8;
 constexpr std::string_view kEmDash = "\xE2\x80\x94";
 
@@ -364,7 +363,7 @@ bool readField(Checker& check, const Json& json, const std::string& path, Field 
             break;
         case Field::Traits:
             if constexpr (std::is_same_v<T, Regular>) {
-                return check.words(json, path, kMinTraits, kMaxTraits, target.traits);
+                return check.words(json, path, kMinNpcTraits, kMaxNpcTraits, target.traits);
             }
             break;
         case Field::Relationships:
@@ -588,9 +587,26 @@ bool parseNpcFile(std::string_view label, std::string_view text, std::vector<Npc
     if (nestsTooDeep(text)) {
         return fail("nested deeper than " + std::to_string(kMaxDepth) + " levels");
     }
-    const Json json = Json::parse(text.begin(), text.end(), nullptr, false);
+    // The parser keeps the last of two equal keys; a duplicate is an authoring mistake, so it is refused.
+    std::vector<std::set<std::string>> keysByDepth;
+    std::string duplicate;
+    const Json json = Json::parse(
+        text.begin(), text.end(),
+        [&](int depth, Json::parse_event_t event, Json& parsed) {
+            if (event == Json::parse_event_t::object_start) {
+                keysByDepth.resize(std::max(keysByDepth.size(), static_cast<std::size_t>(depth) + 2));
+                keysByDepth[static_cast<std::size_t>(depth) + 1].clear();
+            } else if (event == Json::parse_event_t::key && !keysByDepth[static_cast<std::size_t>(depth)].insert(parsed.get<std::string>()).second && duplicate.empty()) {
+                duplicate = parsed.get<std::string>().substr(0, 40);
+            }
+            return true;
+        },
+        false);
     if (json.is_discarded()) {
         return fail("not valid JSON");
+    }
+    if (!duplicate.empty()) {
+        return fail("duplicate key \"" + duplicate + "\"");
     }
     if (!json.is_array()) {
         return fail("expected an array, got " + std::string(typeName(json)));
