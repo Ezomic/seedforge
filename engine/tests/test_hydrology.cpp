@@ -4,6 +4,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <functional>
 #include <numeric>
 #include <utility>
@@ -376,4 +378,148 @@ TEST_CASE("a basin deeper than the cap is not a lake, and one inside it is")
     // Every lake sample belongs to the one lake, and the plateau to none.
     REQUIRE(shallowWater.lake[shallowWater.index(8, 8)] == 1);
     REQUIRE(shallowWater.lake[shallowWater.index(2, 2)] == 0);
+}
+
+TEST_CASE("a river's half width grows with the catchment, from the spring to a ceiling")
+{
+    HydrologyParams params;
+    params.riverThreshold = 100;
+    params.springHalfWidth = 2.0f;
+    params.maxHalfWidth = 30.0f;
+
+    REQUIRE(riverHalfWidth(0, params) == 0.0f);
+    REQUIRE(riverHalfWidth(1, params) == 0.0f);
+    REQUIRE(riverHalfWidth(99, params) == 0.0f);
+    REQUIRE(riverHalfWidth(100, params) == 2.0f);
+    REQUIRE(riverHalfWidth(400, params) == 4.0f);
+    REQUIRE(riverHalfWidth(10000, params) == 20.0f);
+    REQUIRE(riverHalfWidth(1000000, params) == 30.0f);
+    REQUIRE(riverHalfWidth(UINT32_MAX, params) == 30.0f);
+
+    float last = 0.0f;
+    for (std::uint32_t accumulation = 0; accumulation < 200000; accumulation += 7) {
+        const float width = riverHalfWidth(accumulation, params);
+        REQUIRE(width >= last);
+        REQUIRE(width <= params.maxHalfWidth);
+        last = width;
+    }
+
+    HydrologyParams everything = params;
+    everything.riverThreshold = 1;
+    REQUIRE(riverHalfWidth(UINT32_MAX, everything) == 30.0f);
+    everything.riverThreshold = UINT32_MAX;
+    REQUIRE(riverHalfWidth(UINT32_MAX, everything) == 2.0f);
+}
+
+TEST_CASE("a river that is not meant to widen, or has parameters that are not numbers, keeps no width")
+{
+    HydrologyParams params;
+    params.riverThreshold = 100;
+    params.maxHalfWidth = 0.0f;
+    REQUIRE(riverHalfWidth(100000, params) == 0.0f);
+    params.maxHalfWidth = std::nanf("");
+    REQUIRE(riverHalfWidth(100000, params) == 0.0f);
+    params.maxHalfWidth = 20.0f;
+    params.springHalfWidth = std::nanf("");
+    REQUIRE(riverHalfWidth(100000, params) == 0.0f);
+    params.springHalfWidth = -1.0f;
+    REQUIRE(riverHalfWidth(100000, params) == 0.0f);
+    params.springHalfWidth = 1.0f;
+    params.riverThreshold = 0;
+    REQUIRE(riverHalfWidth(100000, params) == 0.0f);
+    params.riverThreshold = 100;
+    params.maxHalfWidth = INFINITY;
+    REQUIRE(std::isfinite(riverHalfWidth(UINT32_MAX, params)));
+    params.springHalfWidth = INFINITY;
+    REQUIRE(std::isfinite(riverHalfWidth(UINT32_MAX, params)));
+    // A ceiling under the spring width leaves the spring width.
+    params.springHalfWidth = 5.0f;
+    params.maxHalfWidth = 2.0f;
+    REQUIRE(riverHalfWidth(100000, params) == 5.0f);
+}
+
+TEST_CASE("rivers are wider downstream, and the same on every forge")
+{
+    WorldDesc desc;
+    desc.seed = 11;
+    desc.sizeMetres = 1024;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 256;
+    const Heightfield field = forgeHeightfield(desc);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    rivers.springHalfWidth = 6.0f;
+
+    const Heightfield first = carveRivers(field, h, rivers, CarveParams{});
+    const Heightfield again = carveRivers(forgeHeightfield(desc), computeHydrology(forgeHeightfield(desc)), rivers, CarveParams{});
+    REQUIRE(first.digest() == again.digest());
+
+    std::size_t wider = 0;
+    std::vector<float> widest(h.accumulation.size(), 0.0f);
+    for (std::size_t i = 0; i < h.accumulation.size(); ++i) {
+        widest[i] = riverHalfWidth(h.accumulation[i], rivers);
+    }
+    for (std::size_t i = 0; i < h.accumulation.size(); ++i) {
+        if (h.isOutlet(i) || !isRiver(h, i, rivers)) continue;
+        const std::size_t d = h.downstream(i);
+        REQUIRE(isRiver(h, d, rivers));
+        REQUIRE(widest[d] >= widest[i]);
+        // Where two rivers meet, the water below is at least as wide as either that fed it.
+        wider += widest[d] > widest[i] ? 1 : 0;
+    }
+    REQUIRE(wider > 0);
+    const std::uint32_t biggest = *std::max_element(h.accumulation.begin(), h.accumulation.end());
+    REQUIRE(riverHalfWidth(biggest, rivers) > 2.0f * rivers.springHalfWidth);
+}
+
+TEST_CASE("carving widens the channel with the river: banks come down to the bed within the half width, and no further")
+{
+    WorldDesc desc;
+    desc.seed = 11;
+    desc.sizeMetres = 1024;
+    desc.metresPerSample = 8;
+    desc.cellMetres = 256;
+    const Heightfield field = forgeHeightfield(desc);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 200;
+    rivers.springHalfWidth = 6.0f;
+    const Heightfield carved = carveRivers(field, h, rivers, CarveParams{});
+
+    HydrologyParams narrow = rivers;
+    narrow.maxHalfWidth = 0.0f;
+    const Heightfield thin = carveRivers(field, h, narrow, CarveParams{});
+    REQUIRE(carved.digest() != thin.digest());
+
+    const float spacing = static_cast<float>(desc.metresPerSample);
+    struct Reach {
+        float x, z, half;
+    };
+    std::vector<Reach> reaches;
+    for (std::uint32_t z = 0; z < h.side; ++z) {
+        for (std::uint32_t x = 0; x < h.side; ++x) {
+            const float half = riverHalfWidth(h.accumulation[h.index(x, z)], rivers);
+            if (half > 0.0f) reaches.push_back({static_cast<float>(x) * spacing, static_cast<float>(z) * spacing, half});
+        }
+    }
+    std::size_t banks = 0;
+    for (std::uint32_t z = 0; z < h.side; ++z) {
+        for (std::uint32_t x = 0; x < h.side; ++x) {
+            const std::size_t i = h.index(x, z);
+            const float px = static_cast<float>(x) * spacing;
+            const float pz = static_cast<float>(z) * spacing;
+            const bool reached = std::any_of(reaches.begin(), reaches.end(), [&](const Reach& r) {
+                return (r.x - px) * (r.x - px) + (r.z - pz) * (r.z - pz) <= r.half * r.half;
+            });
+            // Further from every river than its half width, a sample is carved exactly as a thin river leaves it.
+            if (!reached) {
+                REQUIRE(carved.samples()[i] == thin.samples()[i]);
+            } else if (carved.samples()[i] != thin.samples()[i]) {
+                REQUIRE(carved.samples()[i] < thin.samples()[i]);
+                ++banks;
+            }
+        }
+    }
+    REQUIRE(banks > 0);
 }

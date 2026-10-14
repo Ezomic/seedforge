@@ -11,6 +11,10 @@ namespace ichor {
 // carved through deeper basins are the ones the game does not draw a lake over.
 constexpr float kPlayableLakeDepth = 10.0f;
 
+// No river is wider than this, whatever the parameters say, so that finding the water around a
+// sample never means searching further than this.
+constexpr float kRiverHalfWidthCeiling = 64.0f;
+
 struct HydrologyParams {
     // A sample is a river when this many samples (itself included) drain through it.
     std::uint32_t riverThreshold = 2000;
@@ -20,7 +24,19 @@ struct HydrologyParams {
     // to its rim however high that is, which on rough ground makes reservoirs hundreds of metres
     // deep; a real world would have breached the rim. The default is no limit.
     float maxLakeDepth = 1.0e9f;
+    // Half the width of a river where it begins, in metres. It grows with the square root of the
+    // catchment over riverThreshold, the way real channels do, and stops at maxHalfWidth. A river is
+    // never narrower than one sample; a maxHalfWidth of zero keeps every river one sample wide.
+    float springHalfWidth = 1.5f;
+    float maxHalfWidth = 12.0f;
 };
+
+// How far from the middle of a river the water reaches, in metres, for a sample that this many
+// samples drain through: zero for a sample that is not a river, springHalfWidth where a river
+// begins, then wider with the catchment, never narrower downstream and never past maxHalfWidth.
+// Not a number in the parameters counts as no widening. Plain float arithmetic and one correctly
+// rounded square root, so it is the same on every machine.
+float riverHalfWidth(std::uint32_t accumulation, const HydrologyParams& params);
 
 // Where the water goes (doc 08, phase 3). Every sample of the heightfield has one place it
 // drains to, found by priority-flood: the land is flooded in from its edges, lowest first, and

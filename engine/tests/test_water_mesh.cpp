@@ -239,6 +239,7 @@ TEST_CASE("a river that steps across a diagonal stays joined, and a bank lower t
     const Hydrology h = computeHydrology(field);
     HydrologyParams rivers;
     rivers.riverThreshold = 6;
+    rivers.maxHalfWidth = 0.0f; // the valley is a metre a sample, where the river's own width would reach its banks
     const WaterMeshParams params;
     const Mesh mesh = buildWaterMesh(field, h, rivers, {0, 0}, params);
     REQUIRE_FALSE(mesh.vertices.empty());
