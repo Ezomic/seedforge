@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/audio/ducking.h"
 #include "ichor/audio/reverb.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -23,7 +24,9 @@ public:
     virtual std::uint32_t findSound(std::string_view name) const = 0;
 
     // The gain scales the cue, 1 being the clip as cooked.
-    virtual void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f) = 0;
+    // A categorised cue is capped by its category's ceiling and ducks the ambience while it plays.
+    virtual void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f,
+        SoundCategory category = SoundCategory::None) = 0;
     // A looping, non-spatial bed under everything else. Calling it again only retargets the gain,
     // which eases in, so it can be called every frame.
     virtual void setAmbience(std::uint32_t sound, float gain) = 0;
