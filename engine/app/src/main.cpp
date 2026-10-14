@@ -3,6 +3,7 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
+#include "ichor/audio/music_player.h"
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/wading_splash.h"
@@ -350,6 +351,16 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     // A campaign owns the world; its slots are snapshots inside it (doc 14).
     const std::uint64_t worldSeed = heightfield.empty() ? options.seed : heightfield.desc().seed;
+    // Event-driven music: stingers for vistas, discoveries, combat and death, with silence between. The
+    // game systems that raise those events call musicPlayer.trigger(event, seconds); none exist yet.
+    std::vector<ichor::MusicCue> musicCues;
+    if (!ichor::loadMusicCues(data, musicCues)) {
+        ichor::log(ichor::LogLevel::Warn, "data: a music cue is malformed, so none were loaded");
+    }
+    ichor::MusicPlayer musicPlayer(std::move(musicCues), ichor::MusicConfig{}, worldSeed);
+    audio.addBundle(musicPlayer.makeBundle());
+    musicPlayer.bind(audio);
+
     constexpr std::uint32_t kGenVersion = 1;
     const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
     // Ironman keeps its own directory, so a normal run can never load its rolling slot.
@@ -852,6 +863,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         ambience.setGain(ichor::AmbienceLayer::Weather, ichor::rainAmbienceGain(weatherNow().rain));
         ambience.apply(audio);
+        musicPlayer.update(static_cast<double>(engine.scene().tickCount()) * config.fixedDt, audio);
         if (editing) {
             // New objects appear a few metres in front of the player.
             editorEnvironment.spawnAt = playerPosition(engine.scene()) + glm::dvec3(0.0, 0.0, -3.0);

@@ -20,6 +20,7 @@ add_executable(ichor_tests
     test_animation.cpp
     test_animation_system.cpp
     test_audio.cpp
+    test_music.cpp
     test_ducking.cpp
     test_wading_splash.cpp
     test_rain_ambience.cpp
