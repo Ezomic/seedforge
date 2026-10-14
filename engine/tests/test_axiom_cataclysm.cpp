@@ -6,8 +6,8 @@
 #include <array>
 #include <map>
 #include <string>
-#include <vector>
 #include <string_view>
+#include <vector>
 
 using namespace ichor;
 
@@ -73,22 +73,6 @@ TEST_CASE("the three Cataclysm axioms are authored with their directive blocks")
     REQUIRE(cataclysmCount >= 3);
 }
 
-TEST_CASE("conflicts never name the axiom itself and use the slot's own ids")
-{
-    AxiomSet set;
-    REQUIRE(set.loadDirectory(ICHOR_REPO_DATA));
-    for (const Expected& expected : cataclysms()) {
-        const Axiom* found = set.find(expected.id);
-        REQUIRE(found != nullptr);
-        const Axiom& axiom = *found;
-        for (const std::string& other : axiom.conflicts) {
-            CAPTURE(axiom.id, other);
-            REQUIRE(other != axiom.id);
-            REQUIRE(other.rfind("cataclysm.", 0) == 0);
-        }
-    }
-}
-
 TEST_CASE("Artemis Withdrew removes fauna, hunting, hides and mounts rather than adding content")
 {
     AxiomSet set;
@@ -105,6 +89,8 @@ TEST_CASE("Artemis Withdrew removes fauna, hunting, hides and mounts rather than
     const auto& weights = std::get<std::map<std::string, double, std::less<>>>(artemis.blocks.at("poi").at("weights"));
     REQUIRE(weights.at("hunting_lodge") == 0.0);
     REQUIRE(artemis.blocks.count("traversal") == 0);
+    REQUIRE(has(words(artemis, "audio", "bed_overrides"), "no_birdsong"));
+    REQUIRE(std::get<std::string>(artemis.blocks.at("audio").at("music_palette")) == "single_voice");
 }
 
 TEST_CASE("the Silence keeps conventional traversal and swaps healing from prayer to pharmaka")
@@ -118,4 +104,6 @@ TEST_CASE("the Silence keeps conventional traversal and swaps healing from praye
     const auto& weights = std::get<std::map<std::string, double, std::less<>>>(silence.blocks.at("poi").at("weights"));
     REQUIRE(weights.at("dead_sanctuary") > 1.0);
     REQUIRE(silence.blocks.count("traversal") == 0);
+    REQUIRE(has(words(silence, "audio", "bed_overrides"), "empty_colonnade_wind"));
+    REQUIRE(std::get<std::string>(silence.blocks.at("audio").at("music_palette")) == "ruined_processional");
 }

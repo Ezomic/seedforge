@@ -9,5 +9,5 @@
   "enemies": { "roster_add": ["hollow_priest", "votary_shade"], "roster_remove": ["inspired_seer"] },
   "economy": { "scarce": ["votive_offerings", "prophecy"], "abundant": ["pharmaka", "archive_scrolls"] },
   "palette": { "grade": "silence" },
-  "audio": { "bed_overrides": ["empty_colonnade_wind"], "music_palette": "silence" }
+  "audio": { "bed_overrides": ["empty_colonnade_wind"], "music_palette": "ruined_processional" }
 }
