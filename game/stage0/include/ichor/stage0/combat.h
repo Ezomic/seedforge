@@ -67,6 +67,22 @@ struct SkirmisherBrain {
     BrainState brainState() const { return static_cast<BrainState>(state); }
 };
 
+enum class FoeRole : std::uint8_t { Skirmisher, Controller };
+
+enum class ControllerState : std::uint8_t { Unaware, Reposition, Cast };
+const char* name(ControllerState state);
+
+// The controller's decision layer. Counts whole ticks, never seconds, so nothing drifts.
+struct ControllerBrain {
+    std::uint8_t state = 0;
+    std::int32_t stateTicks = 0;
+    std::int32_t cooldownTicks = 0;
+    std::int32_t casts = 0;
+    float strafeSign = 1.0f;
+
+    ControllerState controllerState() const { return static_cast<ControllerState>(state); }
+};
+
 // Every number from stage0-log.md section 3, plus the six knobs doc 18 names.
 struct Tuning {
     float maxHealth = 100.0f;
@@ -121,7 +137,18 @@ struct Tuning {
     float heavyChance = 0.3f;
     int maxFollowUpsIntoStagger = 1;
 
+    // Controller: holds the band between retreat and cast range, slows the target, recasts when the slow runs low.
+    float controllerMaxHealth = 40.0f;
+    float controllerRetreatBelow = 5.0f;
+    float controllerCastRange = 9.0f;
+    float controllerStrafeSpeedScale = 0.4f;
+    int controllerCastTicks = 45;
+    int controllerCooldownTicks = 180;
+    int controllerRecastBelowTicks = 60;
+    int controllerStrafeFlipTicks = 130;
+
     // Cues; kNoSound plays nothing.
+    std::uint32_t controllerCastCue = kNoSound;
     std::uint32_t lightWindupCue = kNoSound;
     std::uint32_t heavyWindupCue = kNoSound;
     std::uint32_t tellCue = kNoSound;
@@ -141,6 +168,10 @@ public:
     void debugLines(const Scene& scene, std::vector<LineSegment>& out) const;
     void overlay(const Scene& scene, std::vector<std::string>& lines) const;
 
+    // Which brain the foe gets on the next reset; call before install or resetFight.
+    void setFoeRole(FoeRole role) { role_ = role; }
+    FoeRole foeRole() const { return role_; }
+
     const Tuning& tuning() const { return tuning_; }
     FightRecorder& recorder() { return recorder_; }
     StableId playerId() const { return player_; }
@@ -156,6 +187,7 @@ public:
 private:
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
     void skirmisherSystem(Scene& scene, double dt);
+    void controllerSystem(Scene& scene);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
     void tickStatus(Scene& scene, entt::entity who, Combatant& c);
     struct PendingHit {
@@ -169,6 +201,7 @@ private:
     void tickCombatant(Scene& scene, entt::entity entity, entt::entity opponent, float fdt, std::vector<PendingHit>& hits);
 
     Tuning tuning_;
+    FoeRole role_ = FoeRole::Skirmisher;
     FightRecorder recorder_;
     StableId player_{};
     StableId foe_{};
@@ -183,6 +216,16 @@ constexpr float kArenaHalf = 10.0f; // the arena is 20 m square, walls at plus a
 }
 
 namespace ichor {
+
+template <>
+struct Reflect<stage0::ControllerBrain> {
+    static constexpr auto fields()
+    {
+        using B = stage0::ControllerBrain;
+        return std::make_tuple(field("state", &B::state), field("stateTicks", &B::stateTicks), field("cooldownTicks", &B::cooldownTicks),
+            field("casts", &B::casts), field("strafeSign", &B::strafeSign));
+    }
+};
 
 template <>
 struct Reflect<stage0::Combatant> {
