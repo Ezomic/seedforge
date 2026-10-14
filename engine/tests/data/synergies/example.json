@@ -1,0 +1,7 @@
+{
+  "synergies": [
+    { "id": "hekatombaia", "tier": "cataclysm_law", "axioms": ["cataclysm.artemis_withdrew", "law.hecatomb"] },
+    { "id": "oathless_return", "tier": "triple", "axioms": ["cataclysm.silence_of_oracles", "law.oath", "pressure.return"] },
+    { "id": "rising_and_breaking", "tier": "pressure", "axioms": ["cataclysm.flood", "pressure.opening"] }
+  ]
+}
