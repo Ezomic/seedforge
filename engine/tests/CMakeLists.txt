@@ -24,6 +24,7 @@ add_executable(ichor_tests
     test_script.cpp
     test_data.cpp
     test_npc_traits.cpp
+    test_npc_tiers.cpp
     test_axiom.cpp
     test_atmosphere.cpp
     test_vegetation.cpp
