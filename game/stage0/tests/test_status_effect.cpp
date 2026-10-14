@@ -108,7 +108,20 @@ TEST_CASE("refresh resets the duration without adding stacks")
     set.apply(StatusId::Slow, 10);
     REQUIRE(set.find(StatusId::Slow)->remainingTicks == 10);
     REQUIRE(set.find(StatusId::Slow)->stacks == 1);
+    set.apply(StatusId::Slow, 1);
+    REQUIRE(set.find(StatusId::Slow)->remainingTicks == 10); // a weaker reapply never shortens
     REQUIRE(set.moveScale() == Catch::Approx(0.65f));
+}
+
+TEST_CASE("corrupt loaded state is pulled back into range instead of overflowing")
+{
+    StatusSet set;
+    set.effects.push_back({static_cast<std::uint8_t>(StatusId::Bleed), std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::min()});
+    set.effects.push_back({static_cast<std::uint8_t>(StatusId::Slow), -4, std::numeric_limits<std::int32_t>::max()});
+    REQUIRE(set.tick() == 400LL * statusDef(StatusId::Bleed)->maxStacks);
+    REQUIRE(set.find(StatusId::Bleed) == nullptr);
+    REQUIRE(set.find(StatusId::Slow)->stacks == 1);
+    REQUIRE(set.find(StatusId::Slow)->remainingTicks == kMaxStatusDurationTicks - 1);
 }
 
 TEST_CASE("effects stay sorted by id however they were applied")
