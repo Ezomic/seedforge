@@ -40,7 +40,7 @@ void SdlPlatform::pumpEvents()
         if (event.type == SDL_EVENT_QUIT) {
             quit_ = true;
         }
-        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+        if (escapeQuits_ && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
             quit_ = true;
         }
     }
@@ -60,6 +60,7 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_F5]) frame.buttons |= InputFrame::QuickSave;
     if (keys[SDL_SCANCODE_F9]) frame.buttons |= InputFrame::QuickLoad;
     if (keys[SDL_SCANCODE_TAB]) frame.buttons |= InputFrame::Journal;
+    if (keys[SDL_SCANCODE_ESCAPE]) frame.buttons |= InputFrame::Menu;
 
     // The mouse is reported in window units; the UI works in drawable pixels, which differ on a scaled display.
     float mouseX = 0.0f;

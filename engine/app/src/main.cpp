@@ -10,6 +10,7 @@
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/ui/ledger.h"
+#include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
@@ -469,6 +470,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::UiContext> ui;
     std::unique_ptr<ichor::Hud> hud;
     std::unique_ptr<ichor::Ledger> ledger;
+    std::unique_ptr<ichor::PauseMenu> pauseMenu;
+    bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
     float hudWater = 0.0f;
@@ -483,15 +486,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (fontsLoaded) {
             hud = std::make_unique<ichor::Hud>(*ui);
             ledger = std::make_unique<ichor::Ledger>(*ui);
+            pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !pauseMenu->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            pauseMenu.reset();
             ledger.reset();
             hud.reset();
             ui.reset();
         }
     }
     if (ui) {
+        platform.setEscapeQuits(false); // Esc opens the pause menu instead
         // The simulation clock drives the UI, so a replay sees the same animations.
         renderer.setUiHooks(
             [&](std::uint32_t width, std::uint32_t height) {
@@ -593,6 +599,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool quickSaveHeld = false;
     bool quickLoadHeld = false;
     bool journalHeld = false;
+    bool menuHeld = false;
     bool pointerHeld = false;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
@@ -608,6 +615,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const bool quickSave = (buttons & ichor::InputFrame::QuickSave) != 0;
         const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
         // The journal is only a view, so it works in a replay too.
+        const bool menu = (buttons & ichor::InputFrame::Menu) != 0;
+        if (menu && !menuHeld && pauseMenu) {
+            paused = !paused;
+            pauseMenu->setVisible(paused);
+        }
+        menuHeld = menu;
         const bool journal = (buttons & ichor::InputFrame::Journal) != 0;
         // Tab moves between the editor's fields, so there it does not open the journal.
         if (journal && !journalHeld && ledger && !editing) {
@@ -634,6 +647,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             }
             if (ledger->takeCloseRequest()) {
                 ledger->setVisible(false);
+            }
+            if (pauseMenu->takeResume()) {
+                paused = false;
+                pauseMenu->setVisible(false);
+            }
+            if (pauseMenu->takeQuit()) {
+                platform.requestQuit();
             }
         }
         // Saving over the player's quicksave while a replay drives the run would be a surprise.
@@ -669,7 +689,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             }
         }
         const double now = platform.now();
-        const double dt = options.headless ? config.fixedDt : now - last;
+        // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
+        const double dt = options.headless ? config.fixedDt : paused ? 0.0 : now - last;
         last = now;
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
