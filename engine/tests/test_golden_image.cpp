@@ -752,7 +752,7 @@ TEST_CASE("golden image: the biggest river of the forged world")
     view.time = 1.25f;
     applyPalette(defaultPalette(), view);
     const glm::dvec3 target(targetX, heightfield.heightAt(targetX, targetZ), targetZ);
-    const glm::dvec3 eye(targetX - 45.0, heightfield.heightAt(targetX - 45.0, targetZ + 45.0) + 18.0, targetZ + 45.0);
+    const glm::dvec3 eye(targetX - 16.0, heightfield.heightAt(targetX - 16.0, targetZ + 16.0) + 7.0, targetZ + 16.0);
     view.camera.position = eye;
     view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
     view.camera.farPlane = 2500.0f;

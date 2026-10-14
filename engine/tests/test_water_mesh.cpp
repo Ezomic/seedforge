@@ -2,6 +2,7 @@
 #include "ichor/world/streamer.h"
 #include "ichor/world/water_mesh.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <vector>
 
 using namespace ichor;
+using Catch::Approx;
 
 namespace {
 
@@ -337,4 +339,46 @@ TEST_CASE("a basin too deep to be a lake is dry ground, with no river drawn acro
             REQUIRE(v.position.y <= field.heightAtSample(x, z) - params.submerge);
         }
     }
+}
+
+TEST_CASE("each vertex carries how far the surface stands over the ground: over it on water, at or under it elsewhere")
+{
+    const Heightfield field = gridOf(17, basinWorld);
+    const Hydrology h = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 100000; // lakes only
+    const Mesh lake = buildWaterMesh(field, h, rivers, {0, 0});
+    REQUIRE_FALSE(lake.vertices.empty());
+    for (const Vertex& v : lake.vertices) {
+        const auto x = static_cast<std::uint32_t>(v.position.x);
+        const auto z = static_cast<std::uint32_t>(v.position.z);
+        REQUIRE(v.uv.x == v.position.y - field.heightAtSample(x, z));
+        if (isLake(h, field, x, z, rivers)) {
+            REQUIRE(v.uv.x > 80.0f); // the basin is about 90 m deep
+        } else {
+            REQUIRE(v.uv.x <= -0.6f + 1e-3f); // sunk below the bank by at least the submerge depth
+        }
+        REQUIRE(v.uv.y == 0.0f);
+    }
+
+    // A river's water lies the surface offset over its bed, wherever it runs.
+    const Heightfield forged = forgeHeightfield(forgedDesc());
+    const Hydrology forgedWater = computeHydrology(forged);
+    HydrologyParams streams;
+    streams.riverThreshold = 200;
+    const WaterMeshParams params;
+    std::size_t riverVertices = 0;
+    for (int z = 0; z < 4; ++z) {
+        for (int x = 0; x < 4; ++x) {
+            for (const Vertex& v : buildWaterMesh(forged, forgedWater, streams, {x, z}, params).vertices) {
+                const auto gx = static_cast<std::uint32_t>(x) * 32 + static_cast<std::uint32_t>(v.position.x / 8.0f);
+                const auto gz = static_cast<std::uint32_t>(z) * 32 + static_cast<std::uint32_t>(v.position.z / 8.0f);
+                if (!isLake(forgedWater, forged, gx, gz, streams) && isRiver(forgedWater, forgedWater.index(gx, gz), streams)) {
+                    REQUIRE(v.uv.x == Approx(params.riverSurface).margin(1e-4f));
+                    ++riverVertices;
+                }
+            }
+        }
+    }
+    REQUIRE(riverVertices > 0);
 }
