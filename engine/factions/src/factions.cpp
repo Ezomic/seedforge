@@ -8,6 +8,7 @@
 #include <array>
 #include <map>
 #include <set>
+#include <tuple>
 
 namespace ichor {
 
@@ -19,6 +20,7 @@ constexpr std::size_t kMaxFileBytes = 1024 * 1024;
 constexpr int kMaxDepth = 16;
 constexpr std::size_t kMaxName = 120;
 constexpr std::size_t kMaxId = 64;
+constexpr std::size_t kMaxEntries = 64;
 constexpr std::size_t kMinFactions = 5;
 constexpr std::size_t kMaxFactions = 7;
 constexpr std::size_t kMaxChallengers = 2;
@@ -186,6 +188,10 @@ bool parseFactions(std::string_view label, std::string_view text, std::vector<Fa
         return fail("expected an array of factions, got " + std::string(typeName(json)));
     }
 
+    if (json.size() > kMaxEntries) {
+        return fail("more than " + std::to_string(kMaxEntries) + " factions");
+    }
+
     std::vector<Faction> factions;
     std::map<std::string, std::size_t, std::less<>> firstIndex;
     for (std::size_t i = 0; i < json.size(); ++i) {
@@ -258,7 +264,7 @@ std::string factionsCanonicalJson(const std::vector<Faction>& factions)
     for (const Faction& faction : factions) {
         sorted.push_back(&faction);
     }
-    std::sort(sorted.begin(), sorted.end(), [](const Faction* a, const Faction* b) { return a->id < b->id; });
+    std::sort(sorted.begin(), sorted.end(), [](const Faction* a, const Faction* b) { return std::tie(a->id, a->name, a->role) < std::tie(b->id, b->name, b->role); });
 
     Json json = Json::array();
     for (const Faction* faction : sorted) {

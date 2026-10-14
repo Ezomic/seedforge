@@ -282,5 +282,36 @@ TEST_CASE("every violation is returned at once", "[factions]")
     CHECK(mentions(violations, "parasite"));
     CHECK(mentions(violations, "custodian"));
     CHECK(mentions(violations, "refusenik"));
-    CHECK(violations.size() >= 5);
+    CHECK(violations.size() == 5);
+}
+
+TEST_CASE("an oversized list is refused at parse time", "[factions]")
+{
+    std::string many = "[";
+    for (int i = 0; i < 65; ++i) {
+        many += (i == 0 ? "" : ",") + entry("f" + std::to_string(i), "herald");
+    }
+    CHECK(mentions(parseProblems(many + "]"), "more than 64"));
+    CHECK(parseProblems(many.substr(0, many.rfind(",")) + "]").empty());
+
+    std::string empties = "[{}";
+    for (int i = 0; i < 100000; ++i) {
+        empties += ",{}";
+    }
+    CHECK(parseProblems(empties + "]").size() == 1);
+}
+
+TEST_CASE("the digest ignores order even when ids repeat", "[factions]")
+{
+    std::vector<Faction> a = {make("x", FactionRole::Herald), make("x", FactionRole::Parasite), Faction{"x", "Other", FactionRole::Herald}};
+    auto b = a;
+    std::reverse(b.begin(), b.end());
+    CHECK(factionsDigest(a) == factionsDigest(b));
+}
+
+TEST_CASE("equal keys in sibling and nested objects are not duplicates", "[factions]")
+{
+    CHECK(parseProblems(kValid).empty());
+    CHECK(mentions(parseProblems(R"([{"id": "a", "id": "b", "name": "n", "role": "herald"}])"), "duplicate key"));
+    CHECK(mentions(parseProblems(R"([{"id": "a", "name": "n", "role": "herald", "z": 1}])"), "[0].z: unknown key"));
 }
