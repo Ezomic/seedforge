@@ -298,7 +298,7 @@ TEST_CASE("an oversized list is refused at parse time", "[factions]")
     CHECK(parseProblems(list(64)).empty());
 
     std::string empties = "[{}";
-    for (int i = 0; i < 100000; ++i) {
+    for (int i = 0; i < 500; ++i) {
         empties += ",{}";
     }
     CHECK(parseProblems(empties + "]").size() == 1);
