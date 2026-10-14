@@ -1,0 +1,154 @@
+#include "ichor/world/validation.h"
+
+#include "ichor/core/hash.h"
+#include "ichor/world/forge.h"
+
+#include <algorithm>
+#include <exception>
+#include <format>
+#include <utility>
+
+namespace ichor {
+
+namespace {
+
+constexpr std::uint64_t kMinLandPerMille = 20;
+constexpr std::uint16_t kMinSampleRange = 256;
+constexpr std::uint32_t kRerollCeiling = 64;
+
+std::optional<std::string> landAboveWater(const ForgedWorld& world, const ForgeRequest& request)
+{
+    if (!request.desc.hasWater()) {
+        return std::nullopt;
+    }
+    const std::uint32_t n = request.desc.samplesPerSide();
+    std::uint64_t land = 0;
+    for (std::uint32_t z = 0; z < n; ++z) {
+        for (std::uint32_t x = 0; x < n; ++x) {
+            land += world.heightfield.heightAtSample(x, z) > request.desc.waterLevel() ? 1 : 0;
+        }
+    }
+    const std::uint64_t total = static_cast<std::uint64_t>(n) * n;
+    if (land * 1000 < total * kMinLandPerMille) {
+        return std::format("{} of {} samples are above the water, under {}%", land, total, kMinLandPerMille / 10);
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> notFlat(const ForgedWorld& world, const ForgeRequest&)
+{
+    const auto& samples = world.heightfield.samples();
+    if (samples.empty()) {
+        return "the world has no samples";
+    }
+    const auto [low, high] = std::minmax_element(samples.begin(), samples.end());
+    if (static_cast<std::uint32_t>(*high - *low) < kMinSampleRange) {
+        return std::format("the heights span only {} of 65535 sample units", *high - *low);
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> hasRiver(const ForgedWorld& world, const ForgeRequest& request)
+{
+    if (!request.carveRivers) {
+        return std::nullopt;
+    }
+    for (std::size_t i = 0; i < world.hydrology.accumulation.size(); ++i) {
+        if (isRiver(world.hydrology, i, request.rivers)) {
+            return std::nullopt;
+        }
+    }
+    return std::format("no sample has {} or more draining through it", request.rivers.riverThreshold);
+}
+
+std::optional<std::string> hydrologyAgrees(const ForgedWorld& world, const ForgeRequest& request)
+{
+    const Hydrology& h = world.hydrology;
+    const std::size_t count = static_cast<std::size_t>(request.desc.samplesPerSide()) * request.desc.samplesPerSide();
+    if (h.side != request.desc.samplesPerSide() || h.filled.size() != count || h.direction.size() != count || h.accumulation.size() != count || h.lake.size() != count) {
+        return "the hydrology does not cover the heightfield";
+    }
+    for (std::size_t i = 0; i < count; ++i) {
+        if (h.lake[i] > h.lakeDeepest.size()) {
+            return std::format("sample {} names lake {} but only {} lakes exist", i, h.lake[i], h.lakeDeepest.size());
+        }
+        if (h.accumulation[i] == 0) {
+            return std::format("sample {} drains nothing, not even itself", i);
+        }
+    }
+    return std::nullopt;
+}
+
+}
+
+std::uint64_t attemptSeed(std::uint64_t worldSeed, std::uint32_t attempt)
+{
+    return attempt == 0 ? worldSeed : hashCombine(worldSeed, attempt);
+}
+
+ForgedWorld forgeWorld(const ForgeRequest& request)
+{
+    ForgedWorld world;
+    world.heightfield = forgeHeightfield(request.desc);
+    if (request.carveRivers) {
+        world.heightfield = carveRivers(world.heightfield, computeHydrology(world.heightfield), request.rivers, CarveParams{});
+    }
+    world.hydrology = computeHydrology(world.heightfield);
+    return world;
+}
+
+std::vector<GateFailure> runGates(const std::vector<Gate>& gates, const ForgedWorld& world, const ForgeRequest& request)
+{
+    std::vector<GateFailure> failures;
+    for (const Gate& gate : gates) {
+        try {
+            if (auto reason = gate.check(world, request)) {
+                failures.push_back({gate.name, std::move(*reason)});
+            }
+        } catch (const std::exception& e) {
+            failures.push_back({gate.name, std::string("threw: ") + e.what()});
+        } catch (...) {
+            failures.push_back({gate.name, "threw a non-standard exception"});
+        }
+    }
+    return failures;
+}
+
+std::vector<Gate> defaultGates()
+{
+    return {
+        {"land-above-water", landAboveWater},
+        {"not-flat", notFlat},
+        {"has-river", hasRiver},
+        {"hydrology-agrees", hydrologyAgrees},
+    };
+}
+
+ValidatedWorld forgeValidated(const ForgeRequest& request, const std::vector<Gate>& gates, std::uint32_t maxRerolls)
+{
+    ValidatedWorld result;
+    result.seed = request.desc.seed;
+    maxRerolls = std::min(maxRerolls, kRerollCeiling);
+    for (std::uint32_t attempt = 0; attempt <= maxRerolls; ++attempt) {
+        ForgeRequest tried = request;
+        tried.desc.seed = attemptSeed(request.desc.seed, attempt);
+        ForgedWorld world = forgeWorld(tried);
+        std::vector<GateFailure> failures = runGates(gates, world, tried);
+        if (failures.empty()) {
+            if (attempt > 0) {
+                world.heightfield = Heightfield(request.desc, world.heightfield.samples());
+            }
+            result.world = std::move(world);
+            result.attempt = attempt;
+            result.passed = true;
+            return result;
+        }
+        if (attempt == 0) {
+            result.world = std::move(world);
+        }
+        result.rejected.push_back({attempt, tried.desc.seed, std::move(failures)});
+    }
+    return result;
+}
+
+}

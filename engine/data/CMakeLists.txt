@@ -3,8 +3,10 @@ find_package(nlohmann_json CONFIG REQUIRED)
 add_library(ichor_data
     src/data_set.cpp
     src/npc_traits.cpp
+    src/npc_tiers.cpp
     src/axiom.cpp
     src/journal.cpp
+    src/slot_roll.cpp
     src/conflicts.cpp
 )
 target_include_directories(ichor_data PUBLIC include)
