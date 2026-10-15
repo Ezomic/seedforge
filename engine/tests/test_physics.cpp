@@ -237,7 +237,7 @@ TEST_CASE("debug lines describe every body")
 
 namespace {
 
-constexpr double kBadValues[] = {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()};
+constexpr double kBadValues[] = {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(), 1.0e300};
 
 bool finite(glm::dvec3 v)
 {
@@ -255,6 +255,7 @@ std::uint64_t tickedHashAfterBadPosition(double bad, int axis)
         scene.tick(kDt);
     }
     REQUIRE(finite(heroTransform(scene).position));
+    REQUIRE(glm::length(heroTransform(scene).position - glm::dvec3(1.0, 0.0, 1.0)) < 1.0);
     REQUIRE(std::isfinite(heroBody(scene).velocity.y));
     REQUIRE(std::isfinite(heroBody(scene).fallSpeed));
     return scene.stateHash();

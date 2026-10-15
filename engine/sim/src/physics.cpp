@@ -26,10 +26,11 @@ namespace ichor {
 
 namespace {
 
-// Jolt asserts, or the float cast overflows, on a NaN or infinite coordinate; none may get past this file.
+// Jolt asserts, or the float cast overflows, on a NaN, infinite or absurdly large coordinate; none may get past this file.
 bool finite(glm::dvec3 v)
 {
-    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    constexpr double kLimit = 1.0e9;
+    return std::abs(v.x) <= kLimit && std::abs(v.y) <= kLimit && std::abs(v.z) <= kLimit;
 }
 
 namespace Layers {
@@ -180,11 +181,11 @@ PhysicsWorld::~PhysicsWorld()
 
 void PhysicsWorld::addStaticBox(StableId id, const StaticBox& box, const Transform& transform)
 {
+    remove(id);
     if (!finite(transform.position)) {
         log(LogLevel::Error, "physics: non-finite position, static box dropped");
         return;
     }
-    remove(id);
     Impl::StaticEntry entry;
     entry.shape = new JPH::BoxShape(toJolt(box.halfExtents));
     entry.worldPosition = transform.position;
