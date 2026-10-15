@@ -84,6 +84,7 @@ AmbusherIntent ambusherStep(AmbusherBrain& brain, const AmbusherSenses& senses, 
     if (brain.state > static_cast<std::uint8_t>(AmbusherState::Withdraw)) enter(brain, AmbusherState::Hidden);
     brain.stateTicks = std::clamp(brain.stateTicks, 0, kMaxTicks);
     brain.cooldownTicks = std::clamp(brain.cooldownTicks, 0, kMaxTicks);
+    brain.strikes = std::clamp(brain.strikes, 0, kMaxTicks);
     brain.spotTicks = std::clamp(brain.spotTicks, 0, std::max(tuning.spotTicksNeeded, 0));
 
     brain.stateTicks += 1;
@@ -126,7 +127,7 @@ AmbusherIntent ambusherStep(AmbusherBrain& brain, const AmbusherSenses& senses, 
         if (brain.stateTicks >= (brain.ambush ? tuning.ambushWindupTicks : tuning.windupTicks)) {
             intent.strike = true;
             intent.ambush = brain.ambush;
-            brain.strikes += 1;
+            brain.strikes = std::min(brain.strikes + 1, kMaxTicks);
             enter(brain, AmbusherState::Recover);
         }
         break;
@@ -136,7 +137,7 @@ AmbusherIntent ambusherStep(AmbusherBrain& brain, const AmbusherSenses& senses, 
         break;
 
     case AmbusherState::Withdraw:
-        if (glm::length(senses.cover - senses.self) <= tuning.arriveRadius) {
+        if (glm::length(senses.cover - senses.self) <= std::max(tuning.arriveRadius, 1e-4f) || brain.stateTicks > tuning.withdrawMaxTicks) {
             brain.cooldownTicks = tuning.rearmTicks;
             brain.spotTicks = 0;
             brain.concealed = true;

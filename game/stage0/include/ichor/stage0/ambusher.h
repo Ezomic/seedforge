@@ -21,6 +21,7 @@ struct AmbusherTuning {
     int windupTicks = 30;         // a blown ambush gives the same tell as any other attack
     int recoveryTicks = 45;
     int rushMaxTicks = 120;       // gives up the chase and withdraws
+    int withdrawMaxTicks = 300;   // blocked on the way home: hides where it stands rather than never re-arming
     int rearmTicks = 240;         // hidden again, but deaf to triggers for this long
     float strikeRange = 1.4f;
     float rushSpeed = 6.0f;

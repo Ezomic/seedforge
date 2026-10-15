@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <utility>
 
 using namespace ichor;
 using namespace ichor::stage0;
@@ -286,6 +287,45 @@ TEST_CASE("a loaded brain with an unknown state or wild counters is pulled back 
     REQUIRE(w.brain.spotTicks <= kTuning.spotTicksNeeded);
 }
 
+TEST_CASE("a loaded brain in a live state has its counters clamped")
+{
+    World w;
+    w.brain.state = static_cast<std::uint8_t>(AmbusherState::Recover);
+    w.brain.stateTicks = -5;
+    w.brain.strikes = std::numeric_limits<std::int32_t>::max();
+    w.tick();
+    REQUIRE(w.brain.stateTicks == 1);
+    REQUIRE(w.brain.strikes <= (1 << 20));
+    w.brain.stateTicks = std::numeric_limits<std::int32_t>::max();
+    w.tick();
+    REQUIRE(w.brain.stateTicks <= (1 << 20) + 1);
+}
+
+TEST_CASE("a committed strike still lands when the target runs off")
+{
+    World w;
+    w.senses.target = {kTuning.triggerRange - 0.5f, 0.0f};
+    REQUIRE(w.tickUntil(AmbusherState::Strike, 200));
+    w.senses.target = {500.0f, 0.0f};
+    REQUIRE(w.ticksToStrike(200) == kTuning.ambushWindupTicks);
+    REQUIRE(w.strikes == 1);
+}
+
+TEST_CASE("a withdraw that can never arrive times out and re-arms in place")
+{
+    AmbusherTuning t;
+    t.withdrawSpeed = 0.0f;
+    AmbusherBrain brain;
+    brain.state = static_cast<std::uint8_t>(AmbusherState::Withdraw);
+    AmbusherSenses s;
+    s.self = {5.0f, 0.0f};
+    for (int i = 0; i < t.withdrawMaxTicks + 5; ++i) {
+        ambusherStep(brain, s, t);
+    }
+    REQUIRE(brain.ambusherState() == AmbusherState::Hidden);
+    REQUIRE(brain.cooldownTicks > 0);
+}
+
 TEST_CASE("degenerate tuning cannot divide by zero or stall")
 {
     AmbusherTuning t;
@@ -294,13 +334,17 @@ TEST_CASE("degenerate tuning cannot divide by zero or stall")
     t.windupTicks = -4;
     t.ambushWindupTicks = -4;
     AmbusherBrain brain;
+    t.arriveRadius = 0.0f;
     AmbusherSenses s;
     s.target = {1.0f, 0.0f};
+    int strikes = 0;
     for (int i = 0; i < 100; ++i) {
         const AmbusherIntent intent = ambusherStep(brain, s, t);
         REQUIRE(std::isfinite(intent.move.x));
         REQUIRE(std::isfinite(intent.move.y));
+        strikes += intent.strike ? 1 : 0;
     }
+    REQUIRE(strikes >= 1);
 }
 
 TEST_CASE("the same inputs step to the same bits every run")
@@ -313,8 +357,8 @@ TEST_CASE("the same inputs step to the same bits every run")
             w.senses.targetFacing = {i % 200 < 100 ? -1.0f : 1.0f, 0.1f};
             w.tick();
         }
-        return hashBrain(w.brain, w.self);
+        return std::pair{hashBrain(w.brain, w.self), w.strikes};
     };
     REQUIRE(run() == run());
-    REQUIRE(run() != 0);
+    REQUIRE(run().second >= 1);
 }
