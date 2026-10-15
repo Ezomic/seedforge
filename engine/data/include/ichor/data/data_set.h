@@ -16,6 +16,7 @@ using DataValue = std::variant<bool, double, std::string, std::vector<std::strin
 
 struct DataRecord {
     std::string id;
+    std::string file; // data-root-relative path of the file that defined it
     std::map<std::string, DataValue, std::less<>> fields;
 };
 

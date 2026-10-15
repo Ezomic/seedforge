@@ -679,6 +679,7 @@ bool AxiomSet::loadDirectory(const std::filesystem::path& dataRoot)
         if (!parseAxiom(label, text, axiom, problems)) {
             continue;
         }
+        axiom.file = label;
         if (const auto seen = origin.find(axiom.id); seen != origin.end()) {
             problems.push_back(label + ": id: duplicate of \"" + axiom.id + "\" in " + seen->second);
             continue;
