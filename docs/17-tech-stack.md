@@ -102,6 +102,7 @@ Tuesday.
 | Navigation | **Recast / Detour** | Navmesh per streaming cell, stitched at borders |
 | UI | **Dear ImGui** (tools), **RmlUi** (game) | Tools first; the game UI is minimal by design |
 | Scripting | **Lua** via **sol2** | Quests, dialogue and encounter scripts live in data |
+| Data in | **nlohmann-json** | `data/` is JSON; the cooker, the generator and the data loaders parse it |
 | Serialisation | own reflection + binary writer | The ledger is a few hundred thousand small facts; see [14](14-save-system.md) |
 | Profiling | **Tracy**, **RenderDoc** | |
 | Tests | **Catch2**, **Google Benchmark**, **libFuzzer** | |
