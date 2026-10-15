@@ -1,0 +1,6 @@
+{
+  "roughness": { "min": 0.35, "max": 0.95 },
+  "albedo": { "min": 0.04, "max": 0.85 },
+  "metal_f0": { "min": 0.45, "max": 0.95 },
+  "dielectric_f0": 0.04
+}

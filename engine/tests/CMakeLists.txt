@@ -29,6 +29,7 @@ add_executable(ichor_tests
     test_npc_schedule.cpp
     test_npc_traits.cpp
     test_factions.cpp
+    test_material_limits.cpp
     test_npc_tiers.cpp
     test_traversal_verbs.cpp
     test_axiom.cpp

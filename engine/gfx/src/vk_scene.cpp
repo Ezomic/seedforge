@@ -50,8 +50,9 @@ struct FrameData {
     glm::vec4 materialParams;
     glm::vec4 groundParams;
     glm::vec4 cloudShadow;
+    glm::vec4 specularParams;
 };
-static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 20));
+static_assert(sizeof(FrameData) % 16 == 0 && sizeof(FrameData) == 16 * (4 * (3 + kCascadeCount) + 21));
 
 struct InstanceGpu {
     glm::vec4 positionScale; // xyz relative to the cell origin, w scale
@@ -1031,7 +1032,10 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
     const auto view = [&](std::uint32_t index, const GpuImage& fallback) {
         return index != kNoTexture && textureBase + index < textures_.size() ? textures_[textureBase + index].view : fallback.view;
     };
-    for (const Material& material : bundle.materials) {
+    const MaterialLimits& limits = activeMaterialLimits();
+    logMaterialIssues("upload", findMaterialIssues(bundle.materials, limits));
+    for (Material material : bundle.materials) {
+        clampMaterial(material, limits);
         VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         allocInfo.descriptorPool = pool_;
         allocInfo.descriptorSetCount = 1;
@@ -1118,6 +1122,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     data.gradeShadows = glm::vec4(view.grade.shadows, 0.0f);
     data.gradeHighlights = glm::vec4(view.grade.highlights, 0.0f);
     data.materialParams = glm::vec4(view.response.roughnessMin, view.response.roughnessMax, view.response.albedoMin, view.response.albedoMax);
+    data.specularParams = glm::vec4(view.response.metalF0Min, view.response.metalF0Max, view.response.dielectricF0, 0.0f);
     data.groundParams = glm::vec4(view.groundColor, view.groundBlendHeight);
     const CloudShadow cloudShadow = cloudShadowFor(sun, view.cloudCover, view.camera.position, view.windDirection, view.time);
     data.cloudShadow = glm::vec4(cloudShadow.strength, cloudShadow.offset, 0.0f);

@@ -232,6 +232,19 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         ichor::log(ichor::LogLevel::Warn, "audio: running silent");
     }
 
+    ichor::Palette palette = ichor::defaultPalette();
+    {
+        ichor::MaterialLimits limits;
+        std::vector<std::string> problems;
+        if (ichor::loadMaterialLimits(options.data / "materials" / "response.json", limits, problems)) {
+            palette.response = limits;
+        }
+        for (const std::string& problem : problems) {
+            ichor::logf(ichor::LogLevel::Warn, "material limits: {}", problem);
+        }
+        ichor::setActiveMaterialLimits(palette.response);
+    }
+
     ichor::SceneBundle bundle;
     if (!ichor::readBundle(options.scene, bundle) || !renderer.uploadBundle(bundle)) {
         return 1;
@@ -524,8 +537,6 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     if (!reloadAllowed) {
         ichor::log(ichor::LogLevel::Info, "hot reload of scripts and data is off while recording or replaying");
     }
-
-    const ichor::Palette palette = ichor::defaultPalette();
 
     // The game UI draws through the window renderer; headless runs have none. The context goes
     // before the HUD so the HUD, which borrows it, goes first.
