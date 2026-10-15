@@ -1,0 +1,16 @@
+{
+  "id": "law.orichalcum",
+  "slot": "law",
+  "title": "Orichalcum",
+  "tags": ["ORE", "VOLCANIC", "WEIGHT", "TERRITORY"],
+  "conflicts": [],
+
+  "settlement": { "prefer_slope": "steep", "density_mult": 0.9 },
+  "biomes": { "inject": ["volcanic_ridge", "ashfall"] },
+  "poi": { "weights": { "orichalcum_mine": 4.0, "ridge_fortress": 2.5, "refinery": 2.0, "farmstead": 0.8 } },
+  "enemies": { "roster_add": ["ore_golem", "mine_warden"] },
+  "traversal": { "unlock": ["mine_cart"] },
+  "economy": { "scarce": ["timber"], "abundant": ["orichalcum_ore", "refined_charge"] },
+  "palette": { "grade": "orichalcum", "fog_density": 1.2 },
+  "audio": { "bed_overrides": ["forge_distant", "ridge_rumble"], "music_palette": "orichalcum" }
+}
