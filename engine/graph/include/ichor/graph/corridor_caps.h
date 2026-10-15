@@ -14,7 +14,7 @@ enum class Variation : std::uint8_t {
     Landmark,    // something to look at breaks the sightline
 };
 
-// One piece of a corridor path. A piece with a variation other than None is a
+// One piece of a corridor path. A piece with a variation other than None must be a
 // zero-length marker between straight pieces and resets the straight run.
 struct Segment {
     float length = 0.0f;
@@ -40,7 +40,8 @@ struct Result {
 
 // Splits straight runs so none is longer than maxStraight, inserting a forced
 // variation (chosen by the seed) each time a cap is hit with more straight
-// path still to come. A run of exactly maxStraight needs no variation. Zero
+// path still to come. A forced width change lasts until the next authored
+// variation. A run of exactly maxStraight needs no variation. Zero
 // length straight pieces are dropped. Pure and deterministic: the same path
 // and params give the same output. NaN, infinite, negative or oversized input,
 // and a result that would exceed kMaxOutputSegments, yield an error instead

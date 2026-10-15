@@ -57,6 +57,8 @@ Result applyCaps(const std::vector<Segment>& path, const Params& params)
     for (const Segment& s : path) {
         if (!finiteAtLeast(s.length, 0.0f))
             return failure("segment length must be finite and not negative");
+        if (s.variation != Variation::None && s.length != 0.0f)
+            return failure("a variation marker must have zero length");
         if (!std::isfinite(s.width) || s.width < kMinWidth || s.width > kMaxWidth)
             return failure("segment width out of range");
         if (static_cast<std::uint8_t>(s.variation) > static_cast<std::uint8_t>(Variation::Landmark))
@@ -66,6 +68,7 @@ Result applyCaps(const std::vector<Segment>& path, const Params& params)
     Rng rng(params.seed);
     Result result;
     float run = 0.0f;
+    float forcedWidth = 0.0f; // zero until a forced width change; lasts until an authored variation
 
     const auto emit = [&result](const Segment& s) {
         if (result.segments.size() >= kMaxOutputSegments)
@@ -80,10 +83,11 @@ Result applyCaps(const std::vector<Segment>& path, const Params& params)
             if (!emit(s))
                 return failure(tooMany);
             run = 0.0f;
+            forcedWidth = 0.0f;
             continue;
         }
 
-        float width = s.width;
+        float width = forcedWidth > 0.0f ? forcedWidth : s.width;
         float remaining = s.length;
         while (remaining > 0.0f) {
             const float room = params.maxStraight - run;
@@ -93,13 +97,15 @@ Result applyCaps(const std::vector<Segment>& path, const Params& params)
                 run += remaining;
                 break;
             }
-            if (!emit(Segment{room, width, Variation::None}))
+            if (room > 0.0f && !emit(Segment{room, width, Variation::None}))
                 return failure(tooMany);
             remaining -= room;
             const Segment forced = forcedVariation(rng, width);
             if (!emit(forced))
                 return failure(tooMany);
             width = forced.width;
+            if (forced.variation == Variation::WidthChange)
+                forcedWidth = width;
             run = 0.0f;
         }
     }

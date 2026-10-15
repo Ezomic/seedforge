@@ -165,10 +165,8 @@ TEST_CASE("huge lengths fail cleanly instead of growing", "[corridor]")
 TEST_CASE("output is bounded", "[corridor]")
 {
     const Result r = applyCaps(straight(20000.0f), params(1, 10.0f));
-    if (r.error.empty())
-        REQUIRE(r.segments.size() <= kMaxOutputSegments);
-    else
-        REQUIRE(r.segments.empty());
+    REQUIRE(r.error.empty());
+    REQUIRE(r.segments.size() <= kMaxOutputSegments);
     const Result big = applyCaps(straight(1.0e6f), params(1, kMinCap));
     REQUIRE_FALSE(big.error.empty());
 }
@@ -198,4 +196,36 @@ TEST_CASE("an unknown variation value is rejected", "[corridor]")
 {
     const Segment s{1.0f, 2.0f, static_cast<Variation>(200)};
     REQUIRE_FALSE(applyCaps({s}, params()).error.empty());
+}
+
+TEST_CASE("a run landing exactly on the cap emits no zero length piece", "[corridor]")
+{
+    const std::vector<Segment> path{{10.0f, 2.0f, Variation::None}, {5.0f, 2.0f, Variation::None}};
+    const Result r = applyCaps(path, params());
+    REQUIRE(r.error.empty());
+    REQUIRE(variations(r.segments) == 1);
+    for (const Segment& s : r.segments)
+        REQUIRE((s.variation != Variation::None || s.length > 0.0f));
+    REQUIRE(longestStraightRun(r.segments) <= 10.0f);
+}
+
+TEST_CASE("a marker with a length is rejected", "[corridor]")
+{
+    REQUIRE_FALSE(applyCaps({{3.0f, 2.0f, Variation::Bend}}, params()).error.empty());
+}
+
+TEST_CASE("a forced width change carries into the next straight piece", "[corridor]")
+{
+    const std::vector<Segment> path{{15.0f, 2.0f, Variation::None}, {15.0f, 2.0f, Variation::None}};
+    for (std::uint64_t seed = 0; seed < 30; ++seed) {
+        const Result r = applyCaps(path, params(seed));
+        REQUIRE(r.error.empty());
+        float width = 2.0f;
+        for (const Segment& s : r.segments) {
+            if (s.variation == Variation::None)
+                REQUIRE(s.width == width);
+            else
+                width = s.width;
+        }
+    }
 }
