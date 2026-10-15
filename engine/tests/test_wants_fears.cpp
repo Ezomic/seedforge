@@ -156,7 +156,39 @@ TEST_CASE("the shipped desires file parses and every record can fire", "[npc][de
     for (const auto& d : list) {
         hasWant = hasWant || d.kind == DesireKind::Want;
         hasFear = hasFear || d.kind == DesireKind::Fear;
+        const auto& c = d.condition;
+        const std::int64_t holds = c.op == CompareOp::Lt ? c.value - 1 : c.op == CompareOp::Gt ? c.value + 1 : c.value;
+        const std::int64_t fails = c.op == CompareOp::Lt ? c.value : c.op == CompareOp::Gt ? c.value : c.op == CompareOp::Le ? c.value + 1 : c.op == CompareOp::Ge ? c.value - 1 : c.value + 1;
+        INFO(d.id);
+        CHECK(ids(activeDesires({ d }, { { c.tag, holds } })) == std::vector<std::string> { d.id });
+        CHECK(activeDesires({ d }, { { c.tag, fails } }).empty());
     }
     CHECK(hasWant);
     CHECK(hasFear);
+}
+
+TEST_CASE("the canonical form is pinned and the digest follows the content", "[npc][desires]")
+{
+    const auto one = parseOk("[" + record("a", "want", 5, "x", ">", "0") + "]");
+    CHECK(desireCanonicalJson(one[0]) == "{\"id\":\"a\",\"intensity\":5,\"kind\":\"want\",\"op\":\">\",\"subject\":\"grain\",\"tag\":\"x\",\"value\":0}");
+
+    const auto ab = parseOk("[" + record("a", "want", 5, "x", ">", "0") + "," + record("b", "fear", 5, "x", ">", "0") + "]");
+    const auto changed = parseOk("[" + record("a", "want", 5, "x", ">", "0") + "," + record("b", "fear", 5, "x", ">", "1") + "]");
+    const auto renamed = parseOk("[" + record("a", "want", 5, "x", ">", "0") + "," + record("c", "fear", 5, "x", ">", "0") + "]");
+    const auto dropped = parseOk("[" + record("a", "want", 5, "x", ">", "0") + "]");
+    CHECK(desiresDigest(ab) != desiresDigest(changed));
+    CHECK(desiresDigest(ab) != desiresDigest(renamed));
+    CHECK(desiresDigest(ab) != desiresDigest(dropped));
+}
+
+TEST_CASE("malformed shapes are reported, an empty array is fine", "[npc][desires]")
+{
+    CHECK(parseOk("[]").empty());
+    CHECK(mentions(problemsOf("[1]"), "[0]: expected an object"));
+    CHECK(mentions(problemsOf("[" + record("A", "want", 5, "t", ">", "1") + "]"), "[0].id"));
+    CHECK(mentions(problemsOf("[" + record("1a", "want", 5, "t", ">", "1") + "]"), "[0].id"));
+    CHECK(mentions(problemsOf("[" + record(std::string(65, 'a'), "want", 5, "t", ">", "1") + "]"), "[0].id"));
+    CHECK(mentions(problemsOf("[{\"id\":5,\"kind\":7,\"subject\":\"s\",\"intensity\":\"3\",\"tag\":\"t\",\"op\":1,\"value\":\"1\"}]"), "[0].intensity"));
+    CHECK(mentions(problemsOf("[" + record("a", "want", 5, "t", ">", "-9223372036854775809") + "]"), "[0].value"));
+    CHECK(mentions(problemsOf("[" + record("a", "want", 0, "t", ">", "1") + "," + record("a", "want", 5, "t", ">", "1") + "]"), "[1].id"));
 }

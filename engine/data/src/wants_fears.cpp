@@ -8,7 +8,9 @@
 #include <array>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <set>
+#include <utility>
 
 namespace ichor {
 
@@ -209,14 +211,12 @@ bool parseDesires(std::string_view label, std::string_view text, std::vector<Des
     for (std::size_t i = 0; i < json.size(); ++i) {
         const std::string path = "[" + std::to_string(i) + "]";
         Desire desire;
-        if (!reader.desire(json[i], path, desire)) {
-            continue;
-        }
-        if (!seen.insert(desire.id).second) {
+        const bool valid = reader.desire(json[i], path, desire);
+        if (!desire.id.empty() && !seen.insert(desire.id).second) {
             reader.add(path + ".id", "duplicate " + shown(desire.id));
-            continue;
+        } else if (valid) {
+            parsed.push_back(std::move(desire));
         }
-        parsed.push_back(std::move(desire));
     }
     if (problems.size() != before) {
         return false;
