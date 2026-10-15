@@ -80,9 +80,48 @@ TEST_CASE("bad table data is reported with a path")
     CHECK(mentions(parseProblems(R"([{"id": "a", "name": "x"}])"), "[0].description: missing"));
     CHECK(mentions(parseProblems("[" + entry("a") + "," + entry("a") + "]"), "[1].id: duplicate"));
     CHECK(mentions(parseProblems(R"([{"id": "a", "id": "b", "name": "x", "description": "y"}])"), "duplicate key"));
-    CHECK(mentions(parseProblems(R"([{"id": "a", "name": "x—y", "description": "y"}])"), "em-dash"));
+    CHECK(mentions(parseProblems(R"([{"id": "a", "name": "x—y","description": "y"}])"), "em-dash"));
     CHECK(mentions(parseProblems(R"([{"id": "a", "name": "x", "description": "y", "requires": "b"}])"), "[0].requires: expected an array"));
     CHECK(mentions(parseProblems(R"([{"id": "a", "name": "x", "description": "y", "requires": [1]}])"), "[0].requires[0]: expected a string"));
+}
+
+TEST_CASE("input limits are enforced")
+{
+    const auto one = [](const std::string& field, const std::string& value) {
+        return "[{\"id\": \"a\", \"name\": \"x\", \"description\": \"y\", \"" + field + "\": " + value + "}]";
+    };
+    CHECK(mentions(parseProblems(std::string(1024 * 1024 + 1, ' ')), "larger than"));
+    CHECK(mentions(parseProblems(std::string(20, '[') + std::string(20, ']')), "nested deeper"));
+
+    std::string many = "[";
+    for (int i = 0; i < 257; ++i) {
+        many += (i == 0 ? "" : ",") + entry("c" + std::to_string(i));
+    }
+    CHECK(mentions(parseProblems(many + "]"), "more than 256"));
+
+    CHECK(mentions(parseProblems("[" + entry(std::string(65, 'a')) + "]"), "[0].id: longer than"));
+    CHECK(mentions(parseProblems(R"([{"id": 5, "name": "x", "description": "y"}])"), "[0].id: expected a string"));
+    CHECK(mentions(parseProblems(R"([{"id": "a", "name": "  ", "description": "y"}])"), "[0].name: must not be empty"));
+    CHECK(mentions(parseProblems(R"([{"id": "a", "name": ")" + std::string(121, 'x') + R"(", "description": "y"}])"), "[0].name: longer than"));
+    CHECK(mentions(parseProblems(R"([{"id": "a", "name": "x", "description": ")" + std::string(401, 'x') + R"("}])"), "[0].description: longer than"));
+
+    std::string required;
+    for (int i = 0; i < 17; ++i) {
+        required += (i == 0 ? "" : ",") + std::string("\"p") + std::to_string(i) + "\"";
+    }
+    CHECK(mentions(parseProblems(one("requires", "[" + required + "]")), "more than 16 prerequisites"));
+}
+
+TEST_CASE("a prerequisite listed twice is refused")
+{
+    CHECK(mentions(parseProblems("[" + entry("a") + "," + entry("b", R"("a", "a")") + "]"), "[1].requires[1]: duplicate"));
+}
+
+TEST_CASE("a bad entry and a cycle are both reported")
+{
+    const auto problems = parseProblems(R"([{"id": "Bad", "name": "x", "description": "y"}, )" + entry("a", R"("b")") + "," + entry("b", R"("a")") + "]");
+    CHECK(mentions(problems, "[0].id"));
+    CHECK(mentions(problems, "prerequisite cycle: a -> b -> a"));
 }
 
 TEST_CASE("a capability carries no numeric bonus")
@@ -233,6 +272,27 @@ TEST_CASE("unlock state round-trips through bytes")
     CHECK(loaded.unlocked() == unlocks.unlocked());
     CHECK(loaded.digest() == unlocks.digest());
     CHECK(loaded.serialise() == bytes);
+}
+
+TEST_CASE("the byte layout is version, count, then length-prefixed sorted ids")
+{
+    const auto table = chain();
+    CapabilityUnlocks unlocks(table);
+    unlocks.unlock("a");
+    CHECK(unlocks.serialise() == std::vector<std::uint8_t>{1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 'a'});
+}
+
+TEST_CASE("an empty unlock set serialises and loads")
+{
+    const auto table = chain();
+    CapabilityUnlocks unlocks(table);
+    const auto bytes = unlocks.serialise();
+    CHECK(bytes == std::vector<std::uint8_t>{1, 0, 0, 0, 0, 0, 0, 0});
+
+    CapabilityUnlocks target(table);
+    target.unlock("a");
+    REQUIRE(target.deserialise(bytes));
+    CHECK(target.unlocked().empty());
 }
 
 TEST_CASE("bytes that name an unknown capability are refused and leave the state alone")

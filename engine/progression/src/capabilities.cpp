@@ -249,8 +249,14 @@ bool parseCapabilities(std::string_view label, std::string_view text, std::vecto
             } else {
                 for (std::size_t p = 0; p < it->size(); ++p) {
                     const std::string path = at + ".requires[" + std::to_string(p) + "]";
-                    if (check.isString((*it)[p], path)) {
-                        capability.prerequisites.push_back((*it)[p].get<std::string>());
+                    if (!check.isString((*it)[p], path)) {
+                        continue;
+                    }
+                    const std::string& required = (*it)[p].get_ref<const std::string&>();
+                    if (std::find(capability.prerequisites.begin(), capability.prerequisites.end(), required) != capability.prerequisites.end()) {
+                        check.add(path, "duplicate of " + shown(required));
+                    } else {
+                        capability.prerequisites.push_back(required);
                     }
                 }
             }
@@ -282,7 +288,9 @@ std::vector<std::string> findPrerequisiteCycle(const std::vector<Capability>& ta
 {
     std::map<std::string, const Capability*> byId;
     for (const Capability& capability : table) {
-        byId.emplace(capability.id, &capability);
+        if (!capability.id.empty()) {
+            byId.emplace(capability.id, &capability);
+        }
     }
 
     enum class Mark { Open, Done };
