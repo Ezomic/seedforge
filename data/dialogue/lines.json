@@ -1,0 +1,2882 @@
+[
+ {
+  "id": "trait_bitter_greeting_1",
+  "text": "Oh, it's you. Come to take what's left? Take it. I've stopped counting what's been taken.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_bitter_greeting_2",
+  "text": "Morning. I'd say good, but I'd be lying, and I've been lied to enough for one lifetime.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_bitter_work_1",
+  "text": "I do the work, and someone else gets the credit. Always has been that way, always will be.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_bitter_work_2",
+  "text": "Another day at it. The pay doesn't rise, but the debts keep a steady pace.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_bitter_rumour_1",
+  "text": "They say things are improving. They said it last year, and the year before. Ask them where.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_bitter_rumour_2",
+  "text": "Everyone has a story about how hard it is. Mine's longer, and it's true.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_bitter_farewell_1",
+  "text": "Go on, then. Nobody stays. Nobody ever stays.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_bitter_farewell_2",
+  "text": "Mind yourself. Not that anyone else will.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_cheerful_greeting_1",
+  "text": "There you are! Sit, sit, the day's too long to spend it frowning.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_cheerful_greeting_2",
+  "text": "Good morning to you and to your enemies, may they sleep badly and wake up laughing.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_cheerful_work_1",
+  "text": "Work's work. But the singing makes the nets lighter, I swear it by whatever gods are still listening.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_cheerful_work_2",
+  "text": "Sore hands, full belly, a bad joke or two. What more does a person need?",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_cheerful_rumour_1",
+  "text": "Have you heard? No? Neither have I, but I'm sure it's awful and I can't wait to find out.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_cheerful_rumour_2",
+  "text": "The harbour's full of gossip today. Most of it's even true, which is a nice change.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_cheerful_farewell_1",
+  "text": "Off with you, then! Come back and tell me how it turned out.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_cheerful_farewell_2",
+  "text": "Safe roads, friend, and bring a story home.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_melancholy_greeting_1",
+  "text": "Ah. Another face. The town had more of them once.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_melancholy_greeting_2",
+  "text": "Hello. The light's turning, you notice? It always turns, and then it's gone.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_melancholy_work_1",
+  "text": "I do it the way my mother did it. She did it better. She isn't here to say so.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_melancholy_work_2",
+  "text": "The work goes on. That is its whole virtue, and its whole grief.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_melancholy_rumour_1",
+  "text": "News? I only hear about things after they've ended. It's a gift of sorts.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_melancholy_rumour_2",
+  "text": "They talk of the new road. I remember when we didn't need one, because we didn't have anywhere left to go.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_melancholy_farewell_1",
+  "text": "Go well. I'll be here. Somebody has to be.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_melancholy_farewell_2",
+  "text": "Goodbye. Come back before the evening takes the street.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_pious_greeting_1",
+  "text": "The gods keep you, stranger. Have you poured today?",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_pious_greeting_2",
+  "text": "Peace on your house. A little oil for the threshold, if you have it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_pious_work_1",
+  "text": "I lay the first fish on the stone before the rest. It has never failed me. Not yet.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_pious_work_2",
+  "text": "Work is a kind of prayer, if the hands are honest.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_pious_rumour_1",
+  "text": "People say the gods have gone quiet. Quiet is not gone. A listener learns the difference.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_pious_rumour_2",
+  "text": "I hear the old shrine road is clear again. A good sign, and I do not say that lightly.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_pious_farewell_1",
+  "text": "Walk under a good sky. I will say a word for you.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_pious_farewell_2",
+  "text": "Go, and pour a little where you stop to rest.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_skeptical_greeting_1",
+  "text": "Hm. Who sent you, and what are they paying for it?",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_skeptical_greeting_2",
+  "text": "Hello. I'll believe you're friendly when you've done something friendly.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_skeptical_work_1",
+  "text": "I measure twice and trust nothing. The scale doesn't care what anyone promises.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_skeptical_work_2",
+  "text": "Show me the tally. Not the story about the tally. The tally.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_skeptical_rumour_1",
+  "text": "A sea serpent off the north rocks, they say. I say a log, a bad light, and a drunk.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_skeptical_rumour_2",
+  "text": "Everyone has heard something. Nobody can say from whom. I'll wait for evidence.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_skeptical_farewell_1",
+  "text": "Goodbye. If you find proof of anything, I'd like to see it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_skeptical_farewell_2",
+  "text": "Off you go. Check your pack before you leave, not after.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_superstitious_greeting_1",
+  "text": "Stop! Left foot first over the threshold. There. Now you may come in.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_superstitious_greeting_2",
+  "text": "Three gulls on the roof this morning. I don't know what you've brought with you, but I'm glad you came.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_superstitious_work_1",
+  "text": "I never start a net on a fourth day. My father didn't either, and he died in bed.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_superstitious_work_2",
+  "text": "Spilled the salt again. I have to throw a pinch behind me and not look. Don't look.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_superstitious_rumour_1",
+  "text": "They say a bird flew backwards over the harbour at dusk. I won't repeat what that means.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_superstitious_rumour_2",
+  "text": "Heard a crow count to nine last night. Nine! Nobody will say what it's counting down to.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_superstitious_farewell_1",
+  "text": "Don't look back until the corner. It's bad luck. Truly.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_superstitious_farewell_2",
+  "text": "Take this knot of thread. Do not untie it. Do not ask.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_greedy_greeting_1",
+  "text": "Welcome, welcome. Everything here has a price, and I assure you mine are fair. For me.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_greedy_greeting_2",
+  "text": "Ah, a customer. Or a creditor. Which is it? The answer changes my smile.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_greedy_work_1",
+  "text": "I charge for the work, and I charge for the waiting. Time is also a good.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_greedy_work_2",
+  "text": "They call me tight. I call it noticing where the coin goes. I notice a great deal.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_greedy_rumour_1",
+  "text": "Rumours have value. What are you offering for this one?",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_greedy_rumour_2",
+  "text": "Prices are shifting. I could tell you which way, for a small consideration.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_greedy_farewell_1",
+  "text": "Come back with coin, and we'll be friends.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_greedy_farewell_2",
+  "text": "Leaving? Mind the step. Repairs cost, and the cost passes on.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_generous_greeting_1",
+  "text": "You look hungry. Here, take half. No, I won't hear any argument.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_generous_greeting_2",
+  "text": "Come in, come in. There's always one more place at the table, even when there isn't.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_generous_work_1",
+  "text": "I made too many, as usual. Take a few. Take more. They'll only go off.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_generous_work_2",
+  "text": "Never mind the price, we'll settle later. Or we won't. The world won't end.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_generous_rumour_1",
+  "text": "There's a family up the hill who could use a hand. I've sent what I could, and you might do the same.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_generous_rumour_2",
+  "text": "I hear the old widow's roof gave way. I'm collecting for the timber, if you can spare anything.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_generous_farewell_1",
+  "text": "Take bread for the road. No, take it. I insist.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_generous_farewell_2",
+  "text": "Go with my blessing, and a spare cloak, since you forgot yours.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_proud_greeting_1",
+  "text": "I trust you're here on business and not out of pity.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_proud_greeting_2",
+  "text": "Good day. My house is in order. You needn't look so closely.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_proud_work_1",
+  "text": "I make it right or I don't make it. There is no third option, and no, I don't want help.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_proud_work_2",
+  "text": "My family has done this work for four generations. I won't be the one to do it badly.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_proud_rumour_1",
+  "text": "They say the town is struggling. Some of us don't struggle, we endure, and it's quite different.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_proud_rumour_2",
+  "text": "Yes, I heard. I decline to discuss it with someone who has nothing to teach me.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_proud_farewell_1",
+  "text": "Good day. Don't trouble yourself to return unless it's worth both our time.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_proud_farewell_2",
+  "text": "Go, then. We managed before you came.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_humble_greeting_1",
+  "text": "Oh, hello. You needn't have bothered with me, but thank you.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_humble_greeting_2",
+  "text": "Good morning. Sorry, I'm in the way, aren't I? Let me move.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_humble_work_1",
+  "text": "It's the crew that does it, really. I just keep the rope from tangling.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_humble_work_2",
+  "text": "Nothing special in what I do. Anyone could, if they had the patience.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_humble_rumour_1",
+  "text": "Oh, I wouldn't know. People tell me things, and then forget they did.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_humble_rumour_2",
+  "text": "I heard something, but it's not mine to pass on. Not that I'd do it justice anyway.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_humble_farewell_1",
+  "text": "Thank you for stopping. Truly. It was kind.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_humble_farewell_2",
+  "text": "Go well. I hope I wasn't too much trouble.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_brave_greeting_1",
+  "text": "Ho! Well met. If it's trouble you've brought, bring it this way, I've time.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_brave_greeting_2",
+  "text": "Stand easy. Whatever's behind you, I've faced worse before breakfast.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_brave_work_1",
+  "text": "Somebody has to go first. It might as well be someone who doesn't mind the cold water.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_brave_work_2",
+  "text": "I do the dangerous part. Afterwards I'm told it was foolish, which is how I know it worked.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_brave_rumour_1",
+  "text": "Raiders on the north road, they say. I'd like to meet them. Let them find out how sharp I am.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_brave_rumour_2",
+  "text": "They say the cellar is haunted. I went down. It's just damp, and a very rude rat.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_brave_farewell_1",
+  "text": "Go and don't look afraid. They can smell it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_brave_farewell_2",
+  "text": "If you need an arm, you know where I stand.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_cowardly_greeting_1",
+  "text": "Oh! You startled me. Is anyone following you? Please say no.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_cowardly_greeting_2",
+  "text": "Hello. Keep your voice down. Walls here are thin and I don't like who's on the other side.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_cowardly_work_1",
+  "text": "I do my share, from the safe end. Somebody has to hold the lantern, and it can't be anyone brave, they'd wander off.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_cowardly_work_2",
+  "text": "I'd run an errand for you, but not that way, and not after dark, and not alone.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_cowardly_rumour_1",
+  "text": "Wolves, they say, or men dressed as wolves. I have a plan. The plan is to stay inside.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_cowardly_rumour_2",
+  "text": "They found tracks near the well. I've blocked my door. Twice.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_cowardly_farewell_1",
+  "text": "Be careful. Actually, be very careful. And tell me when you're back, so I know it's safe.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_cowardly_farewell_2",
+  "text": "Go on, I'll watch from the window. Not that I'd be any use if something happened.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_secretive_greeting_1",
+  "text": "Hello. And who told you I'd be here?",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_secretive_greeting_2",
+  "text": "Good day. You'll understand if I don't say much.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_secretive_work_1",
+  "text": "I keep my own methods. What I do in the back room is my own affair.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_secretive_work_2",
+  "text": "The work goes well enough. No, I won't say how. Ask something else.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_secretive_rumour_1",
+  "text": "What have you heard? Tell me first. Then I'll tell you whether it's wrong.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_secretive_rumour_2",
+  "text": "I know a few things. Some of them I'd rather you didn't.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_secretive_farewell_1",
+  "text": "We did not speak. You understand.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_secretive_farewell_2",
+  "text": "Go quietly. The street has ears.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_gossipy_greeting_1",
+  "text": "There you are! I was just about to tell somebody about the ferryman's wife, and you'll do beautifully.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_gossipy_greeting_2",
+  "text": "Oh, come closer, I've got three things to tell you and they're all better than the last.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_gossipy_work_1",
+  "text": "I work in a place where people talk. I hear everything, and I forget nothing.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_gossipy_work_2",
+  "text": "Between us, the foreman's a thief, but nobody's heard it from me. Keep it quiet.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_gossipy_rumour_1",
+  "text": "You haven't heard? Sit down. No, truly, sit. This will take a while and every word is true, more or less.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_gossipy_rumour_2",
+  "text": "Everyone's whispering about it. I wasn't going to say anything. Obviously I'm going to say something.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_gossipy_farewell_1",
+  "text": "Leaving already? I haven't even gotten to the part about the priest.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_gossipy_farewell_2",
+  "text": "Go, go, but come back. I'll have more by then. I always do.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_patient_greeting_1",
+  "text": "Hello. No hurry. The tide comes in whether we rush it or not.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_patient_greeting_2",
+  "text": "Welcome. Sit if you like. Nothing here is going anywhere.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_patient_work_1",
+  "text": "I do it slowly and once. It saves doing it quickly and twice.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_patient_work_2",
+  "text": "Everything ripens. A net, a debt, a feud. You only have to wait out the sun.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_patient_rumour_1",
+  "text": "They're in a panic about it, are they? Give it a week. Panic is a poor cook and burns the meal.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_patient_rumour_2",
+  "text": "I've heard it. I'll hear the other side before I decide anything.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_patient_farewell_1",
+  "text": "Go gently. We'll talk again when the moment's right.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_patient_farewell_2",
+  "text": "No need to rush. Whatever it is will still be there in the morning.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_greeting_1",
+  "text": "What? What do you want? No, never mind, come in, I'm not angry at you. Yet.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_greeting_2",
+  "text": "You! Good. I've been waiting to say something to someone, and you're the first one standing still.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_work_1",
+  "text": "If one more person tells me how to do my own job, I'll feed them to the nets.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_work_2",
+  "text": "Don't speak to me. Not until I've finished. Then you may speak. Carefully.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_rumour_1",
+  "text": "They said what about me? Where? Where is he? No, no, I'll find him myself.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_rumour_2",
+  "text": "That, I have heard. And if it's true, somebody is going to learn a great deal about my arm.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_farewell_1",
+  "text": "Go on. And forgive me for earlier. I'm not sorry, but I wanted you to know I would be, later.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_hot_tempered_farewell_2",
+  "text": "Get out of here before I say something I'll regret. Or something I won't. Go!",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_stern_greeting_1",
+  "text": "State your business.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_stern_greeting_2",
+  "text": "You are late. State it anyway.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_stern_work_1",
+  "text": "The task is simple. Do it properly. There is no further instruction.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_stern_work_2",
+  "text": "I do not praise. If you hear nothing, you have done well.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_stern_rumour_1",
+  "text": "I do not trade in talk. If there is a fact, give it to me plainly.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_stern_rumour_2",
+  "text": "The town speaks of many things. Most are noise. I attend to the rest.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_stern_farewell_1",
+  "text": "Go. Do not waste the daylight.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_stern_farewell_2",
+  "text": "Return when you have something to report.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_wry_greeting_1",
+  "text": "Ah, a visitor. I was beginning to think the day would pass without any new disappointments.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_wry_greeting_2",
+  "text": "Hello. You look like trouble. I mean that as a compliment, most days.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_wry_work_1",
+  "text": "Work's going about as well as the gods' last promise. That is to say, it exists, and I'm told it was honoured somewhere.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_wry_work_2",
+  "text": "I'm told there's dignity in labour. I haven't found it yet, but I'm only halfway through the shift.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_wry_rumour_1",
+  "text": "The gossip's good this season. Mostly fiction, but with a decent plot.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_wry_rumour_2",
+  "text": "Rumour has it things will improve. Rumour also has it I'm handsome, so weigh accordingly.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_wry_farewell_1",
+  "text": "Go well. Or at least go somewhere interesting, and tell me about it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_wry_farewell_2",
+  "text": "Farewell. If you die, I'll say something kind, and then lie about it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_curious_greeting_1",
+  "text": "Hello! Where did you come from? What did you see on the road? Start from the beginning.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_curious_greeting_2",
+  "text": "Oh, a traveller! You must have a hundred things to tell. I have exactly one question. Well, two.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_curious_work_1",
+  "text": "I took the clock apart to see how it works. It doesn't, now, but I understand it much better.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_curious_work_2",
+  "text": "Everything I make, I make three times, slightly differently, just to find out what changes.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_curious_rumour_1",
+  "text": "Tell me everything you've heard, and I'll tell you whether it fits what I already know. I like to see the seams.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_curious_rumour_2",
+  "text": "What's under the old tower? Nobody knows. I mean to be the first to ask the right person.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_curious_farewell_1",
+  "text": "Come back and tell me how it ended! The ending is the best part.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_curious_farewell_2",
+  "text": "Go, then. But write down what you see. I want the details.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_loyal_greeting_1",
+  "text": "Good day. If you're a friend of this house, you're welcome to my fire.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_loyal_greeting_2",
+  "text": "Hello. If you're not a friend, I'll still be polite. But I won't forget what I'm loyal to.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=greeting"
+  ]
+ },
+ {
+  "id": "trait_loyal_work_1",
+  "text": "I've served this crew twenty years. I'll serve them twenty more, and be glad of it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_loyal_work_2",
+  "text": "A promise is a promise. I made mine to the foreman, and I'll keep it until it breaks me.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=work"
+  ]
+ },
+ {
+  "id": "trait_loyal_rumour_1",
+  "text": "Whatever they say about my people, I'll hear it out and then decide who is lying. It won't be my people.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_loyal_rumour_2",
+  "text": "I don't listen to talk against those I've sworn to. Say it to their faces, or not at all.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=rumour"
+  ]
+ },
+ {
+  "id": "trait_loyal_farewell_1",
+  "text": "Go well. Our door stays open, as long as you do.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "trait_loyal_farewell_2",
+  "text": "Remember who stood by you. I'll remember too.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "topic=farewell"
+  ]
+ },
+ {
+  "id": "schedule_home_1",
+  "text": "Come in, mind the loom. It's the only warm corner, so I'm keeping it.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=home"
+  ]
+ },
+ {
+  "id": "schedule_home_2",
+  "text": "I'm home. Whatever it is, it can wait until I've had my supper.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=home"
+  ]
+ },
+ {
+  "id": "schedule_home_3",
+  "text": "Quiet in here, finally. Is there something you need?",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=home"
+  ]
+ },
+ {
+  "id": "schedule_home_4",
+  "text": "Take off your boots. The floor was clean this morning.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=home"
+  ]
+ },
+ {
+  "id": "schedule_home_5",
+  "text": "The hearth's lit. If you're staying, there's bread.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=home"
+  ]
+ },
+ {
+  "id": "schedule_work_1",
+  "text": "I'm in the middle of something. Talk while I work, or don't talk at all.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=work"
+  ]
+ },
+ {
+  "id": "schedule_work_2",
+  "text": "Hands busy. Say your piece, and I'll listen with one ear.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=work"
+  ]
+ },
+ {
+  "id": "schedule_work_3",
+  "text": "If you're not buying, hauling, or holding, you're in the way. Kindly.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=work"
+  ]
+ },
+ {
+  "id": "schedule_work_4",
+  "text": "Busy hour. Come back later, or carry something and walk with me.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=work"
+  ]
+ },
+ {
+  "id": "schedule_work_5",
+  "text": "Can't stop. The light's good for this, and it won't last.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=work"
+  ]
+ },
+ {
+  "id": "schedule_social_1",
+  "text": "Come, sit, the wine isn't very good but there's plenty of it.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=social"
+  ]
+ },
+ {
+  "id": "schedule_social_2",
+  "text": "Evening. This is the one hour of the day nobody asks anything of me. Join me.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=social"
+  ]
+ },
+ {
+  "id": "schedule_social_3",
+  "text": "I'm off the clock. Go on, ask me anything, I'm feeling lenient.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=social"
+  ]
+ },
+ {
+  "id": "schedule_social_4",
+  "text": "Pull up a stool. Everyone's here. Even the ones who owe me.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=social"
+  ]
+ },
+ {
+  "id": "schedule_social_5",
+  "text": "There's music in the back, and a game I'm losing. Stay and make it worse.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=social"
+  ]
+ },
+ {
+  "id": "schedule_sleep_1",
+  "text": "Mmf. What? It's the middle of the night. This had better be good.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=sleep"
+  ]
+ },
+ {
+  "id": "schedule_sleep_2",
+  "text": "Do you know what hour it is? Neither do I, but it's dark, and that's enough.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=sleep"
+  ]
+ },
+ {
+  "id": "schedule_sleep_3",
+  "text": "Go away. Come back when the sun is a decent person.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=sleep"
+  ]
+ },
+ {
+  "id": "schedule_sleep_4",
+  "text": "Whoever you are, I'll remember this at dawn. Not fondly.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=sleep"
+  ]
+ },
+ {
+  "id": "schedule_sleep_5",
+  "text": "Someone's at the door? At this hour? Gods, let me find my sandals.",
+  "weight": 2,
+  "cooldown": 1800,
+  "conditions": [
+   "schedule=sleep"
+  ]
+ },
+ {
+  "id": "relation_family_1",
+  "text": "My brother's out on the crews again. I tell him the sea gives back only what it feels like giving.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=family"
+  ]
+ },
+ {
+  "id": "relation_family_2",
+  "text": "Mother says I work too hard. Mother has never once let me stop.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=family"
+  ]
+ },
+ {
+  "id": "relation_family_3",
+  "text": "The children are fine. It's their father I worry about. He thinks he's still young.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=family"
+  ]
+ },
+ {
+  "id": "relation_family_4",
+  "text": "Blood is blood. You can't pick them. I would have picked a quieter lot.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=family"
+  ]
+ },
+ {
+  "id": "relation_family_5",
+  "text": "We eat together every night. It isn't peaceful, but it's ours.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=family"
+  ]
+ },
+ {
+  "id": "relation_rival_1",
+  "text": "Him? He undercuts me and smiles about it. One day the smile comes off.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=rival"
+  ]
+ },
+ {
+  "id": "relation_rival_2",
+  "text": "We came up together, he and I. Only one of us is allowed to have done well.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=rival"
+  ]
+ },
+ {
+  "id": "relation_rival_3",
+  "text": "If you see my rival, tell him nothing. If he asks about me, tell him I'm flourishing.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=rival"
+  ]
+ },
+ {
+  "id": "relation_rival_4",
+  "text": "There's a man in the next stall who thinks he's better than me. He's right about the stall.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=rival"
+  ]
+ },
+ {
+  "id": "relation_rival_5",
+  "text": "I don't hate her. I want to beat her. It's an old, honest kind of respect.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=rival"
+  ]
+ },
+ {
+  "id": "relation_creditor_1",
+  "text": "I owe a man more than I'll ever repay. He knows it. It's very civil, in its way.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=creditor"
+  ]
+ },
+ {
+  "id": "relation_creditor_2",
+  "text": "Don't mention the money. Whoever's holding my note is already too present in my thoughts.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=creditor"
+  ]
+ },
+ {
+  "id": "relation_creditor_3",
+  "text": "The payment's due at the next moon. I'll find it. I always find it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=creditor"
+  ]
+ },
+ {
+  "id": "relation_creditor_4",
+  "text": "He's lent me enough rope for a ship. I just haven't found out yet which end he's holding.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=creditor"
+  ]
+ },
+ {
+  "id": "relation_creditor_5",
+  "text": "They say debt is a chain. I say it's a very long leash, and I've learned where the slack is.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=creditor"
+  ]
+ },
+ {
+  "id": "relation_lover_1",
+  "text": "There's someone who waits for me by the water at dusk. That's all I'll say, and more than I should.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=lover"
+  ]
+ },
+ {
+  "id": "relation_lover_2",
+  "text": "She laughed at the way I tried to say it. I've never been happier to be a fool.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=lover"
+  ]
+ },
+ {
+  "id": "relation_lover_3",
+  "text": "I'd cross the hills for him. I haven't yet, but I've looked at them often.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=lover"
+  ]
+ },
+ {
+  "id": "relation_lover_4",
+  "text": "Don't tell the family. They'll have opinions, and I have only the one heart.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=lover"
+  ]
+ },
+ {
+  "id": "relation_lover_5",
+  "text": "Do you ever feel it? The way one person can make a whole market go quiet?",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=lover"
+  ]
+ },
+ {
+  "id": "relation_grudge_1",
+  "text": "I've kept it twenty years. It keeps well in the cold, and it never goes off.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=grudge"
+  ]
+ },
+ {
+  "id": "relation_grudge_2",
+  "text": "He knows what he did. I don't need to say it again. I only need to remember it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=grudge"
+  ]
+ },
+ {
+  "id": "relation_grudge_3",
+  "text": "I'll forgive when the dead come back. Not before.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=grudge"
+  ]
+ },
+ {
+  "id": "relation_grudge_4",
+  "text": "There's a name I won't say aloud. I say it quietly to myself, every night.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=grudge"
+  ]
+ },
+ {
+  "id": "relation_grudge_5",
+  "text": "A grudge is the one thing I own outright. I'm not selling it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "relation=grudge"
+  ]
+ },
+ {
+  "id": "town_short_of_grain_1",
+  "text": "The granary's thin. Everyone's pretending not to count the sacks.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "town_short_of_grain_2",
+  "text": "Bread's gone dear. A loaf is a week's argument these days.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "town_short_of_grain_3",
+  "text": "I've started cutting the barley with chaff. Don't tell the children.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "town_short_of_grain_4",
+  "text": "There's grain on the ships, they say. Which is a sort of comfort if you can eat rumours.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "town_short_of_grain_5",
+  "text": "When the grain runs short, so does everyone's patience. Mind yourself.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "town_rising_sea_1",
+  "text": "The water's higher at the steps this season. I used to have two more.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "town_rising_sea_2",
+  "text": "You hear it at night, the sea moving up the stones, like something looking for the door.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "town_rising_sea_3",
+  "text": "They moved the market again. The tide's making all the decisions now.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "town_rising_sea_4",
+  "text": "My grandmother's house is underwater. She'd call it an improvement, to be rid of the stairs.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "town_rising_sea_5",
+  "text": "We keep building higher. The sea keeps the schedule. It never loses.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "town_hulls_lost_1",
+  "text": "Another hull gone. Same stretch, same weather, same nothing to be done.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "town_hulls_lost_2",
+  "text": "They don't say the names on the quay anymore. There are too many for one breath.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "town_hulls_lost_3",
+  "text": "Whoever's sinking our boats had better stay out of the harbour. Or in it. I'm undecided.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "town_hulls_lost_4",
+  "text": "The shipwrights are working through the night. It's not enough, and they know it.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "town_hulls_lost_5",
+  "text": "Half the fleet's down. Half the town knows exactly who they were.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "town_blockaded_1",
+  "text": "The harbour's shut. Everything we need is sitting just past the mouth, within sight.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "town_blockaded_2",
+  "text": "Not a sail comes in. The merchants are counting their losses, and the rest of us are counting our meals.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "town_blockaded_3",
+  "text": "They've closed the water to us. They've picked a very good way to choke a town.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "town_blockaded_4",
+  "text": "Prices doubled the day the blockade started. Everyone's selling what they can't spare.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "town_blockaded_5",
+  "text": "We can see their ships at night. They keep their lamps lit, just to remind us.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "town_dive_deaths_1",
+  "text": "The dive crews lost another pair yesterday. They'll find a third to take the rope. They always do.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "town_dive_deaths_2",
+  "text": "I can't count the widows anymore. The dive-widows have their own corner of the shrine now.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "town_dive_deaths_3",
+  "text": "The pay's good for a diver, and short for a funeral. The Compact doesn't mention the funeral.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "town_dive_deaths_4",
+  "text": "People say it's a good living. They don't say how short it is.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "town_dive_deaths_5",
+  "text": "Nobody asks anymore if the crews are safe. They only ask who's going down next.",
+  "weight": 3,
+  "cooldown": 1800,
+  "conditions": [
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "memory_helped_me_1",
+  "text": "You. I haven't forgotten what you did. I don't forget, and I intend to repay it.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_me"
+  ]
+ },
+ {
+  "id": "memory_helped_me_2",
+  "text": "Welcome back. The door's open to you, and it is not open to many.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_me"
+  ]
+ },
+ {
+  "id": "memory_helped_me_3",
+  "text": "You're the one who stood up for me. I told the others. They didn't believe me, but I knew.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_me"
+  ]
+ },
+ {
+  "id": "memory_helped_me_4",
+  "text": "I owe you. Not a debt, exactly. Something heavier and better.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_me"
+  ]
+ },
+ {
+  "id": "memory_helped_me_5",
+  "text": "Good to see you. Sit. I don't care what the neighbours think.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_me"
+  ]
+ },
+ {
+  "id": "memory_harmed_me_1",
+  "text": "You. I'd hoped you'd gone. I haven't forgiven it, and I haven't forgotten it.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_me"
+  ]
+ },
+ {
+  "id": "memory_harmed_me_2",
+  "text": "Don't smile at me. I remember what you did.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_me"
+  ]
+ },
+ {
+  "id": "memory_harmed_me_3",
+  "text": "There's nothing to say between us. Say it anyway, if you must, and then leave.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_me"
+  ]
+ },
+ {
+  "id": "memory_harmed_me_4",
+  "text": "I can still feel it, what you took. Don't expect warmth.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_me"
+  ]
+ },
+ {
+  "id": "memory_harmed_me_5",
+  "text": "Walk on. The street is wide enough for both of us, but not for the conversation.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_me"
+  ]
+ },
+ {
+  "id": "memory_helped_kin_1",
+  "text": "I heard what you did for my family. It's not nothing. It's everything, in fact.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_kin"
+  ]
+ },
+ {
+  "id": "memory_helped_kin_2",
+  "text": "My sister told me about you. She doesn't praise easily. I'm listening.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_kin"
+  ]
+ },
+ {
+  "id": "memory_helped_kin_3",
+  "text": "You looked after my own when it mattered. That counts for me as if you'd done it to my face.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_kin"
+  ]
+ },
+ {
+  "id": "memory_helped_kin_4",
+  "text": "Word came. What you did for my kin will be spoken of at this table.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_kin"
+  ]
+ },
+ {
+  "id": "memory_helped_kin_5",
+  "text": "Whatever you need, you've only to say. My family spoke well of you, and mine are hard to please.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=helped_kin"
+  ]
+ },
+ {
+  "id": "memory_harmed_kin_1",
+  "text": "You're the one who hurt my kin. Don't think the word hasn't travelled.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_kin"
+  ]
+ },
+ {
+  "id": "memory_harmed_kin_2",
+  "text": "I know what happened to my family, and I know whose hand it was.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_kin"
+  ]
+ },
+ {
+  "id": "memory_harmed_kin_3",
+  "text": "Stay away from my house. Stay away from my people. This is mercy.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_kin"
+  ]
+ },
+ {
+  "id": "memory_harmed_kin_4",
+  "text": "They told me your name. I'd rather they hadn't. Now I can't stop hearing it.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_kin"
+  ]
+ },
+ {
+  "id": "memory_harmed_kin_5",
+  "text": "Whatever you did to my family, you did to me. Think about that when you walk away.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=harmed_kin"
+  ]
+ },
+ {
+  "id": "memory_witnessed_1",
+  "text": "I saw what you did. I won't say more, but I saw it.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=witnessed"
+  ]
+ },
+ {
+  "id": "memory_witnessed_2",
+  "text": "I was there that day. Everyone says nothing, so I say nothing, but I was there.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=witnessed"
+  ]
+ },
+ {
+  "id": "memory_witnessed_3",
+  "text": "Don't ask who saw you. A few of us did. We have chosen what to do with it.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=witnessed"
+  ]
+ },
+ {
+  "id": "memory_witnessed_4",
+  "text": "I know more about you than you'd like. I'll keep it, as long as you give me reason.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=witnessed"
+  ]
+ },
+ {
+  "id": "memory_witnessed_5",
+  "text": "The whole street saw. They won't say so aloud. They don't need to.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=witnessed"
+  ]
+ },
+ {
+  "id": "memory_in_debt_1",
+  "text": "You owe the town, and the town has a long memory. I'm only reminding you.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=in_debt"
+  ]
+ },
+ {
+  "id": "memory_in_debt_2",
+  "text": "About what you owe. I'm not asking. I'm simply noting that I know.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=in_debt"
+  ]
+ },
+ {
+  "id": "memory_in_debt_3",
+  "text": "The ledger has your name in it, friend. I'd settle it, if I were you.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=in_debt"
+  ]
+ },
+ {
+  "id": "memory_in_debt_4",
+  "text": "I don't press. I only mention that a debt grows quietly, like mould.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=in_debt"
+  ]
+ },
+ {
+  "id": "memory_in_debt_5",
+  "text": "Every town keeps its accounts. Yours is open. That's all I'll say.",
+  "weight": 4,
+  "cooldown": 1800,
+  "conditions": [
+   "memory=in_debt"
+  ]
+ },
+ {
+  "id": "mix_bitter_short_of_grain",
+  "text": "Short of grain again. Naturally. The only thing we're never short of is people telling us to be grateful.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_bitter_blockaded",
+  "text": "They blockade the harbour and call it policy. I call it the same old hand reaching into the same old pocket.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_bitter_dive_deaths",
+  "text": "They'll put up a stone for the divers who die. The living can't eat a stone, but nobody asks the living.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=bitter",
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "mix_cheerful_short_of_grain",
+  "text": "Grain's short, yes, but so is my temper for sorrow. Come, I've a thin soup and a thick joke.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_cheerful_rising_sea",
+  "text": "The sea's coming up the steps, and I say let it. It might bring a fish with it.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cheerful",
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "mix_melancholy_rising_sea",
+  "text": "The sea takes the town an inch at a time. It will be very polite about the last inch.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "mix_melancholy_hulls_lost",
+  "text": "I knew the men on that hull. I keep thinking they've only gone a little farther than usual.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=melancholy",
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "mix_pious_short_of_grain",
+  "text": "I've left grain on the altar each night. The gods do not eat it, but the mice have never been better fed.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_pious_hulls_lost",
+  "text": "I said the rites for every hull. The sea has no ears, but I speak for the men.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=pious",
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "mix_skeptical_rising_sea",
+  "text": "They say the sea rises because we've displeased someone. I say measure it. It's a number, not a mood.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=skeptical",
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "mix_superstitious_hulls_lost",
+  "text": "A hull sank on a black moon. Everyone knows what that means. Nobody will say it.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "mix_superstitious_rising_sea",
+  "text": "The sea has begun to climb. It listens to something, and I've stopped asking what.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=superstitious",
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "mix_greedy_blockaded",
+  "text": "Prices are splendid, if you're holding stock. I'm sorry for everyone else, naturally.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_greedy_short_of_grain",
+  "text": "I'm not hoarding. I'm preserving the value of my property for a time when it's useful. A hard distinction, I know.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=greedy",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_generous_short_of_grain",
+  "text": "I gave my last measure to the Orsen family. We'll make do. Something turns up. It always does.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_generous_dive_deaths",
+  "text": "I've been collecting for the families of the drowned. A coin, a loaf, anything you can spare.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=generous",
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "mix_proud_short_of_grain",
+  "text": "I won't line up at the granary. If it comes to it, I'll eat my pride, and I assure you it's not much of a meal.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=proud",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_brave_blockaded",
+  "text": "I'd run the blockade in a rowboat, if anyone would let me. They won't, so I'm cross instead.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=brave",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_cowardly_blockaded",
+  "text": "The blockade is the safest the town has ever been. No raiders, no strangers. I like it, and I'm ashamed of liking it.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_cowardly_dive_deaths",
+  "text": "They asked me to dive. Me! I'd sooner be buried on land, thank you, and I told them as much.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=cowardly",
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "mix_gossipy_hulls_lost",
+  "text": "Between us, I heard the hull went down because the master sold the good timber. Nobody's said it. Everyone's thinking it.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=gossipy",
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "mix_secretive_blockaded",
+  "text": "Do I know someone who can get past the blockade? I know several. I'll tell you none of them.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=secretive",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_hot_tempered_blockaded",
+  "text": "If I ever lay hands on whoever ordered this blockade, they'll sleep in the harbour like the fish.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_hot_tempered_hulls_lost",
+  "text": "Another hull! I'll tear the shipyard down and rebuild it with my own hands if I have to!",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=hot_tempered",
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "mix_stern_dive_deaths",
+  "text": "The dive crews are lost at a rate we cannot sustain. I intend to address it. Do not expect speeches.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=stern",
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "mix_wry_short_of_grain",
+  "text": "Grain's short. I've decided to eat my words. They're plentiful, if not very filling.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "town=short_of_grain"
+  ]
+ },
+ {
+  "id": "mix_wry_blockaded",
+  "text": "A blockade! At last, something to make the town's trade interesting. I'd thank them, if I weren't starving.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=wry",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "mix_curious_rising_sea",
+  "text": "I've been marking the tide on the harbour wall every day. It's up three finger-widths. I wonder what the sea's trying to say.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=curious",
+   "town=rising_sea"
+  ]
+ },
+ {
+  "id": "mix_loyal_dive_deaths",
+  "text": "I'll stand by every crew that goes down. I'll stand by every widow they leave behind.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "mix_loyal_hulls_lost",
+  "text": "They're my people, and the hulls were theirs. I'll rebuild, and I'll do it with them, not for them.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=loyal",
+   "town=hulls_lost"
+  ]
+ },
+ {
+  "id": "mix_humble_dive_deaths",
+  "text": "I'm no hero. The crew went down, and I stayed ashore. The least I can do is carry their names.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=humble",
+   "town=dive_deaths"
+  ]
+ },
+ {
+  "id": "mix_patient_blockaded",
+  "text": "A blockade is only a very slow wall. Walls fall, if you wait with enough stubbornness.",
+  "weight": 6,
+  "cooldown": 1800,
+  "conditions": [
+   "trait=patient",
+   "town=blockaded"
+  ]
+ },
+ {
+  "id": "generic_1",
+  "text": "Hm? Oh. Hello.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_2",
+  "text": "Mind the nets, there's one by your foot.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_3",
+  "text": "Fair weather, for the moment. Don't trust it.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_4",
+  "text": "Another day, then.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_5",
+  "text": "Something I can help with, or are you just walking?",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_6",
+  "text": "The road's quiet. Make of that what you will.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_7",
+  "text": "Hello. I'd offer you a seat, but there's only mine.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_8",
+  "text": "If you're looking for someone, they're probably at the quay.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_9",
+  "text": "Evening's coming on. Watch your step on the stones.",
+  "weight": 1,
+  "cooldown": 600
+ },
+ {
+  "id": "generic_10",
+  "text": "Well. That's the day, isn't it.",
+  "weight": 1,
+  "cooldown": 600
+ }
+]
