@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <limits>
 
 using namespace ichor;
 
@@ -47,6 +48,11 @@ SpawnCommand hero(glm::dvec3 position)
 }
 
 const Transform& heroTransform(const Scene& scene)
+{
+    return scene.registry().get<Transform>(scene.find(StableId::of("hero")));
+}
+
+Transform& heroTransformMutable(Scene& scene)
 {
     return scene.registry().get<Transform>(scene.find(StableId::of("hero")));
 }
@@ -227,4 +233,85 @@ TEST_CASE("debug lines describe every body")
     std::vector<LineSegment> lines;
     scene.physics().debugLines(lines);
     REQUIRE(lines.size() > 12);
+}
+
+namespace {
+
+constexpr double kBadValues[] = {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()};
+
+bool finite(glm::dvec3 v)
+{
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+}
+
+std::uint64_t tickedHashAfterBadPosition(double bad, int axis)
+{
+    Scene scene(4);
+    scene.enqueue(ground());
+    scene.enqueue(hero({1.0, 0.5, 1.0}));
+    scene.tick(kDt);
+    heroTransformMutable(scene).position[axis] = bad;
+    for (int i = 0; i < 5; ++i) {
+        scene.tick(kDt);
+    }
+    REQUIRE(finite(heroTransform(scene).position));
+    REQUIRE(std::isfinite(heroBody(scene).velocity.y));
+    REQUIRE(std::isfinite(heroBody(scene).fallSpeed));
+    return scene.stateHash();
+}
+
+}
+
+TEST_CASE("a non-finite player position never reaches the physics step and heals to the last good body position")
+{
+    for (const double bad : kBadValues) {
+        for (int axis = 0; axis < 3; ++axis) {
+            const std::uint64_t first = tickedHashAfterBadPosition(bad, axis);
+            REQUIRE(first == tickedHashAfterBadPosition(bad, axis));
+        }
+    }
+}
+
+TEST_CASE("a non-finite teleport leaves the character where it was")
+{
+    for (const double bad : kBadValues) {
+        Scene scene(2);
+        scene.enqueue(ground());
+        scene.enqueue(hero({1.0, 0.0, 1.0}));
+        for (int i = 0; i < 10; ++i) {
+            scene.tick(kDt);
+        }
+        SetTransformCommand command;
+        command.id = StableId::of("hero");
+        command.transform.position = {bad, 0.0, bad};
+        scene.enqueue(command);
+        for (int i = 0; i < 10; ++i) {
+            scene.tick(kDt);
+        }
+        REQUIRE(finite(heroTransform(scene).position));
+        REQUIRE(std::abs(heroTransform(scene).position.x - 1.0) < 0.05);
+        REQUIRE(heroBody(scene).onGround);
+    }
+}
+
+TEST_CASE("spawning with a non-finite position drops the body and the scene still ticks")
+{
+    for (const double bad : kBadValues) {
+        Scene scene(2);
+        scene.enqueue(ground());
+        SpawnCommand badWall = wall(bad);
+        badWall.id = StableId::of("bad-wall");
+        scene.enqueue(badWall);
+        SpawnCommand badHero = hero({bad, 0.0, 0.0});
+        badHero.id = StableId::of("bad-hero");
+        scene.enqueue(badHero);
+        scene.enqueue(hero({0.0, 0.0, 0.0}));
+        for (int i = 0; i < 20; ++i) {
+            scene.tick(kDt);
+        }
+        REQUIRE_FALSE(scene.physics().hasBody(StableId::of("bad-wall")));
+        REQUIRE_FALSE(scene.physics().hasBody(StableId::of("bad-hero")));
+        REQUIRE(scene.physics().hasBody(StableId::of("hero")));
+        REQUIRE(finite(heroTransform(scene).position));
+    }
 }
