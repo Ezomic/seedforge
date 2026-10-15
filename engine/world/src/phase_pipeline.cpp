@@ -94,26 +94,32 @@ std::size_t PhasePipeline::indexOf(const std::string& phase) const
     throw std::out_of_range("no phase named '" + phase + "'");
 }
 
-void PhasePipeline::finish(PhaseRun& result) const
+void PhasePipeline::finish(PhaseRun& result, const PhaseObserver& observer) const
 {
     for (std::size_t i = result.size(); i < phases_.size(); ++i) {
+        if (observer) {
+            observer({i, phases_.size(), phases_[i].name, false});
+        }
         PhaseArtifact artifact = phases_[i].run(PhaseView(result.artifacts_));
         if (artifact.phase() != phases_[i].name) {
             throw std::logic_error("phase '" + phases_[i].name + "' made an artifact named '" + artifact.phase() + "'");
         }
         result.chain_.push_back(link(result.chain_.empty() ? 0 : result.chain_.back(), artifact));
         result.artifacts_.push_back(std::move(artifact));
+        if (observer) {
+            observer({i, phases_.size(), phases_[i].name, true});
+        }
     }
 }
 
-PhaseRun PhasePipeline::run() const
+PhaseRun PhasePipeline::run(const PhaseObserver& observer) const
 {
     PhaseRun result;
-    finish(result);
+    finish(result, observer);
     return result;
 }
 
-PhaseRun PhasePipeline::runFrom(const PhaseRun& previous, std::size_t from) const
+PhaseRun PhasePipeline::runFrom(const PhaseRun& previous, std::size_t from, const PhaseObserver& observer) const
 {
     if (from >= phases_.size()) {
         throw std::out_of_range("there is no phase " + std::to_string(from));
@@ -129,13 +135,13 @@ PhaseRun PhasePipeline::runFrom(const PhaseRun& previous, std::size_t from) cons
     PhaseRun result;
     result.artifacts_.assign(previous.artifacts_.begin(), previous.artifacts_.begin() + static_cast<std::ptrdiff_t>(from));
     result.chain_.assign(previous.chain_.begin(), previous.chain_.begin() + static_cast<std::ptrdiff_t>(from));
-    finish(result);
+    finish(result, observer);
     return result;
 }
 
-PhaseRun PhasePipeline::runFrom(const PhaseRun& previous, const std::string& phase) const
+PhaseRun PhasePipeline::runFrom(const PhaseRun& previous, const std::string& phase, const PhaseObserver& observer) const
 {
-    return runFrom(previous, indexOf(phase));
+    return runFrom(previous, indexOf(phase), observer);
 }
 
 }
