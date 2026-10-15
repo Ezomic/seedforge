@@ -1,0 +1,14 @@
+{
+  "id": "law.hecatomb",
+  "slot": "law",
+  "title": "Hecatomb",
+  "tags": ["SACRIFICE", "VITALITY", "RITE", "MORAL_AXIS"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["pyre_grove"] },
+  "poi": { "weights": { "hekatombaion_altar": 3.0, "pyre_field": 1.5, "sanctuary": 1.5 } },
+  "enemies": { "roster_add": ["levy_warden", "bloodbound_shade"] },
+  "economy": { "scarce": ["salve"], "abundant": ["bottled_vitality", "sacrificial_ox"] },
+  "palette": { "grade": "hecatomb", "fog_density": 1.1 },
+  "audio": { "bed_overrides": ["pyre_crackle", "distant_lowing"], "music_palette": "hecatomb" }
+}
