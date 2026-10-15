@@ -1,4 +1,5 @@
 #include "ichor/core/file_watch.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -9,7 +10,7 @@ using namespace ichor;
 
 TEST_CASE("the watcher reports a file once per change")
 {
-    const auto dir = std::filesystem::temp_directory_path() / "ichor_watch";
+    const auto dir = test::tempPath("ichor_watch");
     std::filesystem::create_directories(dir);
     const auto file = dir / "a.spv";
     std::ofstream(file) << "one";
@@ -31,7 +32,7 @@ TEST_CASE("the watcher reports a file once per change")
 
 TEST_CASE("a watched tree sees nested files, new files and new directories")
 {
-    const auto dir = std::filesystem::temp_directory_path() / "ichor_watch_tree";
+    const auto dir = test::tempPath("ichor_watch_tree");
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir / "kits" / "deep");
     const auto nested = dir / "kits" / "deep" / "x.json";

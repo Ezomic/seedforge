@@ -1,6 +1,7 @@
 #include "ichor/save/save_slots.h"
 #include "ichor/save/chronicle.h"
 #include "ichor/sim/scene.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,7 +21,7 @@ public:
     Dir()
     {
         static int counter = 0;
-        path_ = std::filesystem::temp_directory_path() / ("ichor_save_test_" + std::to_string(counter++));
+        path_ = test::tempPath("ichor_save_test_" + std::to_string(counter++));
         std::filesystem::remove_all(path_);
     }
     ~Dir() { std::filesystem::remove_all(path_); }

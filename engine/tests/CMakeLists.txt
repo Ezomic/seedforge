@@ -34,6 +34,7 @@ add_executable(ichor_tests
     test_standing.cpp
     test_npc_tiers.cpp
     test_wants_fears.cpp
+    test_npc_memory.cpp
     test_traversal_verbs.cpp
     test_axiom.cpp
     test_axiom_cataclysm.cpp
