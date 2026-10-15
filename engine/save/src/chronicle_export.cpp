@@ -53,7 +53,9 @@ bool unsafe(std::uint32_t point)
 {
     return point < 0x20 || (point >= 0x7F && point <= 0x9F) || point == 0x2028 || point == 0x2029
         || (point >= 0x202A && point <= 0x202E) || (point >= 0x2066 && point <= 0x2069)
-        || point == 0x200E || point == 0x200F || point == 0x061C;
+        || point == 0x200E || point == 0x200F || point == 0x061C || point == 0xAD || point == 0xFEFF
+        || (point >= 0x200B && point <= 0x200D) || (point >= 0x2060 && point <= 0x2064)
+        || (point >= 0xFFF9 && point <= 0xFFFB) || (point >= 0xE0000 && point <= 0xE007F);
 }
 
 void appendSafe(std::string& out, std::string_view text)
@@ -75,11 +77,13 @@ void appendSafe(std::string& out, std::string_view text)
     }
 }
 
+constexpr std::uint64_t kMaxSeconds = 1'000'000'000ull * 3600;
+
 std::string playTime(std::uint64_t tick, double secondsPerTick)
 {
-    // NaN, a negative rate and absurd ticks all fall to zero instead of an undefined conversion.
+    // NaN and a negative rate fall to zero, absurd ticks clamp, so the conversion is never undefined.
     const double elapsed = static_cast<double>(tick) * secondsPerTick;
-    const std::uint64_t seconds = elapsed >= 0.0 && elapsed < 1.8e19 ? static_cast<std::uint64_t>(elapsed) : 0;
+    const std::uint64_t seconds = elapsed >= 1.8e19 ? kMaxSeconds : elapsed >= 0.0 ? static_cast<std::uint64_t>(elapsed) : 0;
     return std::format("{}:{:02}:{:02}", seconds / 3600, seconds / 60 % 60, seconds % 60);
 }
 

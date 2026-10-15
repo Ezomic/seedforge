@@ -132,6 +132,10 @@ TEST_CASE("a bad seconds-per-tick or huge tick never produces undefined output",
         REQUIRE(isValidUtf8(text));
     }
     REQUIRE(exportChronicleText(story, std::nan("")).find("[0:00:00] early") != std::string::npos);
+    REQUIRE(exportChronicleText(story, 1e300).find("[1000000000:00:00] late") != std::string::npos);
+    Chronicle hidden;
+    hidden.add(1, "note", "a\xE2\x80\x8B" "b\xEF\xBB\xBF" "c\xF3\xA0\x80\x81" "d");
+    REQUIRE(exportChronicleText(hidden, 1.0).find("a b c d") != std::string::npos);
 }
 
 TEST_CASE("the sanitiser matters: raw control bytes survive Chronicle::exportText", "[chronicle_export]")
