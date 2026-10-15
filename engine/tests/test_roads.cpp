@@ -98,6 +98,9 @@ TEST_CASE("the shipped road bonus is inside the doc's range", "[roads]")
 {
     DataSet data;
     REQUIRE(data.loadDirectory(ICHOR_GAME_DATA_DIR));
+    const DataTable* table = data.table("roads");
+    REQUIRE(table != nullptr);
+    REQUIRE(table->records.count("road_bonus") == 1);
     int bonus = 0;
     std::string note;
     std::string error;

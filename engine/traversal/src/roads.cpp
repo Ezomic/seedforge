@@ -52,7 +52,8 @@ int roadSpeedPermille(float coverage, int bonusPermille)
     if (!(coverage > 0.0f)) {
         return 1000;
     }
-    const int coveragePermille = coverage >= 1.0f ? 1000 : static_cast<int>(coverage * 1000.0f + 0.5f);
+    const float scaled = coverage * 1000.0f; // its own statement, so no compiler fuses it into the rounding
+    const int coveragePermille = coverage >= 1.0f ? 1000 : static_cast<int>(std::lround(scaled));
     return 1000 + clampBonus(bonusPermille) * coveragePermille / 1000;
 }
 
