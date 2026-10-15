@@ -1,0 +1,9 @@
+[
+  { "id": "timing", "kind": "timing", "minGapTicks": 600, "timerTicks": 18000, "slots": 3 },
+  { "id": "settlement_enter", "kind": "rule", "event": "settlement_enter", "delayTicks": 120 },
+  { "id": "settlement_exit", "kind": "rule", "event": "settlement_exit", "delayTicks": 120 },
+  { "id": "dungeon_enter", "kind": "rule", "event": "dungeon_enter", "delayTicks": 120 },
+  { "id": "quest_resolved", "kind": "rule", "event": "quest_resolved", "delayTicks": 300 },
+  { "id": "betrayed", "kind": "rule", "event": "betrayed", "delayTicks": 600 },
+  { "id": "burned", "kind": "rule", "event": "burned", "delayTicks": 600 }
+]

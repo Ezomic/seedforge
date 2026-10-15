@@ -4,6 +4,7 @@
 #include "ichor/sim/components.h"
 #include "ichor/sim/physics.h"
 #include "ichor/sim/scene.h"
+#include "ichor/stage0/anchor.h"
 #include "ichor/stage0/recorder.h"
 #include "ichor/stage0/status_effect.h"
 #include "ichor/stage0/swarm.h"

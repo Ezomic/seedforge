@@ -1,0 +1,6 @@
+[
+  {"id": "health", "start": 100, "end": 180, "weight_permille": 300},
+  {"id": "stamina", "start": 100, "end": 170, "weight_permille": 250},
+  {"id": "carry", "start": 40, "end": 70, "weight_permille": 200},
+  {"id": "attunement", "start": 10, "end": 17, "weight_permille": 250}
+]

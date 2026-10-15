@@ -120,6 +120,20 @@ struct PhaseDivergence {
 
 std::optional<PhaseDivergence> firstDivergence(const PhaseRun& a, const PhaseRun& b);
 
+// Where a run is, for a loading screen: told once as each phase starts and once as it ends. Phases
+// that runFrom() takes from an earlier run are not told. The observer only watches: it gets no
+// access to a phase's input or output, so it cannot change what is forged, and a run reports the
+// same events whatever the observer does with them. It is called on the thread that runs the
+// pipeline; an exception from it ends the run and reaches the caller.
+struct PhaseProgress {
+    std::size_t index = 0; // the phase, counted from zero
+    std::size_t count = 0; // phases in the pipeline
+    std::string phase;
+    bool finished = false; // false as it starts, true as it ends
+};
+
+using PhaseObserver = std::function<void(const PhaseProgress&)>;
+
 class PhasePipeline {
 public:
     // Throws std::invalid_argument for an empty or repeated phase name.
@@ -128,18 +142,18 @@ public:
     const std::vector<Phase>& phases() const { return phases_; }
     std::size_t indexOf(const std::string& phase) const;
 
-    PhaseRun run() const;
+    PhaseRun run(const PhaseObserver& observer = {}) const;
 
     // Runs phases `from` onward, taking phases 0 to from-1 as they are in `previous`. The caller
     // vouches that `previous` was made from the same inputs as the phases that follow; the result
     // is then what run() would have made. Throws std::invalid_argument when `previous` does not
     // hold the first `from` phases of this pipeline, by name, and std::out_of_range when `from`
     // is past the last phase.
-    PhaseRun runFrom(const PhaseRun& previous, std::size_t from) const;
-    PhaseRun runFrom(const PhaseRun& previous, const std::string& phase) const;
+    PhaseRun runFrom(const PhaseRun& previous, std::size_t from, const PhaseObserver& observer = {}) const;
+    PhaseRun runFrom(const PhaseRun& previous, const std::string& phase, const PhaseObserver& observer = {}) const;
 
 private:
-    void finish(PhaseRun& result) const;
+    void finish(PhaseRun& result, const PhaseObserver& observer) const;
 
     std::vector<Phase> phases_;
 };

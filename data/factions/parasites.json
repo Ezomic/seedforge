@@ -1,0 +1,8 @@
+[
+  { "axiom": "law.orichalcum", "id": "metallarchs", "name": "The Metallarchs" },
+  { "axiom": "law.hecatomb", "id": "hekatombaia", "name": "The Hekatombaia" },
+  { "axiom": "law.mysteries", "id": "telestai", "name": "The Telestai" },
+  { "axiom": "law.temenos", "id": "horistai", "name": "The Horistai" },
+  { "axiom": "law.last_favour", "id": "thesauroi", "name": "The Thesauroi" },
+  { "axiom": "law.oath", "id": "horkos_brokers", "name": "The Horkos-brokers" }
+]
