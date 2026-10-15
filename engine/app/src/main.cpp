@@ -5,6 +5,7 @@
 #include "ichor/audio/ambience_layers.h"
 #include "ichor/audio/music_player.h"
 #include "ichor/audio/rain_ambience.h"
+#include "ichor/audio/weather_ambience.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
@@ -15,11 +16,13 @@
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
+#include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/journal_screen.h"
 #include "ichor/data/journal.h"
 #include "ichor/script/journal_bindings.h"
 #include "ichor/ui/map_screen.h"
+#include "ichor/ui/new_game_screen.h"
 #include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
@@ -82,6 +85,7 @@ struct Options {
     bool ironman = false;
     bool editor = false;
     bool showMap = false;
+    bool showNewGame = false;
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -150,6 +154,8 @@ bool parse(int argc, char** argv, Options& options)
             options.editor = true;
         } else if (arg == "--map") {
             options.showMap = true;
+        } else if (arg == "--new-game") {
+            options.showNewGame = true;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -259,6 +265,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::SceneBundle splashSounds;
     splashSounds.sounds.push_back(ichor::makeSplashClip());
     splashSounds.sounds.push_back(ichor::makeRainClip());
+    splashSounds.sounds.push_back(ichor::makeWindClip());
     audio.addBundle(splashSounds);
 
     // The forged world, if there is one: its splat layers go to the renderer
@@ -313,6 +320,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::uint32_t rainBed = audio.findSound("A_Rain");
     ichor::AmbienceLayers ambience;
     ambience.assign(ichor::AmbienceLayer::Weather, rainBed);
+    // No biome beds exist yet, so the wind takes the bed layer.
+    ambience.assign(ichor::AmbienceLayer::Bed, audio.findSound("A_Wind"));
     if (armClip == ichor::AnimationSet::kNoClip) {
         ichor::log(ichor::LogLevel::Error, "the actor bundle has no clip named wave");
         return 1;
@@ -322,9 +331,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.scene().setAnimations(&animations);
+    // No roads exist as world data yet, so the field is empty and the bonus never applies.
+    const ichor::NullRoadField roadField;
+    int roadBonusPermille = ichor::kDefaultRoadBonusPermille;
     if (waterField) {
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
-            return static_cast<double>(ichor::wadingSpeedFactor(waterField->at(position.x, position.z).depth));
+            const float depth = waterField->at(position.x, position.z).depth;
+            return static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
         });
     }
     engine.setAudio(&audio);
@@ -345,6 +358,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::DataSet data;
     if (!data.loadDirectory(options.data)) {
         ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
+    }
+    std::string roadNote;
+    std::string roadError;
+    if (!ichor::loadRoadBonus(data, roadBonusPermille, roadNote, roadError)) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", roadError);
+    } else if (!roadNote.empty()) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", roadNote);
     }
     // The reverb of the places the listener walks into, from the "reverb" table of the data layer.
     std::optional<ichor::JournalTemplates> journalTemplates;
@@ -565,6 +585,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
+    std::unique_ptr<ichor::NewGameScreen> newGameScreen;
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -593,9 +614,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             mapScreen->setImage(ichor::renderMapImage(heightfield));
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
+            newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !pauseMenu->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            newGameScreen.reset();
             pauseMenu.reset();
             mapScreen.reset();
             journalScreen.reset();
@@ -608,6 +631,22 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
+        }
+        if (options.showNewGame && !editing) {
+            ichor::AxiomSet axioms;
+            if (!axioms.loadDirectory(options.data)) {
+                ichor::log(ichor::LogLevel::Warn, "data: the axioms could not be loaded, so the new-game screen shows no titles");
+            }
+            std::vector<ichor::Axiom> pool;
+            for (const auto& [id, axiom] : axioms.axioms()) {
+                pool.push_back(axiom);
+            }
+            const ichor::SlotRollResult roll = ichor::rollSlots(worldSeed, pool);
+            if (!roll.ok()) {
+                ichor::log(ichor::LogLevel::Warn, "the world's axioms could not be rolled from the data");
+            }
+            newGameScreen->setView(ichor::buildNewGameView(worldSeed, roll, axioms));
+            newGameScreen->setVisible(true);
         }
         // The simulation clock drives the UI, so a replay sees the same animations.
         renderer.setUiHooks(
@@ -754,6 +793,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (menu && !menuHeld && pauseMenu) {
             if (mapScreen && mapScreen->visible()) {
                 mapScreen->setVisible(false); // Esc first puts the map away
+            } else if (newGameScreen && newGameScreen->visible()) {
+                newGameScreen->setVisible(false);
             } else {
                 paused = !paused;
                 pauseMenu->setVisible(paused);
@@ -797,6 +838,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             }
             if (mapScreen->takeCloseRequest()) {
                 mapScreen->setVisible(false);
+            }
+            if (newGameScreen->takeBegin()) {
+                newGameScreen->setVisible(false);
             }
             if (journalScreen->takeCloseRequest()) {
                 journalScreen->setVisible(false);
@@ -884,7 +928,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
-        const double dt = options.headless ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) ? 0.0 : now - last;
+        const double dt = options.headless ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
@@ -899,7 +943,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             audio.setReverb(reverb);
             lastReverb = reverb;
         }
-        ambience.setGain(ichor::AmbienceLayer::Weather, ichor::rainAmbienceGain(weatherNow().rain));
+        const ichor::Weather sky = weatherNow();
+        const ichor::WeatherAudioTargets weatherAudio = ichor::weatherAudioTargets(sky.overcast, sky.rain);
+        ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
+        ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
         ambience.apply(audio);
         musicPlayer.update(static_cast<double>(engine.scene().tickCount()) * config.fixedDt, audio);
         if (editing) {
@@ -981,7 +1028,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--screenshot file.png]");
         return 2;
     }
 
