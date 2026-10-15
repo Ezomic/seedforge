@@ -1,0 +1,15 @@
+{
+  "id": "anomaly.labyrinth",
+  "slot": "anomaly",
+  "title": "The Labyrinth",
+  "tags": ["LABYRINTH", "MYTH", "DUNGEON", "MINOTAUR"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["labyrinth_approach"] },
+  "poi": { "weights": { "labyrinth": 4.0, "daedalian_workshop": 1.5, "bull_shrine": 1.5 } },
+  "enemies": { "roster_add": ["minotaur", "labyrinth_shade"] },
+  "traversal": { "unlock": ["ariadnes_thread"] },
+  "economy": { "abundant": ["bronze_tribute"] },
+  "palette": { "grade": "labyrinth", "fog_density": 1.1 },
+  "audio": { "bed_overrides": ["stone_echo"], "music_palette": "labyrinth" }
+}

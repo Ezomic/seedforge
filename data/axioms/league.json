@@ -1,0 +1,15 @@
+{
+  "id": "powers.league",
+  "slot": "powers",
+  "title": "The League",
+  "tags": ["TRADE", "MARITIME", "CONTRACT", "MERCENARY"],
+  "conflicts": [],
+
+  "settlement": { "prefer_slope": "gentle", "density_mult": 1.1 },
+  "poi": { "weights": { "harbour_emporium": 3.0, "toll_station": 2.0, "mercenary_hall": 1.5, "pharos": 1.5, "warehouse_quay": 1.5 } },
+  "enemies": { "roster_add": ["contract_sellsword", "league_privateer"], "roster_remove": ["conscript_levy"] },
+  "traversal": { "unlock": ["boat"] },
+  "economy": { "scarce": ["grain"], "abundant": ["silver", "trade_goods"] },
+  "palette": { "grade": "league", "fog_density": 0.9 },
+  "audio": { "bed_overrides": ["harbour_bustle"], "music_palette": "league" }
+}
