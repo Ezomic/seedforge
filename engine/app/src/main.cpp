@@ -625,11 +625,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             for (const auto& [id, axiom] : axioms.axioms()) {
                 pool.push_back(axiom);
             }
-            const ichor::SlotRollResult roll = ichor::rollSlots(options.seed, pool);
+            const ichor::SlotRollResult roll = ichor::rollSlots(worldSeed, pool);
             if (!roll.ok()) {
                 ichor::log(ichor::LogLevel::Warn, "the world's axioms could not be rolled from the data");
             }
-            newGameScreen->setView(ichor::buildNewGameView(options.seed, roll, axioms));
+            newGameScreen->setView(ichor::buildNewGameView(worldSeed, roll, axioms));
             newGameScreen->setVisible(true);
         }
         // The simulation clock drives the UI, so a replay sees the same animations.

@@ -183,7 +183,15 @@ TEST_CASE("the new-game screen draws nothing until shown, then lists the seed an
 
     screen.setVisible(true);
     f.frame(0.1);
-    REQUIRE(f.renderer.draws().size() >= 5); // veil, card, rows, button, text
+    const std::size_t withRows = f.renderer.draws().size();
+    REQUIRE(withRows >= 5); // veil, card, rows, button, text
+
+    screen.setView(NewGameView{});
+    f.frame(0.15);
+    REQUIRE(f.renderer.draws().size() < withRows); // the three rows and their text are gone
+    screen.setView(buildNewGameView(4242, roll, pool.set));
+    f.frame(0.18);
+    REQUIRE(f.renderer.draws().size() == withRows);
 
     const std::string markup = screen.markup();
     REQUIRE(markup.find("4242") != std::string::npos);
