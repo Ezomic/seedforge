@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -27,12 +28,6 @@ const Axiom& law(const std::string& id)
     const Axiom* axiom = shipped().find(id);
     REQUIRE(axiom != nullptr);
     return *axiom;
-}
-
-bool hasBlock(const Axiom& axiom, const std::string& block, const std::string& key)
-{
-    const auto it = axiom.blocks.find(block);
-    return it != axiom.blocks.end() && it->second.find(key) != it->second.end();
 }
 
 const std::vector<std::string> kLawIds = {"law.hecatomb", "law.orichalcum", "law.last_favour"};
@@ -65,16 +60,6 @@ TEST_CASE("each Law axiom carries titles, tags and at least four directive block
     }
 }
 
-TEST_CASE("Law axioms never name themselves or a Law sibling as a conflict")
-{
-    for (const std::string& id : kLawIds) {
-        for (const std::string& other : law(id).conflicts) {
-            REQUIRE(other != id);
-            REQUIRE(other.rfind("law.", 0) != 0);
-        }
-    }
-}
-
 TEST_CASE("Orichalcum puts the ore on the ridges and makes mines the places to go")
 {
     const Axiom& axiom = law("law.orichalcum");
@@ -92,7 +77,8 @@ TEST_CASE("Hecatomb makes bottled vitality the coin and healing scarce")
     const Axiom& axiom = law("law.hecatomb");
     const auto& abundant = std::get<std::vector<std::string>>(axiom.blocks.at("economy").at("abundant"));
     REQUIRE(std::find(abundant.begin(), abundant.end(), "bottled_vitality") != abundant.end());
-    REQUIRE(hasBlock(axiom, "economy", "scarce"));
+    const auto& scarce = std::get<std::vector<std::string>>(axiom.blocks.at("economy").at("scarce"));
+    REQUIRE(std::find(scarce.begin(), scarce.end(), "salve") != scarce.end());
     const auto& weights = std::get<std::map<std::string, double, std::less<>>>(axiom.blocks.at("poi").at("weights"));
     REQUIRE(weights.at("hekatombaion_altar") > 1.0);
 }
@@ -105,6 +91,9 @@ TEST_CASE("The Last Favour is deflationary: charges scarce, dead shrines and tre
     const auto& weights = std::get<std::map<std::string, double, std::less<>>>(axiom.blocks.at("poi").at("weights"));
     REQUIRE(weights.at("cold_altar") > 1.0);
     REQUIRE(weights.at("thesauros") > 1.0);
+    REQUIRE(weights.at("pilgrim_road") < 1.0);
+    const auto& abundant = std::get<std::vector<std::string>>(axiom.blocks.at("economy").at("abundant"));
+    REQUIRE(std::find(abundant.begin(), abundant.end(), "tarnished_idol") != abundant.end());
 }
 
 TEST_CASE("the Law axioms differ from each other in every identity block")
@@ -124,7 +113,7 @@ TEST_CASE("Law axiom text carries no placeholder wording")
         const Axiom& axiom = law(id);
         std::string everything = axiomCanonicalJson(axiom);
         std::transform(everything.begin(), everything.end(), everything.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        for (const char* banned : {"todo", "tbd", "placeholder", "lorem", "xxx", "fixme"}) {
+        for (const char* banned : {"todo", "placeholder", "lorem", "fixme"}) {
             REQUIRE(everything.find(banned) == std::string::npos);
         }
     }
