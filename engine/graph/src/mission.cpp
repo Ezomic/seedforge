@@ -19,6 +19,8 @@ using Json = nlohmann::json;
 
 constexpr std::size_t kMaxRules = 256;
 constexpr std::size_t kMaxListEntries = 64;
+constexpr std::size_t kMaxMatchNodes = 4;
+constexpr std::size_t kMaxAddNodes = 8;
 constexpr std::uintmax_t kMaxFileBytes = 1u << 20;
 constexpr std::uint64_t kMaxWeight = 65535;
 
@@ -134,6 +136,19 @@ std::string parseRule(const Json& record, std::string& phase, Rule& rule)
         }
         rule.retypes.push_back({*index, text.substr(colon + 1)});
     }
+    if (rule.matchNodes.size() > kMaxMatchNodes || rule.addNodes.size() > kMaxAddNodes) {
+        return bad("a rule may match at most 4 nodes and add at most 8");
+    }
+    // Every matched node past the first must hang off a matched edge, so the
+    // number of matches stays bounded by the graph's degree, not its size to the power of the pattern.
+    for (std::size_t node = 1; node < rule.matchNodes.size(); ++node) {
+        const bool linked = std::any_of(rule.matchEdges.begin(), rule.matchEdges.end(), [&](const EdgePattern& e) {
+            return e.from == static_cast<int>(node) || e.to == static_cast<int>(node);
+        });
+        if (!linked) {
+            return bad("every matched node after the first needs a match edge");
+        }
+    }
     const std::string problem = graph::validate(rule);
     return problem.empty() ? problem : bad(problem);
 }
@@ -186,10 +201,21 @@ bool isKnownType(const std::string& type)
     return known.contains(type);
 }
 
+using Adjacency = std::map<NodeId, std::vector<const Edge*>>;
+
+Adjacency outgoing(const Graph& graph)
+{
+    Adjacency adjacency;
+    for (const auto& [id, edge] : graph.edges()) {
+        adjacency[edge.from].push_back(&edge);
+    }
+    return adjacency;
+}
+
 // Nodes reachable from the entry along path and shortcut edges. A gate can
 // only be entered once it is open; with `collectKeys` every key reached opens
 // its gates, repeated until nothing changes.
-std::set<NodeId> reach(const Graph& graph, NodeId entry, bool collectKeys)
+std::set<NodeId> reach(const Graph& graph, const Adjacency& adjacency, NodeId entry, bool collectKeys)
 {
     std::set<NodeId> open;
     std::set<NodeId> seen;
@@ -201,43 +227,53 @@ std::set<NodeId> reach(const Graph& graph, NodeId entry, bool collectKeys)
         while (!queue.empty()) {
             const NodeId at = queue.front();
             queue.pop_front();
-            if (collectKeys && graph.node(at)->type == kKey) {
-                for (const auto& [id, edge] : graph.edges()) {
-                    if (edge.type == kUnlocks && edge.from == at && open.insert(edge.to).second) {
-                        changed = true;
-                    }
-                }
+            const auto out = adjacency.find(at);
+            if (out == adjacency.end()) {
+                continue;
             }
-            for (const auto& [id, edge] : graph.edges()) {
-                if (edge.from != at || (edge.type != kPath && edge.type != kShortcut) || seen.contains(edge.to)) {
+            const bool isKey = collectKeys && graph.node(at)->type == kKey;
+            for (const Edge* edge : out->second) {
+                if (isKey && edge->type == kUnlocks && open.insert(edge->to).second) {
+                    changed = true;
+                }
+                if ((edge->type != kPath && edge->type != kShortcut) || seen.contains(edge->to)) {
                     continue;
                 }
-                if (graph.node(edge.to)->type == kGate && !open.contains(edge.to)) {
+                if (graph.node(edge->to)->type == kGate && !open.contains(edge->to)) {
                     continue;
                 }
-                seen.insert(edge.to);
-                queue.push_back(edge.to);
+                seen.insert(edge->to);
+                queue.push_back(edge->to);
             }
         }
     }
     return seen;
 }
 
-std::map<NodeId, std::uint32_t> pathDepth(const Graph& graph, NodeId entry)
+std::map<NodeId, std::uint32_t> pathDepth(const Adjacency& adjacency, NodeId entry)
 {
     std::map<NodeId, std::uint32_t> depth{{entry, 0}};
     std::deque<NodeId> queue{entry};
     while (!queue.empty()) {
         const NodeId at = queue.front();
         queue.pop_front();
-        for (const auto& [id, edge] : graph.edges()) {
-            if (edge.from == at && edge.type == kPath && !depth.contains(edge.to)) {
-                depth[edge.to] = depth[at] + 1;
-                queue.push_back(edge.to);
+        const auto out = adjacency.find(at);
+        if (out == adjacency.end()) {
+            continue;
+        }
+        for (const Edge* edge : out->second) {
+            if (edge->type == kPath && !depth.contains(edge->to)) {
+                depth[edge->to] = depth[at] + 1;
+                queue.push_back(edge->to);
             }
         }
     }
     return depth;
+}
+
+bool pathReaches(const Adjacency& adjacency, NodeId from, NodeId target)
+{
+    return pathDepth(adjacency, from).contains(target);
 }
 
 }
@@ -356,28 +392,29 @@ std::vector<std::string> validateMission(const Graph& graph)
         }
     }
 
-    const std::set<NodeId> open = reach(graph, entry, true);
+    const Adjacency adjacency = outgoing(graph);
+    const std::set<NodeId> open = reach(graph, adjacency, entry, true);
     for (const auto& [id, node] : graph.nodes()) {
         if (!open.contains(id)) {
             errors.push_back("node " + std::to_string(id) + " (" + node.type + ") is unreachable even with every key");
         }
     }
-    const std::set<NodeId> shut = reach(graph, entry, false);
+    const std::set<NodeId> shut = reach(graph, adjacency, entry, false);
     for (const auto& [id, node] : graph.nodes()) {
         if ((node.type == kReward || node.type == kClimax) && shut.contains(id)) {
             errors.push_back(node.type + " " + std::to_string(id) + " is reachable without passing a gate");
         }
     }
 
-    const auto depth = pathDepth(graph, entry);
+    const auto depth = pathDepth(adjacency, entry);
     for (const auto& [id, edge] : graph.edges()) {
         if (edge.type != kShortcut) {
             continue;
         }
         const auto from = depth.find(edge.from);
         const auto to = depth.find(edge.to);
-        if (from == depth.end() || to == depth.end() || to->second >= from->second) {
-            errors.push_back("shortcut " + std::to_string(id) + " does not lead back to earlier space");
+        if (from == depth.end() || to == depth.end() || to->second >= from->second || !pathReaches(adjacency, edge.to, edge.from)) {
+            errors.push_back("shortcut " + std::to_string(id) + " does not lead back to an ancestor");
         }
     }
     return errors;

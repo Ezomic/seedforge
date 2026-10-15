@@ -219,14 +219,45 @@ TEST_CASE("the validator rejects leftover placeholders and a missing climax", "[
     CHECK(hasError(validateMission(empty), "exactly one entry"));
 }
 
-TEST_CASE("the validator survives dangling and self referencing edges", "[dungeon][hostile]")
+TEST_CASE("the validator survives self referencing edges and cycles", "[dungeon][hostile]")
 {
     Graph g = handBuilt();
     g.addEdge(1, 1, kPath);
     g.addEdge(6, 1, kShortcut);
     g.addEdge(3, 3, kUnlocks);
-    (void)validateMission(g);
-    SUCCEED();
+    g.addEdge(6, 2, kPath);
+    g.addEdge(2, 6, kShortcut);
+    const auto errors = validateMission(g);
+    CHECK(hasError(errors, "shortcut"));
+}
+
+TEST_CASE("the validator rejects a shortcut into a sibling branch", "[dungeon][invariants]")
+{
+    Graph g;
+    const NodeId entry = g.addNode(kEntry);
+    const NodeId junction = g.addNode(kJunction);
+    const NodeId a = g.addNode(kChallenge);
+    const NodeId b = g.addNode(kChallenge);
+    const NodeId deep = g.addNode(kChallenge);
+    const NodeId key = g.addNode(kKey);
+    const NodeId gate = g.addNode(kGate);
+    const NodeId climax = g.addNode(kClimax);
+    g.addEdge(entry, junction, kPath);
+    g.addEdge(junction, a, kPath);
+    g.addEdge(junction, b, kPath);
+    g.addEdge(a, deep, kPath);
+    g.addEdge(deep, key, kPath);
+    g.addEdge(key, gate, kUnlocks);
+    g.addEdge(b, gate, kPath);
+    g.addEdge(gate, climax, kPath);
+    REQUIRE(validateMission(g).empty());
+    g.addEdge(deep, b, kShortcut);
+    CHECK(hasError(validateMission(g), "ancestor"));
+}
+
+TEST_CASE("a pinned seed builds a pinned mission on every platform", "[dungeon][determinism]")
+{
+    CHECK(generated(1).digest() == 0xbbd58c478ef8afffull);
 }
 
 TEST_CASE("hostile ruleset documents are rejected without crashing", "[dungeon][hostile]")
@@ -262,6 +293,9 @@ TEST_CASE("hostile ruleset documents are rejected without crashing", "[dungeon][
         CHECK_FALSE(parseRuleset(withPhases(std::string(R"({"id":"a","phase":"core","match_nodes":["seg"],)") + field + "}")).error.empty());
     }
     CHECK_FALSE(parseRuleset(withPhases(good + "," + good)).error.empty()); // duplicate id
+    CHECK_FALSE(parseRuleset(withPhases(R"({"id":"a","phase":"core","match_nodes":["","",""]})")).error.empty()); // unconnected wildcards
+    CHECK_FALSE(parseRuleset(withPhases(R"({"id":"a","phase":"core","match_nodes":["a","b","c","d","e"],"match_edges":["0>1:p","1>2:p","2>3:p","3>4:p"]})")).error.empty());
+    CHECK_FALSE(parseRuleset(withPhases(R"({"id":"a","phase":"core","match_nodes":["a"],"add_nodes":["x","x","x","x","x","x","x","x","x"]})")).error.empty());
 }
 
 TEST_CASE("an oversized ruleset is rejected", "[dungeon][hostile]")
@@ -294,10 +328,11 @@ TEST_CASE("rules that cannot resolve every placeholder fail generation", "[dunge
       {"id":"c","phase":"core","match_nodes":["seg",""],"match_edges":["0>1:path"],"retypes":["0:junction"],"add_nodes":["seg"],"add_edges":["0>2:path","2>1:path"]},
       {"id":"l","phase":"lock","match_nodes":["seg"],"retypes":["0:seg"]},
       {"id":"g","phase":"grow","match_nodes":["seg"],"retypes":["0:seg"]},
-      {"id":"r","phase":"reveal","match_nodes":["seg"],"retypes":["0:reveal"]},
+      {"id":"r","phase":"reveal","match_nodes":["seg"],"retypes":["0:seg"]},
       {"id":"v","phase":"resolve","match_nodes":["vault"],"retypes":["0:reward"]}])";
     const Ruleset rules = parseRuleset(doc);
     REQUIRE(rules.error.empty());
     const Result result = generate(rules, Params{});
-    CHECK(((!result.error.empty()) || !validateMission(result.graph).empty()));
+    CHECK(result.error.empty());
+    CHECK(hasError(validateMission(result.graph), "unresolved"));
 }

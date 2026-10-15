@@ -69,14 +69,16 @@ struct Result {
     std::string error; // empty on success
 };
 
-// entry, a gate with its key and a gated reward, a shortcut back, a reveal
-// and the climax are always present; the seed decides everything else.
+// With rules like the shipped ones, an entry, a gate with its key and a gated
+// reward, a shortcut back, a reveal and the climax are always present; the
+// seed decides everything else. Generation fails (error set) rather than
+// looping when a rule never settles; validateMission is what vouches for the result.
 Result generate(const Ruleset& rules, const Params& params);
 
 // Structural invariants of a finished mission graph; empty when all hold:
 // one entry and one climax, no leftover placeholders, every gate has a key,
 // every node reachable once keys are collected, no reward or climax reachable
-// with every gate shut, every shortcut leads back to a node reachable earlier.
+// with every gate shut, every shortcut leads back to a path ancestor of its source.
 std::vector<std::string> validateMission(const Graph& graph);
 
 }
