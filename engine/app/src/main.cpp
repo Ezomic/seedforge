@@ -15,6 +15,7 @@
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
+#include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/journal_screen.h"
 #include "ichor/data/journal.h"
@@ -322,9 +323,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.scene().setAnimations(&animations);
+    // No roads exist as world data yet, so the field is empty and the bonus never applies.
+    const ichor::NullRoadField roadField;
+    int roadBonusPermille = ichor::kDefaultRoadBonusPermille;
     if (waterField) {
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
-            return static_cast<double>(ichor::wadingSpeedFactor(waterField->at(position.x, position.z).depth));
+            const float depth = waterField->at(position.x, position.z).depth;
+            return static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
         });
     }
     engine.setAudio(&audio);
@@ -345,6 +350,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::DataSet data;
     if (!data.loadDirectory(options.data)) {
         ichor::logf(ichor::LogLevel::Warn, "data: {}", data.lastError());
+    }
+    std::string roadNote;
+    std::string roadError;
+    if (!ichor::loadRoadBonus(data, roadBonusPermille, roadNote, roadError)) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", roadError);
+    } else if (!roadNote.empty()) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", roadNote);
     }
     // The reverb of the places the listener walks into, from the "reverb" table of the data layer.
     std::optional<ichor::JournalTemplates> journalTemplates;
