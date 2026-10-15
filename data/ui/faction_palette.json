@@ -1,0 +1,11 @@
+{
+  "min_difference": 15.0,
+  "roles": {
+    "incumbent": "#0072B2",
+    "challenger": "#D55E00",
+    "parasite": "#CC79A7",
+    "custodian": "#56B4E9",
+    "refusenik": "#E69F00",
+    "herald": "#F0E442"
+  }
+}
