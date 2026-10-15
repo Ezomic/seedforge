@@ -29,6 +29,7 @@ add_executable(ichor_tests
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
+    test_dialogue_select.cpp
     test_npc_relationships.cpp
     test_npc_schedule.cpp
     test_npc_traits.cpp
@@ -42,6 +43,7 @@ add_executable(ichor_tests
     test_traversal_verbs.cpp
     test_roads.cpp
     test_axiom.cpp
+    test_axioms_powers.cpp
     test_axioms_law.cpp
     test_axiom_cataclysm.cpp
     test_synergy.cpp
