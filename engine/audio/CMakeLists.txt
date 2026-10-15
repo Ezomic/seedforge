@@ -15,6 +15,7 @@ add_library(ichor_audio
     src/null_audio.cpp
     src/wading_splash.cpp
     src/rain_ambience.cpp
+    src/weather_ambience.cpp
     src/ambience_layers.cpp
     src/music_director.cpp
     src/music_stinger.cpp

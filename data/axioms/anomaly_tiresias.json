@@ -1,0 +1,13 @@
+{
+  "id": "anomaly.tiresias",
+  "slot": "anomaly",
+  "title": "Tiresias Lives",
+  "tags": ["PROPHECY", "SEER", "IMMORTAL", "HERMIT"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["seers_grove"] },
+  "poi": { "weights": { "tiresias_hut": 2.0, "laurel_shrine": 1.5 } },
+  "economy": { "abundant": ["laurel"] },
+  "palette": { "grade": "tiresias", "fog_density": 1.0 },
+  "audio": { "bed_overrides": ["wind_in_laurel"], "music_palette": "tiresias" }
+}
