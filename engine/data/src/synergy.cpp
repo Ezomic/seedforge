@@ -70,6 +70,11 @@ bool isWord(std::string_view text)
     return !text.empty() && text[0] >= 'a' && text[0] <= 'z' && std::all_of(text.begin(), text.end(), [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; });
 }
 
+bool hasControl(std::string_view text, bool allowNewline)
+{
+    return std::any_of(text.begin(), text.end(), [&](unsigned char c) { return (c < 0x20 && !(allowNewline && c == '\n')) || c == 0x7f; });
+}
+
 // Reads an optional string field into `target`. Free text must not be blank; ids must be words.
 void readText(const Json& item, const char* key, const std::string& where, std::size_t maxBytes, bool word, std::string& target, const std::function<void(const std::string&, const std::string&)>& add)
 {
@@ -83,7 +88,7 @@ void readText(const Json& item, const char* key, const std::string& where, std::
         return;
     }
     const std::string& text = it->get_ref<const std::string&>();
-    if (text.size() > maxBytes || (word ? !isWord(text) : isBlank(text))) {
+    if (text.size() > maxBytes || (word ? !isWord(text) : (isBlank(text) || hasControl(text, false)))) {
         add(path, std::string("expected ") + (word ? "a lowercase ascii id (letters, digits, underscores)" : "non-blank text") + " of at most " + std::to_string(maxBytes) + " bytes, got " + shown(text));
         return;
     }
@@ -110,7 +115,7 @@ void readFlavour(const Json& item, const std::string& where, std::map<std::strin
             add(path, "expected lowercase ascii slot ids of at most " + std::to_string(kMaxIdBytes) + " bytes, got " + shown(slot));
         } else if (!value.is_string()) {
             add(path + "." + slot, "expected a string, got " + std::string(typeName(value)));
-        } else if (const std::string& text = value.get_ref<const std::string&>(); text.size() > kMaxFlavourBytes || isBlank(text)) {
+        } else if (const std::string& text = value.get_ref<const std::string&>(); text.size() > kMaxFlavourBytes || isBlank(text) || hasControl(text, true)) {
             add(path + "." + slot, "expected non-blank text of at most " + std::to_string(kMaxFlavourBytes) + " bytes, got " + shown(text));
         } else {
             target.emplace(slot, text);
