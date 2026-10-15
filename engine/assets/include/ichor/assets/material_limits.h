@@ -11,7 +11,9 @@
 namespace ichor {
 
 // The one place that says how far any surface may stray, whatever its source. The shader holds
-// every pixel to these ranges; the same numbers hold every material when it is created or loaded.
+// every pixel to these ranges; the same roughness and metal reflectance numbers hold every material
+// factor when a bundle is uploaded. Albedo brightness is held by the shader alone, since a texture
+// decides it.
 // The defaults change nothing.
 struct MaterialLimits {
     float roughnessMin = 0.04f;
@@ -57,6 +59,10 @@ bool loadMaterialLimits(const std::filesystem::path& path, MaterialLimits& out, 
 
 // Logs one warning per issue, labelled with where the materials came from, so authors can fix the source.
 void logMaterialIssues(std::string_view label, const std::vector<MaterialIssue>& issues);
+
+// Clamps every material of a bundle that is about to be drawn and returns what was outside the
+// limits beforehand, so the caller can report it. This is the step the renderer runs on upload.
+std::vector<MaterialIssue> clampMaterials(std::vector<Material>& materials, const MaterialLimits& limits);
 
 // The limits materials are clamped to when they are created or loaded; set once at startup.
 const MaterialLimits& activeMaterialLimits();

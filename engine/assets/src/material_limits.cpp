@@ -185,6 +185,15 @@ void logMaterialIssues(std::string_view label, const std::vector<MaterialIssue>&
     }
 }
 
+std::vector<MaterialIssue> clampMaterials(std::vector<Material>& materials, const MaterialLimits& limits)
+{
+    std::vector<MaterialIssue> issues = findMaterialIssues(materials, limits);
+    for (Material& material : materials) {
+        clampMaterial(material, limits);
+    }
+    return issues;
+}
+
 const MaterialLimits& activeMaterialLimits()
 {
     return g_active;

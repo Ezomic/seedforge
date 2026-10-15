@@ -1032,10 +1032,9 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
     const auto view = [&](std::uint32_t index, const GpuImage& fallback) {
         return index != kNoTexture && textureBase + index < textures_.size() ? textures_[textureBase + index].view : fallback.view;
     };
-    const MaterialLimits& limits = activeMaterialLimits();
-    logMaterialIssues("upload", findMaterialIssues(bundle.materials, limits));
-    for (Material material : bundle.materials) {
-        clampMaterial(material, limits);
+    std::vector<Material> clamped = bundle.materials;
+    logMaterialIssues("upload", clampMaterials(clamped, activeMaterialLimits()));
+    for (const Material& material : clamped) {
         VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         allocInfo.descriptorPool = pool_;
         allocInfo.descriptorSetCount = 1;

@@ -187,10 +187,24 @@ TEST_CASE("the shipped limits file parses and matches the default palette")
     REQUIRE(limits.dielectricF0 == palette.dielectricF0);
 }
 
+TEST_CASE("clamping a bundle's materials reports what was outside and leaves every one inside")
+{
+    const MaterialLimits limits = narrow();
+    std::vector<Material> materials{dielectric(0.5f), dielectric(0.0f), dielectric(kNaN)};
+    const auto issues = clampMaterials(materials, limits);
+    REQUIRE(issues.size() == 2);
+    REQUIRE(materials[0].roughnessFactor == 0.5f);
+    REQUIRE(materials[1].roughnessFactor == 0.3f);
+    REQUIRE(materials[2].roughnessFactor == 0.9f);
+    REQUIRE(clampMaterials(materials, limits).empty());
+}
+
 TEST_CASE("the active limits are what a renderer clamps to")
 {
-    const MaterialLimits before = activeMaterialLimits();
+    struct Restore {
+        MaterialLimits saved = activeMaterialLimits();
+        ~Restore() { setActiveMaterialLimits(saved); }
+    } restore;
     setActiveMaterialLimits(narrow());
     REQUIRE(activeMaterialLimits().roughnessMax == 0.9f);
-    setActiveMaterialLimits(before);
 }
