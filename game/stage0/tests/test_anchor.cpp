@@ -86,7 +86,7 @@ TEST_CASE("the wind-up is a long fixed telegraph, announced once, with no moveme
         }
     }
     REQUIRE(cues == 1);
-    REQUIRE(windupTicks >= kTuning.windupTicks - 1);
+    REQUIRE(windupTicks == kTuning.windupTicks);
     REQUIRE(kTuning.windupTicks >= 40);
 }
 
@@ -148,7 +148,7 @@ TEST_CASE("after recovering it holds its ground until the cooldown ends instead 
         ++held;
     }
     REQUIRE(brain.anchorState() == AnchorState::Windup);
-    REQUIRE(held <= kTuning.cooldownTicks + 1);
+    REQUIRE(held == kTuning.cooldownTicks);
 }
 
 TEST_CASE("a stagger interrupts the wind-up: no slam, and the anchor stays exposed while staggered")
@@ -175,6 +175,39 @@ TEST_CASE("a stagger interrupts the wind-up: no slam, and the anchor stays expos
 TEST_CASE("the anchor's poise is more than twice the standard fighter's, so a light hit does not stagger it")
 {
     REQUIRE(kTuning.maxPoise > 100.0f * 2.0f);
+}
+
+TEST_CASE("a stagger on a tick with unusable positions still cancels the wind-up")
+{
+    AnchorBrain brain = windingUp();
+    AnchorSenses s = senses(0.0f, kNaN);
+    s.staggered = true;
+    const AnchorIntent intent = anchorStep(brain, s, kTuning);
+    REQUIRE(brain.anchorState() == AnchorState::Staggered);
+    REQUIRE_FALSE(intent.slam);
+}
+
+TEST_CASE("in range with the cooldown running it holds; out of range with it spent it advances")
+{
+    AnchorBrain brain;
+    brain.state = static_cast<std::uint8_t>(AnchorState::Advance);
+    brain.cooldownTicks = 30;
+    anchorStep(brain, senses(0.0f, kTuning.slamRange - 0.5f), kTuning);
+    REQUIRE(brain.anchorState() == AnchorState::Hold);
+
+    brain.cooldownTicks = 0;
+    const AnchorIntent intent = anchorStep(brain, senses(0.0f, kTuning.slamRange + 3.0f), kTuning);
+    REQUIRE(brain.anchorState() == AnchorState::Advance);
+    REQUIRE(intent.move == glm::vec2(0.0f));
+}
+
+TEST_CASE("a target standing on the anchor does not move it")
+{
+    AnchorBrain brain;
+    anchorStep(brain, senses(3.0f, 3.0f), kTuning);
+    const AnchorIntent intent = anchorStep(brain, senses(3.0f, 3.0f), kTuning);
+    REQUIRE(intent.move == glm::vec2(0.0f));
+    REQUIRE(brain.anchorState() != AnchorState::Unaware);
 }
 
 TEST_CASE("a dead target ends the aggression, even mid wind-up")

@@ -47,9 +47,6 @@ void beginWindup(AnchorBrain& brain, AnchorIntent& intent)
 AnchorIntent anchorStep(AnchorBrain& brain, const AnchorSenses& senses, const AnchorTuning& tuning)
 {
     AnchorIntent intent;
-    if (!finite(senses.self) || !finite(senses.target)) {
-        return intent;
-    }
 
     brain.stateTicks = std::clamp(brain.stateTicks, 0, kMaxTicks);
     brain.cooldownTicks = std::clamp(brain.cooldownTicks, 0, std::max(tuning.cooldownTicks, 0));
@@ -57,6 +54,15 @@ AnchorIntent anchorStep(AnchorBrain& brain, const AnchorSenses& senses, const An
 
     if (!senses.targetAlive) {
         if (brain.anchorState() != AnchorState::Unaware) enter(brain, AnchorState::Unaware);
+        return intent;
+    }
+
+    if (senses.staggered) {
+        // A broken poise cancels whatever was committed, even on a tick with unusable positions.
+        if (brain.anchorState() != AnchorState::Staggered) enter(brain, AnchorState::Staggered);
+        return intent;
+    }
+    if (!finite(senses.self) || !finite(senses.target)) {
         return intent;
     }
 
@@ -70,11 +76,6 @@ AnchorIntent anchorStep(AnchorBrain& brain, const AnchorSenses& senses, const An
     brain.stateTicks = std::min(brain.stateTicks + 1, kMaxTicks);
     if (brain.cooldownTicks > 0) --brain.cooldownTicks;
 
-    if (senses.staggered) {
-        // A broken poise cancels whatever was committed; the cooldown starts when it ends.
-        if (brain.anchorState() != AnchorState::Staggered) enter(brain, AnchorState::Staggered);
-        return intent;
-    }
     if (brain.anchorState() == AnchorState::Staggered) {
         brain.cooldownTicks = std::max(tuning.cooldownTicks - 1, 0);
         enter(brain, AnchorState::Hold);
