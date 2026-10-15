@@ -246,6 +246,19 @@ void Stage0::tickStatus(Scene& scene, entt::entity who, Combatant& c)
     recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time());
 }
 
+void Stage0::parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon)
+{
+    Combatant& a = scene.registry().get<Combatant>(attacker);
+    if (!a.alive()) {
+        return;
+    }
+    a.poise = std::max(0.0f, a.poise - weapon.parryPoiseDamage);
+    a.sincePoiseDamage = 0.0f;
+    if (a.poise <= 0.0f && a.combatState() != CombatState::Staggered) {
+        enterState(scene, attacker, a, CombatState::Staggered);
+    }
+}
+
 void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen)
 {
     Combatant& c = scene.registry().get<Combatant>(victim);
@@ -253,7 +266,13 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     if (!c.alive()) {
         return;
     }
-    const bool blocked = c.blocking && c.combatState() == CombatState::Idle;
+    const bool guarded = c.blocking && c.combatState() == CombatState::Idle;
+    const WeaponProfile& weapon = weapons_[c.side];
+    if (guarded && weapon.parries() && c.blockTicks >= 1 && c.blockTicks <= weapon.parryWindowTicks) {
+        parry(scene, attacker, weapon);
+        return;
+    }
+    const bool blocked = guarded;
     float applied = damage;
     if (blocked) {
         // Block converts damage into stamina drain rather than negating it.
@@ -385,6 +404,7 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
         c.stateTime += fdt;
         c.sinceStaminaSpend += fdt;
         c.sincePoiseDamage += fdt;
+        c.blockTicks = c.blocking && c.combatState() == CombatState::Idle ? c.blockTicks + 1 : 0;
 
         tickStatus(scene, entity, c);
         if (!c.alive()) {

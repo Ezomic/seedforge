@@ -20,7 +20,6 @@ namespace {
 static_assert(std::endian::native == std::endian::little, "slot files are little-endian");
 
 constexpr char kMagic[4] = {'I', 'S', 'L', 'T'};
-constexpr std::uint32_t kFormat = 2;
 constexpr std::uintmax_t kMaxSlotBytes = 512ull * 1024 * 1024;
 
 struct Header {
@@ -64,9 +63,20 @@ bool readFile(const std::filesystem::path& path, std::vector<std::uint8_t>& byte
     return static_cast<std::uintmax_t>(file.gcount()) == size;
 }
 
+std::vector<std::uint8_t> encode(Header header, const std::vector<std::uint8_t>& payload)
+{
+    header.payloadSize = payload.size();
+    header.checksum = checksum(header, payload);
+    std::vector<std::uint8_t> bytes(sizeof(Header) + payload.size());
+    std::memcpy(bytes.data(), &header, sizeof(Header));
+    std::copy(payload.begin(), payload.end(), bytes.begin() + static_cast<std::ptrdiff_t>(sizeof(Header)));
+    return bytes;
+}
+
+// Ok covers every format this build can read, the current one or one with a migration path.
 enum class SlotRead { Ok, Missing, Corrupt, UnsupportedVersion };
 
-SlotRead readSlot(const std::filesystem::path& path, Header& header, std::vector<std::uint8_t>& payload)
+SlotRead readSlot(const MigrationRegistry& registry, const std::filesystem::path& path, Header& header, std::vector<std::uint8_t>& payload)
 {
     std::vector<std::uint8_t> bytes;
     if (!readFile(path, bytes)) {
@@ -87,7 +97,16 @@ SlotRead readSlot(const std::filesystem::path& path, Header& header, std::vector
         return SlotRead::Corrupt;
     }
     // Only a copy that passes its checksum may claim to be from another format.
-    return header.format == kFormat ? SlotRead::Ok : SlotRead::UnsupportedVersion;
+    return header.format == registry.current() || registry.canMigrate(header.format) ? SlotRead::Ok : SlotRead::UnsupportedVersion;
+}
+
+std::string unsupportedMessage(const MigrationRegistry& registry, std::uint32_t format)
+{
+    if (registry.isNewer(format)) {
+        return "the slot was saved by a newer version of the game (format " + std::to_string(format) + ", this build reads up to "
+            + std::to_string(registry.current()) + "); it has been left untouched";
+    }
+    return "the slot is in format " + std::to_string(format) + ", which this build can no longer migrate; it has been left untouched";
 }
 
 SlotInfo infoOf(std::string_view name, const Header& header)
@@ -139,6 +158,15 @@ bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContex
         error_ = "ironman allows one rolling slot only";
         return false;
     }
+    const MigrationRegistry& registry = migrations();
+    for (std::uint32_t backup = 0; backup <= policy_.backups; ++backup) {
+        Header existing{};
+        std::vector<std::uint8_t> existingPayload;
+        if (readSlot(registry, pathOf(name, backup), existing, existingPayload) == SlotRead::UnsupportedVersion) {
+            error_ = unsupportedMessage(registry, existing.format) + "; save under another name";
+            return false;
+        }
+    }
     std::error_code ec;
     std::filesystem::create_directories(directory_, ec);
 
@@ -163,17 +191,14 @@ bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContex
 
     Header header{};
     std::memcpy(header.magic, kMagic, sizeof(kMagic));
-    header.format = kFormat;
+    header.format = registry.current();
     header.worldSeed = context.worldSeed;
     header.genVersion = context.genVersion;
     header.dataDigest = context.dataDigest;
     header.tick = scene.tickCount();
     header.payloadSize = payload.size();
     header.snapshotSize = snapshotSize;
-    header.checksum = checksum(header, payload);
-    std::vector<std::uint8_t> bytes(sizeof(Header) + payload.size());
-    std::memcpy(bytes.data(), &header, sizeof(Header));
-    std::copy(payload.begin(), payload.end(), bytes.begin() + static_cast<std::ptrdiff_t>(sizeof(Header)));
+    const std::vector<std::uint8_t> bytes = encode(header, payload);
 
     // The new file is written complete beside the slot first, so a failed write
     // leaves every existing copy exactly as it was.
@@ -194,7 +219,7 @@ bool SaveSlots::save(std::string_view name, const Scene& scene, const SaveContex
     }
     Header currentHeader{};
     std::vector<std::uint8_t> currentPayload;
-    if (policy_.backups >= 1 && readSlot(pathOf(name, 0), currentHeader, currentPayload) == SlotRead::Ok) {
+    if (policy_.backups >= 1 && readSlot(registry, pathOf(name, 0), currentHeader, currentPayload) == SlotRead::Ok) {
         std::filesystem::copy_file(pathOf(name, 0), pathOf(name, 1), std::filesystem::copy_options::overwrite_existing, ec);
     }
     std::filesystem::rename(fresh, pathOf(name, 0), ec);
@@ -213,17 +238,20 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
         error_ = "invalid slot name";
         return result;
     }
+    const MigrationRegistry& registry = migrations();
     bool anyFile = false;
     for (std::uint32_t backup = 0; backup <= policy_.backups; ++backup) {
         Header header{};
         std::vector<std::uint8_t> payload;
-        const SlotRead read = readSlot(pathOf(name, backup), header, payload);
+        const SlotRead read = readSlot(registry, pathOf(name, backup), header, payload);
         if (read == SlotRead::Missing) {
             continue;
         }
         anyFile = true;
         if (read == SlotRead::UnsupportedVersion) {
             result.status = LoadStatus::UnsupportedVersion;
+            result.savedFormat = header.format;
+            error_ = unsupportedMessage(registry, header.format);
             return result;
         }
         if (read == SlotRead::Corrupt) {
@@ -233,6 +261,21 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
             result.status = LoadStatus::WrongWorld;
             result.info = infoOf(name, header);
             return result;
+        }
+        const std::uint32_t savedFormat = header.format;
+        if (savedFormat != registry.current()) {
+            SlotBody body{{payload.begin(), payload.begin() + static_cast<std::ptrdiff_t>(header.snapshotSize)},
+                std::string(payload.begin() + static_cast<std::ptrdiff_t>(header.snapshotSize), payload.end())};
+            if (!registry.migrate(savedFormat, body)) {
+                result.status = LoadStatus::MigrationFailed;
+                result.savedFormat = savedFormat;
+                error_ = "a migration step refused the slot file (format " + std::to_string(savedFormat) + "); it has been left untouched";
+                continue;
+            }
+            header.format = registry.current();
+            header.snapshotSize = body.snapshot.size();
+            payload = std::move(body.snapshot);
+            payload.insert(payload.end(), body.chronicle.begin(), body.chronicle.end());
         }
         const std::filesystem::path scratch = directory_ / (std::string(name) + ".load");
         bool restored = false;
@@ -255,6 +298,20 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
             result.status = LoadStatus::RestoreFailed;
             continue;
         }
+        error_.clear();
+        if (savedFormat != registry.current()) {
+            result.migratedFrom = savedFormat;
+            // Only the slot file itself is rewritten, after the old one is kept whole beside it.
+            // A backup is migrated in memory and left as it is, so the rotating history is never touched.
+            if (backup == 0) {
+                std::filesystem::path kept = pathOf(name, 0);
+                kept.replace_extension(".premigrate-v" + std::to_string(savedFormat));
+                std::filesystem::copy_file(pathOf(name, 0), kept, std::filesystem::copy_options::overwrite_existing, ec);
+                if (ec || !writeFileAtomically(pathOf(name, 0), encode(header, payload))) {
+                    error_ = "the slot was migrated in memory only; the file on disk is unchanged";
+                }
+            }
+        }
         // The story is read after the scene is back; a damaged one costs the journal, not the save.
         const std::string_view story(reinterpret_cast<const char*>(payload.data()) + header.snapshotSize, payload.size() - header.snapshotSize);
         result.chronicleDamaged = !story.empty() && !Chronicle::parse(story, result.chronicle);
@@ -263,7 +320,7 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
         result.dataChanged = header.dataDigest != expected.dataDigest;
         return result;
     }
-    if (result.status != LoadStatus::RestoreFailed) {
+    if (result.status != LoadStatus::RestoreFailed && result.status != LoadStatus::MigrationFailed) {
         result.status = anyFile ? LoadStatus::Corrupt : LoadStatus::NoSuchSlot;
     }
     return result;
@@ -285,7 +342,7 @@ std::vector<SlotInfo> SaveSlots::list() const
         for (std::uint32_t backup = 0; backup <= policy_.backups; ++backup) {
             Header header{};
             std::vector<std::uint8_t> payload;
-            if (readSlot(pathOf(name, backup), header, payload) == SlotRead::Ok) {
+            if (readSlot(migrations(), pathOf(name, backup), header, payload) == SlotRead::Ok) {
                 slots.push_back(infoOf(name, header));
                 break;
             }

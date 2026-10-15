@@ -6,6 +6,7 @@
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/recorder.h"
 #include "ichor/stage0/status_effect.h"
+#include "ichor/stage0/weapon.h"
 
 #include <glm/vec3.hpp>
 
@@ -35,6 +36,7 @@ struct Combatant {
     float sinceStaminaSpend = 999.0f;
     float sincePoiseDamage = 999.0f;
     bool blocking = false;
+    std::int32_t blockTicks = 0; // fixed steps the guard has been up; the parry window counts from here
     bool traceDone = false;
     float yaw = 0.0f; // radians, 0 looks down -Z
     glm::vec3 dodgeDirection{0.0f};
@@ -180,6 +182,7 @@ public:
     // Shared by both systems.
     bool tryAttack(Scene& scene, entt::entity who, AttackKind kind);
     bool tryDodge(Scene& scene, entt::entity who, glm::vec3 direction);
+    void setWeapon(Side side, WeaponProfile weapon) { weapons_[static_cast<std::size_t>(side)] = weapon; }
     bool applyStatus(Scene& scene, entt::entity who, StatusId id, std::int32_t durationTicks = 0);
     void receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen);
     float allowedTurnRate(const Combatant& c) const;
@@ -189,6 +192,7 @@ private:
     void skirmisherSystem(Scene& scene, double dt);
     void controllerSystem(Scene& scene);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
+    void parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon);
     void tickStatus(Scene& scene, entt::entity who, Combatant& c);
     struct PendingHit {
         entt::entity victim;
@@ -202,6 +206,7 @@ private:
 
     Tuning tuning_;
     FoeRole role_ = FoeRole::Skirmisher;
+    WeaponProfile weapons_[2];
     FightRecorder recorder_;
     StableId player_{};
     StableId foe_{};
@@ -235,7 +240,7 @@ struct Reflect<stage0::Combatant> {
         return std::make_tuple(field("side", &C::side), field("health", &C::health), field("stamina", &C::stamina), field("poise", &C::poise),
             field("state", &C::state), field("attack", &C::attack), field("stateTime", &C::stateTime),
             field("sinceStaminaSpend", &C::sinceStaminaSpend), field("sincePoiseDamage", &C::sincePoiseDamage),
-            field("blocking", &C::blocking), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
+            field("blocking", &C::blocking), field("blockTicks", &C::blockTicks), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
             field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause), field("retryHeld", &C::retryHeld), field("status", &C::status));
     }
 };
