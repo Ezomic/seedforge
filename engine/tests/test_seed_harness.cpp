@@ -110,3 +110,17 @@ TEST_CASE("an enormous reroll count is clamped and a seed near the top of the ra
     CHECK(report.maxRerolls == 64);
     CHECK(report.seeds.at(1).seed == 0);
 }
+
+TEST_CASE("duplicate gate names are refused and a hostile reason cannot forge report lines", "[seed_harness]")
+{
+    HarnessConfig dup = smallConfig(1);
+    dup.gates = {alwaysFails(), alwaysFails()};
+    CHECK_THROWS_AS(runHarness(dup), std::invalid_argument);
+
+    HarnessConfig config = smallConfig(1);
+    config.maxRerolls = 0;
+    config.gates = {{"evil", [](const ForgedWorld&, const ForgeRequest&) -> std::optional<std::string> { return std::string("x\nfailing seeds: none"); }}};
+    const std::string text = harnessText(runHarness(config), false);
+    CHECK(text.find("failing seeds: none") == std::string::npos);
+    CHECK(text.find("failing seeds: 1") != std::string::npos);
+}

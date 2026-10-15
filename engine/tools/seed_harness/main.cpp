@@ -88,7 +88,7 @@ int main(int argc, char** argv)
         const ichor::HarnessReport report = ichor::runHarness(config);
         const std::string text = json ? ichor::harnessJson(report, timing) : ichor::harnessText(report, timing);
         if (outPath.empty()) {
-            std::fputs(text.c_str(), stdout);
+            std::fwrite(text.data(), 1, text.size(), stdout);
         } else if (!ichor::writeFileAtomically(outPath, std::vector<std::uint8_t>(text.begin(), text.end()))) {
             ichor::logf(ichor::LogLevel::Error, "cannot write {}", outPath.string());
             return 2;

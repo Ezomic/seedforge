@@ -40,6 +40,16 @@ std::string jsonString(const std::string& text)
     return out + "\"";
 }
 
+std::string printable(const std::string& text)
+{
+    std::string out;
+    for (const char c : text) {
+        const auto u = static_cast<unsigned char>(c);
+        out += (u < 0x20 || u == 0x7f) ? '?' : c;
+    }
+    return out;
+}
+
 std::string failuresJson(const std::vector<GateFailure>& failures)
 {
     std::string out = "[";
@@ -62,6 +72,11 @@ HarnessReport runHarness(const HarnessConfig& config)
 {
     if (config.count == 0 || config.count > kMaxHarnessSeeds) throw std::invalid_argument("seed count out of range");
     if (!config.request.desc.valid()) throw std::invalid_argument("the world description is not valid");
+    for (std::size_t i = 0; i < config.gates.size(); ++i) {
+        for (std::size_t j = 0; j < i; ++j) {
+            if (config.gates[i].name == config.gates[j].name) throw std::invalid_argument("gate names must be distinct");
+        }
+    }
 
     HarnessReport report;
     report.firstSeed = config.firstSeed;
@@ -113,12 +128,12 @@ HarnessReport runHarness(const HarnessConfig& config)
 
 std::string harnessText(const HarnessReport& report, bool withTiming)
 {
-    std::string out = std::format("seeds {}..{} ({}), up to {} rerolls\n", report.firstSeed, report.firstSeed + report.count - 1, report.count, report.maxRerolls);
+    std::string out = std::format("first seed {}, {} seeds, up to {} rerolls\n", report.firstSeed, report.count, report.maxRerolls);
     out += std::format("passed first attempt: {}\npassed after reroll: {}\nfailed every attempt: {}\n", report.passedFirstAttempt, report.passedAfterReroll, report.failedAllAttempts);
     out += "gates (seeds failing at attempt 0 / attempts failing / seeds blocked on every attempt):\n";
     for (const GateStats& g : report.gates) {
-        out += std::format("  {}: {} / {} / {}\n", g.gate, g.firstAttemptFailures, g.attemptFailures, g.blockedSeeds);
-        for (const std::string& reason : g.sampleReasons) out += std::format("    e.g. {}\n", reason);
+        out += std::format("  {}: {} / {} / {}\n", printable(g.gate), g.firstAttemptFailures, g.attemptFailures, g.blockedSeeds);
+        for (const std::string& reason : g.sampleReasons) out += std::format("    e.g. {}\n", printable(reason));
     }
     std::string failed;
     for (const SeedOutcome& s : report.seeds) {

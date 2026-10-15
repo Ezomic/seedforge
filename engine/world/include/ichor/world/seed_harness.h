@@ -8,7 +8,7 @@
 
 namespace ichor {
 
-constexpr std::uint32_t kMaxHarnessSeeds = 1'000'000;
+constexpr std::uint32_t kMaxHarnessSeeds = 100'000;
 constexpr std::size_t kMaxSampleReasons = 3;
 
 // Forges `count` consecutive seeds from `firstSeed` through the validation gates, with the same
