@@ -22,4 +22,13 @@ constexpr std::uint64_t hashCombine(std::uint64_t a, std::uint64_t b)
     return a ^ (b + 0x9e3779b97f4a7c15ull + (a << 6) + (a >> 2));
 }
 
+// SplitMix64 finalizer. Bijective, so chaining it never loses information.
+constexpr std::uint64_t mix64(std::uint64_t z)
+{
+    z += 0x9e3779b97f4a7c15ull;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+    return z ^ (z >> 31);
+}
+
 }
