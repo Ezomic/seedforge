@@ -16,6 +16,41 @@ bool plainCategory(std::string_view category)
         && std::all_of(category.begin(), category.end(), [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'; });
 }
 
+bool parseNumber(std::string_view text, std::uint32_t& out)
+{
+    const auto [rest, error] = std::from_chars(text.data(), text.data() + text.size(), out);
+    return !text.empty() && error == std::errc{} && rest == text.data() + text.size();
+}
+
+// "npc,npc|place|weight"
+bool parseTags(std::string_view column, ChronicleTags& tags)
+{
+    const std::size_t bar = column.find('|');
+    const std::size_t bar2 = bar == std::string_view::npos ? bar : column.find('|', bar + 1);
+    if (bar2 == std::string_view::npos) {
+        return false;
+    }
+    std::string_view list = column.substr(0, bar);
+    while (!list.empty()) {
+        const std::size_t comma = list.find(',');
+        std::uint32_t npc = 0;
+        if (!parseNumber(list.substr(0, comma), npc)) {
+            return false;
+        }
+        tags.npcs.push_back(npc);
+        list = comma == std::string_view::npos ? std::string_view{} : list.substr(comma + 1);
+        if (comma != std::string_view::npos && list.empty()) {
+            return false;
+        }
+    }
+    std::uint32_t weight = 0;
+    if (!parseNumber(column.substr(bar + 1, bar2 - bar - 1), tags.place) || !parseNumber(column.substr(bar2 + 1), weight) || weight > 255) {
+        return false;
+    }
+    tags.weight = static_cast<std::uint8_t>(weight);
+    return true;
+}
+
 }
 
 bool Chronicle::add(std::uint64_t tick, std::string_view category, std::string_view text)
@@ -43,6 +78,21 @@ bool Chronicle::add(std::uint64_t tick, std::string_view category, std::string_v
     return true;
 }
 
+bool Chronicle::add(std::uint64_t tick, std::string_view category, std::string_view text, const ChronicleTags& tags)
+{
+    std::vector<std::uint32_t> npcs = tags.npcs;
+    std::sort(npcs.begin(), npcs.end());
+    npcs.erase(std::unique(npcs.begin(), npcs.end()), npcs.end());
+    if (npcs.size() > kMaxTaggedNpcs || !add(tick, category, text)) {
+        return false;
+    }
+    ChronicleEntry& entry = entries_.back();
+    entry.npcs = std::move(npcs);
+    entry.place = tags.place;
+    entry.weight = tags.weight;
+    return true;
+}
+
 std::string Chronicle::serialize() const
 {
     std::string out(kHeader);
@@ -53,6 +103,13 @@ std::string Chronicle::serialize() const
         out += entry.category;
         out += '\t';
         out += entry.text;
+        if (!entry.npcs.empty() || entry.place != 0 || entry.weight != 0) {
+            out += '\t';
+            for (std::size_t i = 0; i < entry.npcs.size(); ++i) {
+                out += (i == 0 ? "" : ",") + std::to_string(entry.npcs[i]);
+            }
+            out += '|' + std::to_string(entry.place) + '|' + std::to_string(entry.weight);
+        }
         out += '\n';
     }
     return out;
@@ -89,7 +146,17 @@ bool Chronicle::parse(std::string_view bytes, Chronicle& out)
         if (error != std::errc{} || rest != tickText.data() + tickText.size()) {
             return false;
         }
-        if (!parsed.add(tick, line.substr(first + 1, second - first - 1), line.substr(second + 1))) {
+        const std::size_t third = line.find('\t', second + 1);
+        const std::string_view category = line.substr(first + 1, second - first - 1);
+        if (third == std::string_view::npos) {
+            if (!parsed.add(tick, category, line.substr(second + 1))) {
+                return false;
+            }
+            continue;
+        }
+        ChronicleTags tags;
+        if (!parseTags(line.substr(third + 1), tags)
+            || !parsed.add(tick, category, line.substr(second + 1, third - second - 1), tags)) {
             return false;
         }
     }
