@@ -1,6 +1,7 @@
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/cooker.h"
 #include "ichor/assets/image.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -69,7 +70,7 @@ TEST_CASE("bundle round-trips through the binary format")
     CookStats stats;
     REQUIRE(cookGltf(kKit, cooked, stats));
 
-    const auto path = std::filesystem::temp_directory_path() / "ichor_roundtrip.iscene";
+    const auto path = test::tempPath("ichor_roundtrip.iscene");
     REQUIRE(writeBundle(path, cooked));
 
     SceneBundle loaded;
@@ -96,7 +97,7 @@ TEST_CASE("bundle round-trips through the binary format")
 
 TEST_CASE("reading garbage is refused")
 {
-    const auto path = std::filesystem::temp_directory_path() / "ichor_garbage.iscene";
+    const auto path = test::tempPath("ichor_garbage.iscene");
     REQUIRE(writePng(path, 2, 2, std::vector<std::uint8_t>(16, 0).data()));
     SceneBundle bundle;
     REQUIRE_FALSE(readBundle(path, bundle));
@@ -107,7 +108,7 @@ TEST_CASE("mip chains average sRGB in linear light")
 {
     // A 2x2 checker of pure white and pure black. Its 1x1 mip is mid grey in
     // linear light, which is 188 in sRGB; a data texture averages to 128.
-    const auto path = std::filesystem::temp_directory_path() / "ichor_checker.png";
+    const auto path = test::tempPath("ichor_checker.png");
     const std::uint8_t checker[16] = {255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255};
     REQUIRE(writePng(path, 2, 2, checker));
     std::ifstream in(path, std::ios::binary);
