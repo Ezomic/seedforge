@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/assets/material_limits.h"
+
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
@@ -62,14 +64,10 @@ struct ColourGrade {
     glm::vec3 highlights{1.0f}; // multiplies the bright end
 };
 
-// How far any surface may stray, whatever its source: the range roughness is held to and
-// the range of albedo brightness for non-metals. The defaults change nothing.
-struct MaterialResponse {
-    float roughnessMin = 0.04f;
-    float roughnessMax = 1.0f;
-    float albedoMin = 0.0f;
-    float albedoMax = 1000.0f; // effectively open
-};
+// How far any surface may stray, whatever its source: the ranges of roughness, of albedo
+// brightness for non-metals and of reflectance. The same limits clamp each material as it is
+// created or loaded. The defaults change nothing.
+using MaterialResponse = MaterialLimits;
 
 // A resident water cell: the handle the renderer gave its surface mesh and where the cell sits.
 struct WaterDraw {

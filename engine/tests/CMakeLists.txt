@@ -34,6 +34,7 @@ add_executable(ichor_tests
     test_npc_schedule.cpp
     test_npc_traits.cpp
     test_factions.cpp
+    test_material_limits.cpp
     test_wallet.cpp
     test_capabilities.cpp
     test_standing.cpp
