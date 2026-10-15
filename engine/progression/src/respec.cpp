@@ -34,8 +34,13 @@ int nestingDepth(std::string_view text)
     bool escaped = false;
     for (const char c : text) {
         if (inString) {
-            escaped = !escaped && c == '\\';
-            inString = escaped || c != '"';
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                inString = false;
+            }
         } else if (c == '"') {
             inString = true;
         } else if (c == '[' || c == '{') {

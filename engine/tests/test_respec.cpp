@@ -139,6 +139,10 @@ TEST_CASE("the refund discount lowers the price and never goes below zero", "[re
     const RespecQuote free = quoteRespec(generous, w.table, w.unlocks, {"climb"}, w.wallet, w.currencies, 100);
     CHECK(free.cost == 0);
     CHECK(free.status == RespecStatus::Done);
+    const auto before = w.wallet.digest();
+    CHECK(respec(generous, w.table, w.unlocks, {"climb"}, w.wallet, w.currencies, 100).status == RespecStatus::Done);
+    CHECK(w.wallet.digest() == before);
+    CHECK_FALSE(w.unlocks.can("climb"));
 }
 
 TEST_CASE("a refused respec changes nothing", "[respec]")
@@ -187,9 +191,10 @@ TEST_CASE("a refused respec changes nothing", "[respec]")
         w.fund(CurrencySlot::Coin, 100000);
         RespecService bad = trainer;
         bad.sink = "power";
+        const auto funded = w.wallet.digest();
         CHECK(respec(bad, w.table, w.unlocks, {"climb"}, w.wallet, w.currencies, 10).status == RespecStatus::SinkNotAllowed);
+        CHECK(w.wallet.digest() == funded);
     }
-    CHECK(w.wallet.balance(CurrencySlot::Coin) <= 100000);
     CHECK(w.unlocks.digest() == unlockDigest);
 }
 
@@ -222,6 +227,8 @@ TEST_CASE("respec service parsing rejects bad data without throwing", "[respec]"
     CHECK_FALSE(parseProblems("[1]").empty());
     CHECK_FALSE(parseProblems(std::string(300000, ' ')).empty());
     CHECK_FALSE(parseProblems(std::string(500, '[') + std::string(500, ']')).empty());
+    const std::string escapedQuote = R"(["\"", )";
+    CHECK_FALSE(parseProblems(escapedQuote + std::string(500, '[') + std::string(500, ']') + "]").empty());
     CHECK_FALSE(parseProblems("[" + record() + "," + record() + "]").empty());
     CHECK_FALSE(parseProblems("[" + record(R"(, "base_cost": -1)") + "]").empty());
     CHECK_FALSE(parseProblems("[" + record(R"(, "base_cost": 1.5)") + "]").empty());
