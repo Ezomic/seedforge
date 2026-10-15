@@ -1,0 +1,8 @@
+[
+  {"id": "fear_rising_sea", "kind": "fear", "subject": "flood", "intensity": 8, "tag": "sea_level", "op": ">", "value": 3},
+  {"id": "fear_empty_granary", "kind": "fear", "subject": "famine", "intensity": 6, "tag": "settlement.grain", "op": "<", "value": 20},
+  {"id": "fear_hull_losses", "kind": "fear", "subject": "drowned_crews", "intensity": 5, "tag": "settlement.hulls_sunk", "op": ">=", "value": 1},
+  {"id": "want_grain", "kind": "want", "subject": "grain", "intensity": 7, "tag": "settlement.grain", "op": "<", "value": 40},
+  {"id": "want_brother_off_dive_crews", "kind": "want", "subject": "kin_safe_ashore", "intensity": 9, "tag": "settlement.dive_deaths", "op": ">=", "value": 2},
+  {"id": "want_open_harbour", "kind": "want", "subject": "trade", "intensity": 4, "tag": "settlement.blockaded", "op": "==", "value": 1}
+]
