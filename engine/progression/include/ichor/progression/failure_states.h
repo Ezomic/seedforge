@@ -22,7 +22,7 @@ namespace ichor {
 
 enum class FailureKind : std::uint8_t { Cargo, Standing, Companion, Route, Time };
 
-constexpr std::size_t kMaxFailureKeyBytes = 40;
+constexpr std::size_t kMaxFailureKeyBytes = 36;
 constexpr std::uint32_t kMaxFailureAmount = 1000000000;
 
 struct FailureEvent {
