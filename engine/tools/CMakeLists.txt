@@ -2,6 +2,7 @@ add_executable(ichor_cook
     cook/main.cpp
 )
 target_link_libraries(ichor_cook PRIVATE ichor_assets)
+target_compile_definitions(ichor_cook PRIVATE ICHOR_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../data")
 
 add_executable(ichor_forge
     forge/main.cpp

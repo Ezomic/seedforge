@@ -1,9 +1,12 @@
 #include "ichor/assets/audio_cook.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/cooker.h"
+#include "ichor/assets/material_limits.h"
 #include "ichor/core/log.h"
 
 #include <filesystem>
+#include <string>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -16,6 +19,14 @@ int main(int argc, char** argv)
     ichor::CookStats stats;
     if (!ichor::cookGltf(argv[1], bundle, stats)) {
         return 1;
+    }
+    ichor::MaterialLimits limits;
+    std::vector<std::string> problems;
+    if (ichor::loadMaterialLimits(std::filesystem::path(ICHOR_DATA_DIR) / "materials" / "response.json", limits, problems)) {
+        ichor::logMaterialIssues(std::filesystem::path(argv[1]).filename().string(), ichor::findMaterialIssues(bundle.materials, limits));
+    }
+    for (const std::string& problem : problems) {
+        ichor::logf(ichor::LogLevel::Warn, "material limits: {}", problem);
     }
     for (int i = 3; i < argc; ++i) {
         ichor::SoundClip clip;

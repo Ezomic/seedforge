@@ -28,6 +28,7 @@ struct FrameData {
     float4 materialParams;  // x roughness min, y roughness max, z albedo min, w albedo max
     float4 groundParams;    // rgb colour of the ground at the foot of objects, w metres it reaches up (0 is off)
     float4 cloudShadow;     // x strength of the shadows clouds throw (0 is off), yz the camera's place in the cloud plane
+    float4 specularParams;  // x metal F0 min, y metal F0 max, z F0 of every non-metal
 };
 
 struct PushData {

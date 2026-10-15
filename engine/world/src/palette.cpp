@@ -14,6 +14,8 @@ Palette defaultPalette()
     palette.response.roughnessMax = 0.95f;
     palette.response.albedoMin = 0.04f;
     palette.response.albedoMax = 0.85f;
+    palette.response.metalF0Min = 0.45f;
+    palette.response.metalF0Max = 0.95f;
     palette.groundColor = {0.09f, 0.15f, 0.055f};
     palette.groundBlendHeight = 0.8f;
     return palette;
