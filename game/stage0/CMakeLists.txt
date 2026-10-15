@@ -6,6 +6,7 @@ add_library(ichor_stage0
     src/status_effect.cpp
     src/weapon.cpp
     src/skirmisher.cpp
+    src/controller.cpp
     src/recorder.cpp
     src/swarm.cpp
 )
@@ -36,6 +37,7 @@ if(BUILD_TESTING)
         tests/test_fight.cpp
         tests/test_status_effect.cpp
         tests/test_swarm.cpp
+        tests/test_controller.cpp
         tests/test_parry.cpp
     )
     target_link_libraries(stage0_tests PRIVATE ichor_stage0 ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain)
