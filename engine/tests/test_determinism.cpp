@@ -238,12 +238,10 @@ TEST_CASE("determinism: the forged world and the simulation match the checked-in
     REQUIRE(problems.empty());
 }
 
-// Known open finding, kept visible but unable to fail CI. On CI run 38603714882 the Windows and Linux builds
-// agreed on this scene up to tick 30 and diverged by tick 60 for seeds 1 and 42 (seeds 0 and 2^64-1 matched).
-// Suspect: the vcpkg joltphysics port builds Jolt with CROSS_PLATFORM_DETERMINISTIC=OFF and USE_FMADD on, so the
-// library's own float code may fuse multiply-adds differently on clang (Linux) and MSVC (Windows). When the
-// physics is made cross-platform deterministic, drop [!mayfail] so this joins the hard test above.
-TEST_CASE("determinism: the walked physics scene matches across platforms", "[!mayfail]")
+// The stock vcpkg joltphysics port builds Jolt with CROSS_PLATFORM_DETERMINISTIC=OFF (fast math, FMA), which made
+// Windows and Linux diverge between ticks 30 and 60. The overlay port in ports/joltphysics turns it on, so this
+// scene is a hard test like the ones above.
+TEST_CASE("determinism: the walked physics scene matches across platforms")
 {
     const char* update = std::getenv("ICHOR_UPDATE_DETERMINISM");
     if (update != nullptr && update[0] == '1') {
