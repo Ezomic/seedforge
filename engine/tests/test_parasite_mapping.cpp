@@ -130,7 +130,7 @@ TEST_CASE("the mapping parser refuses malformed input without crashing")
     REQUIRE(rejects("[{\"axiom\":\"law.a\",\"id\":\"a\",\"name\":\"The A \xE2\x80\x94 B\"}]", "em-dash"));
     REQUIRE(rejects(R"([{"axiom":"law.a","id":"a","name":"The A","id":"b"}])", "duplicate key"));
     REQUIRE(rejects(R"([{"axiom":"law.a","id":"a","name":"A"},{"axiom":"law.b","id":"b","id":"c","name":"B"}])", "duplicate key"));
-    REQUIRE(rejects("[{\"axiom\":\"law.a\",\"id\":\"a\",\"name\":\"A\nB\"}]", "control characters"));
+    REQUIRE(rejects("[{\"axiom\":\"law.a\",\"id\":\"a\",\"name\":\"A\\nB\"}]", "control characters"));
     REQUIRE(rejects(R"([{"axiom":"law.a","id":"a","name":"A"},{"axiom":"law.a","id":"b","name":"B"}])", "[1].axiom: duplicate"));
     REQUIRE(rejects(R"([{"axiom":"law.a","id":"a","name":"A"},{"axiom":"law.b","id":"a","name":"B"}])", "[1].id: duplicate"));
     REQUIRE(rejects(std::string(R"([{"axiom":"law.a","id":")") + std::string(65, 'a') + R"(","name":"A"}])", "[0].id: longer than"));
