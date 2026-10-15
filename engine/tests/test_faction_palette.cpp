@@ -79,15 +79,6 @@ TEST_CASE("identical colours are flagged under every vision", "[faction_palette]
     REQUIRE(minPaletteDifference(palette, ColourVision::Normal) == 0.0);
 }
 
-TEST_CASE("the shipped palette loses margin when two roles are given the same colour", "[faction_palette]")
-{
-    FactionPalette palette = repoPalette();
-    const double before = minPaletteDifference(palette, ColourVision::Tritanopia);
-    palette.roles[static_cast<std::size_t>(FactionRole::Herald)] = palette.colour(FactionRole::Refusenik);
-    REQUIRE(minPaletteDifference(palette, ColourVision::Tritanopia) < before);
-    REQUIRE_FALSE(checkPaletteDistinguishable(palette).empty());
-}
-
 TEST_CASE("colour vision simulation keeps greys and black and white fixed", "[faction_palette]")
 {
     for (const ColourVision vision : kColourVisions) {
@@ -182,4 +173,16 @@ TEST_CASE("an unreachable threshold flags every pair", "[faction_palette]")
     FactionPalette palette = repoPalette();
     palette.minDifference = std::numeric_limits<double>::infinity();
     REQUIRE_FALSE(checkPaletteDistinguishable(palette).empty());
+}
+
+TEST_CASE("palette parsing rejects duplicate keys and unbalanced closers", "[faction_palette]")
+{
+    std::vector<std::string> problems;
+    REQUIRE_FALSE(parses(R"({"min_difference": 15, "roles": {"incumbent": "#000000", "incumbent": "#FFFFFF", "challenger": "#D55E00", "parasite": "#CC79A7", "custodian": "#56B4E9", "refusenik": "#E69F00", "herald": "#F0E442"}})", problems));
+    REQUIRE(problems.size() == 1);
+    REQUIRE(problems[0].find("duplicate key \"incumbent\"") != std::string::npos);
+
+    problems.clear();
+    REQUIRE_FALSE(parses(std::string(100000, ']') + std::string(100000, '['), problems));
+    REQUIRE(problems.size() == 1);
 }

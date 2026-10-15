@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <set>
 
 namespace ichor {
 
@@ -15,8 +16,6 @@ using Json = nlohmann::json;
 constexpr std::size_t kMaxFileBytes = 64 * 1024;
 constexpr int kMaxDepth = 8;
 constexpr double kMaxMinDifference = 100.0;
-
-constexpr std::array<std::string_view, kFactionRoleCount> kRoleNames = {"incumbent", "challenger", "parasite", "custodian", "refusenik", "herald"};
 
 using Vec = std::array<double, 3>;
 using Matrix = std::array<Vec, 3>;
@@ -86,7 +85,7 @@ bool nestsTooDeep(std::string_view text)
                 return true;
             }
         } else if (c == '}' || c == ']') {
-            --depth;
+            depth = std::max(0, depth - 1);
         }
     }
     return false;
@@ -179,9 +178,27 @@ bool parseFactionPalette(std::string_view label, std::string_view text, FactionP
         note(problems, label, "$", "nests too deeply");
         return false;
     }
-    const Json root = Json::parse(text.begin(), text.end(), nullptr, false);
+    // The parser keeps the last of two equal keys; a duplicate is an authoring mistake, so it is refused.
+    std::vector<std::set<std::string>> keysByDepth;
+    std::string duplicate;
+    const Json root = Json::parse(
+        text.begin(), text.end(),
+        [&](int depth, Json::parse_event_t event, Json& parsed) {
+            if (event == Json::parse_event_t::object_start) {
+                keysByDepth.resize(std::max(keysByDepth.size(), static_cast<std::size_t>(depth) + 2));
+                keysByDepth[static_cast<std::size_t>(depth) + 1].clear();
+            } else if (event == Json::parse_event_t::key && !keysByDepth[static_cast<std::size_t>(depth)].insert(parsed.get<std::string>()).second && duplicate.empty()) {
+                duplicate = parsed.get<std::string>().substr(0, 40);
+            }
+            return true;
+        },
+        false);
     if (root.is_discarded() || !root.is_object()) {
         note(problems, label, "$", "not a JSON object");
+        return false;
+    }
+    if (!duplicate.empty()) {
+        note(problems, label, "$", "duplicate key \"" + duplicate + "\"");
         return false;
     }
     for (const auto& item : root.items()) {
@@ -213,8 +230,8 @@ bool parseFactionPalette(std::string_view label, std::string_view text, FactionP
             }
         }
         for (std::size_t i = 0; i < kFactionRoleCount; ++i) {
-            const std::string path = "roles." + std::string(kRoleNames[i]);
-            const auto it = rolesIt->find(std::string(kRoleNames[i]));
+            const std::string path = "roles." + std::string(factionRoleName(static_cast<FactionRole>(i)));
+            const auto it = rolesIt->find(std::string(factionRoleName(static_cast<FactionRole>(i))));
             if (it == rolesIt->end()) {
                 note(problems, label, path, "missing");
                 continue;
@@ -254,7 +271,7 @@ std::vector<std::string> checkPaletteDistinguishable(const FactionPalette& palet
             for (std::size_t j = i + 1; j < kFactionRoleCount; ++j) {
                 const double difference = colourDifference(palette.roles[i], palette.roles[j], vision);
                 if (!(difference >= palette.minDifference)) {
-                    problems.push_back(std::string(kRoleNames[i]) + " and " + std::string(kRoleNames[j]) + " are too close under " + std::string(colourVisionName(vision))
+                    problems.push_back(std::string(factionRoleName(static_cast<FactionRole>(i))) + " and " + std::string(factionRoleName(static_cast<FactionRole>(j))) + " are too close under " + std::string(colourVisionName(vision))
                         + " (" + std::to_string(difference) + " < " + std::to_string(palette.minDifference) + ")");
                 }
             }
