@@ -14,6 +14,18 @@ target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOUR
 catch_discover_tests(ichor_tests)
 
 add_dependencies(ichor_tests ichor_forge)
+
+# Doc 17: the manifest, the stack table, the module layering and libworldforge's purity.
+# --self-test feeds the checker deliberate violations and fails if any stays green.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    set(deps_script ${CMAKE_SOURCE_DIR}/../tools/check_deps.py)
+    add_test(NAME dependency_policy COMMAND ${Python3_EXECUTABLE} ${deps_script} --root ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME dependency_policy_selftest COMMAND ${Python3_EXECUTABLE} ${deps_script} --root ${CMAKE_SOURCE_DIR}/.. --self-test)
+else()
+    message(WARNING "Python 3 not found: the dependency policy check is not registered")
+endif()
+
 function(forge_data_test kind expect)
     add_test(NAME forge_data_${kind}
         COMMAND ${CMAKE_COMMAND} -DFORGE=$<TARGET_FILE:ichor_forge> -DKIND=${kind} "-DEXPECT_ERROR=${expect}" -DREPO_DATA=${CMAKE_SOURCE_DIR}/../data -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forge_data_check.cmake)

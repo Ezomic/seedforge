@@ -81,3 +81,25 @@ endif()
 
 # Ichor itself. Stage 0 is the first thing built on the engine (doc 18).
 add_subdirectory(${CMAKE_SOURCE_DIR}/../game/stage0 stage0)
+
+# MSVC re-parses <filesystem>, <chrono>, <format>, glm, Catch2 and nlohmann-json in every translation unit.
+# One shared precompiled header per target, applied here so no module list has to change.
+function(ichor_collect_targets dir out)
+    get_property(found DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+    foreach(sub IN LISTS subdirs)
+        ichor_collect_targets(${sub} sub_found)
+        list(APPEND found ${sub_found})
+    endforeach()
+    set(${out} ${found} PARENT_SCOPE)
+endfunction()
+
+if(MSVC)
+    ichor_collect_targets(${CMAKE_CURRENT_SOURCE_DIR} all_targets)
+    foreach(tgt IN LISTS all_targets)
+        get_target_property(tgt_type ${tgt} TYPE)
+        if(tgt_type MATCHES "^(STATIC_LIBRARY|SHARED_LIBRARY|EXECUTABLE)$")
+            target_precompile_headers(${tgt} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/ichor_pch.h>")
+        endif()
+    endforeach()
+endif()
