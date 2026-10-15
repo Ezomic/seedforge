@@ -112,7 +112,7 @@ TEST_CASE("hostile logs yield fewer rows, never a crash")
     CHECK(parseFightLog(row(1, "player", "stamina", "inf")).empty());
     CHECK(parseFightLog(row(-1, "player", "stamina")).empty());
     CHECK(parseFightLog(row(99999999999, "player", "stamina")).empty());
-    CHECK(parseFightLog(std::string("\xff\xfe\x00garbage,1,2", 17)).empty());
+    CHECK(parseFightLog(std::string("\xff\xfe\x00garbage,1,2", 14)).empty());
     std::string truncated = row(1, "player", "stamina");
     truncated.resize(truncated.size() / 2);
     CHECK(parseFightLog(truncated).empty());
