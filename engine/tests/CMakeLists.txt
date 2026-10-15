@@ -24,6 +24,7 @@ add_executable(ichor_tests
     test_ducking.cpp
     test_wading_splash.cpp
     test_rain_ambience.cpp
+    test_weather_ambience.cpp
     test_ambience_layers.cpp
     test_terrain.cpp
     test_script.cpp
