@@ -4,11 +4,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace ichor {
@@ -33,7 +35,7 @@ struct Reflect<Fact> {
     }
 };
 
-enum class AppendResult { Ok, InvalidField, DuplicateId, Full };
+enum class [[nodiscard]] AppendResult { Ok, InvalidField, DuplicateId, Full };
 
 // The world's consequences in the order they happened. Facts can be added and
 // read, never changed or removed, so the ledger is also the save file's record
@@ -43,6 +45,8 @@ public:
     static constexpr std::size_t kMaxFacts = 1000000;
     static constexpr std::size_t kMaxKeyBytes = 128;
     static constexpr std::size_t kMaxValueBytes = 500;
+    // The fewest bytes one fact takes in the saved form: four string lengths and the tick.
+    static constexpr std::size_t kMinFactBytes = 24;
 
     AppendResult append(Fact fact);
 
@@ -50,6 +54,7 @@ public:
     std::size_t size() const { return facts_.size(); }
     bool empty() const { return facts_.empty(); }
 
+    // Pointers from the lookups stay valid only until the next append.
     const Fact* find(std::string_view id) const;
     // Facts in append order. Empty when nothing matches.
     std::vector<const Fact*> bySubject(std::string_view subject) const;
@@ -59,9 +64,10 @@ public:
     // Depends on every field of every fact and on their order.
     std::uint64_t digest() const;
 
-    // parse() is all or nothing and applies the same rules as append().
+    // parse() is all or nothing, applies the same rules as append() and never
+    // sees more facts than the bytes could hold.
     std::vector<std::uint8_t> serialize() const;
-    static bool parse(std::span<const std::uint8_t> bytes, ConsequenceLedger& out);
+    static std::optional<ConsequenceLedger> parse(std::span<const std::uint8_t> bytes);
 
 private:
     std::vector<Fact> facts_;

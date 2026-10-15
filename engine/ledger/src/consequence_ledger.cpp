@@ -101,20 +101,23 @@ std::vector<std::uint8_t> ConsequenceLedger::serialize() const
     return writer.take();
 }
 
-bool ConsequenceLedger::parse(std::span<const std::uint8_t> bytes, ConsequenceLedger& out)
+std::optional<ConsequenceLedger> ConsequenceLedger::parse(std::span<const std::uint8_t> bytes)
 {
     BinaryReader reader(bytes);
     std::uint32_t magic = 0;
     std::uint32_t version = 0;
-    std::vector<Fact> facts;
-    if (!reader.read(magic) || magic != kMagic || !reader.read(version) || version != kVersion) return false;
-    if (!reader.read(facts) || !reader.atEnd()) return false;
-    ConsequenceLedger parsed;
-    for (Fact& fact : facts) {
-        if (parsed.append(std::move(fact)) != AppendResult::Ok) return false;
+    std::uint32_t count = 0;
+    if (!reader.read(magic) || magic != kMagic || !reader.read(version) || version != kVersion || !reader.read(count)) {
+        return std::nullopt;
     }
-    out = std::move(parsed);
-    return true;
+    if (count > kMaxFacts || count > reader.remaining() / kMinFactBytes) return std::nullopt;
+    ConsequenceLedger parsed;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        Fact fact;
+        if (!reader.read(fact) || parsed.append(std::move(fact)) != AppendResult::Ok) return std::nullopt;
+    }
+    if (!reader.atEnd()) return std::nullopt;
+    return parsed;
 }
 
 }

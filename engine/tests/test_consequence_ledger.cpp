@@ -19,10 +19,10 @@ Fact fact(std::string id, std::string subject, std::string kind, std::string val
 ConsequenceLedger sample()
 {
     ConsequenceLedger ledger;
-    ledger.append(fact("f1", "saltmarsh", "burned", "true", 10));
-    ledger.append(fact("f2", "ilse", "betrayed", "harl", 20));
-    ledger.append(fact("f3", "saltmarsh", "tithe_paid", "40", 30));
-    ledger.append(fact("f4", "ilse", "tithe_paid", "5", 40));
+    REQUIRE(ledger.append(fact("f1", "saltmarsh", "burned", "true", 10)) == AppendResult::Ok);
+    REQUIRE(ledger.append(fact("f2", "ilse", "betrayed", "harl", 20)) == AppendResult::Ok);
+    REQUIRE(ledger.append(fact("f3", "saltmarsh", "tithe_paid", "40", 30)) == AppendResult::Ok);
+    REQUIRE(ledger.append(fact("f4", "ilse", "tithe_paid", "5", 40)) == AppendResult::Ok);
     return ledger;
 }
 
@@ -87,8 +87,8 @@ TEST_CASE("the digest depends on every field and on order", "[consequence_ledger
 
     const auto digestWith = [](const Fact& changed) {
         ConsequenceLedger ledger;
-        ledger.append(fact("f1", "saltmarsh", "burned", "true", 10));
-        ledger.append(changed);
+        REQUIRE(ledger.append(fact("f1", "saltmarsh", "burned", "true", 10)) == AppendResult::Ok);
+        REQUIRE(ledger.append(changed) == AppendResult::Ok);
         return ledger.digest();
     };
     const std::uint64_t reference = digestWith(fact("f2", "ilse", "betrayed", "harl", 20));
@@ -99,20 +99,20 @@ TEST_CASE("the digest depends on every field and on order", "[consequence_ledger
     CHECK(digestWith(fact("f2", "ilse", "betrayed", "harl", 21)) != reference);
 
     ConsequenceLedger swapped;
-    swapped.append(fact("f2", "ilse", "betrayed", "harl", 20));
-    swapped.append(fact("f1", "saltmarsh", "burned", "true", 10));
+    REQUIRE(swapped.append(fact("f2", "ilse", "betrayed", "harl", 20)) == AppendResult::Ok);
+    REQUIRE(swapped.append(fact("f1", "saltmarsh", "burned", "true", 10)) == AppendResult::Ok);
     ConsequenceLedger ordered;
-    ordered.append(fact("f1", "saltmarsh", "burned", "true", 10));
-    ordered.append(fact("f2", "ilse", "betrayed", "harl", 20));
+    REQUIRE(ordered.append(fact("f1", "saltmarsh", "burned", "true", 10)) == AppendResult::Ok);
+    REQUIRE(ordered.append(fact("f2", "ilse", "betrayed", "harl", 20)) == AppendResult::Ok);
     CHECK(swapped.digest() != ordered.digest());
 }
 
 TEST_CASE("the digest does not blur field boundaries", "[consequence_ledger]")
 {
     ConsequenceLedger a;
-    a.append(fact("f1", "ab", "c"));
+    REQUIRE(a.append(fact("f1", "ab", "c")) == AppendResult::Ok);
     ConsequenceLedger b;
-    b.append(fact("f1", "a", "bc"));
+    REQUIRE(b.append(fact("f1", "a", "bc")) == AppendResult::Ok);
     CHECK(a.digest() != b.digest());
 }
 
@@ -124,65 +124,101 @@ TEST_CASE("the digest of a known ledger is pinned", "[consequence_ledger]")
 
 TEST_CASE("serialize and parse round trip", "[consequence_ledger]")
 {
-    const ConsequenceLedger ledger = sample();
-    const auto bytes = ledger.serialize();
-    ConsequenceLedger back;
-    REQUIRE(ConsequenceLedger::parse(bytes, back));
-    CHECK(back.facts() == ledger.facts());
-    CHECK(back.digest() == ledger.digest());
-    CHECK(back.serialize() == bytes);
-    REQUIRE(back.find("f3") != nullptr);
-    CHECK(back.bySubject("ilse").size() == 2);
-    CHECK(back.byKind("tithe_paid").size() == 2);
+    ConsequenceLedger ledger = sample();
+    std::string value(ConsequenceLedger::kMaxValueBytes, '\xff');
+    value[3] = '\0';
+    REQUIRE(ledger.append(fact("edge", std::string(ConsequenceLedger::kMaxKeyBytes, 'k'), "big", value, UINT64_MAX)) == AppendResult::Ok);
 
-    ConsequenceLedger empty;
-    ConsequenceLedger emptyBack = sample();
-    REQUIRE(ConsequenceLedger::parse(empty.serialize(), emptyBack));
-    CHECK(emptyBack.empty());
+    const auto bytes = ledger.serialize();
+    const auto back = ConsequenceLedger::parse(bytes);
+    REQUIRE(back.has_value());
+    CHECK(back->facts() == ledger.facts());
+    CHECK(back->digest() == ledger.digest());
+    CHECK(back->serialize() == bytes);
+    REQUIRE(back->find("f3") != nullptr);
+    CHECK(back->bySubject("ilse").size() == 2);
+    CHECK(back->byKind("tithe_paid").size() == 2);
+
+    const auto empty = ConsequenceLedger::parse(ConsequenceLedger{}.serialize());
+    REQUIRE(empty.has_value());
+    CHECK(empty->empty());
+}
+
+namespace {
+
+std::vector<std::uint8_t> header(std::uint32_t count)
+{
+    BinaryWriter writer;
+    writer.write(std::uint32_t{0x4743444Cu});
+    writer.write(std::uint32_t{1});
+    writer.write(count);
+    return writer.take();
+}
+
 }
 
 TEST_CASE("parse is all or nothing", "[consequence_ledger]")
 {
     const auto bytes = sample().serialize();
 
-    ConsequenceLedger target;
-    target.append(fact("keep", "x", "y"));
-    const std::uint64_t kept = target.digest();
-
     SECTION("every truncation fails")
     {
         for (std::size_t n = 0; n < bytes.size(); ++n) {
             const std::vector<std::uint8_t> cut(bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(n));
-            CHECK_FALSE(ConsequenceLedger::parse(cut, target));
+            CHECK_FALSE(ConsequenceLedger::parse(cut).has_value());
         }
     }
     SECTION("trailing bytes fail")
     {
         auto longer = bytes;
         longer.push_back(0);
-        CHECK_FALSE(ConsequenceLedger::parse(longer, target));
+        CHECK_FALSE(ConsequenceLedger::parse(longer).has_value());
     }
     SECTION("wrong magic or version fails")
     {
         auto bad = bytes;
         bad[0] ^= 0xFF;
-        CHECK_FALSE(ConsequenceLedger::parse(bad, target));
+        CHECK_FALSE(ConsequenceLedger::parse(bad).has_value());
         bad = bytes;
         bad[4] = 2;
-        CHECK_FALSE(ConsequenceLedger::parse(bad, target));
+        CHECK_FALSE(ConsequenceLedger::parse(bad).has_value());
     }
     SECTION("a duplicate id or invalid field in the bytes fails")
     {
-        Fact twin = fact("f1", "a", "b");
-        Fact upper = fact("F2", "a", "b");
-        for (const Fact& bad : {twin, upper}) {
+        for (const Fact& bad : {fact("f1", "a", "b"), fact("F2", "a", "b")}) {
             BinaryWriter writer;
             writer.write(std::uint32_t{0x4743444Cu});
             writer.write(std::uint32_t{1});
             writer.write(std::vector<Fact>{fact("f1", "a", "b"), bad});
-            CHECK_FALSE(ConsequenceLedger::parse(writer.bytes(), target));
+            CHECK_FALSE(ConsequenceLedger::parse(writer.bytes()).has_value());
         }
     }
-    CHECK(target.digest() == kept);
-    CHECK(target.size() == 1);
+}
+
+TEST_CASE("parse refuses a count the bytes cannot hold before allocating for it", "[consequence_ledger]")
+{
+    CHECK_FALSE(ConsequenceLedger::parse(header(0xFFFFFFFFu)).has_value());
+    CHECK_FALSE(ConsequenceLedger::parse(header(1)).has_value());
+
+    auto tooMany = header(static_cast<std::uint32_t>(ConsequenceLedger::kMaxFacts + 1));
+    tooMany.resize(tooMany.size() + (ConsequenceLedger::kMaxFacts + 1) * ConsequenceLedger::kMinFactBytes);
+    CHECK_FALSE(ConsequenceLedger::parse(tooMany).has_value());
+}
+
+TEST_CASE("a fact takes at least kMinFactBytes in the saved form", "[consequence_ledger]")
+{
+    BinaryWriter writer;
+    writer.write(Fact{});
+    CHECK(writer.bytes().size() == ConsequenceLedger::kMinFactBytes);
+}
+
+TEST_CASE("append stops at kMaxFacts", "[consequence_ledger]")
+{
+    ConsequenceLedger ledger;
+    for (std::size_t i = 0; i < ConsequenceLedger::kMaxFacts; ++i) {
+        REQUIRE(ledger.append(fact("f" + std::to_string(i), "s", "k", "", i)) == AppendResult::Ok);
+    }
+    CHECK(ledger.append(fact("one_more", "s", "k")) == AppendResult::Full);
+    CHECK(ledger.size() == ConsequenceLedger::kMaxFacts);
+    CHECK(ledger.find("one_more") == nullptr);
 }
