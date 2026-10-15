@@ -1,4 +1,5 @@
 add_library(ichor_npc
+    src/relationships.cpp
     src/schedule.cpp
     src/npc_memory.cpp
 )
