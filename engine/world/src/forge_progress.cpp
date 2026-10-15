@@ -19,10 +19,8 @@ PhaseObserver ForgeProgress::observer()
         state_.started = true;
         state_.phase = progress.phase;
         state_.total = progress.count;
-        if (progress.finished) {
-            state_.completed = progress.index + 1;
-            state_.done = state_.completed >= state_.total;
-        }
+        state_.completed = progress.finished ? progress.index + 1 : progress.index;
+        state_.done = state_.completed >= state_.total;
     };
 }
 

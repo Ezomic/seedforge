@@ -16,7 +16,7 @@ constexpr const char* kLoadingDocument = R"(<rml><head><style>
     body, div { display: block; }
     body { width: 100%; height: 100%; }
     #veil { position: absolute; top: 0px; left: 0px; right: 0px; bottom: 0px; background-color: #05070bf0; }
-    #card { position: absolute; top: 40%; left: 50%; margin-left: -283px; width: 500px; padding: 26px 30px 30px 30px; }
+    #card { position: absolute; top: 40%; left: 50%; margin-left: -280px; width: 500px; padding: 26px 30px 30px 30px; }
     #title { font-family: Cinzel; font-size: 36px; color: #e8d8a8; letter-spacing: 4px; text-align: center; padding-bottom: 8px; }
     #label { font-family: Alegreya Sans; font-size: 22px; color: #a8a090; text-align: center; padding-bottom: 18px; }
     #bar { height: 14px; background-color: #1c222c; border: 2px #3a4252; }

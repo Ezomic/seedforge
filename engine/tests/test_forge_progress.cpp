@@ -145,3 +145,22 @@ TEST_CASE("another thread can read progress while the forge runs on a worker", "
     CHECK(progress.snapshot().fraction() == 1.0f);
     CHECK(digest == forgePipeline(smallRequest(5)).run().chainDigest());
 }
+
+TEST_CASE("a second run, or a run from a later phase, does not show the last run's progress", "[forge_progress]")
+{
+    const PhasePipeline pipeline = three();
+    ForgeProgress progress;
+    const PhaseRun first = pipeline.run(progress.observer());
+    REQUIRE(progress.snapshot().done);
+
+    const PhaseObserver inner = progress.observer();
+    std::vector<ForgeProgressSnapshot> seen;
+    pipeline.runFrom(first, 1, [&](const PhaseProgress& p) {
+        inner(p);
+        seen.push_back(progress.snapshot());
+    });
+    REQUIRE(seen.size() == 4);
+    CHECK_FALSE(seen[0].done);
+    CHECK(seen[0].completed == 1); // phase a was reused, so it counts
+    CHECK(seen[3].done);
+}
