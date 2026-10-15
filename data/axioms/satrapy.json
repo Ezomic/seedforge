@@ -1,0 +1,14 @@
+{
+  "id": "powers.satrapy",
+  "slot": "powers",
+  "title": "The Satrapy",
+  "tags": ["OCCUPATION", "COLLABORATION", "RESISTANCE", "FOREIGN"],
+  "conflicts": [],
+
+  "settlement": { "prefer_slope": "gentle", "density_mult": 0.9 },
+  "poi": { "weights": { "garrison_fort": 3.0, "collaborator_estate": 2.0, "resistance_hideout": 2.0, "tribute_depot": 1.5, "foreign_shrine": 1.0 } },
+  "enemies": { "roster_add": ["satrapal_levy", "partisan_raider"], "roster_remove": ["conscript_levy"] },
+  "economy": { "scarce": ["grain"], "abundant": ["tribute_coin"] },
+  "palette": { "grade": "satrapy", "fog_density": 1.0 },
+  "audio": { "bed_overrides": ["foreign_horns"], "music_palette": "satrapy" }
+}

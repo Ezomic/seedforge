@@ -1,14 +1,12 @@
 # Stage 0: the grey-box combat experiment from doc 18, built on the engine.
 # Disposable by design; its output is a verdict, not a foundation.
 
-add_library(ichor_stage0
-    src/combat.cpp
-    src/status_effect.cpp
-    src/skirmisher.cpp
-    src/recorder.cpp
-)
+# main.cpp is the stage0 executable below.
+file(GLOB ichor_stage0_sources CONFIGURE_DEPENDS src/*.cpp)
+list(FILTER ichor_stage0_sources EXCLUDE REGEX "/main[.]cpp$")
+add_library(ichor_stage0 ${ichor_stage0_sources})
 target_include_directories(ichor_stage0 PUBLIC include)
-target_link_libraries(ichor_stage0 PUBLIC ichor_loop ichor_audio)
+target_link_libraries(ichor_stage0 PUBLIC ichor_loop ichor_audio ichor_data)
 
 if(ENGINE_RUNTIME)
     add_executable(stage0
@@ -30,10 +28,8 @@ endif()
 if(BUILD_TESTING)
     find_package(Catch2 3 CONFIG REQUIRED)
     include(Catch)
-    add_executable(stage0_tests
-        tests/test_fight.cpp
-        tests/test_status_effect.cpp
-    )
+    file(GLOB stage0_test_sources CONFIGURE_DEPENDS tests/test_*.cpp)
+    add_executable(stage0_tests ${stage0_test_sources})
     target_link_libraries(stage0_tests PRIVATE ichor_stage0 ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain)
     catch_discover_tests(stage0_tests)
 endif()

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -255,4 +256,176 @@ TEST_CASE("one match among many definitions is found")
     }
     defs.push_back(make("hit", SynergyTier::Pressure, {"law.oath", "pressure.return"}));
     REQUIRE(detectSynergies({"law.oath", "pressure.return"}, defs) == Ids{"hit"});
+}
+
+namespace {
+
+std::string withOverride(const std::string& fields)
+{
+    return file("{\"id\":\"hekatombaia\",\"tier\":\"cataclysm_law\",\"axioms\":[\"cataclysm.artemis_withdrew\",\"law.hecatomb\"]," + fields + "}");
+}
+
+Synergy overriding(const std::string& id, SynergyTier tier, std::vector<std::string> axioms, const std::string& faction, const std::string& dungeon, const std::string& world, std::map<std::string, std::string> flavour)
+{
+    Synergy synergy = make(id, tier, std::move(axioms));
+    synergy.faction = faction;
+    synergy.dungeonType = dungeon;
+    synergy.worldName = world;
+    synergy.flavour = std::move(flavour);
+    return synergy;
+}
+
+}
+
+TEST_CASE("a synergy without override fields loads with every override empty")
+{
+    std::vector<Synergy> defs;
+    REQUIRE(problemsOf(file(entry("a", "cataclysm_law", "\"cataclysm.flood\",\"law.oath\"")), &defs).empty());
+    REQUIRE(defs.size() == 1);
+    REQUIRE(defs[0].faction.empty());
+    REQUIRE(defs[0].dungeonType.empty());
+    REQUIRE(defs[0].worldName.empty());
+    REQUIRE(defs[0].flavour.empty());
+}
+
+TEST_CASE("override fields parse")
+{
+    std::vector<Synergy> defs;
+    const auto problems = problemsOf(withOverride("\"faction\":\"hekatombaia\",\"dungeon_type\":\"sealed_telesterion\",\"world_name\":\"The Tithed Shore\",\"flavour\":{\"tavern_rumour\":\"The levy is paid in breath.\",\"shrine\":\"No beast stands at the altar.\"}"), &defs);
+    REQUIRE(problems.empty());
+    REQUIRE(defs[0].faction == "hekatombaia");
+    REQUIRE(defs[0].dungeonType == "sealed_telesterion");
+    REQUIRE(defs[0].worldName == "The Tithed Shore");
+    REQUIRE(defs[0].flavour.size() == 2);
+    REQUIRE(defs[0].flavour.at("shrine") == "No beast stands at the altar.");
+}
+
+TEST_CASE("bad override fields are reported with their path")
+{
+    REQUIRE(mentions(problemsOf(withOverride("\"faction\":\"Bad Id\"")), "synergies[0].faction"));
+    REQUIRE(mentions(problemsOf(withOverride("\"faction\":7")), "synergies[0].faction: expected a string"));
+    REQUIRE(mentions(problemsOf(withOverride("\"dungeon_type\":\"\"")), "synergies[0].dungeon_type"));
+    REQUIRE(mentions(problemsOf(withOverride("\"world_name\":\"   \"")), "synergies[0].world_name"));
+    REQUIRE(mentions(problemsOf(withOverride("\"world_name\":\"" + std::string(500, 'x') + "\"")), "synergies[0].world_name"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":[]")), "synergies[0].flavour: expected an object"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"Bad Key\":\"x\"}")), "synergies[0].flavour"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"shrine\":3}")), "synergies[0].flavour.shrine: expected a string"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"shrine\":\"\"}")), "synergies[0].flavour.shrine"));
+}
+
+TEST_CASE("a synergy overrides default flavour and injects faction, dungeon type and world name")
+{
+    const std::vector<Synergy> defs = {overriding("hekatombaia", SynergyTier::CataclysmLaw, {"cataclysm.artemis_withdrew", "law.hecatomb"}, "hekatombaia", "sealed_telesterion", "The Tithed Shore", {{"shrine", "No beast stands at the altar."}})};
+    const std::map<std::string, std::string> defaults = {{"shrine", "Pilgrims leave oxen."}, {"market", "Grain is cheap."}};
+    const SynergyOverride result = applyOverrides({"hekatombaia"}, defs, defaults);
+    REQUIRE(result.factions == Ids{"hekatombaia"});
+    REQUIRE(result.dungeonTypes == Ids{"sealed_telesterion"});
+    REQUIRE(result.worldName == "The Tithed Shore");
+    REQUIRE(result.flavour.at("shrine") == "No beast stands at the altar.");
+    REQUIRE(result.flavour.at("market") == "Grain is cheap.");
+    REQUIRE(result.flavour.size() == 2);
+}
+
+TEST_CASE("nothing fired leaves the defaults untouched")
+{
+    const std::map<std::string, std::string> defaults = {{"shrine", "Pilgrims leave oxen."}};
+    const SynergyOverride result = applyOverrides({}, {}, defaults);
+    REQUIRE(result.factions.empty());
+    REQUIRE(result.dungeonTypes.empty());
+    REQUIRE(result.worldName.empty());
+    REQUIRE(result.flavour == defaults);
+}
+
+TEST_CASE("two fired synergies resolve in firing order: first world name and first flavour win, factions and dungeons accumulate")
+{
+    const std::vector<Synergy> defs = {
+        overriding("second", SynergyTier::LawPowers, {"law.oath", "powers.league"}, "league_wardens", "customs_house", "The Ledger Coast", {{"shrine", "second shrine"}, {"harbour", "second harbour"}}),
+        overriding("first", SynergyTier::CataclysmLaw, {"cataclysm.flood", "law.oath"}, "oathkeepers", "sunken_court", "The Unreleased", {{"shrine", "first shrine"}}),
+    };
+    const SynergyOverride result = applyOverrides({"first", "second"}, defs, {});
+    REQUIRE(result.factions == Ids{"oathkeepers", "league_wardens"});
+    REQUIRE(result.dungeonTypes == Ids{"sunken_court", "customs_house"});
+    REQUIRE(result.worldName == "The Unreleased");
+    REQUIRE(result.flavour.at("shrine") == "first shrine");
+    REQUIRE(result.flavour.at("harbour") == "second harbour");
+}
+
+TEST_CASE("a first synergy without a world name leaves it to the second; repeated factions are listed once; unknown ids are ignored")
+{
+    const std::vector<Synergy> defs = {
+        overriding("a", SynergyTier::CataclysmLaw, {"cataclysm.flood", "law.oath"}, "oathkeepers", "", "", {}),
+        overriding("b", SynergyTier::LawPowers, {"law.oath", "powers.league"}, "oathkeepers", "", "The Ledger Coast", {}),
+    };
+    const SynergyOverride result = applyOverrides({"a", "ghost", "b"}, defs, {});
+    REQUIRE(result.factions == Ids{"oathkeepers"});
+    REQUIRE(result.dungeonTypes.empty());
+    REQUIRE(result.worldName == "The Ledger Coast");
+}
+
+TEST_CASE("applyOverrides ignores the order of the definitions")
+{
+    std::vector<Synergy> defs = {
+        overriding("a", SynergyTier::CataclysmLaw, {"cataclysm.flood", "law.oath"}, "f1", "d1", "W1", {{"k", "v1"}}),
+        overriding("b", SynergyTier::LawPowers, {"law.oath", "powers.league"}, "f2", "d2", "W2", {{"k", "v2"}}),
+    };
+    const SynergyOverride forward = applyOverrides({"a", "b"}, defs, {});
+    std::reverse(defs.begin(), defs.end());
+    const SynergyOverride backward = applyOverrides({"a", "b"}, defs, {});
+    REQUIRE(forward.factions == backward.factions);
+    REQUIRE(forward.dungeonTypes == backward.dungeonTypes);
+    REQUIRE(forward.worldName == backward.worldName);
+    REQUIRE(forward.flavour == backward.flavour);
+
+    const SynergyOverride swapped = applyOverrides({"b", "a"}, defs, {});
+    REQUIRE(swapped.factions == Ids{"f2", "f1"});
+    REQUIRE(swapped.dungeonTypes == Ids{"d2", "d1"});
+    REQUIRE(swapped.worldName == "W2");
+    REQUIRE(swapped.flavour.at("k") == "v2");
+}
+
+TEST_CASE("override size limits sit exactly at their boundaries")
+{
+    REQUIRE(problemsOf(withOverride("\"world_name\":\"" + std::string(80, 'x') + "\"")).empty());
+    REQUIRE(mentions(problemsOf(withOverride("\"world_name\":\"" + std::string(81, 'x') + "\"")), "at most 80 bytes"));
+    REQUIRE(problemsOf(withOverride("\"faction\":\"" + std::string(64, 'a') + "\"")).empty());
+    REQUIRE(mentions(problemsOf(withOverride("\"faction\":\"" + std::string(65, 'a') + "\"")), "lowercase ascii id"));
+    REQUIRE(mentions(problemsOf(withOverride("\"dungeon_type\":\"" + std::string(65, 'a') + "\"")), "lowercase ascii id"));
+    REQUIRE(problemsOf(withOverride("\"flavour\":{\"k\":\"" + std::string(1000, 'x') + "\"}")).empty());
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"k\":\"" + std::string(1001, 'x') + "\"}")), "at most 1000 bytes"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"" + std::string(65, 'k') + "\":\"x\"}")), "slot ids"));
+
+    std::string slots;
+    for (int i = 0; i < 65; ++i) {
+        slots += std::string(slots.empty() ? "" : ",") + "\"s" + std::to_string(i) + "\":\"x\"";
+    }
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{" + slots + "}")), "more than 64 entries"));
+}
+
+TEST_CASE("control characters are rejected in free text, a newline is allowed in flavour")
+{
+    REQUIRE(mentions(problemsOf(withOverride("\"world_name\":\"a\\u0000b\"")), "synergies[0].world_name"));
+    REQUIRE(mentions(problemsOf(withOverride("\"world_name\":\"a\\nb\"")), "synergies[0].world_name"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"k\":\"a\\u001bb\"}")), "synergies[0].flavour.k"));
+    REQUIRE(problemsOf(withOverride("\"flavour\":{\"k\":\"a\\nb\"}")).empty());
+}
+
+TEST_CASE("null and empty override values")
+{
+    REQUIRE(mentions(problemsOf(withOverride("\"faction\":null")), "synergies[0].faction: expected a string, got null"));
+    REQUIRE(mentions(problemsOf(withOverride("\"flavour\":{\"k\":null}")), "synergies[0].flavour.k: expected a string, got null"));
+    std::vector<Synergy> defs;
+    REQUIRE(problemsOf(withOverride("\"flavour\":{}"), &defs).empty());
+    REQUIRE(defs[0].flavour.empty());
+}
+
+TEST_CASE("a default slot survives when only a later synergy overrides another slot, and repeated fired ids count once")
+{
+    const std::vector<Synergy> defs = {
+        overriding("a", SynergyTier::CataclysmLaw, {"cataclysm.flood", "law.oath"}, "f1", "", "", {}),
+        overriding("b", SynergyTier::LawPowers, {"law.oath", "powers.league"}, "", "", "", {{"harbour", "h"}}),
+    };
+    const SynergyOverride result = applyOverrides({"a", "a", "b"}, defs, {{"shrine", "s"}});
+    REQUIRE(result.factions == Ids{"f1"});
+    REQUIRE(result.flavour.at("shrine") == "s");
+    REQUIRE(result.flavour.at("harbour") == "h");
 }

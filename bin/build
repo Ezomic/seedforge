@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# Machine-wide build queue for the Ichor engine. Use this instead of calling cmake directly.
+#
+#   bin/build [-p preset] [-c config] [-t ctest-regex] [target ...]
+#
+# Defaults: preset "windows", config Debug, target ichor_tests. With -t, ctest -R <regex> runs after the build.
+# Env: ICHOR_BUILD_SLOTS (concurrent builds, default 2), ICHOR_BUILD_JOBS (compile jobs per build, default cores/slots),
+#      ICHOR_BUILD_QUEUE (shared state dir), ICHOR_BUILD_CACHE (shared cache dir for sccache).
+set -u
+
+preset=windows
+config=Debug
+test_regex=
+targets=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p|--preset|-c|--config|-t|--test)
+      [ $# -ge 2 ] || { echo "build: $1 needs a value" >&2; exit 2; }
+      case "$1" in -p|--preset) preset=$2 ;; -c|--config) config=$2 ;; *) test_regex=$2 ;; esac
+      shift 2 ;;
+    --) shift; targets+=("$@"); break ;;
+    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) echo "build: unknown option $1" >&2; exit 2 ;;
+    *) targets+=("$1"); shift ;;
+  esac
+done
+[ ${#targets[@]} -gt 0 ] || targets=(ichor_tests)
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+engine=$repo/engine
+bdir=$engine/build/$preset
+
+if [ -d /e ]; then default_root=/e/build-queue; else default_root=${TEMP:-/tmp}/ichor-build-queue; fi
+root=${ICHOR_BUILD_QUEUE:-$default_root}
+slots=${ICHOR_BUILD_SLOTS:-2}
+case "$slots" in ''|*[!0-9]*|0) echo "build: ICHOR_BUILD_SLOTS must be an integer >= 1" >&2; exit 2 ;; esac
+cores=$(nproc 2>/dev/null || echo 4)
+jobs=${ICHOR_BUILD_JOBS:-$(( cores / slots > 0 ? cores / slots : 1 ))}
+mkdir -p "$root/queue" "$root/slots" || { echo "build: cannot create $root" >&2; exit 1; }
+
+log() { echo "[build] $*" >&2; }
+alive() { kill -0 "$1" 2>/dev/null; }
+now() { date +%s; }
+
+if ! command -v cmake >/dev/null 2>&1; then
+  for d in /e/VS2022/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin \
+           "/c/Program Files/Microsoft Visual Studio/2022/"*"/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin"; do
+    [ -x "$d/cmake.exe" ] && PATH="$d:$PATH" && break
+  done
+fi
+command -v cmake >/dev/null 2>&1 || { log "cmake not found on PATH or in a Visual Studio install"; exit 1; }
+
+[ -n "${VCPKG_ROOT:-}" ] || { [ -d /e/vcpkg ] && export VCPKG_ROOT=E:/vcpkg; }
+[ -n "${VCPKG_ROOT:-}" ] || { log "VCPKG_ROOT is not set and E:/vcpkg does not exist"; exit 1; }
+# Shared binary cache: vcpkg's own per-user default, made explicit so every worktree and session agrees on it.
+if [ -z "${VCPKG_BINARY_SOURCES:-}" ] && [ -z "${VCPKG_DEFAULT_BINARIES_CACHE:-}" ] && [ -n "${LOCALAPPDATA:-}" ]; then
+  export VCPKG_DEFAULT_BINARIES_CACHE=$LOCALAPPDATA\\vcpkg\\archives
+fi
+
+use_sccache=0
+if command -v sccache >/dev/null 2>&1; then
+  use_sccache=1
+  export SCCACHE_DIR=${SCCACHE_DIR:-${ICHOR_BUILD_CACHE:-$root/sccache}}
+  export CMAKE_C_COMPILER_LAUNCHER=sccache CMAKE_CXX_COMPILER_LAUNCHER=sccache
+else
+  log "sccache not installed, compiling without a compiler cache (winget install Mozilla.sccache, or choco install sccache)"
+fi
+
+# Drop the oldest-first bookkeeping of dead processes so a killed session never blocks the others.
+owner_alive() { # dir-or-file
+  local p
+  p=$(cat "$1/pid" 2>/dev/null || cat "$1" 2>/dev/null)
+  if [ -z "$p" ]; then
+    local age=$(( $(now) - $(stat -c %Y "$1" 2>/dev/null || now) ))
+    [ "$age" -lt 30 ]
+    return
+  fi
+  alive "$p"
+}
+
+ticket=$root/queue/$(date +%s%N)-$$
+slot=
+cfg_lock=$root/configure.lock
+
+release() {
+  [ -n "$slot" ] && rm -rf "$slot"
+  rm -f "$ticket"
+  [ -d "$cfg_lock" ] && [ "$(cat "$cfg_lock/pid" 2>/dev/null)" = "$$" ] && rm -rf "$cfg_lock"
+  slot=
+}
+trap release EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+
+echo $$ > "$ticket"
+queued_at=$(now)
+last_pos=-1
+while :; do
+  pos=0
+  for t in "$root"/queue/*; do
+    [ -e "$t" ] || continue
+    if ! owner_alive "$t"; then rm -f "$t"; continue; fi
+    [ "$t" = "$ticket" ] && break
+    pos=$(( pos + 1 ))
+  done
+  if [ "$pos" -eq 0 ]; then
+    for i in $(seq 1 "$slots"); do
+      s=$root/slots/$i
+      if [ -d "$s" ] && ! owner_alive "$s"; then rm -rf "$s"; fi
+      if mkdir "$s" 2>/dev/null; then echo $$ > "$s/pid"; slot=$s; break; fi
+    done
+    [ -n "$slot" ] && break
+    [ "$last_pos" -ne 0 ] && log "next in line, waiting for a free build slot"
+    last_pos=0
+  elif [ "$pos" -ne "$last_pos" ]; then
+    log "queue position $pos (waiting for $pos build(s) ahead of this one)"
+    last_pos=$pos
+  fi
+  sleep 2
+done
+rm -f "$ticket"
+log "got build slot after $(( $(now) - queued_at ))s, using $jobs compile jobs"
+
+needs_configure() {
+  local stamp=$bdir/.build-wrapper-configured
+  [ -f "$bdir/CMakeCache.txt" ] && [ -f "$stamp" ] || return 0
+  [ -n "$(find "$engine" -path "$engine/build" -prune -o \( -name CMakeLists.txt -o -name '*.cmake' -o -name vcpkg.json -o -name CMakePresets.json \) -newer "$stamp" -print -quit)" ] && return 0
+  [ -n "$(find "$engine/ports" -newer "$stamp" -print -quit 2>/dev/null)" ]
+}
+
+if needs_configure; then
+  # vcpkg takes a global lock in its buildtrees; waiting here beats 3000 retries inside vcpkg.
+  waited=0
+  until mkdir "$cfg_lock" 2>/dev/null; do
+    if [ -d "$cfg_lock" ] && ! owner_alive "$cfg_lock"; then
+      # mv is atomic, so of several waiters reaping the same dead lock only one wins
+      mv "$cfg_lock" "$cfg_lock.dead.$$" 2>/dev/null && rm -rf "$cfg_lock.dead.$$"
+    fi
+    [ $(( waited % 30 )) -eq 0 ] && log "another session is configuring (vcpkg), waiting"
+    waited=$(( waited + 2 )); sleep 2
+  done
+  echo $$ > "$cfg_lock/pid"
+  rc=0
+  if needs_configure; then
+    log "configuring preset $preset"
+    (cd "$engine" && cmake --preset "$preset")
+    rc=$?
+  fi
+  rm -rf "$cfg_lock"
+  [ $rc -eq 0 ] || { log "configure failed ($rc)"; exit $rc; }
+  [ -d "$bdir" ] && touch "$bdir/.build-wrapper-configured"
+fi
+
+if [ "$use_sccache" -eq 1 ] && grep -q '^CMAKE_GENERATOR:INTERNAL=Visual Studio' "$bdir/CMakeCache.txt" 2>/dev/null; then
+  log "note: the Visual Studio generator ignores compiler launchers, sccache only helps Ninja presets such as windows-ci"
+fi
+
+# Visual Studio only learns about added or removed globbed sources (CONFIGURE_DEPENDS) in ZERO_CHECK, which runs too late for
+# the projects this same build already loaded. Run it first so the build sees the current file lists.
+if grep -q '^CMAKE_GENERATOR:INTERNAL=Visual Studio' "$bdir/CMakeCache.txt" 2>/dev/null; then
+  (cd "$engine" && cmake --build "$bdir" --config "$config" --target ZERO_CHECK >/dev/null)
+fi
+
+start=$(now)
+log "building ${targets[*]} ($preset, $config)"
+(cd "$engine" && cmake --build "$bdir" --config "$config" --parallel "$jobs" --target "${targets[@]}")
+rc=$?
+log "build finished with exit $rc in $(( $(now) - start ))s"
+[ $rc -eq 0 ] || exit $rc
+
+if [ -n "$test_regex" ]; then
+  (cd "$bdir" && ctest -C "$config" -R "$test_regex" --output-on-failure)
+  rc=$?
+fi
+[ "$use_sccache" -eq 1 ] && sccache --show-stats >&2
+exit $rc

@@ -1,0 +1,15 @@
+{
+  "id": "pressure.foretold",
+  "slot": "pressure",
+  "title": "The Foretold",
+  "tags": ["CONQUEST", "PROPHECY", "WAR"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["scorched_road"] },
+  "settlement": { "prefer_slope": "defensible", "density_mult": 0.9 },
+  "poi": { "weights": { "war_camp": 2.5, "watchtower": 2.0, "omen_stone": 1.5, "burned_farmstead": 2.0, "farmstead": 0.7 } },
+  "enemies": { "roster_add": ["conqueror_levy", "vanguard_scout"] },
+  "economy": { "scarce": ["grain", "iron"], "abundant": ["spoils"] },
+  "palette": { "grade": "foretold", "fog_density": 0.9 },
+  "audio": { "bed_overrides": ["distant_war_horns"], "music_palette": "foretold" }
+}

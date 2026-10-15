@@ -1,0 +1,10 @@
+[
+  {"id": "swim", "name": "Swim", "description": "Cross deep water without sinking."},
+  {"id": "dive", "name": "Dive", "description": "Go under the surface of deep water.", "requires": ["swim"]},
+  {"id": "climb", "name": "Climb", "description": "Scale steep faces that have holds."},
+  {"id": "descend", "name": "Descend", "description": "Rope down a drop you could not safely jump.", "requires": ["climb"]},
+  {"id": "boat", "name": "Handle a boat", "description": "Take a small boat across open water."},
+  {"id": "pick_lock_simple", "name": "Pick simple locks", "description": "Open the pin and latch locks of doors and chests."},
+  {"id": "pick_lock_complex", "name": "Pick complex locks", "description": "Open the lever and warded locks of vaults.", "requires": ["pick_lock_simple"]},
+  {"id": "read_old_script", "name": "Read the old script", "description": "Read inscriptions written before the cataclysm."}
+]

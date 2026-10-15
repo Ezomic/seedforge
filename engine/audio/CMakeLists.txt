@@ -8,19 +8,10 @@ add_library(ichor_miniaudio
 target_include_directories(ichor_miniaudio PUBLIC ${MINIAUDIO_INCLUDE_DIR})
 target_compile_definitions(ichor_miniaudio PUBLIC MA_NO_ENCODING MA_NO_GENERATION)
 
-add_library(ichor_audio
-    src/mixer.cpp
-    src/ducking.cpp
-    src/reverb.cpp
-    src/null_audio.cpp
-    src/wading_splash.cpp
-    src/rain_ambience.cpp
-    src/ambience_layers.cpp
-    src/music_director.cpp
-    src/music_stinger.cpp
-    src/music_player.cpp
-    src/miniaudio_device.cpp
-)
+file(GLOB ichor_audio_sources CONFIGURE_DEPENDS src/*.cpp)
+# miniaudio_impl.cpp belongs to ichor_miniaudio above, not to this library.
+list(FILTER ichor_audio_sources EXCLUDE REGEX "/miniaudio_impl[.]cpp$")
+add_library(ichor_audio ${ichor_audio_sources})
 target_include_directories(ichor_audio PUBLIC include)
 target_link_libraries(ichor_audio
     PUBLIC ichor_core ichor_assets

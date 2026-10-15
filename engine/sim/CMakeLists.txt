@@ -2,11 +2,8 @@ find_package(EnTT CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
 
-add_library(ichor_sim
-    src/scene.cpp
-    src/scene_io.cpp
-    src/physics.cpp
-)
+file(GLOB ichor_sim_sources CONFIGURE_DEPENDS src/*.cpp)
+add_library(ichor_sim ${ichor_sim_sources})
 target_include_directories(ichor_sim PUBLIC include)
 target_link_libraries(ichor_sim PUBLIC ichor_core ichor_anim EnTT::EnTT glm::glm-header-only PRIVATE Jolt::Jolt)
 target_compile_definitions(ichor_sim PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_ENABLE_EXPERIMENTAL)

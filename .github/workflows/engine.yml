@@ -3,9 +3,9 @@ name: engine
 on:
   push:
     branches: [main]
-    paths: ["engine/**", ".github/workflows/engine.yml"]
+    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml"]
   pull_request:
-    paths: ["engine/**", ".github/workflows/engine.yml"]
+    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml"]
 
 concurrency:
   group: engine-${{ github.ref }}

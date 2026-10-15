@@ -99,7 +99,7 @@ float3 shade(float3 worldPos, float3 n, float3 geometricNormal, float3 baseColor
     const float nDotH = saturate(dot(n, h));
     const float hDotV = saturate(dot(h, v));
 
-    const float3 f0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
+    const float3 f0 = lerp(frame.specularParams.zzz, clamp(baseColor, frame.specularParams.xxx, frame.specularParams.yyy), metallic);
     const float3 f = fresnelSchlick(hDotV, f0);
     const float d = distributionGgx(nDotH, roughness);
     const float g = geometrySmith(nDotV, nDotL, roughness);

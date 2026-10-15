@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <system_error>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <set>
 
@@ -21,6 +22,9 @@ constexpr std::size_t kMaxFileBytes = 4 * 1024 * 1024;
 constexpr std::size_t kMaxDefinitions = 4096;
 constexpr std::size_t kMaxIdBytes = 64;
 constexpr int kMaxDepth = 8;
+constexpr std::size_t kMaxNameBytes = 80;
+constexpr std::size_t kMaxFlavourBytes = 1000;
+constexpr std::size_t kMaxFlavourSlots = 64;
 
 constexpr std::array<SynergyTier, 6> kTiers = {SynergyTier::Triple, SynergyTier::CataclysmLaw, SynergyTier::CataclysmPowers, SynergyTier::LawPowers, SynergyTier::Pressure, SynergyTier::Anomaly};
 
@@ -64,6 +68,59 @@ bool isBlank(std::string_view text)
 bool isWord(std::string_view text)
 {
     return !text.empty() && text[0] >= 'a' && text[0] <= 'z' && std::all_of(text.begin(), text.end(), [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; });
+}
+
+bool hasControl(std::string_view text, bool allowNewline)
+{
+    return std::any_of(text.begin(), text.end(), [&](unsigned char c) { return (c < 0x20 && !(allowNewline && c == '\n')) || c == 0x7f; });
+}
+
+// Reads an optional string field into `target`. Free text must not be blank; ids must be words.
+void readText(const Json& item, const char* key, const std::string& where, std::size_t maxBytes, bool word, std::string& target, const std::function<void(const std::string&, const std::string&)>& add)
+{
+    const auto it = item.find(key);
+    if (it == item.end()) {
+        return;
+    }
+    const std::string path = where + "." + key;
+    if (!it->is_string()) {
+        add(path, "expected a string, got " + std::string(typeName(*it)));
+        return;
+    }
+    const std::string& text = it->get_ref<const std::string&>();
+    if (text.size() > maxBytes || (word ? !isWord(text) : (isBlank(text) || hasControl(text, false)))) {
+        add(path, std::string("expected ") + (word ? "a lowercase ascii id (letters, digits, underscores)" : "non-blank text") + " of at most " + std::to_string(maxBytes) + " bytes, got " + shown(text));
+        return;
+    }
+    target = text;
+}
+
+void readFlavour(const Json& item, const std::string& where, std::map<std::string, std::string>& target, const std::function<void(const std::string&, const std::string&)>& add)
+{
+    const auto it = item.find("flavour");
+    if (it == item.end()) {
+        return;
+    }
+    const std::string path = where + ".flavour";
+    if (!it->is_object()) {
+        add(path, "expected an object, got " + std::string(typeName(*it)));
+        return;
+    }
+    if (it->size() > kMaxFlavourSlots) {
+        add(path, "has more than " + std::to_string(kMaxFlavourSlots) + " entries");
+        return;
+    }
+    for (const auto& [slot, value] : it->items()) {
+        if (slot.size() > kMaxIdBytes || !isWord(slot)) {
+            add(path, "expected lowercase ascii slot ids of at most " + std::to_string(kMaxIdBytes) + " bytes, got " + shown(slot));
+        } else if (!value.is_string()) {
+            add(path + "." + slot, "expected a string, got " + std::string(typeName(value)));
+        } else if (const std::string& text = value.get_ref<const std::string&>(); text.size() > kMaxFlavourBytes || isBlank(text) || hasControl(text, true)) {
+            add(path + "." + slot, "expected non-blank text of at most " + std::to_string(kMaxFlavourBytes) + " bytes, got " + shown(text));
+        } else {
+            target.emplace(slot, text);
+        }
+    }
 }
 
 bool nestsTooDeep(std::string_view text)
@@ -220,7 +277,7 @@ bool parseSynergies(std::string_view label, std::string_view text, const AxiomPo
         Synergy synergy;
         bool tierKnown = false;
         for (const auto& [key, value] : item.items()) {
-            if (key != "id" && key != "tier" && key != "axioms") {
+            if (key != "id" && key != "tier" && key != "axioms" && key != "faction" && key != "dungeon_type" && key != "world_name" && key != "flavour") {
                 add(where + "." + key.substr(0, 40), "unknown key");
             }
         }
@@ -253,6 +310,11 @@ bool parseSynergies(std::string_view label, std::string_view text, const AxiomPo
                 tierKnown = true;
             }
         }
+
+        readText(item, "faction", where, kMaxIdBytes, true, synergy.faction, add);
+        readText(item, "dungeon_type", where, kMaxIdBytes, true, synergy.dungeonType, add);
+        readText(item, "world_name", where, kMaxNameBytes, false, synergy.worldName, add);
+        readFlavour(item, where, synergy.flavour, add);
 
         bool axiomsOk = false;
         std::vector<AxiomSlot> slots;
@@ -358,6 +420,35 @@ std::vector<std::string> detectSynergies(const std::vector<std::string>& axiomId
         ids.push_back(synergy->id);
     }
     return ids;
+}
+
+SynergyOverride applyOverrides(const std::vector<std::string>& fired, const std::vector<Synergy>& definitions, const std::map<std::string, std::string>& defaultFlavour)
+{
+    SynergyOverride result;
+    result.flavour = defaultFlavour;
+    std::set<std::string> flavoured;
+    const auto addOnce = [](std::vector<std::string>& list, const std::string& id) {
+        if (!id.empty() && std::find(list.begin(), list.end(), id) == list.end()) {
+            list.push_back(id);
+        }
+    };
+    for (const std::string& id : fired) {
+        const auto found = std::find_if(definitions.begin(), definitions.end(), [&](const Synergy& s) { return s.id == id; });
+        if (found == definitions.end()) {
+            continue;
+        }
+        addOnce(result.factions, found->faction);
+        addOnce(result.dungeonTypes, found->dungeonType);
+        if (result.worldName.empty()) {
+            result.worldName = found->worldName;
+        }
+        for (const auto& [slot, text] : found->flavour) {
+            if (flavoured.insert(slot).second) {
+                result.flavour[slot] = text;
+            }
+        }
+    }
+    return result;
 }
 
 }

@@ -1,14 +1,7 @@
 find_package(RmlUi CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
-add_library(ichor_ui
-    src/ui_context.cpp
-    src/hud.cpp
-    src/hud_layout.cpp
-    src/ledger.cpp
-    src/map_screen.cpp
-    src/pause_menu.cpp
-    src/recording_renderer.cpp
-)
+file(GLOB ichor_ui_sources CONFIGURE_DEPENDS src/*.cpp)
+add_library(ichor_ui ${ichor_ui_sources})
 target_include_directories(ichor_ui PUBLIC include)
-target_link_libraries(ichor_ui PUBLIC ichor_core ichor_world RmlUi::RmlUi PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(ichor_ui PUBLIC ichor_core ichor_world ichor_data RmlUi::RmlUi PRIVATE nlohmann_json::nlohmann_json)

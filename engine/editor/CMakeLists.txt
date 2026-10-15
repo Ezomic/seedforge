@@ -1,8 +1,7 @@
-add_library(ichor_editor
-    src/nudge.cpp
-    src/picking.cpp
-    src/session.cpp
-)
+file(GLOB ichor_editor_sources CONFIGURE_DEPENDS src/*.cpp)
+# panels.cpp needs ImGui and is built into ichor_editor_ui below, only for the runtime.
+list(FILTER ichor_editor_sources EXCLUDE REGEX "/panels[.]cpp$")
+add_library(ichor_editor ${ichor_editor_sources})
 target_include_directories(ichor_editor PUBLIC include)
 target_link_libraries(ichor_editor PUBLIC ichor_sim)
 

@@ -1,22 +1,5 @@
-add_library(ichor_world
-    src/atmosphere.cpp
-    src/debug_images.cpp
-    src/forge.cpp
-    src/heightfield.cpp
-    src/map_image.cpp
-    src/hydrology.cpp
-    src/hydrology_cache.cpp
-    src/navmesh.cpp
-    src/palette.cpp
-    src/phase_pipeline.cpp
-    src/world_io.cpp
-    src/streamer.cpp
-    src/vegetation.cpp
-    src/validation.cpp
-    src/water_field.cpp
-    src/water_mesh.cpp
-    src/weather.cpp
-)
+file(GLOB ichor_world_sources CONFIGURE_DEPENDS src/*.cpp)
+add_library(ichor_world ${ichor_world_sources})
 target_include_directories(ichor_world PUBLIC include)
 find_package(recastnavigation CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)

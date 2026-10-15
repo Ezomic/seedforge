@@ -78,6 +78,8 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
 {
     scene.registerComponent<Combatant>("stage0.combatant");
     scene.registerComponent<SkirmisherBrain>("stage0.skirmisher");
+    scene.registerComponent<SwarmBrain>("stage0.swarm");
+    scene.registerComponent<ControllerBrain>("stage0.controller");
     playerSpawn_ = playerSpawn;
     foeSpawn_ = foeSpawn;
     player_ = StableId::of("stage0.player");
@@ -114,6 +116,7 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
 
     scene.addSystem("stage0.combat", [this](Scene& s, double dt, const InputFrame& input) { combatSystem(s, dt, input); });
     scene.addSystem("stage0.skirmisher", [this](Scene& s, double dt, const InputFrame&) { skirmisherSystem(s, dt); });
+    scene.addSystem("stage0.controller", [this](Scene& s, double, const InputFrame&) { controllerSystem(s); });
 }
 
 void Stage0::resetFight(Scene& scene)
@@ -137,7 +140,15 @@ void Stage0::resetFight(Scene& scene)
         c.yaw = yawTowards(isPlayer ? playerSpawn_ : foeSpawn_, isPlayer ? foeSpawn_ : playerSpawn_);
         scene.registry().emplace_or_replace<Combatant>(entity, c);
         if (isFoe) {
-            scene.registry().emplace_or_replace<SkirmisherBrain>(entity, SkirmisherBrain{});
+            auto& registry = scene.registry();
+            registry.remove<SkirmisherBrain>(entity);
+            registry.remove<ControllerBrain>(entity);
+            if (role_ == FoeRole::Controller) {
+                registry.get<Combatant>(entity).health = tuning_.controllerMaxHealth;
+                registry.emplace<ControllerBrain>(entity, ControllerBrain{});
+            } else {
+                registry.emplace<SkirmisherBrain>(entity, SkirmisherBrain{});
+            }
         }
         scene.enqueue(MoveCommand{id, (isPlayer ? playerSpawn_ : foeSpawn_) - transform.position});
     }
@@ -236,6 +247,19 @@ void Stage0::tickStatus(Scene& scene, entt::entity who, Combatant& c)
     recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time());
 }
 
+void Stage0::parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon)
+{
+    Combatant& a = scene.registry().get<Combatant>(attacker);
+    if (!a.alive()) {
+        return;
+    }
+    a.poise = std::max(0.0f, a.poise - weapon.parryPoiseDamage);
+    a.sincePoiseDamage = 0.0f;
+    if (a.poise <= 0.0f && a.combatState() != CombatState::Staggered) {
+        enterState(scene, attacker, a, CombatState::Staggered);
+    }
+}
+
 void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen)
 {
     Combatant& c = scene.registry().get<Combatant>(victim);
@@ -243,7 +267,13 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     if (!c.alive()) {
         return;
     }
-    const bool blocked = c.blocking && c.combatState() == CombatState::Idle;
+    const bool guarded = c.blocking && c.combatState() == CombatState::Idle;
+    const WeaponProfile& weapon = weapons_[c.side];
+    if (guarded && weapon.parries() && c.blockTicks >= 1 && c.blockTicks <= weapon.parryWindowTicks) {
+        parry(scene, attacker, weapon);
+        return;
+    }
+    const bool blocked = guarded;
     float applied = damage;
     if (blocked) {
         // Block converts damage into stamina drain rather than negating it.
@@ -375,6 +405,7 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
         c.stateTime += fdt;
         c.sinceStaminaSpend += fdt;
         c.sincePoiseDamage += fdt;
+        c.blockTicks = c.blocking && c.combatState() == CombatState::Idle ? c.blockTicks + 1 : 0;
 
         tickStatus(scene, entity, c);
         if (!c.alive()) {
@@ -476,7 +507,10 @@ void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const
 {
     for (auto [entity, c] : scene.registry().view<const Combatant>().each()) {
         lines.push_back(std::format("{:<10} {:<10} HP {:5.1f}  ST {:5.1f}  PO {:5.1f}  t {:4.2f}{}",
-            c.side == 0 ? "PLAYER" : "SKIRM", name(c.combatState()), c.health, c.stamina, c.poise, c.stateTime, c.blocking ? "  [block]" : ""));
+            c.side == 0 ? "PLAYER" : (scene.registry().all_of<ControllerBrain>(entity) ? "CTRL" : "SKIRM"), name(c.combatState()), c.health, c.stamina, c.poise, c.stateTime, c.blocking ? "  [block]" : ""));
+        if (const auto* brain = scene.registry().try_get<ControllerBrain>(entity)) {
+            lines.push_back(std::format("           {:<10} cooldown {}t  casts {}", name(brain->controllerState()), brain->cooldownTicks, brain->casts));
+        }
         if (const auto* brain = scene.registry().try_get<SkirmisherBrain>(entity)) {
             lines.push_back(std::format("           {:<10} desire {:4.2f}/{:4.2f}  pressure {:4.1f}s  commits {}",
                 name(brain->brainState()), brain->desire, brain->nextThreshold, brain->pressure, brain->commits));

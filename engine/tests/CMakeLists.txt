@@ -2,70 +2,13 @@ find_package(Catch2 3 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 include(Catch)
 
-add_executable(ichor_tests
-    test_hash.cpp
-    test_entity_id.cpp
-    test_rng.cpp
-    test_fixed_step.cpp
-    test_headless_boot.cpp
-    test_golden.cpp
-    test_determinism.cpp
-    test_cooker.cpp
-    test_bundle_render.cpp
-    test_reflect_binary.cpp
-    test_world.cpp
-    test_file_watch.cpp
-    test_dmath.cpp
-    test_physics.cpp
-    test_animation.cpp
-    test_animation_system.cpp
-    test_audio.cpp
-    test_music.cpp
-    test_ducking.cpp
-    test_wading_splash.cpp
-    test_rain_ambience.cpp
-    test_ambience_layers.cpp
-    test_terrain.cpp
-    test_script.cpp
-    test_data.cpp
-    test_npc_schedule.cpp
-    test_npc_traits.cpp
-    test_factions.cpp
-    test_standing.cpp
-    test_npc_tiers.cpp
-    test_traversal_verbs.cpp
-    test_axiom.cpp
-    test_axiom_cataclysm.cpp
-    test_synergy.cpp
-    test_xref.cpp
-    test_slot_roll.cpp
-    test_conflicts.cpp
-    test_atmosphere.cpp
-    test_vegetation.cpp
-    test_hydrology.cpp
-    test_hydrology_cache.cpp
-    test_file_io.cpp
-    test_validation.cpp
-    test_phase_pipeline.cpp
-    test_water_mesh.cpp
-    test_water_field.cpp
-    test_reverb.cpp
-    test_editor.cpp
-    test_picking.cpp
-    test_nudge.cpp
-    test_weather.cpp
-    test_cloud_shadow.cpp
-    test_ui.cpp
-    test_hud_layout.cpp
-    test_map_image.cpp
-    test_debug_images.cpp
-    test_forge_goldens.cpp
-    test_map_screen.cpp
-    test_save.cpp
-    test_settings.cpp
-)
+# Every test_*.cpp here is part of ichor_tests, so a new test is just a new file.
+# The two files below have their own executables, since they need the runtime build.
+file(GLOB ichor_test_sources CONFIGURE_DEPENDS test_*.cpp)
+list(FILTER ichor_test_sources EXCLUDE REGEX "/test_(editor_panels|golden_image)[.]cpp$")
+add_executable(ichor_tests ${ichor_test_sources})
 target_link_libraries(ichor_tests PRIVATE
-    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
+    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_ledger ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
 )
 target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
 catch_discover_tests(ichor_tests)

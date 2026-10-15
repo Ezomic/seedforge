@@ -1,4 +1,5 @@
 #include "ichor/save/settings.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -18,7 +19,7 @@ constexpr float kInf = std::numeric_limits<float>::infinity();
 class TempFile {
 public:
     TempFile()
-        : path_(std::filesystem::temp_directory_path() / ("ichor_settings_test_" + std::to_string(counter_++)) / "settings.cfg")
+        : path_(test::tempPath("ichor_settings_test_" + std::to_string(counter_++)) / "settings.cfg")
     {
         std::filesystem::remove_all(path_.parent_path());
     }

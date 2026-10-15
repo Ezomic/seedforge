@@ -6,6 +6,8 @@
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/recorder.h"
 #include "ichor/stage0/status_effect.h"
+#include "ichor/stage0/swarm.h"
+#include "ichor/stage0/weapon.h"
 
 #include <glm/vec3.hpp>
 
@@ -35,6 +37,7 @@ struct Combatant {
     float sinceStaminaSpend = 999.0f;
     float sincePoiseDamage = 999.0f;
     bool blocking = false;
+    std::int32_t blockTicks = 0; // fixed steps the guard has been up; the parry window counts from here
     bool traceDone = false;
     float yaw = 0.0f; // radians, 0 looks down -Z
     glm::vec3 dodgeDirection{0.0f};
@@ -65,6 +68,22 @@ struct SkirmisherBrain {
     float nextThreshold = 1.0f;
 
     BrainState brainState() const { return static_cast<BrainState>(state); }
+};
+
+enum class FoeRole : std::uint8_t { Skirmisher, Controller };
+
+enum class ControllerState : std::uint8_t { Unaware, Reposition, Cast };
+const char* name(ControllerState state);
+
+// The controller's decision layer. Counts whole ticks, never seconds, so nothing drifts.
+struct ControllerBrain {
+    std::uint8_t state = 0;
+    std::int32_t stateTicks = 0;
+    std::int32_t cooldownTicks = 0;
+    std::int32_t casts = 0;
+    float strafeSign = 1.0f;
+
+    ControllerState controllerState() const { return static_cast<ControllerState>(state); }
 };
 
 // Every number from stage0-log.md section 3, plus the six knobs doc 18 names.
@@ -121,7 +140,18 @@ struct Tuning {
     float heavyChance = 0.3f;
     int maxFollowUpsIntoStagger = 1;
 
+    // Controller: holds the band between retreat and cast range, slows the target, recasts when the slow runs low.
+    float controllerMaxHealth = 40.0f;
+    float controllerRetreatBelow = 5.0f;
+    float controllerCastRange = 9.0f;
+    float controllerStrafeSpeedScale = 0.4f;
+    int controllerCastTicks = 45;
+    int controllerCooldownTicks = 180;
+    int controllerRecastBelowTicks = 60;
+    int controllerStrafeFlipTicks = 130;
+
     // Cues; kNoSound plays nothing.
+    std::uint32_t controllerCastCue = kNoSound;
     std::uint32_t lightWindupCue = kNoSound;
     std::uint32_t heavyWindupCue = kNoSound;
     std::uint32_t tellCue = kNoSound;
@@ -141,6 +171,10 @@ public:
     void debugLines(const Scene& scene, std::vector<LineSegment>& out) const;
     void overlay(const Scene& scene, std::vector<std::string>& lines) const;
 
+    // Which brain the foe gets on the next reset; call before install or resetFight.
+    void setFoeRole(FoeRole role) { role_ = role; }
+    FoeRole foeRole() const { return role_; }
+
     const Tuning& tuning() const { return tuning_; }
     FightRecorder& recorder() { return recorder_; }
     StableId playerId() const { return player_; }
@@ -149,14 +183,18 @@ public:
     // Shared by both systems.
     bool tryAttack(Scene& scene, entt::entity who, AttackKind kind);
     bool tryDodge(Scene& scene, entt::entity who, glm::vec3 direction);
+    void setWeapon(Side side, WeaponProfile weapon) { weapons_[static_cast<std::size_t>(side)] = weapon; }
     bool applyStatus(Scene& scene, entt::entity who, StatusId id, std::int32_t durationTicks = 0);
     void receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen);
     float allowedTurnRate(const Combatant& c) const;
+    // Public so a test can drive the role without a physics step, which asserts on a non-finite body position.
+    void controllerSystem(Scene& scene);
 
 private:
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
     void skirmisherSystem(Scene& scene, double dt);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
+    void parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon);
     void tickStatus(Scene& scene, entt::entity who, Combatant& c);
     struct PendingHit {
         entt::entity victim;
@@ -169,6 +207,8 @@ private:
     void tickCombatant(Scene& scene, entt::entity entity, entt::entity opponent, float fdt, std::vector<PendingHit>& hits);
 
     Tuning tuning_;
+    FoeRole role_ = FoeRole::Skirmisher;
+    WeaponProfile weapons_[2];
     FightRecorder recorder_;
     StableId player_{};
     StableId foe_{};
@@ -185,6 +225,16 @@ constexpr float kArenaHalf = 10.0f; // the arena is 20 m square, walls at plus a
 namespace ichor {
 
 template <>
+struct Reflect<stage0::ControllerBrain> {
+    static constexpr auto fields()
+    {
+        using B = stage0::ControllerBrain;
+        return std::make_tuple(field("state", &B::state), field("stateTicks", &B::stateTicks), field("cooldownTicks", &B::cooldownTicks),
+            field("casts", &B::casts), field("strafeSign", &B::strafeSign));
+    }
+};
+
+template <>
 struct Reflect<stage0::Combatant> {
     static constexpr auto fields()
     {
@@ -192,7 +242,7 @@ struct Reflect<stage0::Combatant> {
         return std::make_tuple(field("side", &C::side), field("health", &C::health), field("stamina", &C::stamina), field("poise", &C::poise),
             field("state", &C::state), field("attack", &C::attack), field("stateTime", &C::stateTime),
             field("sinceStaminaSpend", &C::sinceStaminaSpend), field("sincePoiseDamage", &C::sincePoiseDamage),
-            field("blocking", &C::blocking), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
+            field("blocking", &C::blocking), field("blockTicks", &C::blockTicks), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
             field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause), field("retryHeld", &C::retryHeld), field("status", &C::status));
     }
 };
