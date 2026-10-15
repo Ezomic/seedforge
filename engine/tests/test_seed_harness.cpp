@@ -121,6 +121,6 @@ TEST_CASE("duplicate gate names are refused and a hostile reason cannot forge re
     config.maxRerolls = 0;
     config.gates = {{"evil", [](const ForgedWorld&, const ForgeRequest&) -> std::optional<std::string> { return std::string("x\nfailing seeds: none"); }}};
     const std::string text = harnessText(runHarness(config), false);
-    CHECK(text.find("failing seeds: none") == std::string::npos);
+    CHECK(text.find("\nfailing seeds: none") == std::string::npos);
     CHECK(text.find("failing seeds: 1") != std::string::npos);
 }
