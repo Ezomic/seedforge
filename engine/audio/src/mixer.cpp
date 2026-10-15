@@ -55,6 +55,17 @@ void Mixer::play(std::uint32_t clip, glm::dvec3 position, float gain, bool spati
         spatial, category});
 }
 
+void Mixer::fadeOutCategory(SoundCategory category, float seconds)
+{
+    const std::lock_guard lock(mutex_);
+    const float frames = std::isnan(seconds) ? 0.0f : std::max(seconds, 0.0f) * static_cast<float>(kRate);
+    for (Voice& voice : voices_) {
+        if (voice.category == category) {
+            voice.fadeStep = frames < 1.0f ? voice.fade : voice.fade / frames;
+        }
+    }
+}
+
 void Mixer::setLoopGain(std::uint32_t clip, float gain)
 {
     const std::lock_guard lock(mutex_);
@@ -129,9 +140,16 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
             const float a = static_cast<float>(clip.samples[index]) / 32768.0f;
             const float b = static_cast<float>(clip.samples[index + 1]) / 32768.0f;
             const float sample = (a + (b - a) * t);
-            interleaved[f * 2] += sample * left;
-            interleaved[f * 2 + 1] += sample * right;
+            interleaved[f * 2] += sample * left * voice.fade;
+            interleaved[f * 2 + 1] += sample * right * voice.fade;
             voice.cursor += step;
+            if (voice.fadeStep > 0.0f) {
+                voice.fade = std::max(0.0f, voice.fade - voice.fadeStep);
+                if (voice.fade <= 0.0f) {
+                    voice.cursor = static_cast<double>(clip.samples.size());
+                    break;
+                }
+            }
         }
     }
 

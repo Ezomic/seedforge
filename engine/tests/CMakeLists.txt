@@ -4,6 +4,7 @@ include(Catch)
 
 add_executable(ichor_tests
     test_hash.cpp
+    test_entity_id.cpp
     test_rng.cpp
     test_fixed_step.cpp
     test_headless_boot.cpp
@@ -19,6 +20,7 @@ add_executable(ichor_tests
     test_animation.cpp
     test_animation_system.cpp
     test_audio.cpp
+    test_music.cpp
     test_ducking.cpp
     test_wading_splash.cpp
     test_rain_ambience.cpp
@@ -29,9 +31,12 @@ add_executable(ichor_tests
     test_npc_schedule.cpp
     test_npc_traits.cpp
     test_factions.cpp
+    test_standing.cpp
     test_npc_tiers.cpp
+    test_npc_memory.cpp
     test_traversal_verbs.cpp
     test_axiom.cpp
+    test_axiom_cataclysm.cpp
     test_synergy.cpp
     test_slot_roll.cpp
     test_conflicts.cpp
@@ -41,6 +46,7 @@ add_executable(ichor_tests
     test_hydrology_cache.cpp
     test_file_io.cpp
     test_validation.cpp
+    test_phase_pipeline.cpp
     test_water_mesh.cpp
     test_water_field.cpp
     test_reverb.cpp
@@ -50,12 +56,15 @@ add_executable(ichor_tests
     test_weather.cpp
     test_cloud_shadow.cpp
     test_ui.cpp
+    test_hud_layout.cpp
     test_map_image.cpp
     test_debug_images.cpp
     test_forge_goldens.cpp
     test_map_screen.cpp
     test_save.cpp
     test_settings.cpp
+    test_journal.cpp
+    test_journal_screen.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
     ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json

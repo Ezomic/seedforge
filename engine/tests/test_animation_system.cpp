@@ -2,6 +2,7 @@
 #include "ichor/assets/cooker.h"
 #include "ichor/sim/scene.h"
 #include "ichor/sim/scene_io.h"
+#include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -142,7 +143,7 @@ TEST_CASE("animator and montage state survive a snapshot and hash")
     for (int i = 0; i < 10; ++i) {
         scene.tick(kDt);
     }
-    const auto path = std::filesystem::temp_directory_path() / "ichor_anim.isav";
+    const auto path = test::tempPath("ichor_anim.isav");
     REQUIRE(saveScene(path, scene));
     Scene loaded(4);
     loaded.setAnimations(&f.animations);
