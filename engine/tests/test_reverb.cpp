@@ -2,6 +2,7 @@
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/reverb.h"
 #include "ichor/data/data_set.h"
+#include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -176,7 +177,7 @@ TEST_CASE("overlapping stamps average their rooms and never get louder than the 
 
 TEST_CASE("stamps load from the data layer, and a bad one loads nothing")
 {
-    const auto dir = std::filesystem::temp_directory_path() / "ichor_reverb_data";
+    const auto dir = test::tempPath("ichor_reverb_data");
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir / "reverb");
     const auto write = [&](const char* text) { std::ofstream(dir / "reverb" / "stamps.json", std::ios::binary | std::ios::trunc) << text; };
@@ -228,7 +229,7 @@ TEST_CASE("non-finite settings and positions are ignored, not remembered")
 
 TEST_CASE("a stamp radius that vanishes when narrowed to float is refused")
 {
-    const auto dir = std::filesystem::temp_directory_path() / "ichor_reverb_data_radius";
+    const auto dir = test::tempPath("ichor_reverb_data_radius");
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir / "reverb");
     std::ofstream(dir / "reverb" / "stamps.json", std::ios::binary) << R"([{"id": "tiny", "x": 0, "y": 0, "z": 0, "radius": 1e-50, "wet": 0.5, "room": 0.5, "damping": 0.5}])";

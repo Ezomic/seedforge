@@ -8,6 +8,7 @@ add_library(ichor_world
     src/hydrology_cache.cpp
     src/navmesh.cpp
     src/palette.cpp
+    src/phase_pipeline.cpp
     src/world_io.cpp
     src/streamer.cpp
     src/vegetation.cpp

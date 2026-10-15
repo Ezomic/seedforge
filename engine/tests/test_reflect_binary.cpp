@@ -1,6 +1,7 @@
 #include "ichor/core/binary.h"
 #include "ichor/core/input.h"
 #include "ichor/sim/components.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -87,7 +88,7 @@ TEST_CASE("input streams save and load")
     for (int i = 0; i < 100; ++i) {
         stream.frames.push_back({static_cast<std::uint32_t>(i % 4), static_cast<float>(i) * 0.01f, -0.5f});
     }
-    const auto path = std::filesystem::temp_directory_path() / "ichor_inputs.iinp";
+    const auto path = test::tempPath("ichor_inputs.iinp");
     REQUIRE(stream.save(path));
     InputStream loaded;
     REQUIRE(loaded.load(path));

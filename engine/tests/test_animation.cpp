@@ -1,6 +1,7 @@
 #include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/cooker.h"
+#include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -48,7 +49,7 @@ TEST_CASE("the arm cooks to one skeleton, one skinned mesh and one clip")
     }
     REQUIRE(anyTip);
 
-    const auto path = std::filesystem::temp_directory_path() / "ichor_arm.iscene";
+    const auto path = test::tempPath("ichor_arm.iscene");
     REQUIRE(writeBundle(path, bundle));
     SceneBundle loaded;
     REQUIRE(readBundle(path, loaded));
