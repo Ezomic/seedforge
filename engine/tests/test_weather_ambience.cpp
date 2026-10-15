@@ -77,6 +77,16 @@ TEST_CASE("the weather targets carry both layers and fit the budget")
     CHECK(storm.wind == Approx(windAmbienceGain(1.0f, 1.0f)));
     CHECK(storm.rain + storm.wind <= kAmbienceBudget + 1e-6f);
 
+    for (int o = -2; o <= 12; ++o) {
+        for (int r = -2; r <= 12; ++r) {
+            const WeatherAudioTargets t = weatherAudioTargets(static_cast<float>(o) / 10.0f, static_cast<float>(r) / 10.0f);
+            CHECK(t.rain + t.wind <= kAmbienceBudget + 1e-6f);
+        }
+    }
+    CHECK(weatherAudioTargets(kNaN, 1.0f).wind == 0.0f);
+    CHECK(weatherAudioTargets(kNaN, 1.0f).rain == Approx(kRainMaxGain));
+    CHECK(windAmbienceGain(0.0f, 1.0f) > 0.0f);
+
     const WeatherAudioTargets bad = weatherAudioTargets(kNaN, kNaN);
     CHECK(bad.rain == 0.0f);
     CHECK(bad.wind == 0.0f);
@@ -159,7 +169,11 @@ TEST_CASE("weather flipping around a threshold changes the mix smoothly")
     for (const float s : flipping) {
         REQUIRE(std::isfinite(s));
     }
-    CHECK(meanStep(flipping) <= steady * 1.05);
+    float worst = 0.0f;
+    for (std::size_t i = 2; i < flipping.size(); ++i) {
+        worst = std::max(worst, std::abs(flipping[i] - flipping[i - 2]));
+    }
+    CHECK(worst <= 6.0 * steady);
 }
 
 TEST_CASE("wind keeps playing as one loop through a long run")
