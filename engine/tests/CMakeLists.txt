@@ -65,6 +65,7 @@ add_executable(ichor_tests
     test_debug_images.cpp
     test_forge_goldens.cpp
     test_map_screen.cpp
+    test_new_game_screen.cpp
     test_save.cpp
     test_save_migration.cpp
     test_settings.cpp
