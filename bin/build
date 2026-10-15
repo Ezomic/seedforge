@@ -3,13 +3,15 @@
 #
 #   bin/build [-p preset] [-c config] [-t ctest-regex] [target ...]
 #
-# Defaults: preset "windows", config Debug, target ichor_tests. With -t, ctest -R <regex> runs after the build.
+# Defaults: preset "windows-ci" (Ninja, so sccache works), target ichor_tests. With -t, ctest -R <regex> runs after the build.
+# Config: Ninja presets are single-config; the preset's own build type is used unless -c is given. The Visual Studio preset
+# ("windows") defaults to Debug. Ninja output goes to engine/build/<preset>, the MSVC environment is imported automatically.
 # Env: ICHOR_BUILD_SLOTS (concurrent builds; else the number in $ICHOR_BUILD_QUEUE/slots.conf; else 2), ICHOR_BUILD_JOBS (compile jobs per build, default cores/slots),
 #      ICHOR_BUILD_QUEUE (shared state dir), ICHOR_BUILD_CACHE (shared cache dir for sccache).
 set -u
 
-preset=windows
-config=Debug
+preset=windows-ci
+config=
 test_regex=
 targets=()
 while [ $# -gt 0 ]; do
@@ -19,7 +21,7 @@ while [ $# -gt 0 ]; do
       case "$1" in -p|--preset) preset=$2 ;; -c|--config) config=$2 ;; *) test_regex=$2 ;; esac
       shift 2 ;;
     --) shift; targets+=("$@"); break ;;
-    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "build: unknown option $1" >&2; exit 2 ;;
     *) targets+=("$1"); shift ;;
   esac
@@ -43,6 +45,41 @@ log() { echo "[build] $*" >&2; }
 alive() { kill -0 "$1" 2>/dev/null; }
 now() { date +%s; }
 
+import_msvc_env() {
+  command -v cl >/dev/null 2>&1 && return 0
+  local vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+  local vsdir=
+  [ -x "$vswhere" ] && vsdir=$("$vswhere" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>/dev/null | tr -d '')
+  if [ -z "$vsdir" ]; then
+    for d in /e/VS2022 "/c/Program Files/Microsoft Visual Studio/2022/"*; do [ -f "$d/VC/Auxiliary/Build/vcvars64.bat" ] && vsdir=$d && break; done
+  fi
+  local bat
+  bat=$(cygpath -w "$vsdir/VC/Auxiliary/Build/vcvars64.bat" 2>/dev/null)
+  [ -n "$vsdir" ] && [ -f "$vsdir/VC/Auxiliary/Build/vcvars64.bat" ] || { log "MSVC not found (vswhere and known paths failed), cannot set up the compiler environment"; return 1; }
+  local line k v dump wrapper after=0
+  local -A before=()
+  wrapper=$(mktemp --suffix=.bat) || return 1
+  printf '@echo off\r\nset\r\necho ---VCVARS---\r\ncall "%s" >nul 2>&1\r\nset\r\n' "$bat" > "$wrapper"
+  dump=$(cmd //c "$(cygpath -w "$wrapper")")
+  rm -f "$wrapper"
+  # Only variables vcvars64.bat changed are imported, so MSYS's own POSIX-style variables stay untouched.
+  while IFS= read -r line; do
+    line=${line%$'\r'}
+    if [ "$line" = "---VCVARS---" ]; then after=1; continue; fi
+    case "$line" in *=*) ;; *) continue ;; esac
+    k=${line%%=*}; v=${line#*=}
+    case "$k" in ''|*[!A-Za-z0-9_]*|[0-9]*) continue ;; esac
+    if [ $after -eq 0 ]; then before[${k^^}]=$v; continue; fi
+    [ "${before[${k^^}]-}" = "$v" ] && continue
+    case "$k" in
+      Path|PATH) PATH="$(cygpath -up "$v"):$PATH" ;;
+      *) export "$k=$v" ;;
+    esac
+  done <<< "$dump"
+  export PATH
+  command -v cl >/dev/null 2>&1 || { log "cl.exe still not on PATH after vcvars64.bat"; return 1; }
+}
+
 if ! command -v cmake >/dev/null 2>&1; then
   for d in /e/VS2022/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin \
            "/c/Program Files/Microsoft Visual Studio/2022/"*"/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin"; do
@@ -57,6 +94,11 @@ command -v cmake >/dev/null 2>&1 || { log "cmake not found on PATH or in a Visua
 if [ -z "${VCPKG_BINARY_SOURCES:-}" ] && [ -z "${VCPKG_DEFAULT_BINARIES_CACHE:-}" ] && [ -n "${LOCALAPPDATA:-}" ]; then
   export VCPKG_DEFAULT_BINARIES_CACHE=$LOCALAPPDATA\\vcpkg\\archives
 fi
+
+case "$preset" in
+  windows) ;;
+  *) case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) import_msvc_env || exit 1 ;; esac ;;
+esac
 
 use_sccache=0
 if command -v sccache >/dev/null 2>&1; then
@@ -122,9 +164,22 @@ done
 rm -f "$ticket"
 log "got build slot after $(( $(now) - queued_at ))s, using $jobs compile jobs"
 
+if [ "$preset" = windows ]; then config=${config:-Debug}; fi
+cfg_arg=()
+[ -n "$config" ] && cfg_arg=(--config "$config")
+ctest_cfg=()
+[ -n "$config" ] && ctest_cfg=(-C "$config")
+
 needs_configure() {
   local stamp=$bdir/.build-wrapper-configured
   [ -f "$bdir/CMakeCache.txt" ] && [ -f "$stamp" ] || return 0
+  if [ "$preset" != windows ]; then
+    local has_launcher=0
+    grep -q '^CMAKE_CXX_COMPILER_LAUNCHER:.*=sccache' "$bdir/CMakeCache.txt" && has_launcher=1
+    [ "$has_launcher" -eq "$use_sccache" ] || return 0
+  fi
+  if [ -n "$config" ] && grep -q '^CMAKE_BUILD_TYPE:' "$bdir/CMakeCache.txt" 2>/dev/null &&
+     ! grep -q "^CMAKE_BUILD_TYPE:STRING=$config\$" "$bdir/CMakeCache.txt"; then return 0; fi
   [ -n "$(find "$engine" -path "$engine/build" -prune -o \( -name CMakeLists.txt -o -name '*.cmake' -o -name vcpkg.json -o -name CMakePresets.json \) -newer "$stamp" -print -quit)" ] && return 0
   [ -n "$(find "$engine/ports" -newer "$stamp" -print -quit 2>/dev/null)" ]
 }
@@ -144,7 +199,9 @@ if needs_configure; then
   rc=0
   if needs_configure; then
     log "configuring preset $preset"
-    (cd "$engine" && cmake --preset "$preset")
+    bt=()
+    if [ "$preset" != windows ] && [ -n "$config" ]; then bt=("-DCMAKE_BUILD_TYPE=$config"); fi
+    (cd "$engine" && cmake --preset "$preset" "${bt[@]}")
     rc=$?
   fi
   rm -rf "$cfg_lock"
@@ -159,18 +216,18 @@ fi
 # Visual Studio only learns about added or removed globbed sources (CONFIGURE_DEPENDS) in ZERO_CHECK, which runs too late for
 # the projects this same build already loaded. Run it first so the build sees the current file lists.
 if grep -q '^CMAKE_GENERATOR:INTERNAL=Visual Studio' "$bdir/CMakeCache.txt" 2>/dev/null; then
-  (cd "$engine" && cmake --build "$bdir" --config "$config" --target ZERO_CHECK >/dev/null)
+  (cd "$engine" && cmake --build "$bdir" "${cfg_arg[@]}" --target ZERO_CHECK >/dev/null)
 fi
 
 start=$(now)
-log "building ${targets[*]} ($preset, $config)"
-(cd "$engine" && cmake --build "$bdir" --config "$config" --parallel "$jobs" --target "${targets[@]}")
+log "building ${targets[*]} ($preset, ${config:-preset build type})"
+(cd "$engine" && cmake --build "$bdir" "${cfg_arg[@]}" --parallel "$jobs" --target "${targets[@]}")
 rc=$?
 log "build finished with exit $rc in $(( $(now) - start ))s"
 [ $rc -eq 0 ] || exit $rc
 
 if [ -n "$test_regex" ]; then
-  (cd "$bdir" && ctest -C "$config" -R "$test_regex" --output-on-failure)
+  (cd "$bdir" && ctest "${ctest_cfg[@]}" -R "$test_regex" --output-on-failure)
   rc=$?
 fi
 [ "$use_sccache" -eq 1 ] && sccache --show-stats >&2
