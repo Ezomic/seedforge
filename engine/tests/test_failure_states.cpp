@@ -136,3 +136,24 @@ TEST_CASE("recording is a pure function of the ledger and the event", "[failure]
     }
     CHECK(a.digest() == b.digest());
 }
+
+TEST_CASE("the longest event of every kind fits the ledger's key limit", "[failure]")
+{
+    ConsequenceLedger ledger;
+    const std::string key(kMaxFailureKeyBytes, 'a');
+    for (FailureKind kind : {FailureKind::Cargo, FailureKind::Standing, FailureKind::Time}) {
+        CHECK(recordFailure(ledger, event(kind, key, key, kMaxFailureAmount, std::numeric_limits<std::uint64_t>::max()))
+            == RecordResult::Ok);
+    }
+    for (FailureKind kind : {FailureKind::Companion, FailureKind::Route}) {
+        CHECK(recordFailure(ledger, event(kind, key, key, 0, std::numeric_limits<std::uint64_t>::max())) == RecordResult::Ok);
+    }
+}
+
+TEST_CASE("events whose subject and cause join to the same text are still distinct", "[failure]")
+{
+    ConsequenceLedger ledger;
+    REQUIRE(recordFailure(ledger, event(FailureKind::Cargo, "a:b", "c", 1, 1)) == RecordResult::Ok);
+    REQUIRE(recordFailure(ledger, event(FailureKind::Cargo, "a", "b:c", 1, 1)) == RecordResult::Ok);
+    CHECK(failures(ledger).size() == 2);
+}

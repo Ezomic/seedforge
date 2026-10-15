@@ -1,0 +1,6 @@
+# Known content layout debt (SEED-273). Shrink this file, never grow it.
+art-backup art/blender/ichor_kit.blend1
+art-backup art/blender/ichor_kit_valheim.blend1
+type-folder art/audio
+type-folder art/fonts
+type-folder art/textures
