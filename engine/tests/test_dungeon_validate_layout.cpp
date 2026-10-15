@@ -223,7 +223,34 @@ TEST_CASE("a layout at the size limit validates", "[dungeon_validate]")
     CHECK(validateLayout(l).empty());
 }
 
-TEST_CASE("generated missions pass the gate and reachability checks", "[dungeon_validate]")
+TEST_CASE("a layout with the maximum keys and rooms validates", "[dungeon_validate]")
+{
+    Layout l;
+    l.rooms.push_back({1, m::kEntry});
+    std::uint32_t next = 2;
+    std::uint32_t last = 1;
+    for (std::uint32_t k = 0; k < kMaxKeys; ++k) {
+        const std::uint32_t key = next++;
+        l.rooms.push_back({key, m::kKey});
+        l.links.push_back({last, key, m::kPath});
+        const std::uint32_t gate = next++;
+        l.rooms.push_back({gate, m::kGate});
+        l.links.push_back({last, gate, m::kPath});
+        l.links.push_back({key, gate, m::kUnlocks});
+        last = gate;
+    }
+    while (next < kMaxRooms) {
+        l.rooms.push_back({next, m::kChallenge});
+        l.links.push_back({last, next, m::kPath});
+        last = next++;
+    }
+    l.rooms.push_back({next, m::kClimax});
+    l.links.push_back({last, next, m::kPath});
+    REQUIRE(l.rooms.size() == kMaxRooms);
+    CHECK(validateLayout(l).empty());
+}
+
+TEST_CASE("generated missions validate clean", "[dungeon_validate]")
 {
     const m::Ruleset rules = m::loadRuleset(std::string(ICHOR_REPO_DATA) + "/dungeon_missions/mission_rules.json");
     REQUIRE(rules.error.empty());
@@ -237,10 +264,6 @@ TEST_CASE("generated missions pass the gate and reachability checks", "[dungeon_
         for (const Finding& x : f) {
             INFO(x.message);
         }
-        CHECK(!has(f, Code::GateBeforeKey));
-        CHECK(!has(f, Code::Unreachable));
-        CHECK(!has(f, Code::KeyNotObtainable));
-        CHECK(!has(f, Code::GateWithoutKey));
-        CHECK(!has(f, Code::NoObjective));
+        CHECK(f.empty());
     }
 }

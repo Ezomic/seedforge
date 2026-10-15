@@ -134,6 +134,10 @@ std::vector<Finding> validateLayout(const Layout& layout)
             }
         }
     }
+    for (auto& list : moves) {
+        std::sort(list.begin(), list.end());
+        list.erase(std::unique(list.begin(), list.end()), list.end());
+    }
     for (std::size_t i = 0; i < count; ++i) {
         if (*type[i] == m::kGate && need[i] == 0) {
             add(out, Code::GateWithoutKey, ids[i], "gate " + name(ids[i]) + " has no key");
