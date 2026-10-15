@@ -1,0 +1,23 @@
+[
+  {
+    "id": "archaists",
+    "name": "The Archaists",
+    "diagnosis": "The world before the Silence was real, and losing it is the wound everything else grows from.",
+    "prescription": "Restore it exactly as it was, because they cannot imagine anything that was not already here.",
+    "requires_incumbent": false
+  },
+  {
+    "id": "diadochoi",
+    "name": "The Diadochoi",
+    "diagnosis": "The Incumbent has lost its grip, and the wrong hands hold the reins.",
+    "prescription": "Take the same methods into their own hands, so the suffering only changes who it falls on.",
+    "requires_incumbent": true
+  },
+  {
+    "id": "isonomoi",
+    "name": "The Isonomoi",
+    "diagnosis": "Power held by a few rots whoever holds it, and the rot is real.",
+    "prescription": "Hold power equally or not at all, whatever it costs the order that keeps people alive.",
+    "requires_incumbent": false
+  }
+]
