@@ -17,6 +17,7 @@ public:
     void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f,
         SoundCategory category = SoundCategory::None) override;
     void setAmbience(std::uint32_t sound, float gain) override { mixer_.setLoopGain(sound, gain); }
+    void fadeOutMusic(float seconds) override { mixer_.fadeOutCategory(SoundCategory::Music, seconds); }
     void setListener(glm::dvec3 position, glm::quat rotation) override;
     void setReverb(const ReverbSettings& settings) override { mixer_.setReverb(settings); }
 
