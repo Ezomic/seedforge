@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/save/chronicle.h"
+#include "ichor/save/save_migration.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -31,6 +32,8 @@ struct SavePolicy {
     // One rolling slot, no manual saves.
     bool ironman = false;
     std::uint32_t backups = 3;
+    // Null means the formats this build ships; tests pass their own.
+    const MigrationRegistry* migrations = nullptr;
 };
 
 enum class LoadStatus {
@@ -38,7 +41,8 @@ enum class LoadStatus {
     NoSuchSlot,
     Corrupt,        // the slot and every backup failed their checks
     WrongWorld,     // saved under another world seed or generator version
-    UnsupportedVersion,
+    UnsupportedVersion, // newer than this build reads, or older with no migration path; the file is left alone
+    MigrationFailed,    // a migration step refused the file; it is left as it was
     RestoreFailed,  // the snapshot itself did not restore into the scene
 };
 
@@ -48,6 +52,8 @@ struct LoadResult {
     bool dataChanged = false;    // loaded, but the data layer differs from when it was saved
     SlotInfo info;
     Chronicle chronicle;         // the story up to the moment of the save
+    std::uint32_t migratedFrom = 0; // the format the file was in, when loading carried it up to the current one
+    std::uint32_t savedFormat = 0;  // the format of the file an UnsupportedVersion or MigrationFailed refusal was about
     bool chronicleDamaged = false; // the slot held a chronicle that could not be read, so it came back empty
 };
 
@@ -69,6 +75,7 @@ public:
     const std::string& lastError() const { return error_; }
 
 private:
+    const MigrationRegistry& migrations() const { return policy_.migrations ? *policy_.migrations : MigrationRegistry::standard(); }
     std::filesystem::path pathOf(std::string_view name, std::uint32_t backup) const;
 
     std::filesystem::path directory_;

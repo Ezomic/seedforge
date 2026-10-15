@@ -4,6 +4,7 @@
 #include "ichor/save/chronicle.h"
 #include "ichor/script/script_host.h"
 #include "ichor/sim/scene.h"
+#include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -150,7 +151,7 @@ TEST_CASE("running a chunk again replaces its functions, which is hot reload")
 
 TEST_CASE("a script file loads by path")
 {
-    const auto path = std::filesystem::temp_directory_path() / "ichor_script_test.lua";
+    const auto path = test::tempPath("ichor_script_test.lua");
     {
         std::ofstream file(path, std::ios::binary);
         file << "function answer() return 42 end";

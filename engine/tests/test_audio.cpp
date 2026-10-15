@@ -4,6 +4,7 @@
 #include "ichor/assets/cooker.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/sim/scene.h"
+#include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -52,7 +53,7 @@ TEST_CASE("the three telegraph cues cook and are distinct")
     REQUIRE(bundle.sounds[0].samples.size() != bundle.sounds[1].samples.size());
     REQUIRE(bundle.sounds[1].samples.size() != bundle.sounds[2].samples.size());
 
-    const auto path = std::filesystem::temp_directory_path() / "ichor_cues.iscene";
+    const auto path = test::tempPath("ichor_cues.iscene");
     REQUIRE(writeBundle(path, bundle));
     SceneBundle loaded;
     REQUIRE(readBundle(path, loaded));

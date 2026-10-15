@@ -1,0 +1,13 @@
+{
+  "id": "cataclysm.silence_of_the_oracles",
+  "slot": "cataclysm",
+  "title": "The Silence of the Oracles",
+  "tags": ["SACRED", "RUIN", "ABSENCE"],
+  "conflicts": [],
+
+  "poi": { "weights": { "dead_sanctuary": 3.0, "oracle_ruin": 2.0, "priestly_archive": 1.5 } },
+  "enemies": { "roster_add": ["hollow_priest", "votary_shade"], "roster_remove": ["inspired_seer"] },
+  "economy": { "scarce": ["votive_offerings", "prophecy"], "abundant": ["pharmaka", "archive_scrolls"] },
+  "palette": { "grade": "silence" },
+  "audio": { "bed_overrides": ["empty_colonnade_wind"], "music_palette": "ruined_processional" }
+}

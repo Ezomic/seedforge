@@ -16,7 +16,7 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'A', 'V'};
-constexpr std::uint32_t kVersion = 4; // 2: montage cues; 3: registered game components; 4: combatant status effects
+constexpr std::uint32_t kVersion = 5; // 2: montage cues; 3: registered game components; 4: combatant status effects; 5: combatant guard ticks
 
 enum ComponentBits : std::uint32_t {
     HasMesh = 1u << 0,
