@@ -186,11 +186,12 @@ public:
     bool applyStatus(Scene& scene, entt::entity who, StatusId id, std::int32_t durationTicks = 0);
     void receiveHit(Scene& scene, entt::entity victim, entt::entity attacker, float damage, float poiseDamage, bool attackerOnScreen);
     float allowedTurnRate(const Combatant& c) const;
+    // Public so a test can drive the role without a physics step, which asserts on a non-finite body position.
+    void controllerSystem(Scene& scene);
 
 private:
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
     void skirmisherSystem(Scene& scene, double dt);
-    void controllerSystem(Scene& scene);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
     void parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon);
     void tickStatus(Scene& scene, entt::entity who, Combatant& c);

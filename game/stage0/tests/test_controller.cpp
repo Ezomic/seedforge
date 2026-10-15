@@ -234,7 +234,7 @@ TEST_CASE("a NaN or infinite target position changes nothing and moves nobody")
         Arena a;
         const ControllerBrain before = a.brain();
         a.playerTransform().position.x = bad;
-        a.scene.tick(kDt);
+        a.stage.controllerSystem(a.scene);
         REQUIRE(a.brain().state == before.state);
         REQUIRE(a.brain().casts == before.casts);
         const glm::vec3 intent = a.scene.registry().get<CharacterBody>(a.foeEntity()).intent;

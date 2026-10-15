@@ -69,12 +69,15 @@ void Stage0::controllerSystem(Scene& scene)
         return;
     }
 
-    const glm::vec3 flat(static_cast<float>(target.position.x - self.position.x), 0.0f, static_cast<float>(target.position.z - self.position.z));
-    const float distance = glm::length(flat);
-    if (!std::isfinite(distance)) {
+    const double dx = target.position.x - self.position.x;
+    const double dz = target.position.z - self.position.z;
+    constexpr double kMaxSpan = 1.0e6;
+    if (!(std::abs(dx) <= kMaxSpan && std::abs(dz) <= kMaxSpan)) {
         body.intent = glm::vec3(0.0f);
         return;
     }
+    const glm::vec3 flat(static_cast<float>(dx), 0.0f, static_cast<float>(dz));
+    const float distance = glm::length(flat);
     const glm::vec3 forward = distance > 1e-4f ? flat / distance : glm::vec3(0.0f, 0.0f, -1.0f);
     const glm::vec3 right = glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), forward);
 
