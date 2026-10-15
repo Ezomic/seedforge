@@ -155,6 +155,12 @@ if [ "$use_sccache" -eq 1 ] && grep -q '^CMAKE_GENERATOR:INTERNAL=Visual Studio'
   log "note: the Visual Studio generator ignores compiler launchers, sccache only helps Ninja presets such as windows-ci"
 fi
 
+# Visual Studio only learns about added or removed globbed sources (CONFIGURE_DEPENDS) in ZERO_CHECK, which runs too late for
+# the projects this same build already loaded. Run it first so the build sees the current file lists.
+if grep -q '^CMAKE_GENERATOR:INTERNAL=Visual Studio' "$bdir/CMakeCache.txt" 2>/dev/null; then
+  (cd "$engine" && cmake --build "$bdir" --config "$config" --target ZERO_CHECK >/dev/null)
+fi
+
 start=$(now)
 log "building ${targets[*]} ($preset, $config)"
 (cd "$engine" && cmake --build "$bdir" --config "$config" --parallel "$jobs" --target "${targets[@]}")
