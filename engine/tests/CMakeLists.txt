@@ -55,6 +55,7 @@ add_executable(ichor_tests
     test_forge_goldens.cpp
     test_map_screen.cpp
     test_save.cpp
+    test_save_migration.cpp
     test_settings.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
