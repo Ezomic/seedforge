@@ -46,7 +46,7 @@ constexpr std::array<Entry, 5> kDeclarations = {{
     {"engine/assets/src/skeleton_cook.cpp", "indexOfName", "offline cooker, joint-name lookup; never iterated"},
     {"engine/assets/src/skeleton_cook.cpp", "jointIndex", "offline cooker, joint-name lookup; never iterated"},
     {"engine/sim/include/ichor/sim/scene.h", "index_", "entity id to entt::entity lookup in Scene; only find/emplace/erase/clear"},
-};
+}};
 
 // Loops over an unordered container that were reviewed and cannot reach hashed state.
 constexpr std::array<Entry, 0> kIterations{};
