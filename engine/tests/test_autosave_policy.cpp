@@ -227,3 +227,33 @@ TEST_CASE("the shipped rules file parses and has no rule for the moment before a
         CHECK(rule.event.find("pending") == std::string::npos);
     }
 }
+
+TEST_CASE("a load that rewinds the clock drops old pending entries and restarts the timer", "[autosave_policy]")
+{
+    const AutosavePolicy p = policy();
+    AutosaveState s;
+    s.saved = true;
+    s.lastSaveTick = 5000;
+    s.pending = {{"betrayed", 20}};
+    const AutosaveDecision d = step(p, s, {}, 30);
+    CHECK_FALSE(d.save);
+    CHECK(d.state.pending.empty());
+    CHECK_FALSE(step(p, d.state, {}, 1029).save);
+    CHECK(step(p, d.state, {}, 1030).save);
+}
+
+TEST_CASE("far future entries cannot starve new events", "[autosave_policy]")
+{
+    AutosaveState s;
+    s.pending.assign(AutosaveState::kMaxPending, PendingAutosave{"x", 1ULL << 50});
+    const AutosaveDecision d = step(policy(), s, {{"quest_resolved", 10}}, 10);
+    REQUIRE(d.save);
+    CHECK(d.reason == "quest_resolved");
+}
+
+TEST_CASE("the earliest due event names the save", "[autosave_policy]")
+{
+    const AutosaveDecision d = step(policy(), {}, {{"betrayed", 100}, {"quest_resolved", 100}}, 200);
+    REQUIRE(d.save);
+    CHECK(d.reason == "quest_resolved");
+}

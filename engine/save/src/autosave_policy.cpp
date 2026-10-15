@@ -115,26 +115,42 @@ AutosaveDecision decideAutosave(const AutosavePolicy& policy, const AutosaveStat
         next.pending.resize(AutosaveState::kMaxPending);
     }
 
-    for (const AutosaveEvent& event : events) {
-        const auto rule = std::find_if(policy.rules.begin(), policy.rules.end(), [&](const AutosaveRule& r) { return r.event == event.kind; });
-        if (rule == policy.rules.end() || next.pending.size() >= AutosaveState::kMaxPending) {
-            continue;
-        }
-        next.pending.push_back({event.kind, saturatingAdd(event.tick, rule->delayTicks)});
+    // A tick before the last save means the clock was reset by a load: what was pending belongs to
+    // the old timeline, and the timer starts over from here.
+    const bool rewound = next.saved && now < next.lastSaveTick;
+    if (rewound) {
+        next.pending.clear();
+        next.lastSaveTick = now;
     }
 
-    // A tick before the last save means the clock was reset by a load, so it cannot block.
-    const bool gapOk = !next.saved || now < next.lastSaveTick || now - next.lastSaveTick >= policy.minGapTicks;
+    for (const AutosaveEvent& event : events) {
+        const auto rule = std::find_if(policy.rules.begin(), policy.rules.end(), [&](const AutosaveRule& r) { return r.event == event.kind; });
+        if (rule == policy.rules.end()) {
+            continue;
+        }
+        const PendingAutosave entry{event.kind, saturatingAdd(event.tick, rule->delayTicks)};
+        if (next.pending.size() < AutosaveState::kMaxPending) {
+            next.pending.push_back(entry);
+            continue;
+        }
+        // Full: the entry furthest in the future makes way, so one corrupt tick cannot starve the rest.
+        const auto latest = std::max_element(next.pending.begin(), next.pending.end(), [](const PendingAutosave& a, const PendingAutosave& b) { return a.dueTick < b.dueTick; });
+        if (entry.dueTick < latest->dueTick) {
+            *latest = entry;
+        }
+    }
+
+    const bool gapOk = !next.saved || rewound || now - next.lastSaveTick >= policy.minGapTicks;
     if (!gapOk) {
         return decision;
     }
 
-    const auto due = std::find_if(next.pending.begin(), next.pending.end(), [&](const PendingAutosave& p) { return p.dueTick <= now; });
-    if (due != next.pending.end()) {
+    const auto due = std::min_element(next.pending.begin(), next.pending.end(), [](const PendingAutosave& a, const PendingAutosave& b) { return a.dueTick < b.dueTick; });
+    if (due != next.pending.end() && due->dueTick <= now) {
         decision.reason = due->reason;
         std::erase_if(next.pending, [&](const PendingAutosave& p) { return p.dueTick <= now; });
     } else {
-        const std::uint64_t base = next.saved && now >= next.lastSaveTick ? next.lastSaveTick : 0;
+        const std::uint64_t base = next.saved ? next.lastSaveTick : 0;
         if (policy.timerTicks == 0 || now - base < policy.timerTicks) {
             return decision;
         }
