@@ -29,10 +29,12 @@ add_executable(ichor_tests
     test_terrain.cpp
     test_script.cpp
     test_data.cpp
+    test_dialogue_select.cpp
     test_npc_relationships.cpp
     test_npc_schedule.cpp
     test_npc_traits.cpp
     test_factions.cpp
+    test_wallet.cpp
     test_capabilities.cpp
     test_standing.cpp
     test_npc_tiers.cpp
@@ -41,6 +43,7 @@ add_executable(ichor_tests
     test_traversal_verbs.cpp
     test_roads.cpp
     test_axiom.cpp
+    test_axioms_powers.cpp
     test_axioms_law.cpp
     test_axiom_cataclysm.cpp
     test_synergy.cpp
@@ -78,7 +81,7 @@ add_executable(ichor_tests
     test_journal_screen.cpp
 )
 target_link_libraries(ichor_tests PRIVATE
-    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_graph ichor_progression ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
+    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
 )
 target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
 catch_discover_tests(ichor_tests)
