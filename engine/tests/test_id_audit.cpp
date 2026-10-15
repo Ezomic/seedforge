@@ -142,7 +142,7 @@ TEST_CASE("hostile files are reported, not crashed on", "[id_audit]")
     fx.write("a/broken.json", "{\"id\": ");
     fx.write("a/empty.json", "");
     fx.write("a/null.json", "null");
-    fx.write("a/nul.json", std::string("[{\"id\": \"a\\u0000b\"}]"));
+    fx.write("a/zero_byte.json", std::string("[{\"id\": \"a\\u0000b\"}]"));
     fx.write("a/deep.json", std::string(5000, '[') + std::string(5000, ']'));
     fx.write("a/big.json", "[" + std::string(2 * 1024 * 1024, ' ') + "]");
     fx.write("a/note.txt", "not json {\"id\": 1}");
