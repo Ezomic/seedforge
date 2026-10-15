@@ -6,6 +6,7 @@
 #include "ichor/world/navmesh.h"
 #include "ichor/world/streamer.h"
 #include "ichor/world/world_io.h"
+#include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -113,7 +114,7 @@ TEST_CASE("the world round-trips through its on-disk layout")
     WorldDesc desc = smallWorld(11);
     desc.waterHeight = 7.5f;
     const Heightfield field = forgeHeightfield(desc);
-    const auto dir = std::filesystem::temp_directory_path() / "ichor_world";
+    const auto dir = test::tempPath("ichor_world");
     REQUIRE(writeWorld(dir, field));
     Heightfield loaded;
     REQUIRE(readWorld(dir, loaded));

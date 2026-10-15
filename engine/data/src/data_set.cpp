@@ -95,7 +95,7 @@ bool DataSet::loadDirectory(const std::filesystem::path& root)
         if (json.is_discarded()) {
             return fail("not valid JSON");
         }
-        if ((tableName == "axioms" || tableName == "conflicts" || tableName == "materials") && json.is_object()) {
+        if ((tableName == "axioms" || tableName == "conflicts" || tableName == "ui" || tableName == "materials") && json.is_object()) {
             continue; // nested documents that AxiomSet, ConflictList and parseMaterialLimits validate and load themselves
         }
         if (!json.is_array()) {

@@ -1,0 +1,9 @@
+[
+  {"id": "vista_open", "event": "vista", "duration": 14, "fade_in": 4, "fade_out": 6, "cooldown": 120, "gain": 0.7, "root_hz": 196},
+  {"id": "vista_wide", "event": "vista", "duration": 16, "fade_in": 5, "fade_out": 7, "cooldown": 120, "gain": 0.7, "root_hz": 247},
+  {"id": "discovery_rise", "event": "discovery", "duration": 8, "fade_in": 1, "fade_out": 3, "cooldown": 60, "gain": 0.8, "root_hz": 262},
+  {"id": "discovery_glint", "event": "discovery", "duration": 7, "fade_in": 0.5, "fade_out": 3, "cooldown": 60, "gain": 0.8, "root_hz": 330},
+  {"id": "combat_pulse", "event": "combat", "duration": 18, "fade_in": 0.5, "fade_out": 3, "cooldown": 45, "gain": 1.0, "root_hz": 110},
+  {"id": "combat_drive", "event": "combat", "duration": 16, "fade_in": 0.5, "fade_out": 3, "cooldown": 45, "gain": 1.0, "root_hz": 98},
+  {"id": "death_sink", "event": "death", "duration": 12, "fade_in": 0.5, "fade_out": 5, "cooldown": 0, "gain": 1.0, "root_hz": 130}
+]

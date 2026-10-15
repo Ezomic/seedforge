@@ -3,6 +3,7 @@
 #include "ichor/core/rng.h"
 #include "ichor/sim/scene.h"
 #include "ichor/sim/scene_io.h"
+#include "test_temp.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -178,7 +179,7 @@ TEST_CASE("save and load round-trip")
     runWithInputs(scene, inputs);
     const std::uint64_t before = scene.stateHash();
 
-    const auto path = std::filesystem::temp_directory_path() / "ichor_roundtrip.isav";
+    const auto path = test::tempPath("ichor_roundtrip.isav");
     REQUIRE(saveScene(path, scene));
 
     Scene loaded(21);
@@ -202,7 +203,7 @@ TEST_CASE("a snapshot from another seed or a truncated file is refused")
     Scene scene(1);
     populate(scene);
     scene.tick(kDt);
-    const auto path = std::filesystem::temp_directory_path() / "ichor_refused.isav";
+    const auto path = test::tempPath("ichor_refused.isav");
     REQUIRE(saveScene(path, scene));
 
     Scene wrongSeed(2);
@@ -224,7 +225,7 @@ TEST_CASE("restoring a snapshot drops live generators, pending commands and the 
     Scene scene(8);
     populate(scene);
     scene.tick(kDt);
-    const auto path = std::filesystem::temp_directory_path() / "ichor_reset.isav";
+    const auto path = test::tempPath("ichor_reset.isav");
     REQUIRE(saveScene(path, scene));
     const std::uint64_t saved = scene.stateHash();
 
