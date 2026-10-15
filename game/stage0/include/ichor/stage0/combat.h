@@ -6,6 +6,7 @@
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/recorder.h"
 #include "ichor/stage0/status_effect.h"
+#include "ichor/stage0/swarm.h"
 #include "ichor/stage0/weapon.h"
 
 #include <glm/vec3.hpp>

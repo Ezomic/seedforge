@@ -34,6 +34,9 @@ public:
     void noteWhiff(bool playerSide);
     void noteDodge(bool playerSide);
     void noteStagger(bool playerSide);
+    // A swarm unit's strike is a foe attack; the grant count shows how the tokens were paced.
+    void noteSwarmGrant();
+    void noteSwarmStrike(double now);
     void noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now);
     // A retry press: an unfinished fight is dropped, and the time since the
     // last death becomes the next row's gap_to_retry.
@@ -41,6 +44,8 @@ public:
 
     bool running() const { return running_; }
     int fightsWritten() const { return fights_; }
+    int swarmGrants() const { return swarmGrants_; }
+    int swarmStrikes() const { return swarmStrikes_; }
     const SideRecord& player() const { return player_; }
     const SideRecord& foe() const { return foe_; }
     DeathCause lastCause() const { return lastCause_; }
@@ -55,6 +60,8 @@ private:
     SideRecord foe_;
     bool running_ = false;
     int fights_ = 0;
+    int swarmGrants_ = 0;
+    int swarmStrikes_ = 0;
     double start_ = 0.0;
     double lastEnd_ = -1.0;
     double retryGap_ = 0.0;

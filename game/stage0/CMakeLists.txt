@@ -8,6 +8,7 @@ add_library(ichor_stage0
     src/skirmisher.cpp
     src/controller.cpp
     src/recorder.cpp
+    src/swarm.cpp
 )
 target_include_directories(ichor_stage0 PUBLIC include)
 target_link_libraries(ichor_stage0 PUBLIC ichor_loop ichor_audio ichor_data)
@@ -35,6 +36,7 @@ if(BUILD_TESTING)
     add_executable(stage0_tests
         tests/test_fight.cpp
         tests/test_status_effect.cpp
+        tests/test_swarm.cpp
         tests/test_controller.cpp
         tests/test_parry.cpp
     )
