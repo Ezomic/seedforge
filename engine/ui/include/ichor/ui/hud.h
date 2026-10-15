@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/ui/hud_layout.h"
 #include "ichor/ui/ui_context.h"
 
 #include <string>
@@ -38,12 +39,12 @@ std::string clockLabel(float hour);
 // position that is not finite gives an empty string.
 std::string targetGuide(double playerX, double playerZ, double targetX, double targetZ);
 
-// The always-on screen furniture: the compass, the clock and the health bar, in the game's fonts. The
-// context must have the Cinzel and Alegreya Sans faces loaded. There are no waypoints and no
+// The always-on screen furniture: the compass, the clock, the wading readout and the health bar, in
+// the game's fonts, as many of them and in the order the layout says. The context must have the Cinzel and Alegreya Sans faces loaded. There are no waypoints and no
 // minimap (doc 18), so this is how the player finds their way.
 class Hud {
 public:
-    explicit Hud(UiContext& ui);
+    explicit Hud(UiContext& ui, const HudLayout& layout = HudLayout::defaultLayout());
     ~Hud();
     Hud(const Hud&) = delete;
     Hud& operator=(const Hud&) = delete;

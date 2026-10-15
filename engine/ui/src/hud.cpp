@@ -16,7 +16,7 @@ namespace {
 
 constexpr float kTwoPi = 6.28318530718f;
 
-constexpr const char* kHudDocument = R"(<rml><head><style>
+constexpr const char* kHudHead = R"(<rml><head><style>
     body, div { display: block; }
     body { width: 100%; height: 100%; }
     #plate { position: absolute; top: 14px; left: 50%; margin-left: -90px; width: 180px; padding: 6px 0px 8px 0px; text-align: center; background-color: #10141acc; border: 2px #a08850; }
@@ -27,8 +27,28 @@ constexpr const char* kHudDocument = R"(<rml><head><style>
     #health { width: 150px; height: 10px; margin: 6px 0px 0px 15px; background-color: #1a0d0d; border: 1px #a08850; }
     #healthfill { width: 0%; height: 10px; background-color: #a83232; }
 </style></head><body>
-    <div id="plate"><div id="compass">N</div><div id="guide"></div><div id="clock">09:00</div><div id="water"></div><div id="health"><div id="healthfill"></div></div></div>
+    <div id="plate">)";
+
+constexpr const char* kHudTail = R"(</div>
 </body></rml>)";
+
+std::string hudDocument(const HudLayout& layout)
+{
+    std::string document = kHudHead;
+    for (const HudSlot& slot : layout.slots) {
+        if (!slot.visible) {
+            continue;
+        }
+        switch (slot.element) {
+        case HudElement::Compass: document += R"(<div id="compass">N</div><div id="guide"></div>)"; break;
+        case HudElement::Clock: document += R"(<div id="clock">09:00</div>)"; break;
+        case HudElement::Water: document += R"(<div id="water"></div>)"; break;
+        case HudElement::Health: document += R"(<div id="health"><div id="healthfill"></div></div>)"; break;
+        }
+    }
+    document += kHudTail;
+    return document;
+}
 
 }
 
@@ -137,10 +157,10 @@ std::string clockLabel(float hour)
     return text;
 }
 
-Hud::Hud(UiContext& ui)
+Hud::Hud(UiContext& ui, const HudLayout& layout)
     : ui_(ui)
 {
-    document_ = ui_.loadDocumentFromMemory(kHudDocument, "[hud]");
+    document_ = ui_.loadDocumentFromMemory(hudDocument(layout), "[hud]");
     if (document_ == nullptr) {
         return;
     }
@@ -170,28 +190,33 @@ void Hud::setGuide(const std::string& text)
 
 void Hud::update(float headingRadians, float hour, float wadingDepth, float health, float maxHealth)
 {
-    if (compass_ == nullptr || clock_ == nullptr || water_ == nullptr || healthFill_ == nullptr) {
-        return;
+    if (compass_ != nullptr) {
+        const std::string compass = compassLabel(headingRadians);
+        if (compass != compassText_) {
+            compassText_ = compass;
+            compass_->SetInnerRML(compass);
+        }
     }
-    const std::string compass = compassLabel(headingRadians);
-    if (compass != compassText_) {
-        compassText_ = compass;
-        compass_->SetInnerRML(compass);
+    if (clock_ != nullptr) {
+        const std::string clock = clockLabel(hour);
+        if (clock != clockText_) {
+            clockText_ = clock;
+            clock_->SetInnerRML(clock);
+        }
     }
-    const std::string clock = clockLabel(hour);
-    if (clock != clockText_) {
-        clockText_ = clock;
-        clock_->SetInnerRML(clock);
+    if (water_ != nullptr) {
+        const std::string water = waterLabel(wadingDepth);
+        if (water != waterText_) {
+            waterText_ = water;
+            water_->SetInnerRML(water);
+        }
     }
-    const std::string water = waterLabel(wadingDepth);
-    if (water != waterText_) {
-        waterText_ = water;
-        water_->SetInnerRML(water);
-    }
-    const int percent = healthPercent(health, maxHealth);
-    if (percent != healthPercent_) {
-        healthPercent_ = percent;
-        healthFill_->SetProperty("width", std::to_string(percent) + "%");
+    if (healthFill_ != nullptr) {
+        const int percent = healthPercent(health, maxHealth);
+        if (percent != healthPercent_) {
+            healthPercent_ = percent;
+            healthFill_->SetProperty("width", std::to_string(percent) + "%");
+        }
     }
 }
 

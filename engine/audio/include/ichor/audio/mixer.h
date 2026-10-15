@@ -36,6 +36,8 @@ public:
     // One looping, non-spatial voice per clip, made on first use. The gain eases toward the target
     // (a time constant of about a quarter second) so a changing value never clicks; NaN counts as silence and the rest is clamped to 0..1.
     void setLoopGain(std::uint32_t clip, float gain);
+    // Fades every playing voice of the category to silence over `seconds` and ends it; a new voice of the category is not affected.
+    void fadeOutCategory(SoundCategory category, float seconds);
     void setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right);
     void setReverb(const ReverbSettings& settings);
 
@@ -59,6 +61,8 @@ private:
         float gain = 1.0f;
         bool spatial = false;
         SoundCategory category = SoundCategory::None;
+        float fade = 1.0f;     // multiplies the voice; only falls, and only after fadeOutCategory
+        float fadeStep = 0.0f; // taken off fade each frame
     };
 
     struct Loop {

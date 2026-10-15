@@ -24,6 +24,7 @@ struct InputFrame {
         Journal = 1u << 9,
         Menu = 1u << 10,
         Map = 1u << 11,
+        Notes = 1u << 12,
     };
     std::uint32_t buttons = 0;
     float moveX = 0.0f; // right positive

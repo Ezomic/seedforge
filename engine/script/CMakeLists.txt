@@ -3,6 +3,7 @@ add_library(ichor_script
     src/scene_bindings.cpp
     src/data_bindings.cpp
     src/chronicle_bindings.cpp
+    src/journal_bindings.cpp
     src/world_bindings.cpp
 )
 target_include_directories(ichor_script PUBLIC include)
