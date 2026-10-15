@@ -185,6 +185,30 @@ TEST_CASE("small groups have no isolated NPC", "[npc][relationships]")
     }
 }
 
+TEST_CASE("the minimum holds across many seeds and sizes", "[npc][relationships]")
+{
+    for (int n = 4; n <= 30; ++n) {
+        for (std::uint64_t seed = 0; seed < 60; ++seed) {
+            const auto npcs = town(n, 2);
+            const auto deg = degrees(generateRelationships(seed, npcs));
+            for (const RelationshipNpc& p : npcs) {
+                REQUIRE(deg.count(p.id) == 1);
+                REQUIRE(deg.at(p.id) >= static_cast<int>(kMinRelationships));
+                REQUIRE(deg.at(p.id) <= static_cast<int>(kMaxRelationships));
+            }
+        }
+    }
+}
+
+TEST_CASE("different seeds give different webs", "[npc][relationships]")
+{
+    std::set<std::uint64_t> digests;
+    for (std::uint64_t seed = 0; seed < 8; ++seed) {
+        digests.insert(relationshipsDigest(generateRelationships(seed, town(40))));
+    }
+    REQUIRE(digests.size() == 8);
+}
+
 TEST_CASE("a thousand NPCs stay bounded and fast", "[npc][relationships]")
 {
     const auto npcs = town(1000, 10);

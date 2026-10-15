@@ -96,6 +96,55 @@ std::vector<RelationshipEdge> generateRelationships(std::uint64_t worldSeed, con
         }
     }
 
+    // The greedy pass can leave a late NPC with no free partner; top those up from whoever still has room.
+    for (std::size_t i = 0; i < count; ++i) {
+        for (std::size_t j = 0; j < count && degree[i] < kMinRelationships; ++j) {
+            if (j == i || degree[j] >= kMaxRelationships || linked.count({std::min(i, j), std::max(i, j)}) != 0) {
+                continue;
+            }
+            RelationshipEdge edge;
+            edge.a = std::min(people[i].id, people[j].id);
+            edge.b = std::max(people[i].id, people[j].id);
+            edge.kind = RelationKind::Rival;
+            edge.strength = kMinStrength;
+            edges.push_back(std::move(edge));
+            linked.insert({std::min(i, j), std::max(i, j)});
+            ++degree[i];
+            ++degree[j];
+        }
+    }
+
+    // Everyone else is full: splice the stuck NPC into an edge between two others, which costs them nothing.
+    auto indexOf = [&](const std::string& id) {
+        return static_cast<std::size_t>(std::lower_bound(people.begin(), people.end(), id, [](const RelationshipNpc& p, const std::string& v) { return p.id < v; }) - people.begin());
+    };
+    for (std::size_t i = 0; i < count; ++i) {
+        while (degree[i] < kMinRelationships) {
+            auto splice = std::find_if(edges.begin(), edges.end(), [&](const RelationshipEdge& e) {
+                const std::size_t k = indexOf(e.a);
+                const std::size_t m = indexOf(e.b);
+                return k != i && m != i && linked.count({std::min(i, k), std::max(i, k)}) == 0 && linked.count({std::min(i, m), std::max(i, m)}) == 0;
+            });
+            if (splice == edges.end()) {
+                break;
+            }
+            const std::size_t k = indexOf(splice->a);
+            const std::size_t m = indexOf(splice->b);
+            edges.erase(splice);
+            linked.erase({std::min(k, m), std::max(k, m)});
+            for (std::size_t other : {k, m}) {
+                RelationshipEdge edge;
+                edge.a = std::min(people[i].id, people[other].id);
+                edge.b = std::max(people[i].id, people[other].id);
+                edge.kind = RelationKind::Rival;
+                edge.strength = kMinStrength;
+                edges.push_back(std::move(edge));
+                linked.insert({std::min(i, other), std::max(i, other)});
+            }
+            degree[i] += 2;
+        }
+    }
+
     std::sort(edges.begin(), edges.end(), [](const RelationshipEdge& l, const RelationshipEdge& r) {
         return l.a != r.a ? l.a < r.a : l.b < r.b;
     });

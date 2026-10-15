@@ -29,7 +29,8 @@ constexpr int kMaxStrength = 5;
 bool isMutual(RelationKind kind);
 
 // Only Regulars take part (doc 10: three to five relationships each). Input
-// order does not matter and duplicate ids collapse to one NPC. At most one
+// order does not matter and duplicate ids collapse to one NPC (the one with
+// the smallest settlement name). At most one
 // edge per pair, no self edges, family edges form a forest, every Regular has
 // kMinRelationships to kMaxRelationships edges (fewer only when there are too
 // few other Regulars to reach that). Sorted by (a, b).
