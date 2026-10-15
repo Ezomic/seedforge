@@ -5,6 +5,7 @@ add_library(ichor_data
     src/npc_traits.cpp
     src/npc_tiers.cpp
     src/axiom.cpp
+    src/journal.cpp
     src/synergy.cpp
     src/slot_roll.cpp
     src/conflicts.cpp

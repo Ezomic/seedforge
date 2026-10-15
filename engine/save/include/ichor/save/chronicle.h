@@ -43,6 +43,9 @@ public:
     // The newest `count` entries, newest first, for the journal screen.
     std::vector<ChronicleLine> recent(double secondsPerTick, std::size_t count) const;
 
+    // The same, for the entries of one category only.
+    std::vector<ChronicleLine> recentIn(std::string_view category, double secondsPerTick, std::size_t count) const;
+
     // Readable text for the journal and for sharing, with the time of each
     // entry as hours:minutes:seconds of simulated play.
     std::string exportText(double secondsPerTick) const;
