@@ -22,6 +22,7 @@ using AxiomBlock = std::map<std::string, AxiomValue, std::less<>>;
 
 struct Axiom {
     std::string id;
+    std::string file; // data-root-relative path it was loaded from; empty for a parsed string
     AxiomSlot slot = AxiomSlot::Cataclysm;
     std::string title;
     std::vector<std::string> tags;
