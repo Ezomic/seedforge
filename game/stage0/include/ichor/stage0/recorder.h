@@ -1,14 +1,12 @@
 #pragma once
 
+#include "ichor/stage0/death_cause.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <string>
 
 namespace ichor::stage0 {
-
-// Stamped by the state machine at the killing blow, never reconstructed later.
-// The distribution is the diagnosis (doc 18, stage0-log.md section 4).
-enum class DeathCause : std::uint8_t { Unknown, OutOfStamina, WhiffPunished, Cornered, MistimedBlock, OffScreen, Unreadable, Bleed };
 
 struct SideRecord {
     float healthLeft = 0.0f;
@@ -49,6 +47,8 @@ public:
     const SideRecord& player() const { return player_; }
     const SideRecord& foe() const { return foe_; }
     DeathCause lastCause() const { return lastCause_; }
+    // Player deaths only, this session; the live read of the distribution.
+    const DeathTally& playerDeaths() const { return playerDeaths_; }
     const std::string& lastRow() const { return lastRow_; }
 
 private:
@@ -66,6 +66,7 @@ private:
     double lastEnd_ = -1.0;
     double retryGap_ = 0.0;
     DeathCause lastCause_ = DeathCause::Unknown;
+    DeathTally playerDeaths_;
     std::string lastRow_;
 };
 
