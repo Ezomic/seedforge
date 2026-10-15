@@ -1,0 +1,15 @@
+{
+  "id": "anomaly.underworld",
+  "slot": "anomaly",
+  "title": "The Underworld Is Reachable",
+  "tags": ["UNDERWORLD", "DEAD", "THRESHOLD", "MYTH"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["asphodel_fields", "styx_bank"] },
+  "poi": { "weights": { "underworld_gate": 3.0, "nekyomanteion": 2.0, "charon_ferry": 1.5 } },
+  "enemies": { "roster_add": ["shade", "keres"] },
+  "traversal": { "unlock": ["descend_underworld", "charon_ferry"] },
+  "economy": { "scarce": ["lamp_oil"], "abundant": ["obol"] },
+  "palette": { "grade": "hades", "fog_density": 1.6 },
+  "audio": { "bed_overrides": ["dead_whisper"], "music_palette": "hades" }
+}
