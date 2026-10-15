@@ -1,5 +1,6 @@
 add_library(ichor_save
     src/save_slots.cpp
+    src/save_migration.cpp
     src/chronicle.cpp
     src/settings.cpp
 )
