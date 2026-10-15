@@ -4,7 +4,7 @@
 #   bin/build [-p preset] [-c config] [-t ctest-regex] [target ...]
 #
 # Defaults: preset "windows", config Debug, target ichor_tests. With -t, ctest -R <regex> runs after the build.
-# Env: ICHOR_BUILD_SLOTS (concurrent builds, default 2), ICHOR_BUILD_JOBS (compile jobs per build, default cores/slots),
+# Env: ICHOR_BUILD_SLOTS (concurrent builds; else the number in $ICHOR_BUILD_QUEUE/slots.conf; else 2), ICHOR_BUILD_JOBS (compile jobs per build, default cores/slots),
 #      ICHOR_BUILD_QUEUE (shared state dir), ICHOR_BUILD_CACHE (shared cache dir for sccache).
 set -u
 
@@ -32,7 +32,8 @@ bdir=$engine/build/$preset
 
 if [ -d /e ]; then default_root=/e/build-queue; else default_root=${TEMP:-/tmp}/ichor-build-queue; fi
 root=${ICHOR_BUILD_QUEUE:-$default_root}
-slots=${ICHOR_BUILD_SLOTS:-2}
+slots=${ICHOR_BUILD_SLOTS:-$(tr -d '[:space:]' < "$root/slots.conf" 2>/dev/null || true)}
+slots=${slots:-2}
 case "$slots" in ''|*[!0-9]*|0) echo "build: ICHOR_BUILD_SLOTS must be an integer >= 1" >&2; exit 2 ;; esac
 cores=$(nproc 2>/dev/null || echo 4)
 jobs=${ICHOR_BUILD_JOBS:-$(( cores / slots > 0 ? cores / slots : 1 ))}
