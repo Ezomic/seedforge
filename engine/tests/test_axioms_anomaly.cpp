@@ -6,7 +6,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <string>
+#include <variant>
 #include <vector>
 
 using namespace ichor;
@@ -67,13 +69,10 @@ TEST_CASE("three anomaly axioms ship in slot E and validate through the real loa
     REQUIRE(anomalies >= 3);
 }
 
-TEST_CASE("anomaly conflicts name only well-formed other-slot ids")
+TEST_CASE("anomalies declare no conflicts, since slot E is rolled alone and the validator cannot check ids from other slots")
 {
     for (const std::string& id : kAnomalyIds) {
-        for (const std::string& other : anomaly(id).conflicts) {
-            REQUIRE(other != id);
-            REQUIRE(other.rfind("anomaly.", 0) != 0);
-        }
+        REQUIRE(anomaly(id).conflicts.empty());
     }
 }
 
@@ -94,7 +93,7 @@ TEST_CASE("tiresias lives: a findable seer, not a fighting force")
     const Axiom& axiom = anomaly("anomaly.tiresias");
     REQUIRE(axiom.title == "Tiresias Lives");
     REQUIRE(hasTag(axiom, "PROPHECY"));
-    REQUIRE(weight(axiom, "tiresias_hut") > 0.0);
+    REQUIRE(weight(axiom, "tiresias_hut") > 1.0);
     REQUIRE(axiom.blocks.count("enemies") == 0);
     REQUIRE(axiom.blocks.count("traversal") == 0);
 }
