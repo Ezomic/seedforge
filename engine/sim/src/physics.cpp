@@ -26,6 +26,12 @@ namespace ichor {
 
 namespace {
 
+// Jolt asserts, or the float cast overflows, on a NaN or infinite coordinate; none may get past this file.
+bool finite(glm::dvec3 v)
+{
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+}
+
 namespace Layers {
 constexpr JPH::ObjectLayer NonMoving = 0;
 constexpr JPH::ObjectLayer Moving = 1;
@@ -174,6 +180,10 @@ PhysicsWorld::~PhysicsWorld()
 
 void PhysicsWorld::addStaticBox(StableId id, const StaticBox& box, const Transform& transform)
 {
+    if (!finite(transform.position)) {
+        log(LogLevel::Error, "physics: non-finite position, static box dropped");
+        return;
+    }
     remove(id);
     Impl::StaticEntry entry;
     entry.shape = new JPH::BoxShape(toJolt(box.halfExtents));
@@ -190,6 +200,10 @@ void PhysicsWorld::addStaticBox(StableId id, const StaticBox& box, const Transfo
 
 void PhysicsWorld::addHeightField(StableId id, const float* heights, std::uint32_t sampleCount, glm::dvec3 origin, float spacing)
 {
+    if (!finite(origin)) {
+        log(LogLevel::Error, "physics: non-finite origin, height field dropped");
+        return;
+    }
     remove(id);
     JPH::HeightFieldShapeSettings settings(heights, JPH::Vec3::sZero(), JPH::Vec3(spacing, 1.0f, spacing), sampleCount);
     settings.mBlockSize = 4;
@@ -215,6 +229,10 @@ void PhysicsWorld::addHeightField(StableId id, const float* heights, std::uint32
 
 void PhysicsWorld::addCharacter(StableId id, const CharacterBody& body, const Transform& transform)
 {
+    if (!finite(transform.position)) {
+        log(LogLevel::Error, "physics: non-finite position, character dropped");
+        return;
+    }
     remove(id);
     JPH::Ref<JPH::CharacterVirtualSettings> settings = new JPH::CharacterVirtualSettings();
     settings->mMaxSlopeAngle = JPH::DegreesToRadians(45.0f);
@@ -236,6 +254,9 @@ void PhysicsWorld::addCharacter(StableId id, const CharacterBody& body, const Tr
 
 void PhysicsWorld::setOrigin(glm::dvec3 origin)
 {
+    if (!finite(origin)) {
+        return;
+    }
     if (origin == impl_->origin) {
         return;
     }
@@ -303,6 +324,9 @@ void PhysicsWorld::setCharacterIntent(StableId id, glm::vec3 horizontalVelocity)
 
 void PhysicsWorld::setCharacterPosition(StableId id, glm::dvec3 position)
 {
+    if (!finite(position)) {
+        return;
+    }
     if (auto found = impl_->characters.find(id.value); found != impl_->characters.end()) {
         found->second.character->SetPosition(impl_->toLocal(position));
         found->second.verticalVelocity = 0.0f;
