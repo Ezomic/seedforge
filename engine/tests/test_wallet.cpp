@@ -3,10 +3,12 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -138,7 +140,7 @@ TEST_CASE("adversarial amounts never produce a negative or wrapped balance")
     }
     SECTION("spending more than owned is refused and changes nothing")
     {
-        wallet.earn(table, CurrencySlot::Coin, 5, "loot");
+        (void)wallet.earn(table, CurrencySlot::Coin, 5, "loot");
         const Wallet before = wallet;
         CHECK(wallet.spend(table, CurrencySlot::Coin, 6, "trade") == TxStatus::Insufficient);
         CHECK(wallet.spend(table, CurrencySlot::Coin, kMax, "trade") == TxStatus::Insufficient);
@@ -164,9 +166,12 @@ TEST_CASE("adversarial amounts never produce a negative or wrapped balance")
     }
     SECTION("the two balances are independent")
     {
-        wallet.earn(table, CurrencySlot::Hard, kMax, "loot");
+        (void)wallet.earn(table, CurrencySlot::Hard, kMax, "loot");
         CHECK(wallet.balance(CurrencySlot::Hard) == table.def(CurrencySlot::Hard).cap);
         CHECK(wallet.balance(CurrencySlot::Coin) == 0);
+        (void)wallet.earn(table, CurrencySlot::Coin, 4, "loot");
+        CHECK(wallet.spend(table, CurrencySlot::Coin, 4, "trade") == TxStatus::Ok);
+        CHECK(wallet.balance(CurrencySlot::Hard) == table.def(CurrencySlot::Hard).cap);
     }
 }
 
@@ -189,15 +194,15 @@ TEST_CASE("the digest is deterministic, sensitive to every balance and pinned")
     Wallet b;
     CHECK(a.digest() == b.digest());
 
-    a.earn(table, CurrencySlot::Coin, 7, "loot");
+    (void)a.earn(table, CurrencySlot::Coin, 7, "loot");
     CHECK(a.digest() != b.digest());
-    b.earn(table, CurrencySlot::Coin, 7, "quest");
+    (void)b.earn(table, CurrencySlot::Coin, 7, "quest");
     CHECK(a.digest() == b.digest());
 
     Wallet coinOnly;
     Wallet hardOnly;
-    coinOnly.earn(table, CurrencySlot::Coin, 7, "loot");
-    hardOnly.earn(table, CurrencySlot::Hard, 7, "loot");
+    (void)coinOnly.earn(table, CurrencySlot::Coin, 7, "loot");
+    (void)hardOnly.earn(table, CurrencySlot::Hard, 7, "loot");
     CHECK(coinOnly.digest() != hardOnly.digest());
 
     CHECK(Wallet{}.digest() == 0x0C593F1B0D139064ull);
@@ -207,8 +212,8 @@ TEST_CASE("serialisation is little-endian and round-trips")
 {
     const CurrencyTable table = shipped();
     Wallet wallet;
-    wallet.earn(table, CurrencySlot::Coin, 0x0102, "loot");
-    wallet.earn(table, CurrencySlot::Hard, 3, "loot");
+    (void)wallet.earn(table, CurrencySlot::Coin, 0x0102, "loot");
+    (void)wallet.earn(table, CurrencySlot::Hard, 3, "loot");
 
     const std::vector<std::uint8_t> bytes = wallet.serialise();
     REQUIRE(bytes.size() == 4 + 8 + 8);
@@ -227,7 +232,7 @@ TEST_CASE("corrupt wallet bytes are rejected")
 {
     const CurrencyTable table = shipped();
     Wallet wallet;
-    wallet.earn(table, CurrencySlot::Coin, 5, "loot");
+    (void)wallet.earn(table, CurrencySlot::Coin, 5, "loot");
     const std::vector<std::uint8_t> good = wallet.serialise();
 
     SECTION("empty and every truncation")
@@ -248,12 +253,27 @@ TEST_CASE("corrupt wallet bytes are rejected")
         bytes[0] = 2;
         CHECK_FALSE(Wallet::deserialise(bytes, table).has_value());
     }
-    SECTION("a balance above the cap")
+    SECTION("a balance above the cap, in either slot")
     {
-        std::vector<std::uint8_t> bytes = good;
-        for (std::size_t i = 4; i < 12; ++i) {
-            bytes[i] = 0xFF;
+        for (const std::size_t first : {std::size_t{4}, std::size_t{12}}) {
+            std::vector<std::uint8_t> bytes = good;
+            for (std::size_t i = first; i < first + 8; ++i) {
+                bytes[i] = 0xFF;
+            }
+            CHECK_FALSE(Wallet::deserialise(bytes, table).has_value());
         }
+    }
+    SECTION("a balance of exactly the cap is accepted and one more is not")
+    {
+        Wallet full;
+        (void)full.earn(table, CurrencySlot::Coin, kMax, "loot");
+        (void)full.earn(table, CurrencySlot::Hard, kMax, "loot");
+        const auto restored = Wallet::deserialise(full.serialise(), table);
+        REQUIRE(restored.has_value());
+        CHECK(*restored == full);
+
+        std::vector<std::uint8_t> bytes = full.serialise();
+        ++bytes[12];
         CHECK_FALSE(Wallet::deserialise(bytes, table).has_value());
     }
 }
@@ -267,6 +287,8 @@ TEST_CASE("bad currency tables are rejected with a message naming the currency")
     };
     const std::vector<Case> cases = {
         {"missing", "[" + kCoin + "]", "needs both"},
+        {"nocoin", "[{\"id\": \"hard\", " + kGoodHard + "}]", "needs both"},
+        {"notlist", hardJson(R"("name": "C", "symbol": "c", "earn": "loot", "spend": [], "cap": 5)"), "'hard': \"earn\""},
         {"third", "[" + kCoin + ", {\"id\": \"gem\", " + kGoodHard + "}]", "only currencies"},
         {"noname", hardJson(R"("name": "", "symbol": "ch", "earn": [], "spend": [], "cap": 5)"), "'hard': \"name\""},
         {"nosymbol", hardJson(R"("name": "C", "earn": [], "spend": [], "cap": 5)"), "'hard': \"symbol\""},

@@ -3,6 +3,7 @@
 #include "ichor/data/data_set.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -65,14 +66,14 @@ public:
     bool canAfford(CurrencySlot slot, std::uint64_t amount) const { return balance(slot) >= amount; }
 
     // Credits up to the cap; the surplus is lost and `credited` says how much landed.
-    EarnResult earn(const CurrencyTable& table, CurrencySlot slot, std::uint64_t amount, std::string_view source);
+    [[nodiscard]] EarnResult earn(const CurrencyTable& table, CurrencySlot slot, std::uint64_t amount, std::string_view source);
     // All or nothing: a refused spend changes no balance.
-    TxStatus spend(const CurrencyTable& table, CurrencySlot slot, std::uint64_t amount, std::string_view sink);
+    [[nodiscard]] TxStatus spend(const CurrencyTable& table, CurrencySlot slot, std::uint64_t amount, std::string_view sink);
 
     // Little-endian bytes: a format version, then the balances in slot order.
     std::vector<std::uint8_t> serialise() const;
     // Nothing for truncated, trailing, wrong-version or over-cap bytes.
-    static std::optional<Wallet> deserialise(std::span<const std::uint8_t> bytes, const CurrencyTable& table);
+    [[nodiscard]] static std::optional<Wallet> deserialise(std::span<const std::uint8_t> bytes, const CurrencyTable& table);
 
     // FNV-1a of serialise(): identical on every platform.
     std::uint64_t digest() const;
