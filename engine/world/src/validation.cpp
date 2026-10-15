@@ -1,11 +1,13 @@
 #include "ichor/world/validation.h"
 
+#include "ichor/core/binary.h"
 #include "ichor/core/hash.h"
 #include "ichor/world/forge.h"
 
 #include <algorithm>
 #include <exception>
 #include <format>
+#include <string_view>
 #include <utility>
 
 namespace ichor {
@@ -15,6 +17,27 @@ namespace {
 constexpr std::uint64_t kMinLandPerMille = 20;
 constexpr std::uint16_t kMinSampleRange = 256;
 constexpr std::uint32_t kRerollCeiling = 64;
+
+std::uint64_t hydrologyDigest(const Hydrology& h)
+{
+    BinaryWriter w;
+    w.write(h.side);
+    w.write(h.filled);
+    w.write(h.direction);
+    w.write(h.accumulation);
+    w.write(h.lake);
+    w.write(h.lakeDeepest);
+    const std::vector<std::uint8_t> bytes = w.take();
+    return hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+}
+
+std::uint64_t heightfieldDigest(const Heightfield& h)
+{
+    BinaryWriter w;
+    w.write(h.desc());
+    const std::vector<std::uint8_t> bytes = w.take();
+    return hashCombine(h.digest(), hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size())));
+}
 
 std::optional<std::string> landAboveWater(const ForgedWorld& world, const ForgeRequest& request)
 {
@@ -86,15 +109,34 @@ std::uint64_t attemptSeed(std::uint64_t worldSeed, std::uint32_t attempt)
     return attempt == 0 ? worldSeed : hashCombine(worldSeed, attempt);
 }
 
+PhasePipeline forgePipeline(const ForgeRequest& request)
+{
+    return PhasePipeline({
+        makePhase<Heightfield>(
+            kPhaseTerrain, [request](const PhaseView&) { return forgeHeightfield(request.desc); }, heightfieldDigest),
+        makePhase<Heightfield>(
+            kPhaseRivers,
+            [request](const PhaseView& earlier) {
+                const Heightfield& terrain = earlier.get<Heightfield>(kPhaseTerrain);
+                if (!request.carveRivers) {
+                    return terrain;
+                }
+                return carveRivers(terrain, computeHydrology(terrain), request.rivers, CarveParams{});
+            },
+            heightfieldDigest),
+        makePhase<Hydrology>(
+            kPhaseHydrology, [](const PhaseView& earlier) { return computeHydrology(earlier.get<Heightfield>(kPhaseRivers)); }, hydrologyDigest),
+    });
+}
+
+ForgedWorld forgedWorld(const PhaseRun& run)
+{
+    return {run.get<Heightfield>(kPhaseRivers), run.get<Hydrology>(kPhaseHydrology)};
+}
+
 ForgedWorld forgeWorld(const ForgeRequest& request)
 {
-    ForgedWorld world;
-    world.heightfield = forgeHeightfield(request.desc);
-    if (request.carveRivers) {
-        world.heightfield = carveRivers(world.heightfield, computeHydrology(world.heightfield), request.rivers, CarveParams{});
-    }
-    world.hydrology = computeHydrology(world.heightfield);
-    return world;
+    return forgedWorld(forgePipeline(request).run());
 }
 
 std::vector<GateFailure> runGates(const std::vector<Gate>& gates, const ForgedWorld& world, const ForgeRequest& request)

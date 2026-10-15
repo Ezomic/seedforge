@@ -30,6 +30,8 @@ public:
     // A looping, non-spatial bed under everything else. Calling it again only retargets the gain,
     // which eases in, so it can be called every frame.
     virtual void setAmbience(std::uint32_t sound, float gain) = 0;
+    // Fades the music voices that are playing to silence over `seconds`. Hosts without a mixer ignore it.
+    virtual void fadeOutMusic(float seconds) { (void)seconds; }
     virtual void setListener(glm::dvec3 position, glm::quat rotation) = 0;
     virtual void setReverb(const ReverbSettings& settings) = 0;
 };

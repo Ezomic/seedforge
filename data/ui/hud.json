@@ -1,0 +1,8 @@
+{
+  "elements": [
+    {"id": "compass"},
+    {"id": "clock"},
+    {"id": "water"},
+    {"id": "health"}
+  ]
+}
