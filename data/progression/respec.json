@@ -1,0 +1,4 @@
+[
+  {"id": "trainer", "name": "Hired trainer", "currency": "coin", "sink": "trade", "base_cost": 500, "per_capability_cost": 250, "refund_per_capability": 0, "min_travel": 3},
+  {"id": "ritual", "name": "Unbinding ritual", "currency": "hard", "sink": "power", "base_cost": 40, "per_capability_cost": 10, "refund_per_capability": 5, "min_travel": 8}
+]
