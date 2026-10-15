@@ -120,6 +120,9 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
     player_.healthLeft = playerHealth;
     foe_.healthLeft = foeHealth;
     lastCause_ = cause;
+    if (playerDied) {
+        playerDeaths_.add(cause);
+    }
     const double gap = retryGap_;
     lastRow_ = std::format("{},{:.2f},{:.2f},{},{},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f}\n",
         fights_ + 1, now - start_, gap, playerDied ? "player" : "foe", causeName(cause),

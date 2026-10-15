@@ -296,12 +296,7 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     if (c.health <= 0.0f) {
         const glm::dvec3 at = scene.registry().get<Transform>(victim).position;
         const bool againstWall = std::max(std::abs(at.x), std::abs(at.z)) > kArenaHalf - tuning_.bodyRadius - 0.6;
-        DeathCause cause = DeathCause::Unreadable;
-        if (!attackerOnScreen) cause = DeathCause::OffScreen;
-        else if (c.combatState() == CombatState::Recovery) cause = DeathCause::WhiffPunished;
-        else if (blocked) cause = DeathCause::MistimedBlock;
-        else if (c.stamina <= 1.0f) cause = DeathCause::OutOfStamina;
-        else if (againstWall) cause = DeathCause::Cornered;
+        const DeathCause cause = classifyDeath({attackerOnScreen, c.combatState() == CombatState::Recovery, blocked, c.stamina <= 1.0f, againstWall});
         c.deathCause = static_cast<std::uint8_t>(cause);
         enterState(scene, victim, c, CombatState::Dead);
         const Combatant& playerC = scene.registry().get<Combatant>(scene.find(player_));
