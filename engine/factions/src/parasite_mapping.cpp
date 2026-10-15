@@ -206,6 +206,8 @@ bool parseParasiteMapping(std::string_view label, std::string_view text, std::ve
                 add(at + ".name", "must not be empty");
             } else if (name->size() > kMaxName) {
                 add(at + ".name", "longer than " + std::to_string(kMaxName) + " bytes");
+            } else if (std::any_of(name->begin(), name->end(), [](unsigned char c) { return c < 0x20 || c == 0x7F; })) {
+                add(at + ".name", "must not contain control characters");
             } else if (name->find(kEmDash) != std::string::npos) {
                 add(at + ".name", "must not contain an em-dash");
             } else {
