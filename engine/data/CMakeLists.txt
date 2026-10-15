@@ -9,6 +9,7 @@ add_library(ichor_data
     src/synergy.cpp
     src/slot_roll.cpp
     src/conflicts.cpp
+    src/directive_merge.cpp
 )
 target_include_directories(ichor_data PUBLIC include)
 target_link_libraries(ichor_data PUBLIC ichor_core PRIVATE nlohmann_json::nlohmann_json)
