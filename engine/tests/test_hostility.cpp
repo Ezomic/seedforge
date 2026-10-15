@@ -148,23 +148,41 @@ TEST_CASE("bad input is reported, never crashes", "[hostility]")
     CHECK(m.empty());
     CHECK(p.empty());
 
+    const auto seed = [&] {
+        p.clear();
+        REQUIRE(computeHostilityMatrix({st("x", OrderStance::Restore, LawStance::Free), st("y", OrderStance::Restore, LawStance::Free)}, {}, m, p));
+        REQUIRE(m.size() == 1);
+    };
+    const auto mentions = [&](const char* word) {
+        return std::any_of(p.begin(), p.end(), [&](const std::string& line) { return line.find(word) != std::string::npos; });
+    };
+
+    seed();
     CHECK_FALSE(computeHostilityMatrix({st("a", OrderStance::Restore, LawStance::Free), st("a", OrderStance::Replace, LawStance::Free)}, {}, m, p));
     CHECK(m.empty());
-    CHECK_FALSE(p.empty());
+    CHECK(mentions("duplicate"));
 
-    p.clear();
+    seed();
     CHECK_FALSE(computeHostilityMatrix({st("a", OrderStance::Restore, LawStance::Free)}, {cl("ghost", {1})}, m, p));
-    CHECK_FALSE(p.empty());
-
-    p.clear();
-    CHECK_FALSE(computeHostilityMatrix({st("a", OrderStance::Restore, LawStance::Free)}, {cl("a", {1}), cl("a", {2})}, m, p));
-    CHECK_FALSE(p.empty());
-
-    p.clear();
-    FactionStance bad{"a", static_cast<OrderStance>(9), LawStance::Free};
-    CHECK_FALSE(computeHostilityMatrix({bad}, {}, m, p));
-    CHECK_FALSE(p.empty());
     CHECK(m.empty());
+    CHECK(mentions("unknown"));
+
+    seed();
+    CHECK_FALSE(computeHostilityMatrix({st("a", OrderStance::Restore, LawStance::Free)}, {cl("a", {1}), cl("a", {2})}, m, p));
+    CHECK(m.empty());
+    CHECK(mentions("duplicate"));
+
+    seed();
+    FactionStance badOrder{"a", static_cast<OrderStance>(9), LawStance::Free};
+    CHECK_FALSE(computeHostilityMatrix({badOrder}, {}, m, p));
+    CHECK(m.empty());
+    CHECK(mentions("out of range"));
+
+    seed();
+    FactionStance badLaw{"a", OrderStance::Restore, static_cast<LawStance>(9)};
+    CHECK_FALSE(computeHostilityMatrix({badLaw}, {}, m, p));
+    CHECK(m.empty());
+    CHECK(mentions("out of range"));
 }
 
 TEST_CASE("many factions stay bounded and consistent", "[hostility]")
