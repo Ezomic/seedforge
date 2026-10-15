@@ -84,8 +84,8 @@ RecordResult recordFailure(ConsequenceLedger& ledger, const FailureEvent& event)
     const auto name = kindName(event.kind);
     if (!name || !validKey(event.subject) || !validKey(event.cause)) return RecordResult::InvalidKey;
     if (!validAmount(event.kind, event.amount)) return RecordResult::InvalidAmount;
-    const std::string id = std::string(*name) + ":" + std::to_string(event.tick) + ":" + event.subject + ":" + event.cause + ":"
-        + std::to_string(event.amount);
+    const std::string id = std::string(*name) + ":" + std::to_string(event.tick) + ":" + std::to_string(event.amount) + ":"
+        + std::to_string(event.subject.size()) + ":" + event.subject + ":" + event.cause;
     if (ledger.find(id) != nullptr) return RecordResult::DuplicateId;
     if (ledger.size() >= ConsequenceLedger::kMaxFacts) return RecordResult::LedgerFull;
     const AppendResult result
