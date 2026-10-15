@@ -79,6 +79,7 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
     scene.registerComponent<Combatant>("stage0.combatant");
     scene.registerComponent<SkirmisherBrain>("stage0.skirmisher");
     scene.registerComponent<SwarmBrain>("stage0.swarm");
+    scene.registerComponent<AnchorBrain>("stage0.anchor");
     scene.registerComponent<ControllerBrain>("stage0.controller");
     playerSpawn_ = playerSpawn;
     foeSpawn_ = foeSpawn;
