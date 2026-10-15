@@ -1,0 +1,9 @@
+[
+  {"id": "ferryman_aldric_swim", "trainer": "ferryman_aldric", "name": "Aldric the ferryman", "gate": "river_guild_trusted", "currency": "coin", "sink": "trade", "capability": "swim", "cost": 300, "days": 2},
+  {"id": "ferryman_aldric_dive", "trainer": "ferryman_aldric", "name": "Aldric the ferryman", "gate": "river_guild_trusted", "currency": "coin", "sink": "trade", "capability": "dive", "cost": 800, "days": 5},
+  {"id": "ferryman_aldric_boat", "trainer": "ferryman_aldric", "name": "Aldric the ferryman", "gate": "river_guild_trusted", "currency": "coin", "sink": "trade", "capability": "boat", "cost": 600, "days": 4},
+  {"id": "cliff_warden_climb", "trainer": "cliff_warden", "name": "The cliff warden", "gate": "wardens_friendly", "currency": "coin", "sink": "trade", "capability": "climb", "cost": 400, "days": 3},
+  {"id": "cliff_warden_descend", "trainer": "cliff_warden", "name": "The cliff warden", "gate": "wardens_friendly", "currency": "coin", "sink": "trade", "capability": "descend", "cost": 900, "days": 6},
+  {"id": "locksmith_nera_pick_lock_simple", "trainer": "locksmith_nera", "name": "Nera the locksmith", "gate": "guild_of_keys_neutral", "currency": "coin", "sink": "trade", "capability": "pick_lock_simple", "cost": 350, "days": 2},
+  {"id": "locksmith_nera_pick_lock_complex", "trainer": "locksmith_nera", "name": "Nera the locksmith", "gate": "guild_of_keys_neutral", "currency": "coin", "sink": "trade", "capability": "pick_lock_complex", "cost": 1200, "days": 8}
+]
