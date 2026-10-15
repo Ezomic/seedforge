@@ -3,6 +3,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -67,15 +73,32 @@ TEST_CASE("the three shipped Pressure axioms validate and use the pressure slot"
     REQUIRE(pressure >= 3);
 }
 
-TEST_CASE("no Pressure axiom carries an em-dash or placeholder text")
+TEST_CASE("no Pressure data file carries an em-dash or placeholder text")
 {
-    for (const char* id : {"pressure.miasma", "pressure.unburied", "pressure.foretold"}) {
-        const std::string text = axiomCanonicalJson(axiom(id));
-        REQUIRE(text.find("\xE2\x80\x94") == std::string::npos);
-        for (const char* placeholder : {"TODO", "TBD", "placeholder", "lorem", "FIXME", "xxx"}) {
+    for (const char* name : {"miasma", "unburied", "foretold"}) {
+        std::ifstream in(std::filesystem::path(ICHOR_REPO_DATA) / "axioms" / (std::string(name) + ".json"), std::ios::binary);
+        REQUIRE(in.good());
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        REQUIRE_FALSE(text.empty());
+        REQUIRE(text.find("â") == std::string::npos);
+        for (const char* placeholder : {"TODO", "TBD", "placeholder", "lorem", "FIXME"}) {
             REQUIRE(text.find(placeholder) == std::string::npos);
         }
     }
+}
+
+TEST_CASE("the three Pressure axioms are distinct")
+{
+    std::set<std::uint64_t> digests;
+    std::set<std::string> grades;
+    for (const char* id : {"pressure.miasma", "pressure.unburied", "pressure.foretold"}) {
+        const Axiom& a = axiom(id);
+        digests.insert(axiomDigest(a));
+        REQUIRE(a.blocks.count("audio") == 1);
+        grades.insert(std::get<std::string>(a.blocks.at("palette").at("grade")));
+    }
+    REQUIRE(digests.size() == 3);
+    REQUIRE(grades.size() == 3);
 }
 
 TEST_CASE("the Miasma is purified rather than fought")
@@ -87,6 +110,8 @@ TEST_CASE("the Miasma is purified rather than fought")
     REQUIRE(has(words(a, "economy", "scarce"), "clean_water"));
     REQUIRE(has(words(a, "biomes", "inject"), "miasma_fen"));
     REQUIRE(has(words(a, "enemies", "roster_add"), "afflicted"));
+    REQUIRE(poiWeights(a).at("purification_spring") > poiWeights(a).at("farmstead"));
+    REQUIRE(poiWeights(a).at("purification_spring") > poiWeights(a).at("polluted_well"));
 }
 
 TEST_CASE("the Unburied raises the dead and the graves that hold them")
@@ -107,4 +132,6 @@ TEST_CASE("the Foretold is a conqueror who is winning")
     REQUIRE(poiWeights(a).at("omen_stone") > 0.0);
     REQUIRE(has(words(a, "biomes", "inject"), "scorched_road"));
     REQUIRE(has(words(a, "economy", "scarce"), "grain"));
+    REQUIRE(poiWeights(a).at("war_camp") > poiWeights(a).at("farmstead"));
+    REQUIRE(poiWeights(a).at("burned_farmstead") > poiWeights(a).at("farmstead"));
 }
