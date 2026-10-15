@@ -76,10 +76,10 @@ TEST_CASE("validation rejects bad milestones")
     bad(m, "at least one condition");
     m = lockMilestone();
     m.id = "Bad Id";
-    bad(m, "id");
+    bad(m, ".id");
     m = lockMilestone();
     m.id = std::string(500, 'a');
-    bad(m, "id");
+    bad(m, ".id");
     m = lockMilestone();
     m.quests = {"../etc/passwd"};
     bad(m, "quest");
@@ -238,4 +238,17 @@ TEST_CASE("the gate is load bearing: no facts, no grant")
     CHECK_FALSE(unlocks.can("pick_locks"));
     CHECK(tracker.evaluate(allFacts(), unlocks).size() == 1);
     CHECK(unlocks.can("pick_locks"));
+}
+
+TEST_CASE("one evaluation chains a prerequisite granted later in id order")
+{
+    Milestone vaults = lockMilestone();
+    vaults.id = "alpha_vaults";
+    vaults.capability = "pick_vaults";
+    Milestone locks = lockMilestone();
+    locks.id = "zeta_locks";
+    CapabilityUnlocks unlocks(capTable());
+    MilestoneTracker tracker({vaults, locks});
+    CHECK(tracker.evaluate(allFacts(), unlocks) == std::vector<std::string>{"zeta_locks", "alpha_vaults"});
+    CHECK(unlocks.can("pick_vaults"));
 }

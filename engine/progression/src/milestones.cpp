@@ -1,6 +1,8 @@
 #include "ichor/progression/milestones.h"
 
 #include <algorithm>
+#include <string>
+#include <utility>
 
 namespace ichor {
 
@@ -108,22 +110,27 @@ MilestoneTracker::MilestoneTracker(std::vector<Milestone> table)
 std::vector<std::string> MilestoneTracker::evaluate(const MilestoneFacts& facts, CapabilityUnlocks& unlocks)
 {
     std::vector<std::string> newly;
-    for (const Milestone& m : table_) {
-        if (granted_.find(m.id) != granted_.end() || !conditionsHold(m, facts)) {
-            continue;
-        }
-        if (!m.capability.empty()) {
-            const UnlockResult result = unlocks.unlock(m.capability);
-            if (result != UnlockResult::Unlocked && result != UnlockResult::AlreadyUnlocked) {
+    bool progressed = true;
+    while (progressed) {
+        progressed = false;
+        for (const Milestone& m : table_) {
+            if (granted_.find(m.id) != granted_.end() || !conditionsHold(m, facts)) {
                 continue;
             }
-        } else if (!m.stat.empty()) {
-            stats_.insert(m.stat);
-        } else {
-            continue;
+            if (!m.capability.empty()) {
+                const UnlockResult result = unlocks.unlock(m.capability);
+                if (result != UnlockResult::Unlocked && result != UnlockResult::AlreadyUnlocked) {
+                    continue;
+                }
+            } else if (!m.stat.empty()) {
+                stats_.insert(m.stat);
+            } else {
+                continue;
+            }
+            granted_.insert(m.id);
+            newly.push_back(m.id);
+            progressed = true;
         }
-        granted_.insert(m.id);
-        newly.push_back(m.id);
     }
     return newly;
 }
