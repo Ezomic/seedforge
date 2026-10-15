@@ -197,7 +197,7 @@ struct Reflect<stage0::Combatant> {
         return std::make_tuple(field("side", &C::side), field("health", &C::health), field("stamina", &C::stamina), field("poise", &C::poise),
             field("state", &C::state), field("attack", &C::attack), field("stateTime", &C::stateTime),
             field("sinceStaminaSpend", &C::sinceStaminaSpend), field("sincePoiseDamage", &C::sincePoiseDamage),
-            field("blocking", &C::blocking), field("blockTicks", &C::blockTicks),field("traceDone", &C::traceDone), field("yaw", &C::yaw),
+            field("blocking", &C::blocking), field("blockTicks", &C::blockTicks), field("traceDone", &C::traceDone), field("yaw", &C::yaw),
             field("dodgeDirection", &C::dodgeDirection), field("deathCause", &C::deathCause), field("retryHeld", &C::retryHeld), field("status", &C::status));
     }
 };
