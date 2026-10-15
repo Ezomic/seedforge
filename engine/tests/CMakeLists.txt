@@ -13,7 +13,7 @@ target_link_libraries(ichor_tests PRIVATE
 target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
 catch_discover_tests(ichor_tests)
 
-add_dependencies(ichor_tests ichor_forge)
+add_dependencies(ichor_tests ichor_forge ichor_seed_harness)
 
 # Doc 17: the manifest, the stack table, the module layering and libworldforge's purity.
 # --self-test feeds the checker deliberate violations and fails if any stays green.
@@ -37,6 +37,8 @@ forge_data_test(empty "no tables")
 forge_data_test(file "no data directory")
 forge_data_test(malformed "b.json")
 forge_data_test(badrecord "non-empty string id")
+add_test(NAME seed_harness_cli COMMAND $<TARGET_FILE:ichor_seed_harness> 4 --size 512 --sample 16 --cell 256 --json)
+set_tests_properties(seed_harness_cli PROPERTIES PASS_REGULAR_EXPRESSION "\"count\":4,")
 
 if(ENGINE_RUNTIME)
     add_executable(ichor_editor_ui_tests

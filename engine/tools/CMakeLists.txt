@@ -10,3 +10,8 @@ add_executable(ichor_forge
 target_link_libraries(ichor_forge PRIVATE ichor_world ichor_data)
 get_filename_component(ICHOR_FORGE_DATA_PATH ../../data ABSOLUTE BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(ichor_forge PRIVATE ICHOR_DATA_DIR="${ICHOR_FORGE_DATA_PATH}")
+
+add_executable(ichor_seed_harness
+    seed_harness/main.cpp
+)
+target_link_libraries(ichor_seed_harness PRIVATE ichor_world)
