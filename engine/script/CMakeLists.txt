@@ -1,11 +1,5 @@
-add_library(ichor_script
-    src/script_host.cpp
-    src/scene_bindings.cpp
-    src/data_bindings.cpp
-    src/chronicle_bindings.cpp
-    src/journal_bindings.cpp
-    src/world_bindings.cpp
-)
+file(GLOB ichor_script_sources CONFIGURE_DEPENDS src/*.cpp)
+add_library(ichor_script ${ichor_script_sources})
 target_include_directories(ichor_script PUBLIC include)
 find_package(unofficial-lua CONFIG REQUIRED)
 find_package(sol2 CONFIG REQUIRED)
