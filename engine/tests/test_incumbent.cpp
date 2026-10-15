@@ -84,13 +84,37 @@ TEST_CASE("unknown, empty and non-Powers ids give no plan", "[factions][incumben
     CHECK_FALSE(planIncumbents(std::string(1 << 20, 'a')).has_value());
 }
 
-TEST_CASE("planning is deterministic and incumbent ids are valid words", "[factions][incumbent]")
+TEST_CASE("Poleis incumbents have pinned ids and names in order", "[factions][incumbent]")
+{
+    const auto plan = planIncumbents("powers.poleis", 4);
+    REQUIRE(plan.has_value());
+    REQUIRE(plan->incumbents.size() == 4);
+    const char* ids[] = {"polis_1", "polis_2", "polis_3", "polis_4"};
+    const char* names[] = {"The First Polis", "The Second Polis", "The Third Polis", "The Fourth Polis"};
+    for (std::size_t i = 0; i < 4; ++i) {
+        CHECK(plan->incumbents[i].id == ids[i]);
+        CHECK(plan->incumbents[i].name == names[i]);
+    }
+}
+
+TEST_CASE("a three-polis plan is a prefix of the four-polis plan", "[factions][incumbent]")
+{
+    const auto three = planIncumbents("powers.poleis", 3);
+    const auto four = planIncumbents("powers.poleis", 4);
+    REQUIRE((three && four));
+    CHECK(factionsCanonicalJson(three->incumbents) == factionsCanonicalJson({four->incumbents.begin(), four->incumbents.begin() + 3}));
+}
+
+TEST_CASE("every planned incumbent survives the faction JSON path", "[factions][incumbent]")
 {
     for (const char* axiom : {"powers.hegemony", "powers.league", "powers.satrapy", "powers.amphictyony", "powers.poleis"}) {
-        const auto a = planIncumbents(axiom, 4);
-        const auto b = planIncumbents(axiom, 4);
-        REQUIRE(a.has_value());
-        CHECK(factionsDigest(a->incumbents) == factionsDigest(b->incumbents));
+        const auto plan = planIncumbents(axiom, 4);
+        REQUIRE(plan.has_value());
+        std::vector<Faction> parsed;
+        std::vector<std::string> problems;
+        CHECK(parseFactions("plan", factionsCanonicalJson(plan->incumbents), parsed, problems));
+        CHECK(problems.empty());
+        CHECK(parsed.size() == plan->incumbents.size());
     }
 }
 
