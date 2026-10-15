@@ -1,0 +1,8 @@
+[
+  { "id": "miastores", "pressure": "pressure.miasma", "name": "The Miastores" },
+  { "id": "hastening_vigil", "pressure": "pressure.unburied", "name": "The Hastening Vigil" },
+  { "id": "granary_reckoners", "pressure": "pressure.famine", "name": "The Granary Reckoners" },
+  { "id": "kerykes", "pressure": "pressure.return", "name": "The Kerykes" },
+  { "id": "chasm_cult", "pressure": "pressure.opening", "name": "The Chasm Cult" },
+  { "id": "conquerors_people", "pressure": "pressure.foretold", "name": "The Conqueror's People" }
+]
