@@ -82,6 +82,13 @@ experiment itself, built with the engine.
 **`data/` being shared is the important bit.** Axioms are read by *both* the generator and
 the game; two copies will diverge within a month.
 
+**Content is organised by feature, not by asset type**: `data/progression/trainers.json`,
+not `data/json/trainers.json`. Folders are lower snake_case and never named after an asset
+type. `data/` files are snake_case `.json`; `art/` files are `T_` textures, `SM_`/`SK_`
+meshes and `A_` audio in PascalCase, fonts as `Family-Style`, Blender sources and scripts
+in snake_case. `tools/check_content_layout.py` enforces this in ctest; the debt it
+tolerates is listed in `tools/content_layout_baseline.txt` and only shrinks.
+
 ## The stack
 
 Every entry is a decision somebody made on purpose. Replacing one is a ticket, not a
