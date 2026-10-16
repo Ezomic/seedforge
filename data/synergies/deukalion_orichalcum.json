@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "deukalion_orichalcum",
+      "tier": "cataclysm_law",
+      "axioms": ["cataclysm.flood", "law.orichalcum"],
+      "content_tier": 1,
+      "faction": "metallarchs",
+      "dungeon_type": "pressurised_wreck",
+      "mechanic": "dive_progression",
+      "world_name": "The Drowned Lode",
+      "flavour": {
+        "world_description": "The metal is Atlantean and Atlantis is under the water, so the guilds go down for it on borrowed air. They keep a ledger of the ones who did not come back up, and it is the longest book in the world."
+      }
+    }
+  ]
+}
