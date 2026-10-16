@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "hekatombaia",
+      "tier": "cataclysm_law",
+      "axioms": ["cataclysm.artemis_withdrew", "law.hecatomb"],
+      "content_tier": 1,
+      "faction": "hekatombaia",
+      "dungeon_type": "levy_house",
+      "mechanic": "human_levy",
+      "world_name": "The Levied Shore",
+      "flavour": {
+        "world_description": "There are no animals left to sacrifice, and the rites still name their quantities. The Hekatombaia collect the difference, with immaculate procedure."
+      }
+    }
+  ]
+}
