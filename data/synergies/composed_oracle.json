@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "composed_oracle",
+      "tier": "cataclysm_powers",
+      "axioms": ["cataclysm.silence_of_the_oracles", "powers.amphictyony"],
+      "content_tier": 1,
+      "faction": "mnemones",
+      "dungeon_type": "scriptorium_vault",
+      "mechanic": "composed_pronouncement",
+      "world_name": "The Composed Oracle",
+      "flavour": {
+        "world_description": "The oracle has said nothing for two hundred years, and the league that keeps its sanctuary has not let the pronouncements stop. Some of the priests who carry them down the mountain believe every word."
+      }
+    }
+  ]
+}

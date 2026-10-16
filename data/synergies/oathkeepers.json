@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "silence_oath",
+      "tier": "cataclysm_law",
+      "axioms": ["cataclysm.silence_of_the_oracles", "law.oath"],
+      "content_tier": 1,
+      "faction": "horkos_brokers",
+      "dungeon_type": "tally_vault",
+      "mechanic": "traceable_oath",
+      "world_name": "The Unreleased Lands",
+      "flavour": {
+        "world_description": "The gods once witnessed every oath and could release the one who swore it. They are silent now, so no one is released. Children carry what their grandparents promised, and the Styx keeps the count."
+      }
+    }
+  ]
+}

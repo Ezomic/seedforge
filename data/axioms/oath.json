@@ -1,0 +1,13 @@
+{
+  "id": "law.oath",
+  "slot": "law",
+  "title": "The Oath",
+  "tags": ["DEBT", "BINDING", "WITNESS", "MORAL_AXIS"],
+  "conflicts": [],
+
+  "poi": { "weights": { "oath_stone": 3.0, "styx_shrine": 1.5, "tally_house": 1.5 } },
+  "enemies": { "roster_add": ["oath_warden", "debt_shade"] },
+  "economy": { "scarce": ["absolution"], "abundant": ["sworn_token", "tally_stick"] },
+  "palette": { "grade": "oath", "fog_density": 1.0 },
+  "audio": { "bed_overrides": ["whispered_vows", "dripping_black_water"], "music_palette": "oath" }
+}
