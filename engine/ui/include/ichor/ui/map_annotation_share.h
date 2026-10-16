@@ -2,6 +2,7 @@
 
 #include "ichor/ui/map_annotation_codec.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>

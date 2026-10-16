@@ -2,8 +2,12 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
 #include <initializer_list>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 using namespace ichor;
 
@@ -79,6 +83,16 @@ TEST_CASE("encode rejects bad seed and author", "[ui][share]")
     AnnotationShareLimits tiny;
     tiny.maxEnvelopeBytes = 10;
     CHECK(encodeAnnotationShare(s, "ok", "", tiny).status == AnnotationShareStatus::TooLarge);
+}
+
+TEST_CASE("a configured limit above the u16 length field cannot wrap it", "[ui][share]")
+{
+    AnnotationShareLimits wide;
+    wide.maxSeedBytes = 100000;
+    wide.maxAuthorBytes = 100000;
+    const MapAnnotationStore s;
+    CHECK(encodeAnnotationShare(s, std::string(65536, 'a'), "", wide).status == AnnotationShareStatus::InvalidSeed);
+    CHECK(encodeAnnotationShare(s, "ok", std::string(65536, 'a'), wide).status == AnnotationShareStatus::InvalidAuthor);
 }
 
 TEST_CASE("every single flipped bit is caught", "[ui][share]")

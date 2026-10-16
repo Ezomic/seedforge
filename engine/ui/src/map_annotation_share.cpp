@@ -1,7 +1,9 @@
 #include "ichor/ui/map_annotation_share.h"
 
 #include <array>
+#include <cstddef>
 #include <cstring>
+#include <utility>
 
 namespace ichor {
 
@@ -11,6 +13,7 @@ constexpr std::uint8_t kMagic[4] = {'I', 'C', 'M', 'S'};
 constexpr std::uint8_t kVersion = 1;
 // magic, version, seedLen, authorLen, payloadLen, crc with everything else empty.
 constexpr std::size_t kMinBytes = 4 + 1 + 2 + 2 + 4 + 4;
+constexpr std::size_t kMaxLengthField = 0xFFFF;
 
 std::array<std::uint32_t, 256> makeCrcTable()
 {
@@ -69,10 +72,11 @@ std::uint32_t annotationCrc32(std::span<const std::uint8_t> bytes)
 AnnotationShareEncoded encodeAnnotationShare(const MapAnnotationStore& store, std::string_view seed,
                                              std::string_view author, const AnnotationShareLimits& share)
 {
-    if (seed.empty() || seed.size() > share.maxSeedBytes || !isCleanAnnotationText(seed)) {
+    if (seed.empty() || seed.size() > share.maxSeedBytes || seed.size() > kMaxLengthField ||
+        !isCleanAnnotationText(seed)) {
         return {AnnotationShareStatus::InvalidSeed, {}};
     }
-    if (author.size() > share.maxAuthorBytes || !isCleanAnnotationText(author)) {
+    if (author.size() > share.maxAuthorBytes || author.size() > kMaxLengthField || !isCleanAnnotationText(author)) {
         return {AnnotationShareStatus::InvalidAuthor, {}};
     }
     const std::vector<std::uint8_t> payload = encodeAnnotations(store);
