@@ -2,7 +2,12 @@
 
 #include "ichor/save/delta_store.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
 #include <random>
+#include <string>
+#include <vector>
 
 using namespace ichor;
 
@@ -131,7 +136,7 @@ TEST_CASE("every truncation of a valid delta is rejected", "[save][delta]")
     d.removed = {"gamma", "zeta"};
     const auto enc = *encodeDelta(d);
     for (std::size_t n = 0; n < enc.size(); ++n) {
-        CHECK_FALSE(decodeDelta(std::vector<std::uint8_t>(enc.begin(), enc.begin() + static_cast<long>(n))).has_value());
+        CHECK_FALSE(decodeDelta(std::vector<std::uint8_t>(enc.begin(), enc.begin() + static_cast<std::ptrdiff_t>(n))).has_value());
     }
     auto extra = enc;
     extra.push_back(0);
@@ -198,6 +203,8 @@ TEST_CASE("size limits hold on encode, decode and apply", "[save][delta]")
     both.set["a"] = {};
     both.removed = {"a"};
     CHECK_FALSE(encodeDelta(both).has_value());
+    CHECK_FALSE(applyDelta({{"a", bytes({1})}}, both).has_value());
+    CHECK_FALSE(decodeDelta(bytes({1, 1, 1, 'a', 0, 1, 1, 'a'})).has_value());
     StateDelta dup;
     dup.removed = {"a", "a"};
     CHECK_FALSE(encodeDelta(dup).has_value());

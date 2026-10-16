@@ -1,6 +1,9 @@
 #include "ichor/save/delta_store.h"
 
 #include <algorithm>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace ichor {
 
@@ -106,7 +109,7 @@ std::optional<DeltaState> applyDelta(const DeltaState& baseline, const StateDelt
 {
     DeltaState state = baseline;
     for (const auto& key : delta.removed) {
-        if (state.erase(key) == 0) {
+        if (delta.set.count(key) != 0 || state.erase(key) == 0) {
             return std::nullopt;
         }
     }
@@ -115,6 +118,9 @@ std::optional<DeltaState> applyDelta(const DeltaState& baseline, const StateDelt
             return std::nullopt;
         }
         state[key] = value;
+    }
+    if (state.size() > lim::kMaxEntries) {
+        return std::nullopt;
     }
     return state;
 }
