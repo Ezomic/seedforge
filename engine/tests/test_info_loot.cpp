@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <string>
 
 using namespace ichor;
 
@@ -269,4 +270,95 @@ TEST_CASE("results do not depend on registration order", "[info_loot]")
     InfoLootState sb;
     CHECK(useInfoItem(a, sa, "b", "l2").status == useInfoItem(b, sb, "b", "l2").status);
     CHECK(unchanged(sa, sb));
+}
+
+TEST_CASE("a failed use of a single-use cipher does not spend it", "[info_loot]")
+{
+    InfoLootRegistry r;
+    InfoItemDef d = cipherItem("once", {{"t.1", "alpha"}});
+    d.singleUse = true;
+    REQUIRE(r.add(d) == InfoDefStatus::Ok);
+    InfoLootState st;
+    CHECK(useInfoItem(r, st, "once", "t.9").status == InfoUseStatus::WrongTarget);
+    CHECK(useInfoItem(r, st, "once").status == InfoUseStatus::MissingTarget);
+    CHECK(st.spentItems.empty());
+    CHECK(useInfoItem(r, st, "once", "t.1").spent);
+    CHECK(useInfoItem(r, st, "once", "t.1").status == InfoUseStatus::Spent);
+}
+
+TEST_CASE("a single-use chart is spent by its first use", "[info_loot]")
+{
+    InfoLootRegistry r;
+    InfoItemDef d = chartItem("one_chart", {"route.a"});
+    d.singleUse = true;
+    REQUIRE(r.add(d) == InfoDefStatus::Ok);
+    InfoLootState st;
+    CHECK(useInfoItem(r, st, "one_chart").spent);
+    CHECK(useInfoItem(r, st, "one_chart").status == InfoUseStatus::Spent);
+}
+
+TEST_CASE("cipher definitions are validated and deduplicated", "[info_loot]")
+{
+    InfoLootRegistry r;
+    CHECK(r.add(cipherItem("c", {{"bad id", "x"}})) == InfoDefStatus::InvalidId);
+    CHECK(r.add(cipherItem("c", {{"t", ""}})) == InfoDefStatus::Malformed);
+    CHECK(r.add(cipherItem("c", std::vector<InfoCipherText>(kInfoMaxEntries + 1, {"t", "x"})))
+        == InfoDefStatus::TooLarge);
+    REQUIRE(r.add(cipherItem("c", {{"t", "first"}, {"t", "second"}})) == InfoDefStatus::Ok);
+    InfoLootState st;
+    CHECK(useInfoItem(r, st, "c", "t").plain == "first");
+}
+
+TEST_CASE("full state lists refuse and spend nothing", "[info_loot]")
+{
+    InfoLootRegistry r;
+    InfoItemDef k = keyItem("k", "lock.new", true);
+    REQUIRE(r.add(k) == InfoDefStatus::Ok);
+    REQUIRE(r.add(chartItem("c", {"route.new"})) == InfoDefStatus::Ok);
+    REQUIRE(r.add(cipherItem("z", {{"t.new", "x"}})) == InfoDefStatus::Ok);
+    std::vector<std::string> full;
+    for (std::size_t i = 0; i < kInfoMaxStateEntries; ++i) {
+        full.push_back("a" + std::to_string(i));
+    }
+    std::sort(full.begin(), full.end());
+
+    InfoLootState st;
+    st.openedLocks = full;
+    st.markedRoutes = full;
+    st.decodedTexts = full;
+    CHECK(useInfoItem(r, st, "k", "lock.new").status == InfoUseStatus::StateFull);
+    CHECK(useInfoItem(r, st, "c").status == InfoUseStatus::StateFull);
+    CHECK(useInfoItem(r, st, "z", "t.new").status == InfoUseStatus::StateFull);
+    CHECK(st.openedLocks.size() == kInfoMaxStateEntries);
+    CHECK(st.markedRoutes.size() == kInfoMaxStateEntries);
+    CHECK(st.decodedTexts.size() == kInfoMaxStateEntries);
+
+    InfoLootState spentFull;
+    spentFull.spentItems = full;
+    CHECK(useInfoItem(r, spentFull, "k", "lock.new").status == InfoUseStatus::StateFull);
+    CHECK(spentFull.openedLocks.empty());
+}
+
+TEST_CASE("lookup works whatever order items were registered in", "[info_loot]")
+{
+    InfoLootRegistry a;
+    InfoLootRegistry b;
+    const char* ids[] = {"d", "b", "a", "c"};
+    for (const char* id : ids) {
+        a.add(keyItem(id, std::string("lock.") + id));
+    }
+    for (int i = 3; i >= 0; --i) {
+        b.add(keyItem(ids[i], std::string("lock.") + ids[i]));
+    }
+    for (const char* id : ids) {
+        REQUIRE(a.find(id) != nullptr);
+        REQUIRE(b.find(id) != nullptr);
+        InfoLootState sa;
+        InfoLootState sb;
+        const auto ra = useInfoItem(a, sa, id, std::string("lock.") + id);
+        const auto rb = useInfoItem(b, sb, id, std::string("lock.") + id);
+        CHECK(ra.status == InfoUseStatus::Ok);
+        CHECK(ra.openedLock == rb.openedLock);
+        CHECK(unchanged(sa, sb));
+    }
 }
