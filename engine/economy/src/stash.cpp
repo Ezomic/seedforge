@@ -31,7 +31,7 @@ StashContainer* StashRegistry::lookup(std::string_view id, std::string_view view
 
 StashStatus StashRegistry::create(ContainerKind kind, std::string_view id, std::string_view owner, std::string_view place, std::uint32_t capacity)
 {
-    if (!validName(id) || !validName(owner) || !validName(place) || capacity == 0 || capacity > kMaxStashCapacity) {
+    if (kind > ContainerKind::Cache || !validName(id) || !validName(owner) || !validName(place) || capacity == 0 || capacity > kMaxStashCapacity) {
         return StashStatus::InvalidInput;
     }
     if (containers_.find(id) != containers_.end()) {
@@ -196,6 +196,9 @@ RaidResult StashRegistry::raid(std::string_view id, std::uint32_t permille)
         return {StashStatus::Unavailable, {}};
     }
     RaidResult result;
+    if (permille == 0) {
+        return result;
+    }
     for (auto it = c.items.begin(); it != c.items.end();) {
         const auto share = static_cast<std::uint32_t>(static_cast<std::uint64_t>(it->second) * permille / kPermilleAll);
         if (share > 0) {

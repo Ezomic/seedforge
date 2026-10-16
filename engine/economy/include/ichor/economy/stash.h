@@ -59,6 +59,11 @@ struct RaidResult {
     std::map<std::string, std::uint32_t> taken; // only items that lost at least one unit
 };
 
+// markLost, recover, discover, raid and destroy take no actor: they are world
+// events the caller triggers, not player requests, so they do not hide a
+// cache's existence. Ids share one namespace, destroyed containers keep their
+// slot (there is no pruning yet), and create reports Duplicate for any id.
+//
 // Every count is checked against the capacity before it is added, so nothing
 // wraps, and every refusal leaves the registry unchanged.
 class StashRegistry {

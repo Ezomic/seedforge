@@ -288,3 +288,16 @@ TEST_CASE("two registries given the same calls end identical", "[stash]")
     CHECK(x.find("b", "ann")->items.at("zinc") == 5);
     CHECK(x.visibleTo("ann") == std::vector<std::string>{"a", "b"});
 }
+
+TEST_CASE("a zero raid and an out of range kind do nothing", "[stash][raid]")
+{
+    StashRegistry r;
+    CHECK(r.create(static_cast<ContainerKind>(7), "x", "ann", "p", 5) == StashStatus::InvalidInput);
+    REQUIRE(r.create(ContainerKind::Cart, "cart", "ann", "gate", 5) == StashStatus::Ok);
+    (void)r.deposit("cart", "ann", "ore", 4);
+    const RaidResult none = r.raid("cart", 0);
+    CHECK(none.status == StashStatus::Ok);
+    CHECK(none.taken.empty());
+    CHECK(r.find("cart", "ann")->raids == 0);
+    CHECK(r.count("cart", "ann", "ore") == 4);
+}
