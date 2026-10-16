@@ -1,0 +1,11 @@
+{
+  "base": ["compass", "clock", "water", "health"],
+  "laws": {
+    "law.hecatomb": ["compass", "clock", "water", "vitality_cost"],
+    "law.last_favour": ["compass", "clock", "water", "health", "favour_count"],
+    "law.orichalcum": ["compass", "clock", "water", "health", "metal_supply"],
+    "law.mysteries": ["compass", "clock", "water", "health", "rite_loadout"],
+    "law.temenos": ["compass", "clock", "water", "health", "consecrated_ground"],
+    "law.oath": ["compass", "clock", "water", "health", "debt_meter"]
+  }
+}
