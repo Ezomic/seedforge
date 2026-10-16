@@ -1,4 +1,5 @@
 #include "ichor/data/data_set.h"
+#include "ichor/economy/access_fees.h"
 #include "ichor/economy/economy_sim_campaign.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -10,6 +11,8 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 #ifdef _WIN32
 #include <process.h>
@@ -90,7 +93,8 @@ TEST_CASE("the current tuning makes the player briefly rich two or three times p
     CHECK(result.longestPeriodDays <= EconomyTarget{}.maxPeriodDays);
     CHECK(result.totalRichDays * 1000 <= result.totalDays * EconomyTarget{}.maxRichPermille);
     // A spell that never forms would also be "brief": there must be real riches.
-    CHECK(result.totalRichDays >= result.seeds * 2);
+    CHECK(result.totalRichDays >= result.seeds * 4);
+    CHECK(result.seedsWithLongSpell == 0);
 }
 
 TEST_CASE("without any sink the player is rich for the rest of the campaign")
@@ -130,7 +134,43 @@ TEST_CASE("a threshold the wallet always clears is always rich")
 
     const EconomySweep result = sweep(table, tuning);
     CHECK(result.hits == 0);
-    CHECK(result.seedsWithLongSpell > 0);
+    CHECK(result.seedsWithLongSpell == result.seeds);
+    CHECK(result.totalRichDays * 1000 > result.totalDays * 900);
+}
+
+TEST_CASE("the exit level ends a spell: never leaving makes one endless spell, leaving at the threshold makes spells shorter")
+{
+    const CurrencyTable table = shipped();
+    EconomySimTuning never;
+    never.richExitPermille = 0;
+    CHECK(sweep(table, never).seedsWithLongSpell == kSeeds);
+
+    EconomySimTuning eager;
+    eager.richExitPermille = 1000;
+    const EconomySweep eagerResult = sweep(table, eager);
+    const EconomySweep normal = sweep(table, EconomySimTuning{});
+    CHECK(eagerResult.totalRichDays < normal.totalRichDays);
+}
+
+TEST_CASE("the player can afford supplies most days under the current tuning")
+{
+    const CurrencyTable table = shipped();
+    std::uint64_t missed = 0;
+    for (std::uint64_t seed = 1; seed <= 50; ++seed) {
+        missed += run(table, EconomySimTuning{}, seed).missedUpkeepDays;
+    }
+    CHECK(missed * 10 < 50ull * EconomySimTuning{}.days);
+}
+
+TEST_CASE("cheap projects all finish and the sink is reported exhausted, after which the player stays rich longer")
+{
+    const CurrencyTable table = shipped();
+    EconomySimTuning cheap;
+    cheap.rebuildCosts = {50, 50};
+    const EconomySimReport spent = run(table, cheap, 3);
+    CHECK(spent.sinksExhaustedDay != 0);
+    CHECK(run(table, EconomySimTuning{}, 3).sinksExhaustedDay == 0);
+    CHECK(sweep(table, cheap).totalRichDays > sweep(table, EconomySimTuning{}).totalRichDays);
 }
 
 TEST_CASE("restoring the cut trade route lowers what supplies cost")
@@ -226,6 +266,13 @@ TEST_CASE("hostile tunings are refused with a reason")
         CHECK(rejects(table, t));
     }
     SECTION("pricing rule above the limit") { EconomySimTuning t; t.pricing.scarcePrice = kMaxPermille + 1; CHECK(rejects(table, t)); }
+    SECTION("threshold above the limit") { EconomySimTuning t; t.richThreshold = kMaxGoodPrice + 1; CHECK(rejects(table, t)); }
+    SECTION("reserve above the cap") { EconomySimTuning t; t.rebuildReserve = kMaxCurrencyCap + 1; CHECK(rejects(table, t)); }
+    SECTION("dues period above the limit") { EconomySimTuning t; t.duesPeriodDays = kMaxFeePeriod + 1; CHECK(rejects(table, t)); }
+    SECTION("hoard range inverted") { EconomySimTuning t; t.windfallRewardMin = t.windfallRewardMax + 1; CHECK(rejects(table, t)); }
+    SECTION("huge repair") { EconomySimTuning t; t.repairCost = kMaxGoodPrice + 1; CHECK(rejects(table, t)); }
+    SECTION("huge dues") { EconomySimTuning t; t.duesAmount = kMaxGoodPrice + 1; CHECK(rejects(table, t)); }
+    SECTION("too many units sold") { EconomySimTuning t; t.saleUnitsMax = 1000001; CHECK(rejects(table, t)); }
     SECTION("no projects is allowed and leaves the supply route cut")
     {
         EconomySimTuning t;
@@ -253,6 +300,7 @@ TEST_CASE("a currency table that forbids a sink the sim uses is refused")
     std::string simError;
     CHECK_FALSE(runEconomySim(*table, EconomySimTuning{}, 1, simError).has_value());
     CHECK(simError.find("rebuild") != std::string::npos);
+    std::filesystem::remove_all(root);
 }
 
 TEST_CASE("print the measured campaign numbers", "[.economy-sim-report]")

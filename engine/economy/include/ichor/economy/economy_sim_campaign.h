@@ -47,14 +47,15 @@ struct EconomySimTuning {
     std::uint64_t questRewardMax = 320;
 
     // Hoards: windfallMin..windfallMax of them, one per equal slice of the
-    // campaign, so two never land close enough to merge into one rich spell.
+    // campaign, each in the middle half of its slice (so a long campaign keeps
+    // two apart; a tiny one may not).
     std::uint32_t windfallMin = 2;
     std::uint32_t windfallMax = 3;
     std::uint64_t windfallRewardMin = 2200;
     std::uint64_t windfallRewardMax = 3200;
 
     // Sinks. Supplies are bought at the merchant's price, so a cut route costs more.
-    std::uint32_t rationsPerDay = 2;
+    std::uint32_t rationsPerDay = 1;
     std::uint32_t repairIntervalDays = 10;
     std::uint64_t repairCost = 40;
     std::uint64_t duesAmount = 60;
@@ -63,7 +64,7 @@ struct EconomySimTuning {
     // Rebuild: the player funds the first open project with this share of the
     // coin above the reserve each day. The first project is a trade route
     // that starts cut, so funding it lowers the supply price.
-    std::vector<std::uint64_t> rebuildCosts = {500, 1500, 1500, 1500, 1500, 1500};
+    std::vector<std::uint64_t> rebuildCosts = {500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500};
     std::uint64_t rebuildReserve = 300;
     std::uint32_t rebuildSharePermille = 200;
 
