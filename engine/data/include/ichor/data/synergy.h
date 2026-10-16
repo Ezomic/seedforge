@@ -17,6 +17,10 @@ enum class SynergyTier { Triple, CataclysmLaw, CataclysmPowers, LawPowers, Press
 
 std::string_view synergyTierName(SynergyTier tier);
 
+// Doc 02 "Content tiers": 1 is a flagship (faction + dungeon type + mechanic + prose),
+// 2 is text only. Unset for files that do not say; synergy_content.h requires it.
+enum class ContentTier { Unset, Flagship, TextOnly };
+
 // Doc 02: a world runs at most two synergies.
 constexpr std::size_t kMaxActiveSynergies = 2;
 
@@ -32,6 +36,9 @@ struct Synergy {
     std::string worldName;
     // Flavour slot id -> text that replaces the default for that slot.
     std::map<std::string, std::string> flavour;
+    ContentTier contentTier = ContentTier::Unset;
+    // Id of the mechanical change a flagship introduces, empty when the file leaves it out.
+    std::string mechanic;
 };
 
 // What the fired synergies inject, ready to be copied into WorldConfig.
@@ -48,7 +55,8 @@ AxiomPool axiomPool(const AxiomSet& axioms);
 
 // Parses one file of the form {"synergies": [{"id", "tier", "axioms"}, ...]}.
 // Each entry may also carry "faction", "dungeon_type" (lowercase ids),
-// "world_name" (text) and "flavour" (an object of slot id -> text).
+// "world_name" (text), "flavour" (an object of slot id -> text), "mechanic" (a
+// lowercase id) and "content_tier" (1 or 2).
 // Every problem is appended to `problems` as "<label>: <field path>: <what is
 // wrong>". Returns true, and fills `out` sorted by id, only when there are no
 // problems. Never throws on bad input.
