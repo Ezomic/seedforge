@@ -170,6 +170,9 @@ void checkSynergyFiles(Checker& checker, const std::filesystem::path& dataRoot, 
                 continue;
             }
             const std::string record = synergy.contains("id") && synergy["id"].is_string() ? synergy["id"].get<std::string>() : "synergies[" + std::to_string(i) + "]";
+            if (checker.hasRecords("factions") && synergy.contains("faction") && synergy["faction"].is_string()) {
+                checker.check(label, record, "faction", "factions", synergy["faction"].get<std::string>());
+            }
             for (std::size_t j = 0; j < synergy["axioms"].size(); ++j) {
                 if (synergy["axioms"][j].is_string()) {
                     checker.check(label, record, "axioms[" + std::to_string(j) + "]", kAxioms, synergy["axioms"][j].get<std::string>());
