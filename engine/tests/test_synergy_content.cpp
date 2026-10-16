@@ -282,3 +282,34 @@ TEST_CASE("the shipped flagship fires from its axioms and injects its faction", 
     CHECK_FALSE(result.dungeonTypes.empty());
     CHECK_FALSE(result.worldName.empty());
 }
+
+TEST_CASE("the flood and league flagship loads, resolves its faction and fires for its axiom pair", "[synergy_content]")
+{
+    const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
+    DataSet data;
+    AxiomSet axioms;
+    REQUIRE(data.loadDirectory(root));
+    REQUIRE(axioms.loadDirectory(root));
+    std::vector<Synergy> defs;
+    std::vector<std::string> problems;
+    REQUIRE(loadSynergyContentDirectory(root / "synergies", axiomPool(axioms), defs, problems));
+    const XrefReport report = checkReferences(data, axioms, root);
+    for (const DanglingRef& ref : report.dangling) {
+        UNSCOPED_INFO(describe(ref));
+    }
+    CHECK(report.ok());
+
+    const auto it = std::find_if(defs.begin(), defs.end(), [](const Synergy& s) { return s.id == "flood_league"; });
+    REQUIRE(it != defs.end());
+    CHECK(it->contentTier == ContentTier::Flagship);
+    CHECK(it->mechanic == "shipping_life_support");
+
+    const auto fired = detectSynergies({"cataclysm.flood", "powers.league"}, defs);
+    REQUIRE(std::find(fired.begin(), fired.end(), "flood_league") != fired.end());
+    const SynergyOverride result = applyOverrides(fired, defs, {});
+    CHECK(result.factions == std::vector<std::string>{"periegetes"});
+    CHECK(result.dungeonTypes == std::vector<std::string>{"grain_quay"});
+    CHECK(result.worldName == "The Grain Ledger");
+
+    CHECK(detectSynergies({"cataclysm.flood", "law.oath"}, defs).empty());
+}
