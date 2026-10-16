@@ -1,0 +1,14 @@
+{
+  "synergies": [
+    {
+      "id": "artemis_unburied",
+      "tier": "pressure",
+      "axioms": ["cataclysm.artemis_withdrew", "pressure.unburied"],
+      "content_tier": 2,
+      "world_name": "The Standing Dead",
+      "flavour": {
+        "world_description": "Nothing living moves across the hills, but the dead are standing up."
+      }
+    }
+  ]
+}

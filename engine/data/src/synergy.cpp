@@ -277,7 +277,7 @@ bool parseSynergies(std::string_view label, std::string_view text, const AxiomPo
         Synergy synergy;
         bool tierKnown = false;
         for (const auto& [key, value] : item.items()) {
-            if (key != "id" && key != "tier" && key != "axioms" && key != "faction" && key != "dungeon_type" && key != "world_name" && key != "flavour") {
+            if (key != "id" && key != "tier" && key != "axioms" && key != "faction" && key != "dungeon_type" && key != "world_name" && key != "flavour" && key != "mechanic" && key != "content_tier") {
                 add(where + "." + key.substr(0, 40), "unknown key");
             }
         }
@@ -314,7 +314,15 @@ bool parseSynergies(std::string_view label, std::string_view text, const AxiomPo
         readText(item, "faction", where, kMaxIdBytes, true, synergy.faction, add);
         readText(item, "dungeon_type", where, kMaxIdBytes, true, synergy.dungeonType, add);
         readText(item, "world_name", where, kMaxNameBytes, false, synergy.worldName, add);
+        readText(item, "mechanic", where, kMaxIdBytes, true, synergy.mechanic, add);
         readFlavour(item, where, synergy.flavour, add);
+        if (const auto it = item.find("content_tier"); it != item.end()) {
+            if (it->is_number_unsigned() && (it->get<std::uint64_t>() == 1 || it->get<std::uint64_t>() == 2)) {
+                synergy.contentTier = it->get<std::uint64_t>() == 1 ? ContentTier::Flagship : ContentTier::TextOnly;
+            } else {
+                add(where + ".content_tier", "expected 1 (flagship) or 2 (text only), got " + shown(it->dump()));
+            }
+        }
 
         bool axiomsOk = false;
         std::vector<AxiomSlot> slots;
