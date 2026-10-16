@@ -179,6 +179,9 @@ std::vector<Finding> findIterations(const std::string& file, const std::string& 
 {
     std::vector<Finding> found;
     for (const std::string& name : names) {
+        if (clean.find(name) == std::string::npos) {
+            continue;
+        }
         const std::string n = name;
         const std::regex rangeFor(R"(\bfor\s*\([^;)]*:\s*(?:\*\s*)?[\w:.>\-\[\]]*\b)" + n + R"(\s*\))");
         const std::regex begin(R"(\b)" + n + R"(\s*(?:\.|->)\s*c?r?begin\s*\()");

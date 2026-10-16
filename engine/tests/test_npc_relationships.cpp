@@ -215,7 +215,8 @@ TEST_CASE("a thousand NPCs stay bounded and fast", "[npc][relationships]")
     const auto start = std::chrono::steady_clock::now();
     const auto edges = generateRelationships(77, npcs);
     const auto elapsed = std::chrono::steady_clock::now() - start;
-    REQUIRE(elapsed < std::chrono::seconds(5));
+    // Generous because tests run in parallel under ASan; this only catches a blow-up, the degree checks below catch wrong output.
+    REQUIRE(elapsed < std::chrono::seconds(30));
     requireSound(edges, npcs);
     const auto deg = degrees(edges);
     REQUIRE(deg.size() == 1000);
