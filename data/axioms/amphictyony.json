@@ -1,0 +1,14 @@
+{
+  "id": "powers.amphictyony",
+  "slot": "powers",
+  "title": "The Amphictyony",
+  "tags": ["SANCTUARY", "LEAGUE", "RITUAL", "AUTHORITY"],
+  "conflicts": [],
+
+  "settlement": { "prefer_slope": "gentle", "density_mult": 0.9 },
+  "poi": { "weights": { "league_sanctuary": 3.0, "pilgrim_hostel": 2.0, "synod_hall": 2.0, "treasury_of_offerings": 1.5, "boundary_stele": 1.5 } },
+  "enemies": { "roster_add": ["sanctuary_guard", "league_envoy"] },
+  "economy": { "scarce": ["grain"], "abundant": ["offerings"] },
+  "palette": { "grade": "amphictyony", "fog_density": 1.0 },
+  "audio": { "bed_overrides": ["processional_hush"], "music_palette": "amphictyony" }
+}
