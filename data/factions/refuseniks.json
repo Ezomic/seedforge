@@ -1,0 +1,18 @@
+[
+  {
+    "id": "asebeis",
+    "name": "The Asebeis",
+    "placement": "marginal_land",
+    "claims_territory": true,
+    "offers_services_anywhere": false,
+    "summary": "They set down the rites on principle, and are named the impious by their enemies. Defenceless, clean-handed, and correct in a way that gets them killed."
+  },
+  {
+    "id": "xenoi",
+    "name": "The Xenoi",
+    "placement": "routes",
+    "claims_territory": false,
+    "offers_services_anywhere": true,
+    "summary": "Strangers moving under guest-right, with no territory and no claim, protected by xenia in everyone's land. The player's lifeline in hostile regions."
+  }
+]
