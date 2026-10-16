@@ -10,7 +10,13 @@
       "mechanic": "human_levy",
       "world_name": "The Levied Shore",
       "flavour": {
-        "world_description": "There are no animals left to sacrifice, and the rites still name their quantities. The Hekatombaia collect the difference, with immaculate procedure."
+        "world_description": "There are no animals left to sacrifice, and the rites still name their quantities. The Hekatombaia collect the difference, with immaculate procedure.",
+        "world_summary": "The hunt is over and the altars are not. A hundred oxen were owed at every feast, and the hills hold none, so the debt is written in people now, correctly, in triplicate.",
+        "faction_blurb": "The Hekatombaia keep the rolls. Every household owes a share of the rite, assessed by census and collected by warrant, and no clerk has ever raised their voice.",
+        "dungeon_blurb": "A levy house is a granary turned counting-hall. The tallies are neat, the doors are sound, and the people inside have already been counted.",
+        "mechanic_blurb": "The levy falls on the poleis that still keep the rite. Those that abandoned sacrifice have nothing to levy and nothing to bargain with, and the Hekatombaia know it.",
+        "currency_blurb": "Coin is bottled vitality, and everyone at the market knows whose it was.",
+        "precedent_blurb": "They cite Iphigenia at Aulis. The goddess was owed, the army was becalmed, a daughter was brought. Nobody called it a tragedy at the time. They call it a precedent."
       }
     }
   ]
