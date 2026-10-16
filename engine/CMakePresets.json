@@ -47,9 +47,13 @@
     { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan" }
   ],
   "testPresets": [
-    { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug", "output": { "outputOnFailure": true } },
-    { "name": "windows-release", "configurePreset": "windows", "configuration": "Release", "output": { "outputOnFailure": true } },
-    { "name": "windows-ci", "configurePreset": "windows-ci", "output": { "outputOnFailure": true } },
-    { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true } }
+    { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug", "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 } },
+    { "name": "windows-release", "configurePreset": "windows", "configuration": "Release", "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 } },
+    { "name": "windows-ci", "configurePreset": "windows-ci", "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 } },
+    { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 } }
   ]
 }
