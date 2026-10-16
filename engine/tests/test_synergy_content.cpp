@@ -283,6 +283,32 @@ TEST_CASE("the shipped flagship fires from its axioms and injects its faction", 
     CHECK_FALSE(result.worldName.empty());
 }
 
+TEST_CASE("the Hekatombaia flagship carries its full content and names the human levy", "[synergy_content]")
+{
+    const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
+    AxiomSet axioms;
+    REQUIRE(axioms.loadDirectory(root));
+    std::vector<Synergy> defs;
+    std::vector<std::string> problems;
+    REQUIRE(loadSynergyContentDirectory(root / "synergies", axiomPool(axioms), defs, problems));
+    const auto it = std::find_if(defs.begin(), defs.end(), [](const Synergy& s) { return s.id == "hekatombaia"; });
+    REQUIRE(it != defs.end());
+    CHECK(it->contentTier == ContentTier::Flagship);
+    CHECK(it->faction == "hekatombaia");
+    CHECK(it->dungeonType == "levy_house");
+    CHECK(it->mechanic == "human_levy");
+    CHECK(it->worldName == "The Levied Shore");
+    for (const char* slot : {"world_description", "world_summary", "faction_blurb", "dungeon_blurb", "mechanic_blurb", "currency_blurb", "precedent_blurb"}) {
+        INFO(slot);
+        REQUIRE(it->flavour.count(slot) == 1);
+        CHECK(it->flavour.at(slot).find("â") == std::string::npos);
+    }
+    const SynergyOverride result = applyOverrides(detectSynergies({"cataclysm.artemis_withdrew", "law.hecatomb"}, defs), defs, {});
+    CHECK(result.dungeonTypes == std::vector<std::string>{"levy_house"});
+    CHECK(result.worldName == "The Levied Shore");
+    CHECK(result.flavour.count("precedent_blurb") == 1);
+}
+
 TEST_CASE("the flood and league flagship loads, resolves its faction and fires for its axiom pair", "[synergy_content]")
 {
     const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
