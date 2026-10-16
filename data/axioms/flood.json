@@ -3,7 +3,7 @@
   "slot": "cataclysm",
   "title": "Deukalion's Flood",
   "tags": ["WATER", "RUIN", "SCARCITY", "VERTICAL_LIMIT"],
-  "conflicts": [],
+  "conflicts": ["cataclysm.demeters_grief"],
 
   "terrain": { "sea_level_offset_m": 200, "coastal_erosion": 2.4 },
   "settlement": { "min_elevation_m": 210, "prefer_slope": "gentle", "density_mult": 0.7 },
