@@ -8,7 +8,7 @@ file(GLOB ichor_test_sources CONFIGURE_DEPENDS test_*.cpp)
 list(FILTER ichor_test_sources EXCLUDE REGEX "/test_(editor_panels|golden_image)[.]cpp$")
 add_executable(ichor_tests ${ichor_test_sources})
 target_link_libraries(ichor_tests PRIVATE
-    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_ledger ichor_save ichor_platform_null ichor_gfx_null Catch2::Catch2WithMain nlohmann_json::nlohmann_json
+    ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_ledger ichor_save ichor_platform_null ichor_gfx_null ichor_forgecli Catch2::Catch2WithMain nlohmann_json::nlohmann_json
 )
 target_compile_definitions(ichor_tests PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
 target_include_directories(ichor_tests PRIVATE ${CMAKE_SOURCE_DIR}/../libworldforge/include)
