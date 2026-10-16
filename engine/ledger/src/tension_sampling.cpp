@@ -91,51 +91,50 @@ void collectContested(const TensionInputs& in, std::uint64_t milli, std::vector<
     if (factions < 2) {
         return;
     }
-    std::size_t cells = kMaxTerritoryCells;
-    for (std::size_t f = 0; f < factions; ++f) {
-        cells = std::min(cells, t->strength[f].size());
-    }
-    struct Pair {
-        std::uint64_t overlap = 0;
-        std::uint64_t strengthI = 0;
-        std::uint64_t strengthJ = 0;
-        std::uint32_t firstCell = 0;
-        bool seen = false;
-    };
-    std::vector<Pair> pairs(factions * factions);
-    for (std::size_t c = 0; c < cells; ++c) {
-        for (std::size_t i = 0; i < factions; ++i) {
-            const std::uint32_t si = std::min<std::uint32_t>(t->strength[i][c], kMaxClaimStrength);
-            if (si == 0) {
+    std::map<std::pair<std::string, std::string>, Tension> best;
+    for (std::size_t i = 0; i < factions; ++i) {
+        const std::string& idI = t->ids[i];
+        if (!validId(idI)) {
+            continue;
+        }
+        for (std::size_t j = i + 1; j < factions; ++j) {
+            const std::string& idJ = t->ids[j];
+            if (!validId(idJ) || idI == idJ) {
                 continue;
             }
-            for (std::size_t j = i + 1; j < factions; ++j) {
+            const std::size_t cells = std::min({t->strength[i].size(), t->strength[j].size(), kMaxTerritoryCells});
+            std::uint64_t overlap = 0;
+            std::uint64_t strengthI = 0;
+            std::uint64_t strengthJ = 0;
+            std::size_t firstCell = 0;
+            bool seen = false;
+            for (std::size_t c = 0; c < cells; ++c) {
+                const std::uint32_t si = std::min<std::uint32_t>(t->strength[i][c], kMaxClaimStrength);
                 const std::uint32_t sj = std::min<std::uint32_t>(t->strength[j][c], kMaxClaimStrength);
-                if (sj == 0) {
+                if (si == 0 || sj == 0) {
                     continue;
                 }
-                Pair& p = pairs[i * factions + j];
-                if (!p.seen) {
-                    p.seen = true;
-                    p.firstCell = static_cast<std::uint32_t>(c);
+                if (!seen) {
+                    seen = true;
+                    firstCell = c;
                 }
-                p.overlap += std::min(si, sj);
-                p.strengthI += si;
-                p.strengthJ += sj;
+                overlap += std::min(si, sj);
+                strengthI += si;
+                strengthJ += sj;
+            }
+            if (!seen) {
+                continue;
+            }
+            const bool iWants = strengthI != strengthJ ? strengthI > strengthJ : idI < idJ;
+            Tension tension{TensionKind::Contested, iWants ? idI : idJ, iWants ? idJ : idI, "cell:" + std::to_string(firstCell), weighted(overlap, milli)};
+            auto [slot, inserted] = best.try_emplace(idI < idJ ? std::make_pair(idI, idJ) : std::make_pair(idJ, idI), tension);
+            if (!inserted && before(tension, slot->second)) {
+                slot->second = std::move(tension);
             }
         }
     }
-    for (std::size_t i = 0; i < factions; ++i) {
-        for (std::size_t j = i + 1; j < factions; ++j) {
-            const Pair& p = pairs[i * factions + j];
-            const std::string& idI = t->ids[i];
-            const std::string& idJ = t->ids[j];
-            if (!p.seen || !validId(idI) || !validId(idJ) || idI == idJ) {
-                continue;
-            }
-            const bool iWants = p.strengthI != p.strengthJ ? p.strengthI > p.strengthJ : idI < idJ;
-            add(out, {TensionKind::Contested, iWants ? idI : idJ, iWants ? idJ : idI, "cell:" + std::to_string(p.firstCell), weighted(p.overlap, milli)});
-        }
+    for (auto& entry : best) {
+        add(out, std::move(entry.second));
     }
 }
 

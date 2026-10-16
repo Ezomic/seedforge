@@ -2,7 +2,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cmath>
 #include <limits>
 #include <string>
 #include <vector>
@@ -115,25 +114,29 @@ TEST_CASE("below-threshold hostility and uncontested cells are not tensions", "[
 
 TEST_CASE("one dominant tension is nearly always kept, faint ones are not", "[tension]")
 {
-    std::vector<HostilityEntry> matrix = {hostile("boss", "x", kMaxHostility)};
+    ConsequenceLedger ledger;
+    REQUIRE(ledger.append(Fact{"f1", "boss", "wrong", "1", 0}) == AppendResult::Ok);
+    std::vector<HostilityEntry> matrix;
     for (int i = 0; i < 40; ++i) {
         matrix.push_back(hostile("f" + std::to_string(100 + i), "y", kHostileAtLeast));
     }
-    // Make the dominant tension dominate by pressure: faint ones are scaled down by data, not config.
     TensionInputs in;
+    in.ledger = &ledger;
+    in.ledgerQuery.kinds = {{"wrong", kMaxKindWeight}};
     in.hostility = &matrix;
     std::size_t bossKept = 0;
     std::size_t faintKept = 0;
     for (std::uint64_t seed = 0; seed < 200; ++seed) {
-        const auto list = sampleTensions(in, config(seed, 4));
+        TensionConfig c = config(seed, 4);
+        c.consequenceWeight = 20.0;
+        const auto list = sampleTensions(in, c);
         REQUIRE(list.size() == 4);
         bossKept += countKept(list, "boss");
         faintKept += countKept(list, "f100");
     }
-    // boss holds 2000/(2000+40*1000) of the weight per draw: far above a faint tension, which is
-    // what unweighted sampling (4/41 each) would not show.
-    CHECK(bossKept > 2 * faintKept);
-    CHECK(bossKept > 20);
+    // The boss weighs about 65M against 1M per faint pair. Unweighted sampling would keep it 4/41 of the time.
+    CHECK(bossKept >= 190);
+    CHECK(faintKept < bossKept / 4);
 }
 
 TEST_CASE("sampling is deterministic per seed, bounded, ordered and varies by seed", "[tension]")
@@ -232,7 +235,7 @@ TEST_CASE("hostile ids are skipped, not crashed on", "[tension]")
     const auto all = collectTensions(in, config(1, 8));
     REQUIRE(all.size() == 2);
     CHECK(all[0].wanter == "r");
-    CHECK(all[0].score == kMaxHostility * 1000);
+    CHECK(all[0].score == static_cast<std::uint32_t>(kMaxHostility) * 1000u);
     CHECK(all[1].wanter == binary);
     CHECK(all[1].holder == "good");
 
@@ -306,4 +309,21 @@ TEST_CASE("weights shift which source dominates", "[tension]")
     CHECK(collectTensions(in, c)[0].kind == TensionKind::Hostility);
     c.hostilityWeight = 0.0005;
     CHECK(collectTensions(in, c)[0].kind == TensionKind::Contested);
+}
+
+TEST_CASE("one broken territory row does not silence the other pairs, and repeated ids do not repeat tensions", "[tension]")
+{
+    TerritoryResult t;
+    t.ids = {"a", "b", "c"};
+    t.strength = {{5, 5}, {}, {5, 5}};
+    TensionInputs in;
+    in.territory = &t;
+    const auto broken = collectTensions(in, config(1, 8));
+    REQUIRE(broken.size() == 1);
+    CHECK(broken[0].stake == "cell:0");
+
+    t.ids = {"a", "b", "a"};
+    t.strength = {{5}, {5}, {9}};
+    const auto repeated = collectTensions(in, config(1, 8));
+    CHECK(repeated.size() == 1);
 }
