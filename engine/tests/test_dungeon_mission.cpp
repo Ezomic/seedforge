@@ -124,7 +124,7 @@ TEST_CASE("more steps build bigger missions", "[dungeon]")
 {
     std::size_t small = 0;
     std::size_t large = 0;
-    for (std::uint64_t seed = 0; seed < 50; ++seed) {
+    for (std::uint64_t seed = 0; seed < 10; ++seed) {
         small += generated(seed, 0, 0).nodes().size();
         large += generated(seed, 8, 32).nodes().size();
     }

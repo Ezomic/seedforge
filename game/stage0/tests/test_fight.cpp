@@ -1,6 +1,7 @@
 #include "ichor/sim/scene.h"
 #include "ichor/sim/scene_io.h"
 #include "ichor/stage0/combat.h"
+#include "../../../engine/tests/test_temp.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -142,7 +143,7 @@ TEST_CASE("tracking is capped during the wind-up and frozen during active frames
 
 TEST_CASE("a death is classified and written as one CSV row")
 {
-    const auto csv = std::filesystem::temp_directory_path() / "ichor_fights.csv";
+    const auto csv = ichor::test::tempPath("ichor_fights.csv");
     std::filesystem::remove(csv);
     Arena a(6);
     a.stage.recorder().open(csv);
@@ -222,7 +223,7 @@ TEST_CASE("a scripted fight replays to the same hash and survives a snapshot")
     REQUIRE(a.scene.stateHash() == b.scene.stateHash());
     REQUIRE(a.stage.recorder().player().attacks > 0);
 
-    const auto path = std::filesystem::temp_directory_path() / "ichor_stage0.isav";
+    const auto path = ichor::test::tempPath("ichor_stage0.isav");
     REQUIRE(saveScene(path, a.scene));
     Arena c(9);
     REQUIRE(loadScene(path, c.scene));
