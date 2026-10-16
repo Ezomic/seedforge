@@ -36,7 +36,8 @@ float roomMaterialAbsorption(RoomMaterial material);
 // Sabine estimate: RT60 = 0.161 * volume / (surfaceArea * absorption), in metres. Volume and
 // surface area must be finite and positive; anything else (zero, negative, NaN, infinity) is a bad
 // reading and yields the dry preset (minimum decay, no wet) rather than a guess. Finite extremes
-// are clamped. Never decays faster for a larger volume, nor slower for a larger surface area.
+// are clamped. Never decays faster for a larger volume at the same surface area, nor slower for a
+// larger surface area at the same volume. A box scaled up uniformly never decays faster.
 RoomReverb roomReverb(float volume, float surfaceArea, RoomMaterial material);
 
 // The same for an axis-aligned box of the given width, depth and height in metres.

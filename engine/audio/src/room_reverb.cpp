@@ -34,20 +34,13 @@ constexpr double kWetFloor = 0.08;
 constexpr double kWetSpan = 0.52;
 constexpr double kWetFullAtDecay = 8.0;
 
-}  // namespace
-
-float roomMaterialAbsorption(RoomMaterial material)
-{
-    return row(material).absorption;
-}
-
-RoomReverb roomReverb(float volume, float surfaceArea, RoomMaterial material)
+// Doubles hold any product of three finite floats, so a huge box never needs a sentinel.
+RoomReverb fromDoubles(double volume, double surfaceArea, RoomMaterial material)
 {
     const MaterialRow m = row(material);
-    if (!usable(volume) || !usable(surfaceArea)) return {kRoomReverbMinDecay, 0.0f, m.damping};
+    if (!(volume > 0.0) || !(surfaceArea > 0.0)) return {kRoomReverbMinDecay, 0.0f, m.damping};
 
-    const double absorbing = static_cast<double>(surfaceArea) * static_cast<double>(m.absorption);
-    double decay = kSabine * static_cast<double>(volume) / absorbing;
+    double decay = kSabine * volume / (surfaceArea * static_cast<double>(m.absorption));
     if (!(decay > kRoomReverbMinDecay)) decay = kRoomReverbMinDecay;
     if (decay > kRoomReverbMaxDecay) decay = kRoomReverbMaxDecay;
 
@@ -61,20 +54,26 @@ RoomReverb roomReverb(float volume, float surfaceArea, RoomMaterial material)
     return out;
 }
 
+}  // namespace
+
+float roomMaterialAbsorption(RoomMaterial material)
+{
+    return row(material).absorption;
+}
+
+RoomReverb roomReverb(float volume, float surfaceArea, RoomMaterial material)
+{
+    if (!usable(volume) || !usable(surfaceArea)) return fromDoubles(0.0, 0.0, material);
+    return fromDoubles(static_cast<double>(volume), static_cast<double>(surfaceArea), material);
+}
+
 RoomReverb roomReverbForBox(float width, float depth, float height, RoomMaterial material)
 {
-    if (!usable(width) || !usable(depth) || !usable(height)) return roomReverb(0.0f, 0.0f, material);
+    if (!usable(width) || !usable(depth) || !usable(height)) return fromDoubles(0.0, 0.0, material);
     const double w = width;
     const double d = depth;
     const double h = height;
-    const double volume = w * d * h;
-    const double area = 2.0 * (w * d + w * h + d * h);
-    constexpr double kFloatMax = 3.0e38;
-    if (volume > kFloatMax || area > kFloatMax) {
-        // Out of float range: a vast room. Keep the volume to area ratio from collapsing.
-        return roomReverb(3.0e38f, 3.0e30f, material);
-    }
-    return roomReverb(static_cast<float>(volume), static_cast<float>(area), material);
+    return fromDoubles(w * d * h, 2.0 * (w * d + w * h + d * h), material);
 }
 
 ReverbSettings toReverbSettings(const RoomReverb& room)

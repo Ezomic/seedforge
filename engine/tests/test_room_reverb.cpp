@@ -137,8 +137,19 @@ TEST_CASE("the preset converts to Reverb settings in range", "[audio][room_rever
     CHECK(big.roomSize > small.roomSize);
 }
 
-TEST_CASE("the same room always yields the same preset", "[audio][room_reverb]")
+TEST_CASE("a vast flat slab decays by its volume to area ratio, not the clamp", "[audio][room_reverb]")
 {
-    CHECK(roomReverbForBox(7.0f, 9.0f, 3.5f, RoomMaterial::Brick) ==
-          roomReverbForBox(7.0f, 9.0f, 3.5f, RoomMaterial::Brick));
+    // V / A is about 0.5 m, so stone gives 0.161 * 0.5 / 0.03 = 2.68 s.
+    const RoomReverb slab = roomReverbForBox(1.0e20f, 1.0e20f, 1.0f, RoomMaterial::Stone);
+    CHECK(slab.decaySeconds == Catch::Approx(2.683f).margin(0.01f));
+}
+
+TEST_CASE("fixed rooms keep their exact presets", "[audio][room_reverb]")
+{
+    const RoomReverb stone = roomReverbForBox(10.0f, 10.0f, 4.0f, RoomMaterial::Stone);
+    CHECK(stone.decaySeconds == Catch::Approx(5.96296f).margin(1.0e-4f));
+    CHECK(stone.wet == Catch::Approx(0.08f + 0.52f * (5.96296f - 0.1f) / 7.9f).margin(1.0e-4f));
+    CHECK(stone.damping == 0.20f);
+    const RoomReverb dry = roomReverb(kNan, 10.0f, RoomMaterial::Cloth);
+    CHECK(dry == RoomReverb{kRoomReverbMinDecay, 0.0f, 0.90f});
 }
