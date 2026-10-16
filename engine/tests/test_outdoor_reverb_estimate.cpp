@@ -95,6 +95,7 @@ TEST_CASE("a taller wall never reduces the reverb", "[audio][outdoor_reverb]")
         CHECK(p.wet >= lastWet);
         lastWet = p.wet;
     }
+    CHECK(lastWet > 0.2f);
 }
 
 TEST_CASE("outputs are deterministic and bounded", "[audio][outdoor_reverb]")
@@ -114,11 +115,10 @@ TEST_CASE("the height function is called a bounded number of times", "[audio][ou
     int calls = 0;
     const OutdoorHeightFn counting = [&](float, float) {
         ++calls;
-        return 100.0f;
+        return 0.0f;
     };
     estimateOutdoorReverb(counting, 0.0f, 0.0f, kEar);
-    CHECK(calls <= kOutdoorReverbRays * kOutdoorReverbSteps);
-    CHECK(calls > 0);
+    CHECK(calls == kOutdoorReverbRays * kOutdoorReverbSteps);
 }
 
 TEST_CASE("NaN and infinite heights are treated as open air", "[audio][outdoor_reverb]")
