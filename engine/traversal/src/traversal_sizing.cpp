@@ -38,7 +38,8 @@ std::uint32_t travelSeconds(std::uint32_t metres, std::uint32_t speedMmPerS)
     if (speedMmPerS == 0) {
         return 0;
     }
-    return static_cast<std::uint32_t>(static_cast<std::uint64_t>(metres) * 1000 / speedMmPerS);
+    const std::uint64_t seconds = static_cast<std::uint64_t>(metres) * 1000 / speedMmPerS;
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(seconds, 0xFFFFFFFFU));
 }
 
 WorldSizing sizeWorld(const TraversalSet& set)
@@ -72,7 +73,7 @@ WorldSizing sizeWorld(const TraversalSet& set)
     if (boat != 0) {
         weighted += boatShare * (kUnit / boat);
     }
-    const std::uint64_t speed = weighted == 0 ? foot : kUnit * 1000 / weighted;
+    const std::uint64_t speed = kUnit * 1000 / weighted;
     out.effectiveSpeedMmPerS = static_cast<std::uint32_t>(std::clamp<std::uint64_t>(speed, kMinSpeedMm, kMaxSpeedMm));
 
     std::uint64_t edge = scaleMetres(out.effectiveSpeedMmPerS, kSizingWorldSeconds);
@@ -93,7 +94,8 @@ WorldSizing sizeWorld(const TraversalSet& set)
 
 bool sizingWithinBounds(const WorldSizing& sizing)
 {
-    return travelSeconds(sizing.siteSpacingMetres, sizing.effectiveSpeedMmPerS) <= kSizingSiteMaxSeconds
+    return sizing.effectiveSpeedMmPerS != 0
+        && travelSeconds(sizing.siteSpacingMetres, sizing.effectiveSpeedMmPerS) <= kSizingSiteMaxSeconds
         && travelSeconds(sizing.regionSpanMetres, sizing.effectiveSpeedMmPerS) <= kSizingRegionMaxSeconds;
 }
 

@@ -83,10 +83,11 @@ TEST_CASE("shares beyond the whole are scaled back", "[traversal_sizing]")
 {
     TraversalSet s = onFoot();
     s.mountSpeed = 8.0F;
-    s.boatSpeed = 8.0F;
+    s.boatSpeed = 16.0F;
     s.mountedShare = 800;
     s.boatShare = 800;
-    REQUIRE(sizeWorld(s).effectiveSpeedMmPerS == 8000);
+    // Mounts take their 800 first, the boat gets the remaining 200: 0.8/8 + 0.2/16 = 0.1125 s per metre.
+    REQUIRE(sizeWorld(s).effectiveSpeedMmPerS == 8888);
     s.mountedShare = std::numeric_limits<std::uint32_t>::max();
     s.boatShare = std::numeric_limits<std::uint32_t>::max();
     REQUIRE(sizeWorld(s).effectiveSpeedMmPerS == 8000);
@@ -150,5 +151,7 @@ TEST_CASE("travel seconds handles zero speed and large distances", "[traversal_s
 {
     REQUIRE(travelSeconds(1000, 0) == 0);
     REQUIRE(travelSeconds(4000, 4000) == 1000);
-    REQUIRE(travelSeconds(std::numeric_limits<std::uint32_t>::max(), 100) > 0);
+    REQUIRE(travelSeconds(429496730, 100) == std::numeric_limits<std::uint32_t>::max());
+    REQUIRE(travelSeconds(std::numeric_limits<std::uint32_t>::max(), 100) == std::numeric_limits<std::uint32_t>::max());
+    REQUIRE_FALSE(sizingWithinBounds(WorldSizing{}));
 }
