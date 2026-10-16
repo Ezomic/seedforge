@@ -1,0 +1,16 @@
+{
+  "id": "cataclysm.demeters_grief",
+  "slot": "cataclysm",
+  "title": "Demeter's Grief",
+  "tags": ["WINTER", "FAMINE", "SILENCE", "ABSENCE"],
+  "conflicts": ["cataclysm.flood"],
+
+  "settlement": { "density_mult": 0.75 },
+  "biomes": { "inject": ["frozen_field", "thin_regrowth"], "suppress": ["lowland_farm"] },
+  "poi": { "weights": { "empty_granary": 2.5, "sealed_telesterion": 2.0, "frost_shrine": 1.5, "farmstead": 0.3 } },
+  "enemies": { "roster_add": ["famine_wolf", "frost_shade"], "roster_remove": ["bandit_farmer"] },
+  "traversal": { "unlock": ["sledge", "cold_gear"] },
+  "economy": { "scarce": ["grain", "seed_corn", "fuel"], "abundant": ["salt_meat", "frozen_stores"] },
+  "palette": { "grade": "grief", "fog_density": 0.9 },
+  "audio": { "bed_overrides": ["thin_wind", "brittle_ice"], "music_palette": "grief" }
+}

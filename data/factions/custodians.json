@@ -1,4 +1,4 @@
 [
-  { "id": "mnemones", "name": "The Mnemones", "reward": "secret", "cataclysms": ["cataclysm.silence_of_the_oracles", "cataclysm.artemis_withdrew"] },
+  { "id": "mnemones", "name": "The Mnemones", "reward": "secret", "cataclysms": ["cataclysm.silence_of_the_oracles", "cataclysm.artemis_withdrew", "cataclysm.demeters_grief"] },
   { "id": "periegetes", "name": "The Periegetes", "reward": "map_knowledge", "cataclysms": ["cataclysm.flood"] }
 ]
