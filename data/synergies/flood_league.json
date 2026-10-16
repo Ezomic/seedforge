@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "flood_league",
+      "tier": "cataclysm_powers",
+      "axioms": ["cataclysm.flood", "powers.league"],
+      "content_tier": 1,
+      "faction": "periegetes",
+      "dungeon_type": "grain_quay",
+      "mechanic": "shipping_life_support",
+      "world_name": "The Grain Ledger",
+      "flavour": {
+        "world_description": "Nothing grows below the new waterline, so every loaf is a cargo. The League did not choose to rule the harbours. It simply became the only thing standing between the polis and the empty granary."
+      }
+    }
+  ]
+}
