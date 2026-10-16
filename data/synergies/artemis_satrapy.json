@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "artemis_satrapy",
+      "tier": "cataclysm_powers",
+      "axioms": ["cataclysm.artemis_withdrew", "powers.satrapy"],
+      "content_tier": 1,
+      "faction": "diadochoi",
+      "dungeon_type": "remount_station",
+      "mechanic": "occupier_mounts",
+      "world_name": "The Stabled Occupation",
+      "flavour": {
+        "world_description": "The wild herds are gone, and the only living beasts were brought over the sea by the occupiers. A horse on the skyline means a rider with a master, and nobody in the hills has ever been allowed to keep one."
+      }
+    }
+  ]
+}
