@@ -1,0 +1,14 @@
+{
+  "id": "law.mysteries",
+  "slot": "law",
+  "title": "The Mysteries",
+  "tags": ["INITIATION", "RITE", "ADMISSION", "REVOCATION"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["initiates_grove"] },
+  "poi": { "weights": { "telesterion": 2.5, "initiation_hall": 2.0, "sanctuary": 3.0, "sacred_way": 1.5 } },
+  "enemies": { "roster_add": ["lapsed_initiate", "rite_warden"] },
+  "economy": { "scarce": ["rite_token"], "abundant": ["initiation_fee", "torch_resin"] },
+  "palette": { "grade": "mysteries", "fog_density": 1.1 },
+  "audio": { "bed_overrides": ["torch_crackle", "murmured_liturgy"], "music_palette": "mysteries" }
+}
