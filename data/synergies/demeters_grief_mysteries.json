@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "demeters_grief_mysteries",
+      "tier": "cataclysm_law",
+      "axioms": ["cataclysm.demeters_grief", "law.mysteries"],
+      "content_tier": 1,
+      "faction": "telestai",
+      "dungeon_type": "sealed_telesterion",
+      "mechanic": "failed_rite",
+      "world_name": "The Unreturned",
+      "flavour": {
+        "world_description": "The rite promised that she would come back. She did not, and the Hierophants keep the doors open and the torches lit all the same, while the lapsed stand in the snow and ask for their years."
+      }
+    }
+  ]
+}
