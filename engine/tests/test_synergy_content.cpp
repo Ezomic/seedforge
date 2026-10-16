@@ -282,3 +282,28 @@ TEST_CASE("the shipped flagship fires from its axioms and injects its faction", 
     CHECK_FALSE(result.dungeonTypes.empty());
     CHECK_FALSE(result.worldName.empty());
 }
+
+TEST_CASE("the invaders' animals synergy loads, passes xref and fires for its axiom pair", "[synergy_content]")
+{
+    const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
+    DataSet data;
+    AxiomSet axioms;
+    REQUIRE(data.loadDirectory(root));
+    REQUIRE(axioms.loadDirectory(root));
+    std::vector<Synergy> defs;
+    std::vector<std::string> problems;
+    REQUIRE(loadSynergyContentDirectory(root / "synergies", axiomPool(axioms), defs, problems));
+    const auto found = std::find_if(defs.begin(), defs.end(), [](const Synergy& s) { return s.id == "artemis_satrapy"; });
+    REQUIRE(found != defs.end());
+    CHECK(found->contentTier == ContentTier::Flagship);
+    CHECK(checkReferences(data, axioms, root).ok());
+
+    const auto fired = detectSynergies({"cataclysm.artemis_withdrew", "powers.satrapy"}, defs);
+    const SynergyOverride result = applyOverrides(fired, defs, {});
+    CHECK(result.factions == std::vector<std::string>{"diadochoi"});
+    CHECK(result.worldName == "The Stabled Occupation");
+    CHECK_FALSE(result.dungeonTypes.empty());
+
+    const auto unrelated = detectSynergies({"cataclysm.artemis_withdrew", "powers.hegemony"}, defs);
+    CHECK(applyOverrides(unrelated, defs, {}).worldName != "The Stabled Occupation");
+}
