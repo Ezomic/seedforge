@@ -1,0 +1,11 @@
+[
+  {
+    "id": "skirmisher",
+    "desire_gain_rate": 0.35,
+    "preferred_spacing": 2.5,
+    "rest_duration": 1.5,
+    "punish_reaction_time": 0.25,
+    "windup_scale": 1.0,
+    "tracking_cap_deg_per_sec": 30.0
+  }
+]
