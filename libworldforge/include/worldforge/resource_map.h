@@ -22,7 +22,7 @@
 //                  elsewhere. Only land cells (eroded height >= 0) carry ore.
 //  - oreGrade[c] : 0 (no ore) to 255 (richest). oreKind is None iff oreGrade is 0.
 //  - arable[c]   : 0 (unfarmable, including all ocean) to 255 (best farmland).
-//  - leyNodes    : at most params.leyNodeCount cells, each on a plate boundary cell, in placement
+//  - leyNodes    : at most params.leyNodeCount cells, each on a land plate boundary cell, in placement
 //                  order (strongest candidate first), pairwise at least params.leyMinSpacing apart
 //                  (Euclidean, in cells). Empty when the Law does not call for ley nodes.
 //
@@ -33,8 +33,8 @@
 // the arable score are likewise deferred.
 //
 // Determinism: integer-only, no libm, no floating point, no unordered container; ties resolve by
-// row-major cell index. Randomness comes only from subseed.h hashing. Memory is O(cells), at most
-// about 12 bytes per cell, with cells <= kTectonicsMaxSize^2.
+// cell index (ley nodes: the higher index wins an exact tie). Randomness comes only from subseed.h hashing. Memory is O(cells), at most
+// about 20 bytes per cell (transient), with cells <= kTectonicsMaxSize^2.
 namespace worldforge {
 
 enum class OreKind : std::uint8_t { None, Orichalcum, Iron };
@@ -205,13 +205,14 @@ inline void scoreArable(const ResourceInputs& in, ResourceMap& out)
     }
 }
 
-inline void placeLeyNodes(const TectonicMap& t, const ResourceParams& p, ResourceMap& out)
+inline void placeLeyNodes(const TectonicMap& t, const ErodedMap& eroded, const ResourceParams& p, ResourceMap& out)
 {
     if (p.leyNodeCount == 0) return;
     std::vector<std::uint64_t> keys;
+    keys.reserve(t.boundary.size());
     for (std::size_t c = 0; c < t.boundary.size(); ++c) {
         const int rank = boundaryRank(static_cast<BoundaryKind>(t.boundary[c]));
-        if (rank == 0) continue;
+        if (rank == 0 || eroded.heightM[c] < 0) continue;
         const std::uint64_t noise = resourceHash(t.seed, kSaltLey, static_cast<std::uint32_t>(c)) & 0xFFFFFFu;
         keys.push_back((static_cast<std::uint64_t>(rank) << 56) | (noise << 32) | static_cast<std::uint64_t>(c));
     }
@@ -251,7 +252,7 @@ inline std::optional<ResourceMap> generateResources(const ResourceInputs& inputs
     out.arable.assign(cells, 0);
     detail::placeOre(inputs, params, out);
     detail::scoreArable(inputs, out);
-    detail::placeLeyNodes(t, params, out);
+    detail::placeLeyNodes(t, *inputs.eroded, params, out);
     return out;
 }
 

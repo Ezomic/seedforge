@@ -56,7 +56,7 @@ TEST_CASE("resources are deterministic and match the golden hash", "[worldforge]
     const ResourceMap b = resources(w, params);
     CHECK(hashResourceMap(a) == hashResourceMap(b));
     CHECK(a.oreGrade == b.oreGrade);
-    CHECK(hashResourceMap(a) == 0x48cf4dc5e746944cull);
+    CHECK(hashResourceMap(a) == 0x33b247495a34ab4full);
 }
 
 TEST_CASE("different seeds give different resources", "[worldforge][resources]")
@@ -159,7 +159,8 @@ TEST_CASE("arable score prefers flat lowland over steep or high ground", "[world
     REQUIRE(lowCount > 0);
     const double lowMean = static_cast<double>(lowSum) / static_cast<double>(lowCount);
     CHECK(lowMean > 40.0);
-    if (highCount > 0) CHECK(highSum == 0);
+    CHECK(highCount > 0);
+    CHECK(highSum == 0);
 }
 
 TEST_CASE("arable score follows the moisture input", "[worldforge][resources]")
@@ -208,6 +209,7 @@ TEST_CASE("ley nodes sit on boundaries, respect spacing and count", "[worldforge
     CHECK(r.leyNodes.size() <= 10);
     for (std::size_t i = 0; i < r.leyNodes.size(); ++i) {
         CHECK(w.tectonics.boundaryAt(r.leyNodes[i].x, r.leyNodes[i].y) != BoundaryKind::None);
+        CHECK(w.eroded.heightM[r.index(r.leyNodes[i].x, r.leyNodes[i].y)] >= 0);
         for (std::size_t j = i + 1; j < r.leyNodes.size(); ++j) {
             const int dx = r.leyNodes[i].x - r.leyNodes[j].x;
             const int dy = r.leyNodes[i].y - r.leyNodes[j].y;
