@@ -68,7 +68,7 @@ enum class BoardStatus {
     UnknownContract,
     AlreadyTaken,
     TooManyActive,
-    Expired,
+    WalletFull, // the coin cap is reached; the contract stays held and uses no payout
     PayoutCapReached, // the contract stays held and can be completed next period
     NotAllowed,       // the currency table forbids the "quest" source
     TimeInvalid, // the clock went back, or past the last period the ids can name
@@ -105,8 +105,8 @@ public:
     // Pays the flat reward in coin from source "quest" (Tier 0 shares the quest income source).
     [[nodiscard]] CompleteResult complete(std::uint64_t id, Wallet& wallet, const CurrencyTable& table);
 
-    // Little-endian bytes: a version, the clock, the payout count, the taken offers and the ids
-    // of held contracts (each is rebuilt from its offer, so the bytes cannot disagree with the seed).
+    // Little-endian bytes: a version, a fingerprint of config and seed, the clock, the payout count, the taken offers and the ids
+    // of held contracts (each is rebuilt from its offer). Bytes saved under a different config or seed are refused.
     std::vector<std::uint8_t> serialise() const;
     // Nothing for truncated, trailing, wrong-version, over-limit or inconsistent bytes.
     [[nodiscard]] static std::optional<ContractBoard> deserialise(std::span<const std::uint8_t> bytes, BoardConfig config, std::uint64_t seed);

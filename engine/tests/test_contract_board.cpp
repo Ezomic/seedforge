@@ -196,6 +196,19 @@ TEST_CASE("unfinished contracts expire after the grace period", "[contract_board
     CHECK(wallet.balance(CurrencySlot::Coin) == 0);
 }
 
+TEST_CASE("a full wallet keeps the contract and spends no payout", "[contract_board]")
+{
+    const CurrencyTable table = shipped();
+    ContractBoard b = board();
+    Wallet wallet;
+    REQUIRE(wallet.earn(table, CurrencySlot::Coin, table.def(CurrencySlot::Coin).cap, "loot").credited == table.def(CurrencySlot::Coin).cap);
+    const auto id = b.openOffers()[0].id;
+    REQUIRE(b.accept(id) == BoardStatus::Ok);
+    CHECK(b.complete(id, wallet, table).status == BoardStatus::WalletFull);
+    CHECK(b.held().size() == 1);
+    CHECK(b.payoutsThisPeriod() == 0);
+}
+
 TEST_CASE("time cannot go back or past the id range", "[contract_board]")
 {
     ContractBoard b = board();
@@ -236,6 +249,10 @@ TEST_CASE("state round-trips and hostile bytes are refused", "[contract_board]")
     auto version = bytes;
     version[0] = 9;
     CHECK_FALSE(ContractBoard::deserialise(version, config(), 7).has_value());
+    CHECK_FALSE(ContractBoard::deserialise(bytes, config(), 8).has_value());
+    BoardConfig patched = config();
+    patched.templates[0].unitPrice = 11;
+    CHECK_FALSE(ContractBoard::deserialise(bytes, patched, 7).has_value());
     BoardConfig broken = config();
     broken.slots = 0;
     CHECK_FALSE(ContractBoard::deserialise(bytes, broken, 7).has_value());
@@ -248,9 +265,9 @@ TEST_CASE("every single-byte corruption either fails or yields a board that re-s
     REQUIRE(b.accept(b.openOffers()[0].id) == BoardStatus::Ok);
     const auto bytes = b.serialise();
     for (std::size_t i = 0; i < bytes.size(); ++i) {
-        for (const std::uint8_t flip : {0x01, 0x80, 0xFF}) {
+        for (const unsigned flip : {0x01u, 0x80u, 0xFFu}) {
             auto mutated = bytes;
-            mutated[i] ^= flip;
+            mutated[i] = static_cast<std::uint8_t>(mutated[i] ^ flip);
             const auto back = ContractBoard::deserialise(mutated, config(), 7);
             if (back) {
                 CHECK(ContractBoard::deserialise(back->serialise(), config(), 7).has_value());
@@ -265,8 +282,8 @@ TEST_CASE("a taken id from another period is refused", "[contract_board]")
     REQUIRE(b.advanceTo(1200) == BoardStatus::Ok);
     REQUIRE(b.accept(b.openOffers()[0].id) == BoardStatus::Ok);
     auto bytes = b.serialise();
-    // version(4) tick(8) payouts(4) takenCount(4), then the taken id: flip a bit of its period
-    const std::size_t takenId = 4 + 8 + 4 + 4;
+    // version(4) fingerprint(8) tick(8) payouts(4) takenCount(4), then the taken id: flip a bit of its period
+    const std::size_t takenId = 4 + 8 + 8 + 4 + 4;
     bytes[takenId + 2] ^= 0x01;
     CHECK_FALSE(ContractBoard::deserialise(bytes, config(), 7).has_value());
 }

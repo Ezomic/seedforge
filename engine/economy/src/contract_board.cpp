@@ -73,6 +73,29 @@ bool validate(const BoardConfig& config, std::string& error)
     return true;
 }
 
+std::uint64_t fingerprint(const BoardConfig& config, std::uint64_t seed)
+{
+    BinaryWriter writer;
+    writer.write(seed);
+    writer.write(config.periodTicks);
+    writer.write(config.slots);
+    writer.write(config.maxActive);
+    writer.write(config.maxPayoutsPerPeriod);
+    writer.write(config.gracePeriods);
+    for (const ContractTemplate& t : config.templates) {
+        writer.write(static_cast<std::uint8_t>(t.kind));
+        writer.write(t.target);
+        writer.write(t.minQuantity);
+        writer.write(t.maxQuantity);
+        writer.write(t.unitPrice);
+    }
+    for (const std::string& issuer : config.issuers) {
+        writer.write(issuer);
+    }
+    const std::vector<std::uint8_t>& bytes = writer.bytes();
+    return hash64(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+}
+
 }
 
 std::string describe(const Contract& contract)
@@ -177,16 +200,16 @@ CompleteResult ContractBoard::complete(std::uint64_t id, Wallet& wallet, const C
     if (it == held_.end()) {
         return {BoardStatus::UnknownContract, 0};
     }
-    if (tick_ >= it->expiresAt) {
-        return {BoardStatus::Expired, 0};
-    }
     if (payouts_ >= config_.maxPayoutsPerPeriod) {
         return {BoardStatus::PayoutCapReached, 0};
     }
-    const EarnResult earned = wallet.earn(table, CurrencySlot::Coin, it->reward, "quest");
-    if (earned.status != TxStatus::Ok) {
+    if (!table.canEarnFrom(CurrencySlot::Coin, "quest")) {
         return {BoardStatus::NotAllowed, 0};
     }
+    if (wallet.balance(CurrencySlot::Coin) >= table.def(CurrencySlot::Coin).cap) {
+        return {BoardStatus::WalletFull, 0};
+    }
+    const EarnResult earned = wallet.earn(table, CurrencySlot::Coin, it->reward, "quest");
     ++payouts_;
     held_.erase(it);
     return {BoardStatus::Ok, earned.credited};
@@ -196,6 +219,7 @@ std::vector<std::uint8_t> ContractBoard::serialise() const
 {
     BinaryWriter writer;
     writer.write(kBoardVersion);
+    writer.write(fingerprint(config_, seed_));
     writer.write(tick_);
     writer.write(payouts_);
     writer.write(static_cast<std::uint32_t>(takenThisPeriod_.size()));
@@ -218,11 +242,13 @@ std::optional<ContractBoard> ContractBoard::deserialise(std::span<const std::uin
     }
     BinaryReader reader(bytes);
     std::uint32_t version = 0;
+    std::uint64_t print = 0;
     std::uint64_t tick = 0;
     std::uint32_t payouts = 0;
     std::vector<std::uint64_t> taken;
     std::vector<std::uint64_t> heldIds;
-    if (!reader.read(version) || version != kBoardVersion || !reader.read(tick) || !reader.read(payouts) || !reader.read(taken)
+    if (!reader.read(version) || version != kBoardVersion || !reader.read(print) || print != fingerprint(board->config_, seed)
+        || !reader.read(tick) || !reader.read(payouts) || !reader.read(taken)
         || !reader.read(heldIds) || !reader.atEnd()) {
         return std::nullopt;
     }
