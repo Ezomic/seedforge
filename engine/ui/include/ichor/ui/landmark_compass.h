@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace ichor {
@@ -87,7 +86,6 @@ struct CompassReading {
 
 struct RouteDirections {
     CompassStatus status = CompassStatus::Ok;
-    bool viaLandmark = false;
     std::string viaId; // empty when no landmark helped
     std::string text;  // e.g. "North past the salt flats, then east where the broken tower stands."
 };
@@ -111,8 +109,9 @@ CompassReading readCompass(AnnotationPoint from, AnnotationPoint facing, const s
     const CompassLimits& limits = {});
 
 // Verbal route to `target`: the bearing from `from` toward the landmark
-// nearest the target (not the target itself), then the bearing from that
-// landmark to the target. With no usable landmark it gives a single
+// nearest the target (not the target itself, and only one that lies nearer
+// the target than `from` and is nearer `from` than the target is), then the
+// bearing from that landmark to the target. With no usable landmark it gives a single
 // bearing and a distance band instead.
 RouteDirections describeRoute(AnnotationPoint from, const NavLandmark& target, const std::vector<NavLandmark>& landmarks,
     const CompassLimits& limits = {});

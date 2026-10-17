@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string_view>
 
 namespace ichor {
 
@@ -56,6 +57,9 @@ int octantIndex(double right, double forward)
 {
     const double ar = std::fabs(right);
     const double af = std::fabs(forward);
+    if (ar == 0.0 && af == 0.0) {
+        return 0;
+    }
     constexpr double kTan = 2.41421356;
     if (af * kTan < ar) {
         return right > 0.0 ? 2 : 6;
@@ -238,7 +242,7 @@ RouteDirections describeRoute(AnnotationPoint from, const NavLandmark& target, c
             continue;
         }
         const double d2 = squaredDistance(lm.position, target.position);
-        if (d2 >= directSq) {
+        if (d2 >= directSq || squaredDistance(from, lm.position) >= directSq) {
             continue;
         }
         if (via == nullptr || d2 < viaSq || (d2 == viaSq && lm.id < via->id)) {
@@ -264,7 +268,6 @@ RouteDirections describeRoute(AnnotationPoint from, const NavLandmark& target, c
     const CompassPoint first = bearingOf(static_cast<double>(via->position.x) - from.x, static_cast<double>(via->position.y) - from.y);
     const CompassPoint second = bearingOf(static_cast<double>(target.position.x) - via->position.x,
         static_cast<double>(target.position.y) - via->position.y);
-    out.viaLandmark = true;
     out.viaId = via->id;
     out.text = upperFirst(compassPointName(first)) + " past " + via->name + ", then " + compassPointName(second)
         + " to " + target.name + ", " + distanceBandPhrase(band) + " off.";

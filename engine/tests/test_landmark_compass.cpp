@@ -157,7 +157,6 @@ TEST_CASE("route goes through the landmark nearest the target", "[landmark_compa
     const NavLandmark mine{"site.mine", "the old mine", {600.0f, 1500.0f}};
     const auto r = describeRoute({0.0f, 0.0f}, mine, world());
     REQUIRE(r.status == CompassStatus::Ok);
-    CHECK(r.viaLandmark);
     CHECK(r.viaId == "lm.flats");
     CHECK(r.text == "North past the salt flats, then east to the old mine, a long way off.");
 }
@@ -167,7 +166,7 @@ TEST_CASE("route without a closer landmark gives a plain bearing", "[landmark_co
     const NavLandmark mine{"site.mine", "the old mine", {0.0f, -300.0f}};
     const auto r = describeRoute({0.0f, 0.0f}, mine, {{"lm.far", "the far spire", {5000.0f, 5000.0f}}});
     REQUIRE(r.status == CompassStatus::Ok);
-    CHECK_FALSE(r.viaLandmark);
+    CHECK(r.viaId.empty());
     CHECK(r.viaId.empty());
     CHECK(r.text == "Head south to the old mine, a good walk off.");
 }
@@ -177,8 +176,33 @@ TEST_CASE("route skips the target itself and a landmark underfoot", "[landmark_c
     const auto lms = world();
     const auto r = describeRoute({-30.0f, 0.0f}, lms[0], lms);
     REQUIRE(r.status == CompassStatus::Ok);
-    CHECK(r.viaId != "lm.tower");
-    CHECK(r.viaId != "lm.well");
+    CHECK(r.viaId.empty());
+    CHECK(r.text == "Head north to the broken tower, a good walk off.");
+}
+
+TEST_CASE("route never doubles back through a landmark behind the player", "[landmark_compass]")
+{
+    const NavLandmark mine{"site.mine", "the old mine", {0.0f, 1000.0f}};
+    const std::vector<NavLandmark> lms = {{"lm.behind", "the sunken road", {0.0f, -100.0f}}};
+    CHECK(describeRoute({0.0f, 0.0f}, mine, lms).viaId.empty());
+}
+
+TEST_CASE("zero deltas read as north and ahead", "[landmark_compass]")
+{
+    CHECK(bearingOf(0, 0) == CompassPoint::North);
+    CHECK(relativeSectorOf(0, 0, 0, 1) == RelativeSector::Ahead);
+    const auto r = readCompass({5.0f, 5.0f}, {0.0f, 1.0f}, {{"lm.here", "the old well", {5.0f, 5.0f}}});
+    REQUIRE(r.nearest.size() == 1);
+    CHECK(r.nearest[0].bearing == CompassPoint::North);
+    CHECK(r.nearest[0].distance == DistanceBand::StonesThrow);
+}
+
+TEST_CASE("compass accepts extreme facing vectors and zero results", "[landmark_compass]")
+{
+    const auto r = readCompass({0.0f, 0.0f}, {3.0e38f, 0.0f}, world());
+    REQUIRE(r.status == CompassStatus::Ok);
+    CHECK(r.facing == CompassPoint::East);
+    CHECK(readCompass({0.0f, 0.0f}, {0.0f, 1.0f}, world(), {.maxResults = 0}).nearest.empty());
 }
 
 TEST_CASE("route to where you stand says so", "[landmark_compass]")
