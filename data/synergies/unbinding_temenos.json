@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "unbinding_temenos",
+      "tier": "cataclysm_law",
+      "axioms": ["cataclysm.unbinding", "law.temenos"],
+      "content_tier": 1,
+      "faction": "horistai",
+      "dungeon_type": "chasm_sanctuary",
+      "mechanic": "edge_power",
+      "world_name": "The Sundered Ways",
+      "flavour": {
+        "world_description": "The earth split along the processional roads, so every chasm is a temenos with the floor taken out. The Horistai say the god is strongest where the footing is worst, and nobody has yet disproved it from the bottom."
+      }
+    }
+  ]
+}
