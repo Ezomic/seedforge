@@ -1,0 +1,14 @@
+{
+  "synergies": [
+    {
+      "id": "orichalcum_foretold",
+      "tier": "pressure",
+      "axioms": ["law.orichalcum", "pressure.foretold"],
+      "content_tier": 2,
+      "world_name": "The Held Ridge",
+      "flavour": {
+        "world_description": "The prophecy says the conqueror cannot lose, but it says nothing of the ridge he holds. Behind the war horns is an ore road and a refinery, and a war that looks lost is a supply line that can be cut."
+      }
+    }
+  ]
+}
