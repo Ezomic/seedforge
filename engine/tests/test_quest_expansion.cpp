@@ -34,15 +34,18 @@ std::size_t countType(const Graph& g, const std::string& type)
 }
 
 // Longest chain of edges from the situation; the graphs are acyclic.
-std::size_t depth(const Graph& g, NodeId at)
+std::size_t depth(const Graph& g, NodeId at, std::map<NodeId, std::size_t>& memo)
 {
+    if (const auto found = memo.find(at); found != memo.end()) {
+        return found->second;
+    }
     std::size_t best = 0;
     for (const auto& [id, edge] : g.edges()) {
         if (edge.from == at) {
-            best = std::max(best, 1 + depth(g, edge.to));
+            best = std::max(best, 1 + depth(g, edge.to, memo));
         }
     }
-    return best;
+    return memo[at] = best;
 }
 
 NodeId situationOf(const Graph& g)
@@ -130,7 +133,8 @@ TEST_CASE("quests reach three levels deep", "[quest]")
     std::size_t deepest = 0;
     for (std::uint64_t seed = 0; seed < 300; ++seed) {
         const Graph g = expanded("broken_dependency", seed);
-        const std::size_t d = depth(g, situationOf(g));
+        std::map<NodeId, std::size_t> memo;
+        const std::size_t d = depth(g, situationOf(g), memo);
         CHECK(d >= 2);
         deepest = std::max(deepest, d);
     }
@@ -238,4 +242,24 @@ TEST_CASE("validateQuest names each broken invariant", "[quest]")
     Graph twoRoots = g;
     twoRoots.addNode(kSituation);
     CHECK(hasError(validateQuest(twoRoots), "expected one situation"));
+}
+
+TEST_CASE("a rule that fans out into many placeholders still settles", "[quest]")
+{
+    const char* json = R"([
+      {"id": "t", "phase": "tension", "match_nodes": ["contested_cell"], "retypes": ["0:situation"],
+       "add_nodes": ["p", "p", "p", "p", "p", "walk_away"],
+       "add_edges": ["0>1:needs", "0>2:needs", "0>3:needs", "0>4:needs", "0>5:needs", "0>6:refuse"]},
+      {"id": "s", "phase": "structure", "match_nodes": ["p"], "retypes": ["0:q"],
+       "add_nodes": ["q", "q"], "add_edges": ["0>1:then", "0>2:then"]},
+      {"id": "d", "phase": "detail", "match_nodes": ["q"], "retypes": ["0:fetch"]}
+    ])";
+    const Ruleset rules = parseRuleset(json);
+    REQUIRE(rules.error.empty());
+    Params params;
+    params.tension = "contested_cell";
+    const Result result = expand(rules, params);
+    CHECK(result.error.empty());
+    CHECK(validateQuest(result.graph).empty());
+    CHECK(countType(result.graph, "fetch") == 15);
 }

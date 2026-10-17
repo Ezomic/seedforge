@@ -19,6 +19,7 @@ using Json = nlohmann::json;
 
 constexpr std::size_t kMaxRules = 256;
 constexpr std::uintmax_t kMaxFileBytes = 1u << 20;
+constexpr std::uint32_t kMaxExpansionSteps = 512;
 
 Ruleset failed(std::string message)
 {
@@ -59,8 +60,7 @@ std::string runPhase(Graph& graph, const RuleSet& rules, std::uint64_t seed, con
 {
     RewriteOptions options;
     options.seed = Rng(seed).derive(phase).nextU64();
-    // Every step must consume a placeholder, so a bound proportional to the graph is always enough.
-    options.maxIterations = static_cast<std::uint32_t>(graph.nodes().size()) * 2 + 8;
+    options.maxIterations = kMaxExpansionSteps;
     const RewriteResult result = rewrite(graph, rules, options);
     if (result.reason == StopReason::InvalidRule) {
         return std::string(phase) + ": " + result.error;
@@ -176,7 +176,8 @@ std::vector<std::string> validateQuest(const Graph& graph)
             if (at == root && edge.type == kNeeds) {
                 hasRequirement = true;
             }
-            if (at == root && edge.type == kRefuse && graph.node(edge.to)->type == kWalkAway) {
+            const Node* to = graph.node(edge.to);
+            if (at == root && edge.type == kRefuse && to != nullptr && to->type == kWalkAway) {
                 refusable = true;
             }
             if (seen.insert(edge.to).second) {
