@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <worldforge/biome_map.h>
 #include <worldforge/hydrology_map.h>
 #include <worldforge/region_tier_assign.h>
 #include <worldforge/tectonics_map.h>
@@ -13,6 +14,10 @@ namespace {
 constexpr std::uint8_t kPlatePalette[][3] = {
     {230, 25, 75}, {60, 180, 75}, {255, 225, 25}, {67, 99, 216}, {245, 130, 49}, {145, 30, 180},
     {70, 240, 240}, {240, 50, 230}, {188, 246, 12}, {250, 190, 212}, {0, 128, 128}, {220, 190, 255},
+};
+constexpr std::uint8_t kBiomePalette[worldforge::kBiomeCount][3] = {
+    {20, 50, 120}, {60, 120, 200}, {240, 248, 255}, {170, 190, 170}, {40, 90, 70}, {30, 120, 40}, {140, 190, 70}, {225, 200, 120},
+    {200, 170, 60}, {0, 90, 30}, {150, 150, 160}, {100, 90, 85}, {70, 110, 100}, {220, 210, 90}, {160, 60, 160}, {60, 150, 150},
 };
 constexpr std::size_t kPaletteSize = sizeof kPlatePalette / sizeof kPlatePalette[0];
 
@@ -133,6 +138,34 @@ PhaseResult runHydrology(std::uint64_t seed, int size)
     return r;
 }
 
+PhaseResult runBiomes(std::uint64_t seed, int size)
+{
+    const auto map = tectonics(seed, size);
+    if (!map) return failure(sizeError(size));
+    const auto eroded = worldforge::erodeTectonics(*map);
+    if (!eroded) return failure("erosion failed");
+    const auto hydro = worldforge::computeHydrology(*eroded);
+    if (!hydro) return failure("hydrology failed");
+    const auto climate = worldforge::generateClimate(*eroded);
+    if (!climate) return failure("climate failed");
+    const auto biomes = worldforge::generateBiomes({ &*climate, &*hydro });
+    if (!biomes) return failure("biomes failed");
+
+    Layer color = makeLayer("biome", size, size, 3);
+    Layer blend = makeLayer("biome_blend", size, size, 1);
+    for (std::size_t i = 0; i < biomes->biome.size(); ++i) {
+        const auto* c = kBiomePalette[biomes->biome[i]];
+        color.pixels[i * 3] = c[0];
+        color.pixels[i * 3 + 1] = c[1];
+        color.pixels[i * 3 + 2] = c[2];
+        blend.pixels[i] = biomes->blend[i];
+    }
+    PhaseResult r;
+    r.layers.push_back(std::move(color));
+    r.layers.push_back(std::move(blend));
+    return r;
+}
+
 }
 
 const std::vector<Phase>& phaseRegistry()
@@ -141,6 +174,7 @@ const std::vector<Phase>& phaseRegistry()
         {"tectonics", "plate map, boundary kinds and base height field", runTectonics},
         {"region_tiers", "difficulty tier per cell, from distance to the centre and boundary danger", runRegionTiers},
         {"hydrology", "eroded terrain with depressions filled: flow accumulation, rivers, lakes and carved height", runHydrology},
+        {"biomes", "biome id colour map and border blend weight, from climate and hydrology", runBiomes},
     };
     return phases;
 }
