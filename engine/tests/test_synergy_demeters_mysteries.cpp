@@ -7,8 +7,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <map>
 #include <filesystem>
 #include <string>
+#include <variant>
 #include <vector>
 
 using namespace ichor;
@@ -69,10 +71,48 @@ TEST_CASE("the Hierophants synergy loads, passes xref and fires for its axiom pa
     const auto fired = detectSynergies({"cataclysm.demeters_grief", "law.mysteries"}, defs);
     REQUIRE(std::find(fired.begin(), fired.end(), "demeters_grief_mysteries") != fired.end());
     const SynergyOverride result = applyOverrides(fired, defs, {});
-    CHECK(result.factions == std::vector<std::string>{"telestai"});
+    CHECK(result.factions == std::vector<std::string>{"hierophants"});
     CHECK(result.dungeonTypes == std::vector<std::string>{"sealed_telesterion"});
     CHECK(result.worldName == "The Unreturned");
 
     CHECK(detectSynergies({"cataclysm.demeters_grief", "law.hecatomb"}, defs).empty());
     CHECK(detectSynergies({"cataclysm.flood", "law.mysteries"}, defs).empty());
+}
+
+TEST_CASE("the Hierophants are a real faction of the Mysteries, distinct from the Telestai stand-in", "[synergy_content]")
+{
+    const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
+    DataSet data;
+    REQUIRE(data.loadDirectory(root));
+
+    const DataRecord* hierophants = data.record("factions", "hierophants");
+    REQUIRE(hierophants != nullptr);
+    CHECK(data.field("factions", "hierophants", "name") != nullptr);
+    const DataValue* axiom = data.field("factions", "hierophants", "axiom");
+    REQUIRE(axiom != nullptr);
+    REQUIRE(std::holds_alternative<std::string>(*axiom));
+    CHECK(std::get<std::string>(*axiom) == "law.mysteries");
+    CHECK(data.record("factions", "telestai") != nullptr);
+}
+
+TEST_CASE("Demeter's Grief and The Mysteries keep every POI weight inside the range of the sibling axioms", "[synergy_content]")
+{
+    const std::filesystem::path root = ICHOR_GAME_DATA_DIR;
+    AxiomSet axioms;
+    REQUIRE(axioms.loadDirectory(root));
+    for (const char* id : {"cataclysm.demeters_grief", "law.mysteries"}) {
+        const Axiom* axiom = axioms.find(id);
+        REQUIRE(axiom != nullptr);
+        const auto poi = axiom->blocks.find("poi");
+        REQUIRE(poi != axiom->blocks.end());
+        const auto weights = poi->second.find("weights");
+        REQUIRE(weights != poi->second.end());
+        const auto* map = std::get_if<std::map<std::string, double, std::less<>>>(&weights->second);
+        REQUIRE(map != nullptr);
+        for (const auto& [poiId, weight] : *map) {
+            INFO(id << " " << poiId);
+            CHECK(weight > 0.0);
+            CHECK(weight <= 3.0);
+        }
+    }
 }
