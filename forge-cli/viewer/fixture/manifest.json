@@ -1,0 +1,19 @@
+{
+  "tool": "forge-cli",
+  "size": 64,
+  "phases": ["tectonics", "region_tiers", "hydrology", "biomes"],
+  "runs": [
+    {"seed": 1, "layers": [
+      {"name": "plates", "phase": "tectonics", "file": "seed_1/plates.png", "width": 64, "height": 64, "channels": 3, "hash": "4c69858509baee99"},
+      {"name": "boundary", "phase": "tectonics", "file": "seed_1/boundary.png", "width": 64, "height": 64, "channels": 1, "hash": "b9e886218c2b7fea"},
+      {"name": "height", "phase": "tectonics", "file": "seed_1/height.png", "width": 64, "height": 64, "channels": 1, "hash": "58360f3f225d7aa2"},
+      {"name": "region_tier", "phase": "region_tiers", "file": "seed_1/region_tier.png", "width": 64, "height": 64, "channels": 1, "hash": "4e0bc1c607a035a7"},
+      {"name": "flow", "phase": "hydrology", "file": "seed_1/flow.png", "width": 64, "height": 64, "channels": 1, "hash": "ab3426b7a74fe3e9"},
+      {"name": "rivers", "phase": "hydrology", "file": "seed_1/rivers.png", "width": 64, "height": 64, "channels": 1, "hash": "f2ae4ad546cfc120"},
+      {"name": "lakes", "phase": "hydrology", "file": "seed_1/lakes.png", "width": 64, "height": 64, "channels": 1, "hash": "82d72a57feb055e9"},
+      {"name": "height_carved", "phase": "hydrology", "file": "seed_1/height_carved.png", "width": 64, "height": 64, "channels": 1, "hash": "43aa9f1cbdc61319"},
+      {"name": "biome", "phase": "biomes", "file": "seed_1/biome.png", "width": 64, "height": 64, "channels": 3, "hash": "855704f0b2aabbef"},
+      {"name": "biome_blend", "phase": "biomes", "file": "seed_1/biome_blend.png", "width": 64, "height": 64, "channels": 1, "hash": "a44758156b98449e"}
+    ]}
+  ]
+}
