@@ -1,5 +1,8 @@
 #include <forgecli/forge.h>
 
+#include <algorithm>
+
+#include <worldforge/hydrology_map.h>
 #include <worldforge/region_tier_assign.h>
 #include <worldforge/tectonics_map.h>
 
@@ -100,6 +103,36 @@ PhaseResult runRegionTiers(std::uint64_t seed, int size)
     return r;
 }
 
+PhaseResult runHydrology(std::uint64_t seed, int size)
+{
+    const auto map = tectonics(seed, size);
+    if (!map) return failure(sizeError(size));
+    const auto eroded = worldforge::erodeTectonics(*map);
+    if (!eroded) return failure("erosion failed");
+    const auto hydro = worldforge::computeHydrology(*eroded);
+    if (!hydro) return failure("hydrology failed");
+
+    Layer flow = makeLayer("flow", size, size, 1);
+    Layer rivers = makeLayer("rivers", size, size, 1);
+    Layer lakes = makeLayer("lakes", size, size, 1);
+    Layer height = makeLayer("height_carved", size, size, 1);
+    const int range = worldforge::kTectonicsMaxHeightM - worldforge::kTectonicsMinHeightM;
+    const std::uint64_t maxAccumulation = *std::max_element(hydro->accumulation.begin(), hydro->accumulation.end());
+    for (std::size_t i = 0; i < hydro->heightM.size(); ++i) {
+        const std::uint64_t root = worldforge::detail::isqrtU64((static_cast<std::uint64_t>(hydro->accumulation[i]) << 16) / maxAccumulation);
+        flow.pixels[i] = static_cast<std::uint8_t>(root > 255 ? 255 : root);
+        rivers.pixels[i] = static_cast<std::uint8_t>(hydro->river[i] * 255);
+        lakes.pixels[i] = static_cast<std::uint8_t>(hydro->lakeDepthM[i] > 255 ? 255 : hydro->lakeDepthM[i]);
+        height.pixels[i] = static_cast<std::uint8_t>((hydro->heightM[i] - worldforge::kTectonicsMinHeightM) * 255 / range);
+    }
+    PhaseResult r;
+    r.layers.push_back(std::move(flow));
+    r.layers.push_back(std::move(rivers));
+    r.layers.push_back(std::move(lakes));
+    r.layers.push_back(std::move(height));
+    return r;
+}
+
 }
 
 const std::vector<Phase>& phaseRegistry()
@@ -107,6 +140,7 @@ const std::vector<Phase>& phaseRegistry()
     static const std::vector<Phase> phases = {
         {"tectonics", "plate map, boundary kinds and base height field", runTectonics},
         {"region_tiers", "difficulty tier per cell, from distance to the centre and boundary danger", runRegionTiers},
+        {"hydrology", "eroded terrain with depressions filled: flow accumulation, rivers, lakes and carved height", runHydrology},
     };
     return phases;
 }
