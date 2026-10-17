@@ -136,7 +136,7 @@ TEST_CASE("persistent entities are preferred over fresh ones", "[quest][bind]")
         }
     }
     int hits = 0;
-    int npcNodes = 0;
+    int questsWithNpc = 0;
     for (std::uint64_t seed = 0; seed < 16; ++seed) {
         const Graph g = expanded("hostility_pair", seed);
         const Result r = bind(g, w, seed);
@@ -144,17 +144,18 @@ TEST_CASE("persistent entities are preferred over fresh ones", "[quest][bind]")
         for (const Binding& b : r.bindings) {
             EntityKind k{};
             if (kindFor(b.type, k) && k == EntityKind::Npc) {
-                ++npcNodes;
+                ++questsWithNpc;
                 if (b.entity == "npc_4") {
                     ++hits;
                 }
+                break;
             }
         }
     }
-    REQUIRE(npcNodes > 0);
+    REQUIRE(questsWithNpc > 0);
     // Unused entities win first, so npc_4 is taken by the first NPC node of
-    // each quest; without the appearance bonus it would win about 1 in 6.
-    REQUIRE(hits >= 16);
+    // each quest that has one; without the appearance bonus it would win about 1 in 6.
+    REQUIRE(hits == questsWithNpc);
 }
 
 TEST_CASE("nodes prefer the anchor's region", "[quest][bind]")
