@@ -1,4 +1,5 @@
 #include "ichor/graph/quest_refusal.h"
+#include "ichor/data/data_set.h"
 #include "ichor/ledger/consequence_ledger.h"
 #include "ichor/ledger/quest_validation.h"
 #include "ichor/ledger/quest_visible_effect.h"
@@ -56,19 +57,45 @@ std::set<std::string, std::less<>> knownEntities()
     return out;
 }
 
+std::vector<std::string> split(const std::string& text, char sep)
+{
+    std::vector<std::string> out;
+    if (text.empty())
+        return out;
+    std::size_t from = 0;
+    for (;;) {
+        const std::size_t at = text.find(sep, from);
+        out.push_back(text.substr(from, at == std::string::npos ? at : at - from));
+        if (at == std::string::npos)
+            return out;
+        from = at + 1;
+    }
+}
+
+std::vector<std::string> fieldsOf(const std::string& record, std::size_t count)
+{
+    std::vector<std::string> out = split(record, '|');
+    out.resize(count);
+    return out;
+}
+
 BoundQuest bound(const json& q)
 {
     BoundQuest out;
     out.id = q.at("id").get<std::string>();
-    for (const json& n : q.at("nodes")) {
+    for (const json& record : q.at("nodes")) {
+        const std::vector<std::string> f = fieldsOf(record.get<std::string>(), 6);
         QuestNode node;
-        node.id = n.at("id").get<std::string>();
-        node.entity = n.at("entity").get<std::string>();
-        node.cost = n.at("cost").get<std::uint32_t>();
-        node.refusable = n.at("refusable").get<bool>();
-        node.after = n.at("after").get<std::vector<std::string>>();
-        for (const json& a : n.at("assumes"))
-            node.assumes.push_back({a.at("subject").get<std::string>(), a.at("kind").get<std::string>(), a.at("value").get<std::string>()});
+        node.id = f[0];
+        node.entity = f[1];
+        node.cost = static_cast<std::uint32_t>(std::stoul(f[2]));
+        node.refusable = f[3] == "1";
+        node.after = split(f[4], ',');
+        for (const std::string& a : split(f[5], ';')) {
+            const std::vector<std::string> parts = split(a, ':');
+            REQUIRE(parts.size() == 3);
+            node.assumes.push_back({parts[0], parts[1], parts[2]});
+        }
         out.nodes.push_back(std::move(node));
     }
     return out;
@@ -108,15 +135,18 @@ refusal::Quest refusalQuest(const json& q)
 {
     refusal::Quest out;
     out.start = q.at("start").get<std::uint32_t>();
-    for (const json& s : q.at("steps")) {
+    for (const json& record : q.at("steps")) {
+        const std::vector<std::string> f = fieldsOf(record.get<std::string>(), 3);
         refusal::Step step;
-        step.id = s.at("id").get<std::uint32_t>();
-        step.otherSide = partyNumber(s.at("other_side").get<std::string>());
-        for (const json& o : s.at("options")) {
+        step.id = static_cast<std::uint32_t>(std::stoul(f[0]));
+        step.otherSide = partyNumber(f[1]);
+        for (const std::string& option : split(f[2], ';')) {
+            const std::vector<std::string> parts = split(option, '>');
+            REQUIRE(parts.size() >= 2);
             refusal::Option opt;
-            opt.choice = choiceOf(o.at("choice").get<std::string>());
-            opt.next = o.at("next").get<std::uint32_t>();
-            opt.consequence = o.value("consequence", "");
+            opt.choice = choiceOf(parts[0]);
+            opt.next = static_cast<std::uint32_t>(std::stoul(parts[1]));
+            opt.consequence = parts.size() > 2 ? parts[2] : "";
             step.options.push_back(std::move(opt));
         }
         out.steps.push_back(std::move(step));
@@ -129,10 +159,11 @@ std::vector<QuestEffect> effectsOf(const json& q)
     static const std::map<std::string, VisibleMetric> metrics = {{"Territory", VisibleMetric::Territory},
         {"SupplyStatus", VisibleMetric::SupplyStatus}, {"FactionStrength", VisibleMetric::FactionStrength}, {"Route", VisibleMetric::Route}};
     std::vector<QuestEffect> out;
-    for (const json& e : q.at("effects")) {
-        const auto it = metrics.find(e.at("metric").get<std::string>());
+    for (const json& record : q.at("effects")) {
+        const std::vector<std::string> f = fieldsOf(record.get<std::string>(), 3);
+        const auto it = metrics.find(f[0]);
         REQUIRE(it != metrics.end());
-        out.push_back({it->second, e.at("target").get<std::string>(), e.at("delta").get<std::int64_t>()});
+        out.push_back({it->second, f[1], std::stoll(f[2])});
     }
     return out;
 }
@@ -241,6 +272,12 @@ TEST_CASE("set-piece quests: visible number check goes red on cancelling effects
     for (QuestEffect& e : effects)
         e.delta = 0;
     CHECK(checkVisibleNumber(effects).verdict != VisibleNumberVerdict::Moves);
+}
+
+TEST_CASE("set-piece quests: files load as flat data records", "[quests][setpiece]")
+{
+    DataSet data;
+    REQUIRE(data.loadDirectory(ICHOR_REPO_DATA));
 }
 
 TEST_CASE("set-piece quests: text has no em-dashes", "[quests][setpiece]")
