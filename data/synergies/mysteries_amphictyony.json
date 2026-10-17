@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "mysteries_amphictyony",
+      "tier": "law_powers",
+      "axioms": ["law.mysteries", "powers.amphictyony"],
+      "content_tier": 1,
+      "faction": "telestai",
+      "dungeon_type": "sanctuary_tribunal",
+      "mechanic": "capital_initiation",
+      "world_name": "The Closed Rite",
+      "flavour": {
+        "world_description": "The league decides who may be shown the sacred things, and anyone shown them without its seal has stolen from the gods. Learning is licensed here, and the unlicensed are tried for sacrilege before the sanctuary steps."
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+[
+ {
+  "id": "fallen_colossus",
+  "name": "Fallen Colossus",
+  "silhouette": "a bronze giant face down across a river bend, one arm raised as a bridge",
+  "roles": [
+   "npc.casting_foreman",
+   "npc.bronze_listener"
+  ],
+  "routes": [
+   "route.colossus_arm"
+  ]
+ },
+ {
+  "id": "drowned_temple",
+  "name": "Drowned Temple",
+  "silhouette": "a pediment and six columns standing out of a flooded valley",
+  "roles": [
+   "npc.reed_priest",
+   "npc.salvage_diver"
+  ],
+  "routes": [
+   "route.temple_causeway"
+  ]
+ },
+ {
+  "id": "beacon_tower",
+  "name": "Beacon Tower",
+  "silhouette": "a broken signal tower with a cold brazier on its crown",
+  "roles": [
+   "npc.last_watchman",
+   "npc.smoke_courier"
+  ],
+  "routes": [
+   "route.ridge_signal"
+  ]
+ },
+ {
+  "id": "oracle_cleft",
+  "name": "Oracle Cleft",
+  "silhouette": "a split cliff face with a stair that climbs into the dark",
+  "roles": [
+   "npc.silent_pythia",
+   "npc.pilgrim_guide"
+  ],
+  "routes": [
+   "route.pilgrim_stair"
+  ]
+ },
+ {
+  "id": "salt_obelisk",
+  "name": "Salt Obelisk",
+  "silhouette": "a white spire on a dead lakebed, ringed by a field of cracked tiles",
+  "roles": [
+   "npc.brine_surveyor",
+   "npc.oath_reader"
+  ],
+  "routes": [
+   "route.salt_road"
+  ]
+ }
+]

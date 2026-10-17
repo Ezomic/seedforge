@@ -5,7 +5,7 @@
       "tier": "cataclysm_law",
       "axioms": ["cataclysm.demeters_grief", "law.mysteries"],
       "content_tier": 1,
-      "faction": "telestai",
+      "faction": "hierophants",
       "dungeon_type": "sealed_telesterion",
       "mechanic": "failed_rite",
       "world_name": "The Unreturned",

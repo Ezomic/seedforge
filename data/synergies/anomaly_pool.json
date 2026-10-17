@@ -1,0 +1,24 @@
+{
+  "synergies": [
+    {
+      "id": "tiresias_silence",
+      "tier": "anomaly",
+      "axioms": ["anomaly.tiresias", "cataclysm.silence_of_the_oracles"],
+      "content_tier": 2,
+      "world_name": "The Unanswered Seer",
+      "flavour": {
+        "world_description": "For two hundred years one blind man has gone on prophesying without a single word from the gods behind it, and he knows exactly what that means. Pilgrims climb to his hut for the answer the sanctuaries can no longer give, and he tells them the truth."
+      }
+    },
+    {
+      "id": "underworld_unburied",
+      "tier": "anomaly",
+      "axioms": ["anomaly.underworld", "pressure.unburied"],
+      "content_tier": 2,
+      "world_name": "The Road Back Up",
+      "flavour": {
+        "world_description": "The dead are not returning by accident. The gate below the hills stands open and the unburied are walking back out of it, one grave field at a time, with nobody left to turn them around."
+      }
+    }
+  ]
+}

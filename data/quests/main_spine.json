@@ -1,0 +1,24 @@
+[
+  {"id": "spine.meta", "type": "meta", "name": "The Reckoning of the Silence", "budget": 40},
+
+  {"id": "spine.slot.incumbent", "type": "slot", "slot": "incumbent", "kind": "faction"},
+  {"id": "spine.slot.challenger", "type": "slot", "slot": "challenger", "kind": "faction", "hostile_to": "incumbent"},
+  {"id": "spine.slot.parasite", "type": "slot", "slot": "parasite", "kind": "faction"},
+  {"id": "spine.slot.custodian", "type": "slot", "slot": "custodian", "kind": "faction"},
+  {"id": "spine.slot.refusenik", "type": "slot", "slot": "refusenik", "kind": "faction"},
+  {"id": "spine.slot.broker", "type": "slot", "slot": "broker", "kind": "npc", "member_of": "parasite"},
+  {"id": "spine.slot.envoy", "type": "slot", "slot": "envoy", "kind": "npc", "member_of": "incumbent", "needs_tag": "envoy"},
+  {"id": "spine.slot.informant", "type": "slot", "slot": "informant", "kind": "npc", "member_of": "challenger"},
+  {"id": "spine.slot.witness", "type": "slot", "slot": "witness", "kind": "npc", "member_of": "custodian", "needs_tag": "rememberer"},
+
+  {"id": "spine.beat.commission", "type": "beat", "slot": "broker", "cost": 2, "refusable": false, "after": []},
+  {"id": "spine.beat.rumour", "type": "beat", "slot": "informant", "cost": 3, "refusable": false, "after": ["spine.beat.commission"]},
+  {"id": "spine.beat.audience", "type": "beat", "slot": "envoy", "cost": 3, "refusable": false, "after": ["spine.beat.commission"]},
+  {"id": "spine.beat.testimony", "type": "beat", "slot": "witness", "cost": 5, "refusable": false, "after": ["spine.beat.rumour", "spine.beat.audience"]},
+  {"id": "spine.beat.secret", "type": "beat", "slot": "custodian", "cost": 4, "refusable": false, "after": ["spine.beat.testimony"]},
+  {"id": "spine.beat.double_dealing", "type": "beat", "slot": "parasite", "cost": 4, "refusable": false, "after": ["spine.beat.testimony"]},
+  {"id": "spine.beat.choose_side", "type": "beat", "slot": "challenger", "cost": 3, "refusable": true, "after": ["spine.beat.secret", "spine.beat.double_dealing"]},
+  {"id": "spine.beat.walk_away", "type": "beat", "slot": "refusenik", "cost": 1, "refusable": true, "after": ["spine.beat.choose_side"]},
+  {"id": "spine.beat.confrontation", "type": "beat", "slot": "incumbent", "cost": 6, "refusable": false, "after": ["spine.beat.choose_side"]},
+  {"id": "spine.beat.reckoning", "type": "beat", "slot": "custodian", "cost": 5, "refusable": false, "after": ["spine.beat.confrontation"]}
+]

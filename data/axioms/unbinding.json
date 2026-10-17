@@ -1,0 +1,16 @@
+{
+  "id": "cataclysm.unbinding",
+  "slot": "cataclysm",
+  "title": "The Unbinding",
+  "tags": ["VERTICAL", "RUIN", "ISOLATION", "VERTICAL_LIMIT"],
+  "conflicts": [],
+
+  "settlement": { "prefer_slope": "steep", "density_mult": 0.8 },
+  "biomes": { "inject": ["chasm_rim", "sundered_plateau"] },
+  "poi": { "weights": { "chasm_ladder": 3.0, "rope_bridge": 2.0, "sanctuary": 1.5 } },
+  "enemies": { "roster_add": ["cliff_stalker", "chasm_shade"] },
+  "traversal": { "unlock": ["climb", "descend"] },
+  "economy": { "scarce": ["timber"], "abundant": ["rope", "iron"] },
+  "palette": { "grade": "unbinding", "fog_density": 1.2 },
+  "audio": { "bed_overrides": ["deep_wind", "distant_rockfall"], "music_palette": "unbinding" }
+}

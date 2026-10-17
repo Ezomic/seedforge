@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "favour_league",
+      "tier": "law_powers",
+      "axioms": ["law.last_favour", "powers.league"],
+      "content_tier": 1,
+      "faction": "thesauroi",
+      "dungeon_type": "sealed_treasury",
+      "mechanic": "inflating_prices",
+      "world_name": "The Cornered Favour",
+      "flavour": {
+        "world_description": "There is only so much grace left, and the League has bought the rights to it. A votive that cost pocket change in spring is a house by harvest, and the Thesauroi keep the ledger that says the price has not peaked yet."
+      }
+    }
+  ]
+}
