@@ -1,0 +1,14 @@
+{
+  "id": "law.temenos",
+  "slot": "law",
+  "title": "Temenos",
+  "tags": ["SACRED", "POSITIONAL", "SANCTUARY", "MORAL_AXIS"],
+  "conflicts": [],
+
+  "biomes": { "inject": ["sacred_grove"] },
+  "poi": { "weights": { "sanctuary": 3.0, "sacred_spring": 2.0, "boundary_stone": 1.5 } },
+  "enemies": { "roster_add": ["boundary_warden", "sanctuary_shade"] },
+  "economy": { "scarce": ["blessed_oil"], "abundant": ["votive_offering", "spring_water"] },
+  "palette": { "grade": "temenos", "fog_density": 1.0 },
+  "audio": { "bed_overrides": ["grove_wind", "spring_trickle"], "music_palette": "temenos" }
+}
