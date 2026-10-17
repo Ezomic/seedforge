@@ -1,0 +1,7 @@
+[
+  {"id": "arming_blade", "name": "Arming blade", "windup_ticks": 24, "strike_ticks": 8, "recovery_ticks": 22, "stamina_cost": 18, "poise_damage": 30, "reach_permille": 1000, "ranged": false},
+  {"id": "knife", "name": "Knife", "windup_ticks": 12, "strike_ticks": 6, "recovery_ticks": 14, "stamina_cost": 9, "poise_damage": 14, "reach_permille": 500, "ranged": false},
+  {"id": "spear", "name": "Spear", "windup_ticks": 30, "strike_ticks": 8, "recovery_ticks": 26, "stamina_cost": 22, "poise_damage": 26, "reach_permille": 1800, "ranged": false},
+  {"id": "maul", "name": "Maul", "windup_ticks": 46, "strike_ticks": 10, "recovery_ticks": 40, "stamina_cost": 34, "poise_damage": 80, "reach_permille": 1100, "ranged": false},
+  {"id": "bow", "name": "Bow", "windup_ticks": 40, "strike_ticks": 4, "recovery_ticks": 18, "stamina_cost": 16, "poise_damage": 18, "reach_permille": 12000, "ranged": true}
+]
