@@ -1,3 +1,4 @@
+#include "ichor/data/data_set.h"
 #include "ichor/graph/quest_refusal.h"
 #include "ichor/ledger/consequence_ledger.h"
 #include "ichor/ledger/quest_validation.h"
@@ -30,7 +31,79 @@ Json readJson(const std::string& relative)
     return Json::parse(text.str());
 }
 
+std::vector<std::string> split(const std::string& text, char sep)
+{
+    std::vector<std::string> parts;
+    std::string current;
+    for (const char c : text) {
+        if (c == sep) {
+            parts.push_back(current);
+            current.clear();
+        } else {
+            current += c;
+        }
+    }
+    parts.push_back(current);
+    return parts;
+}
+
+// DataSet records are flat, so steps and effects are authored as pipe separated
+// strings: id|type|slot|cost|after,after|refusable|other_side|slot=kind=value;...|refusal|tell
+// and metric|slot|delta. This decodes them into the nested shape the checks use.
+Json decode(const Json& record)
+{
+    Json quest = {{"id", record.at("id")}, {"faction", record.at("faction")}, {"budget", record.at("budget")}, {"steps", Json::array()}, {"effects", Json::array()}};
+    bool first = true;
+    for (const Json& line : record.at("steps")) {
+        const std::vector<std::string> f = split(line.get<std::string>(), '|');
+        REQUIRE(f.size() == 10);
+        REQUIRE_FALSE(f[3].empty());
+        REQUIRE(f[3].find_first_not_of("0123456789") == std::string::npos);
+        REQUIRE((f[5] == "0" || f[5] == "1"));
+        REQUIRE_FALSE(f[8].empty());
+        Json step = {{"id", f[0]}, {"type", f[1]}, {"slot", f[2]}, {"cost", std::stoul(f[3])}, {"after", Json::array()}, {"refusable", f[5] == "1"}};
+        if (!f[4].empty()) {
+            step["after"] = split(f[4], ',');
+        }
+        if (!f[6].empty()) {
+            step["other_side"] = f[6];
+        }
+        if (!f[7].empty()) {
+            step["assumes"] = Json::array();
+            for (const std::string& a : split(f[7], ';')) {
+                const std::vector<std::string> parts = split(a, '=');
+                REQUIRE(parts.size() == 3);
+                step["assumes"].push_back({{"slot", parts[0]}, {"kind", parts[1]}, {"value", parts[2]}});
+            }
+        }
+        step[first ? "decline" : "walk_away"] = f[8];
+        if (!f[9].empty()) {
+            step["tell"] = f[9];
+        }
+        first = false;
+        quest["steps"].push_back(std::move(step));
+    }
+    for (const Json& line : record.at("effects")) {
+        const std::vector<std::string> f = split(line.get<std::string>(), '|');
+        REQUIRE(f.size() == 3);
+        quest["effects"].push_back({{"metric", f[0]}, {"slot", f[1]}, {"delta", std::stoll(f[2])}});
+    }
+    return quest;
+}
+
 const Json& questlines()
+{
+    static const Json data = [] {
+        Json out = Json::array();
+        for (const Json& record : readJson("quests/faction_questlines.json")) {
+            out.push_back(decode(record));
+        }
+        return out;
+    }();
+    return data;
+}
+
+const Json& rawRecords()
 {
     static const Json data = readJson("quests/faction_questlines.json");
     return data;
@@ -249,10 +322,22 @@ TEST_CASE("faction quests use only cast slots and carry a refusal path on every 
 TEST_CASE("faction quest text has no em-dashes", "[faction_questlines]")
 {
     std::vector<std::string> strings;
-    collectStrings(questlines(), strings);
+    collectStrings(rawRecords(), strings);
     REQUIRE_FALSE(strings.empty());
     for (const std::string& s : strings) {
         CHECK(s.find("\xE2\x80\x94") == std::string::npos);
         CHECK(s.find("--") == std::string::npos);
+    }
+}
+
+TEST_CASE("the shared data loader still accepts the repo data with the questlines in it", "[faction_questlines]")
+{
+    DataSet data;
+    REQUIRE(data.loadDirectory(ICHOR_GAME_DATA_DIR));
+    const DataTable* table = data.table("quests");
+    REQUIRE(table != nullptr);
+
+    for (const Json& record : rawRecords()) {
+        CHECK(table->records.contains(record.at("id").get<std::string>()));
     }
 }
