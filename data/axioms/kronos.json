@@ -1,0 +1,13 @@
+{
+  "id": "cataclysm.kronos",
+  "slot": "cataclysm",
+  "title": "The Age of Kronos",
+  "tags": ["PLENTY", "DECEIT", "INTRIGUE", "ABSENCE"],
+  "conflicts": [],
+
+  "poi": { "weights": { "feast_hall": 2.0, "unfading_orchard": 2.0, "sealed_archive": 1.0 } },
+  "enemies": { "roster_add": ["gilded_warden"] },
+  "economy": { "scarce": ["candour"], "abundant": ["golden_fruit"] },
+  "palette": { "grade": "golden_age", "fog_density": 0.2 },
+  "audio": { "bed_overrides": ["warm_banquet_murmur"], "music_palette": "golden_age" }
+}
