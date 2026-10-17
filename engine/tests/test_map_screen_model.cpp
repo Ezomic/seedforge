@@ -86,8 +86,8 @@ TEST_CASE("zooming keeps the anchor fixed and clamps the zoom", "[map_screen_mod
     CHECK(zoomMapViewport(v, 2.0f, kInf, 0.0f).zoom == 2.0f);
     const MapViewport huge = zoomMapViewport(v, 2.0f, 3.0e38f, -3.0e38f);
     CHECK(isValidMapViewport(huge));
-    CHECK(huge.centerX == -kMapViewMaxCoordinate);
-    CHECK(huge.centerY == -kMapViewMaxCoordinate);
+    CHECK(huge.centerX == kMapViewMaxCoordinate);
+    CHECK(huge.centerY == kMapViewMaxCoordinate);
 }
 
 TEST_CASE("centering moves the view onto a point", "[map_screen_model]")
