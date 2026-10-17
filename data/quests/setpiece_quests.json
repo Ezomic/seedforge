@@ -1,0 +1,125 @@
+[
+ {
+  "id": "setpiece.hollow_giant",
+  "archetype": "fallen_colossus",
+  "title": "The Hollow Giant",
+  "summary": "Two claimants want the bronze heart inside the colossus. Open the chest cavity, or let the casters strip it.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|fallen_colossus|3|0||fallen_colossus:state:fallen",
+   "b|npc.casting_foreman|4|0|a|",
+   "c|metallarchs|5|1|b|metallarchs:stance:claiming",
+   "d|mnemones|5|1|b|mnemones:stance:claiming",
+   "e|route.colossus_arm|3|0|c|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:hollow_giant",
+   "2|metallarchs|Accept>3>;WalkAway>0>abandoned:hollow_giant_cavity;TellOtherSide>3>told:metallarchs_of_mnemones_plan",
+   "3|mnemones|Accept>0>;WalkAway>0>abandoned:hollow_giant_heart;TellOtherSide>0>told:mnemones_of_casters"
+  ],
+  "effects": [
+   "FactionStrength|metallarchs|-4",
+   "FactionStrength|mnemones|3",
+   "Route|route.colossus_arm|1"
+  ]
+ },
+ {
+  "id": "setpiece.pediment_below",
+  "archetype": "drowned_temple",
+  "title": "The Pediment Below",
+  "summary": "The reed priests will not leave the temple and the divers will not leave without its offerings. A dry causeway helps only one side.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|drowned_temple|3|0||drowned_temple:state:flooded",
+   "b|npc.reed_priest|4|1|a|",
+   "c|npc.salvage_diver|4|0|a|",
+   "d|periegetes|5|1|b,c|periegetes:stance:mapping",
+   "e|route.temple_causeway|3|0|d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:pediment_below",
+   "2|periegetes|Accept>3>;WalkAway>0>abandoned:pediment_below_flood;TellOtherSide>3>told:periegetes_of_the_priests",
+   "3|hekatombaia|Accept>0>;WalkAway>0>abandoned:pediment_below_offerings;TellOtherSide>0>told:hekatombaia_of_the_divers"
+  ],
+  "effects": [
+   "Route|route.temple_causeway|1",
+   "SupplyStatus|hekatombaia|-6",
+   "FactionStrength|periegetes|2"
+  ]
+ },
+ {
+  "id": "setpiece.cold_brazier",
+  "archetype": "beacon_tower",
+  "title": "The Cold Brazier",
+  "summary": "Relight the beacon and every faction on the ridge sees your road. Leave it dark and the last watchman keeps his secret.",
+  "budget": 18,
+  "start": 1,
+  "nodes": [
+   "a|beacon_tower|3|0||beacon_tower:state:dark",
+   "b|npc.last_watchman|4|1|a|",
+   "c|npc.smoke_courier|3|0|a|",
+   "d|diadochoi|5|1|b|diadochoi:stance:holding_ridge",
+   "e|route.ridge_signal|2|0|d,c|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:cold_brazier",
+   "2|diadochoi|Accept>3>;WalkAway>0>abandoned:cold_brazier_stair;TellOtherSide>3>told:diadochoi_of_the_light",
+   "3||Accept>0>;WalkAway>0>abandoned:cold_brazier_crown"
+  ],
+  "effects": [
+   "Territory|diadochoi|-3",
+   "Route|route.ridge_signal|1"
+  ]
+ },
+ {
+  "id": "setpiece.stair_of_silence",
+  "archetype": "oracle_cleft",
+  "title": "The Stair of Silence",
+  "summary": "The pythia has not spoken since the oracles fell silent. Guide pilgrims up the stair or seal it for the faction that wants the question kept.",
+  "budget": 22,
+  "start": 1,
+  "nodes": [
+   "a|oracle_cleft|4|0||oracle_cleft:state:silent",
+   "b|npc.pilgrim_guide|4|0|a|",
+   "c|npc.silent_pythia|6|1|b|",
+   "d|mnemones|4|1|c|mnemones:stance:keeping_question",
+   "e|route.pilgrim_stair|2|0|c|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:stair_of_silence",
+   "2|mnemones|Accept>3>;WalkAway>0>abandoned:stair_of_silence_climb;TellOtherSide>3>told:mnemones_of_the_pilgrims",
+   "3||Accept>0>;WalkAway>0>abandoned:stair_of_silence_hall"
+  ],
+  "effects": [
+   "Route|route.pilgrim_stair|1",
+   "FactionStrength|mnemones|-5"
+  ]
+ },
+ {
+  "id": "setpiece.salt_oath",
+  "archetype": "salt_obelisk",
+  "title": "The Salt Oath",
+  "summary": "An oath is cut into the obelisk and the brokers want it read aloud. Reading it frees a salt road and binds whoever stands closest.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|salt_obelisk|3|0||salt_obelisk:state:unread",
+   "b|npc.oath_reader|4|0|a|",
+   "c|horkos_brokers|5|1|b|horkos_brokers:stance:bidding",
+   "d|npc.brine_surveyor|4|1|b|",
+   "e|route.salt_road|3|0|c|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:salt_oath",
+   "2|horkos_brokers|Accept>3>;WalkAway>0>abandoned:salt_oath_tiles;TellOtherSide>3>told:horkos_brokers_of_the_reading",
+   "3||Accept>0>;WalkAway>0>abandoned:salt_oath_spire"
+  ],
+  "effects": [
+   "Route|route.salt_road|1",
+   "SupplyStatus|horkos_brokers|5",
+   "FactionStrength|horkos_brokers|2"
+  ]
+ }
+]
