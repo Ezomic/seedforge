@@ -31,7 +31,7 @@
 // Algorithm, per cell:
 //  1. Water: lakeDepthM > 0 gives Lake; final height <= seaLevelM gives Ocean. Everything below
 //     applies to land only. seaLevelM must equal the HydrologyParams::seaLevelM used for phase 3.
-//  2. Slope is the largest absolute height difference to a 4-neighbour, in metres. At or above
+//  2. Slope is the largest absolute height difference to a land 4-neighbour, in metres. At or above
 //     cragSlopeM the cell is Crag (bare rock).
 //  3. Temperature (ClimateMap::temperatureC10, already lapse-cooled) picks one of six rows by the
 //     five ascending tempEdgesC10 (below the first: Glacier). Moisture (ClimateMap::moisture) picks
@@ -249,15 +249,20 @@ inline std::vector<std::uint16_t> oceanDistance(const std::vector<std::uint8_t>&
     return dist;
 }
 
-inline int biomeSlope(const std::vector<std::int16_t>& z, int w, int h, int x, int y)
+// Largest height difference to a land 4-neighbour: a sea floor or lake bed is not a cliff face.
+inline int biomeSlope(const HydrologyMap& hy, int seaLevelM, int x, int y)
 {
-    const std::size_t c = static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x);
-    const int v = z[c];
+    const int w = hy.width;
+    const int v = hy.heightM[hy.index(x, y)];
     int slope = 0;
-    if (x > 0) slope = std::max(slope, std::abs(v - z[c - 1]));
-    if (x + 1 < w) slope = std::max(slope, std::abs(v - z[c + 1]));
-    if (y > 0) slope = std::max(slope, std::abs(v - z[c - static_cast<std::size_t>(w)]));
-    if (y + 1 < h) slope = std::max(slope, std::abs(v - z[c + static_cast<std::size_t>(w)]));
+    for (int n = 0; n < 4; ++n) {
+        const int nx = x + (n == 0 ? 1 : n == 1 ? -1 : 0);
+        const int ny = y + (n == 2 ? 1 : n == 3 ? -1 : 0);
+        if (nx < 0 || ny < 0 || nx >= w || ny >= hy.height) continue;
+        const std::size_t c = hy.index(nx, ny);
+        if (hy.lakeDepthM[c] > 0 || hy.heightM[c] <= seaLevelM) continue;
+        slope = std::max(slope, std::abs(v - hy.heightM[c]));
+    }
     return slope;
 }
 
@@ -291,7 +296,7 @@ inline void classifyBiomes(const BiomeInputs& in, const BiomeParams& p, BiomeMap
             } else if (z <= p.seaLevelM) {
                 b = BiomeId::Ocean;
             } else {
-                const int slope = biomeSlope(hy.heightM, w, h, x, y);
+                const int slope = biomeSlope(hy, p.seaLevelM, x, y);
                 const int t = cl.temperatureC10[c];
                 const int m = cl.moisture[c];
                 int row = 0;

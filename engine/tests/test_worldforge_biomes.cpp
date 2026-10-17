@@ -217,6 +217,20 @@ TEST_CASE("biome injection with a coast reach stays near the sea", "[worldforge]
     CHECK(count(out, BiomeId::Ocean) == 8 * kH);
 }
 
+TEST_CASE("biome shores are not cliffs", "[worldforge][biomes]")
+{
+    World world = makeFlat(100, 300, 8);
+    for (int y = 0; y < kH; ++y) {
+        for (int x = 0; x < 8; ++x) world.hydro.heightM[world.hydro.index(x, y)] = -300;
+    }
+    world.hydro.lakeDepthM[world.hydro.index(40, 40)] = 200;
+    world.hydro.heightM[world.hydro.index(40, 40)] = -100;
+    const BiomeMap out = biomes(world);
+    CHECK(count(out, BiomeId::Crag) == 0);
+    CHECK(out.biome[out.index(8, 20)] == static_cast<std::uint8_t>(BiomeId::Savanna));
+    CHECK(out.biome[out.index(41, 40)] == static_cast<std::uint8_t>(BiomeId::Savanna));
+}
+
 TEST_CASE("biome later injections overwrite earlier ones", "[worldforge][biomes]")
 {
     const World world = makeFlat(100, 300, 8);
@@ -308,7 +322,7 @@ TEST_CASE("biome golden hash is stable", "[worldforge][biomes]")
     p.injections.push_back({ BiomeId::SaltBlight, 96, 0, 400, 6, 4 });
     p.suppressMask = biomeBit(BiomeId::LowlandFarm);
     const BiomeMap out = *generateBiomes(pipe.inputs(), p);
-    CHECK(hashBiomeMap(out) == 0x000b5d1e849b2f63ull);
+    CHECK(hashBiomeMap(out) == 0x3ee494f561dc0d15ull);
 }
 
 TEST_CASE("biome generation is deterministic and seed dependent", "[worldforge][biomes]")
