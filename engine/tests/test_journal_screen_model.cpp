@@ -96,6 +96,7 @@ TEST_CASE("caps bound the lines and report what was left out", "[journal_model]"
     }
     const auto view = buildJournalModel(in);
     REQUIRE(view[1].groups.size() == kJournalModelMaxGroups);
+    CHECK(view[1].omittedGroups == 41 - kJournalModelMaxGroups);
     const JournalModelGroup* war = nullptr;
     for (const auto& g : view[1].groups) {
         if (g.title == "War") {

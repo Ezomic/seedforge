@@ -128,9 +128,10 @@ std::vector<JournalModelTab> buildJournalModel(const std::vector<JournalModelEnt
     std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return newest[a] > newest[b]; });
     for (const std::size_t i : order) {
         if (view[1].groups.size() == kJournalModelMaxGroups) {
-            break;
+            ++view[1].omittedGroups;
+        } else {
+            view[1].groups.push_back(std::move(groups[i]));
         }
-        view[1].groups.push_back(std::move(groups[i]));
     }
     return view;
 }

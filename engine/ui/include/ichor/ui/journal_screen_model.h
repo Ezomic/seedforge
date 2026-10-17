@@ -41,6 +41,8 @@ struct JournalModelTab {
     JournalTab tab = JournalTab::Prose;
     std::string title;
     std::vector<JournalModelGroup> groups;
+    // Groups dropped by the group cap.
+    std::size_t omittedGroups = 0;
 
     bool operator==(const JournalModelTab&) const = default;
 };
