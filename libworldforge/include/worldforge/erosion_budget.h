@@ -16,6 +16,11 @@
 // the cost still exceeds the budget, lower the iteration count (at least 1). The caller erodes at
 // workWidth x workHeight and upsamples by 2^downscaleShift before phase 3. Calibrating the budget
 // against real forge time is a benchmarking job and is not done here.
+//
+// The planner is independent of the tectonics size limit: erodeTectonics today accepts only sides
+// in [kTectonicsMinSize, kTectonicsMaxSize], so a plan above kTectonicsMaxSize (the 4096 target in
+// doc 08) needs that limit lifted first. When fits is false the plan is the cheapest the floor
+// allows and may exceed both the budget and kErosionMaxCellPasses; callers must not run it.
 namespace worldforge {
 
 constexpr int kErosionBudgetMaxSide = 16384;
@@ -37,12 +42,12 @@ inline std::int64_t erosionCellPasses(int width, int height, const ErosionParams
 }
 
 // nullopt when a dimension is outside [1, kErosionBudgetMaxSide], budgetCellPasses <= 0,
-// minWorkSide < 1, or params are out of range. The budget is clamped to kErosionMaxCellPasses.
+// minWorkSide < kTectonicsMinSize, or params are out of range. The budget is clamped to kErosionMaxCellPasses.
 inline std::optional<ErosionPlan> planErosionBudget(int width, int height, const ErosionParams& params, std::int64_t budgetCellPasses,
     int minWorkSide = kErosionBudgetDefaultMinSide)
 {
     if (width < 1 || height < 1 || width > kErosionBudgetMaxSide || height > kErosionBudgetMaxSide) return std::nullopt;
-    if (budgetCellPasses <= 0 || minWorkSide < 1 || !detail::erosionParamsValid(params)) return std::nullopt;
+    if (budgetCellPasses <= 0 || minWorkSide < kTectonicsMinSize || !detail::erosionParamsValid(params)) return std::nullopt;
     const std::int64_t budget = std::min(budgetCellPasses, kErosionMaxCellPasses);
 
     ErosionPlan plan;
@@ -61,7 +66,7 @@ inline std::optional<ErosionPlan> planErosionBudget(int width, int height, const
     ErosionParams single = params;
     single.iterations = 1;
     const std::int64_t perIteration = erosionCellPasses(plan.workWidth, plan.workHeight, single);
-    if (params.iterations > 0 && perIteration * params.iterations > budget) {
+    if (perIteration * params.iterations > budget) {
         plan.params.iterations = static_cast<int>(std::max<std::int64_t>(1, std::min<std::int64_t>(params.iterations, budget / perIteration)));
     }
     plan.cellPasses = erosionCellPasses(plan.workWidth, plan.workHeight, plan.params);

@@ -121,6 +121,7 @@ TEST_CASE("hostile inputs are rejected without overflow", "[worldforge][erosion_
     CHECK_FALSE(planErosionBudget(64, 64, p, 0).has_value());
     CHECK_FALSE(planErosionBudget(64, 64, p, -5).has_value());
     CHECK_FALSE(planErosionBudget(64, 64, p, 1000, 0).has_value());
+    CHECK_FALSE(planErosionBudget(64, 64, p, 1000, kTectonicsMinSize - 1).has_value());
     ErosionParams bad;
     bad.iterations = kErosionMaxIterations + 1;
     CHECK_FALSE(planErosionBudget(64, 64, bad, 1000).has_value());
@@ -145,4 +146,33 @@ TEST_CASE("a planned run is accepted by erodeTectonics and stays within budget",
     auto small = generateTectonics(7, { plan->workWidth, plan->workHeight, 6 });
     REQUIRE(small.has_value());
     CHECK(erodeTectonics(*small, plan->params).has_value());
+}
+
+TEST_CASE("odd and non-square grids round up and the shorter side meets the floor", "[worldforge][erosion_budget]")
+{
+    ErosionParams p;
+    p.thermalPasses = 0;
+    const std::int64_t budget = erosionCellPasses(51, 100, p);
+    const auto plan = planErosionBudget(101, 200, p, budget, 16);
+    REQUIRE(plan.has_value());
+    CHECK(plan->downscaleShift == 1);
+    CHECK(plan->workWidth == 51);
+    CHECK(plan->workHeight == 100);
+    CHECK(plan->fits);
+
+    const auto narrow = planErosionBudget(16384, 20, p, 1000, 16);
+    REQUIRE(narrow.has_value());
+    CHECK(narrow->downscaleShift == 0);
+    CHECK(narrow->workHeight == 20);
+    CHECK_FALSE(narrow->fits);
+}
+
+TEST_CASE("an unfit plan may exceed the work cap and says so", "[worldforge][erosion_budget]")
+{
+    ErosionParams heavy;
+    heavy.thermalPasses = kErosionMaxIterations;
+    const auto plan = planErosionBudget(kErosionBudgetMaxSide, kErosionBudgetMaxSide, heavy, kErosionMaxCellPasses, kErosionBudgetMaxSide);
+    REQUIRE(plan.has_value());
+    CHECK_FALSE(plan->fits);
+    CHECK(plan->cellPasses > kErosionMaxCellPasses);
 }
