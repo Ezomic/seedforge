@@ -1,0 +1,14 @@
+{
+  "synergies": [
+    {
+      "id": "mysteries_miasma",
+      "tier": "pressure",
+      "axioms": ["law.mysteries", "pressure.miasma"],
+      "content_tier": 2,
+      "world_name": "The Carried Stain",
+      "flavour": {
+        "world_description": "The stain travels with the initiated. Every sanctuary left unpurified is a rite forgotten for good, and the Hierophants count the dead springs the way other priests count prayers."
+      }
+    }
+  ]
+}
