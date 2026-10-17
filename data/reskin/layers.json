@@ -1,0 +1,11 @@
+[
+  { "id": "faction.archaists", "kind": "faction", "key": "archaists", "material": "bronze_plate", "tint": "#8C6A3F", "scale_permille": 1050, "gear": ["bronze_spear", "crested_helm"] },
+  { "id": "faction.archaists.anchor", "kind": "faction", "key": "archaists", "role": "anchor", "scale_permille": 1150, "speed_permille": 900, "gear": ["tower_shield"] },
+  { "id": "faction.asebeis", "kind": "faction", "key": "asebeis", "material": "rag_and_ash", "tint": "#5A5A66", "speed_permille": 1100, "gear": ["sling", "ash_mask"] },
+  { "id": "faction.diadochoi", "kind": "faction", "key": "diadochoi", "material": "gilded_scale", "tint": "#B8962E", "gear": ["gilded_pelta"] },
+  { "id": "faction.xenoi", "kind": "faction", "key": "xenoi", "material": "sea_leather", "tint": "#2F6F73", "scale_jitter_permille": 80, "gear": ["hooked_blade"] },
+  { "id": "biome.salt_blight", "kind": "biome", "key": "salt_blight", "material": "salt_crusted", "tint": "#D8D4C8", "speed_permille": 950, "gear": ["salt_wrap"] },
+  { "id": "biome.volcanic_ridge", "kind": "biome", "key": "volcanic_ridge", "material": "ashen_hide", "tint": "#3B2F2F", "scale_permille": 1050, "scale_jitter_permille": 60, "gear": ["ash_cloak"] },
+  { "id": "biome.miasma_fen", "kind": "biome", "key": "miasma_fen", "material": "mire_slick", "tint": "#4B5A3A", "speed_permille": 900, "scale_jitter_permille": 50, "gear": ["reed_wrap"] },
+  { "id": "biome.frozen_field", "kind": "biome", "key": "frozen_field", "material": "frost_fur", "tint": "#B7C9D6", "scale_permille": 1100, "speed_permille": 950, "gear": ["fur_mantle"] }
+]
