@@ -54,6 +54,10 @@ struct Ruleset {
 // retypes ("index:type"), add_nodes (types), add_edges ("from>to:type").
 // Never throws; a bad document yields a Ruleset with `error` set.
 Ruleset parseRuleset(std::string_view json);
+
+// One rule record, as parseRuleset reads it; returns the problem, empty when it parsed.
+// Lets other rulesets reuse the record format with their own phases.
+std::string parseRuleRecord(std::string_view recordJson, std::string& phase, Rule& rule);
 Ruleset loadRuleset(const std::filesystem::path& file);
 
 struct Params {

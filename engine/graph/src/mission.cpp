@@ -278,6 +278,15 @@ bool pathReaches(const Adjacency& adjacency, NodeId from, NodeId target)
 
 }
 
+std::string parseRuleRecord(std::string_view recordJson, std::string& phase, Rule& rule)
+{
+    const Json record = Json::parse(recordJson.begin(), recordJson.end(), nullptr, false);
+    if (record.is_discarded()) {
+        return "record is not valid JSON";
+    }
+    return parseRule(record, phase, rule);
+}
+
 Ruleset parseRuleset(std::string_view json)
 {
     const Json document = Json::parse(json.begin(), json.end(), nullptr, false);
