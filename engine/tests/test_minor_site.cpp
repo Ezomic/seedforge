@@ -155,16 +155,19 @@ TEST_CASE("validateSite rejects broken sites", "[site]")
 TEST_CASE("archetypes differ in their encounter mix", "[site]")
 {
     auto encounters = [](std::uint32_t archetype) {
-        std::uint32_t total = 0;
+        double encounterNodes = 0;
+        double allNodes = 0;
         for (std::uint64_t seed = 0; seed < 200; ++seed) {
             Params p;
             p.seed = seed;
             p.archetype = archetype;
-            for (const auto& [id, n] : generate(p).graph.nodes()) {
-                total += n.type == kEncounter ? 1u : 0u;
+            const Result r = generate(p);
+            for (const auto& [id, n] : r.graph.nodes()) {
+                encounterNodes += n.type == kEncounter ? 1.0 : 0.0;
+                allNodes += 1.0;
             }
         }
-        return total;
+        return encounterNodes / allNodes;
     };
     REQUIRE(encounters(3) > encounters(0));
     REQUIRE(encounters(3) > encounters(1));
