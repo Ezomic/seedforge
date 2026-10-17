@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "kronos_favour",
+      "tier": "cataclysm_law",
+      "axioms": ["cataclysm.kronos", "law.last_favour"],
+      "content_tier": 1,
+      "faction": "thesauroi",
+      "dungeon_type": "hidden_reckoning",
+      "mechanic": "concealed_shortage",
+      "world_name": "The Gilded Count",
+      "flavour": {
+        "world_description": "The golden age has not ended, and perhaps nine people know it is running on borrowed grace. The Thesauroi keep the count in a locked room and the feasts lit, because a city that learns the sum will riot long before the sum comes due."
+      }
+    }
+  ]
+}
