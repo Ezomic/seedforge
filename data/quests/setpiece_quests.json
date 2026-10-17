@@ -1,0 +1,705 @@
+[
+ {
+  "id": "setpiece.hollow_giant",
+  "archetype": "fallen_colossus",
+  "title": "The Hollow Giant",
+  "budget": 20,
+  "summary": "Two claimants want the bronze heart inside the colossus. Open the chest cavity, or let the casters strip it.",
+  "nodes": [
+   {
+    "id": "a",
+    "entity": "fallen_colossus",
+    "cost": 3,
+    "refusable": false,
+    "after": [],
+    "assumes": [
+     {
+      "subject": "fallen_colossus",
+      "kind": "state",
+      "value": "fallen"
+     }
+    ]
+   },
+   {
+    "id": "b",
+    "entity": "npc.casting_foreman",
+    "cost": 4,
+    "refusable": false,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "c",
+    "entity": "metallarchs",
+    "cost": 5,
+    "refusable": true,
+    "after": [
+     "b"
+    ],
+    "assumes": [
+     {
+      "subject": "metallarchs",
+      "kind": "stance",
+      "value": "claiming"
+     }
+    ]
+   },
+   {
+    "id": "d",
+    "entity": "mnemones",
+    "cost": 5,
+    "refusable": true,
+    "after": [
+     "b"
+    ],
+    "assumes": [
+     {
+      "subject": "mnemones",
+      "kind": "stance",
+      "value": "claiming"
+     }
+    ]
+   },
+   {
+    "id": "e",
+    "entity": "route.colossus_arm",
+    "cost": 3,
+    "refusable": false,
+    "after": [
+     "c"
+    ],
+    "assumes": []
+   }
+  ],
+  "start": 1,
+  "steps": [
+   {
+    "id": 1,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 2
+     },
+     {
+      "choice": "Decline",
+      "next": 0,
+      "consequence": "declined:hollow_giant"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "other_side": "metallarchs",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 3
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:hollow_giant_cavity"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 3,
+      "consequence": "told:metallarchs_of_mnemones_plan"
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "other_side": "mnemones",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 0
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:hollow_giant_heart"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 0,
+      "consequence": "told:mnemones_of_casters"
+     }
+    ]
+   }
+  ],
+  "effects": [
+   {
+    "metric": "FactionStrength",
+    "target": "metallarchs",
+    "delta": -4
+   },
+   {
+    "metric": "FactionStrength",
+    "target": "mnemones",
+    "delta": 3
+   },
+   {
+    "metric": "Route",
+    "target": "route.colossus_arm",
+    "delta": 1
+   }
+  ]
+ },
+ {
+  "id": "setpiece.pediment_below",
+  "archetype": "drowned_temple",
+  "title": "The Pediment Below",
+  "budget": 20,
+  "summary": "The reed priests will not leave the temple and the divers will not leave without its offerings. A dry causeway helps only one side.",
+  "nodes": [
+   {
+    "id": "a",
+    "entity": "drowned_temple",
+    "cost": 3,
+    "refusable": false,
+    "after": [],
+    "assumes": [
+     {
+      "subject": "drowned_temple",
+      "kind": "state",
+      "value": "flooded"
+     }
+    ]
+   },
+   {
+    "id": "b",
+    "entity": "npc.reed_priest",
+    "cost": 4,
+    "refusable": true,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "c",
+    "entity": "npc.salvage_diver",
+    "cost": 4,
+    "refusable": false,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "d",
+    "entity": "periegetes",
+    "cost": 5,
+    "refusable": true,
+    "after": [
+     "b",
+     "c"
+    ],
+    "assumes": [
+     {
+      "subject": "periegetes",
+      "kind": "stance",
+      "value": "mapping"
+     }
+    ]
+   },
+   {
+    "id": "e",
+    "entity": "route.temple_causeway",
+    "cost": 3,
+    "refusable": false,
+    "after": [
+     "d"
+    ],
+    "assumes": []
+   }
+  ],
+  "start": 1,
+  "steps": [
+   {
+    "id": 1,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 2
+     },
+     {
+      "choice": "Decline",
+      "next": 0,
+      "consequence": "declined:pediment_below"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "other_side": "periegetes",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 3
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:pediment_below_flood"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 3,
+      "consequence": "told:periegetes_of_the_priests"
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "other_side": "hekatombaia",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 0
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:pediment_below_offerings"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 0,
+      "consequence": "told:hekatombaia_of_the_divers"
+     }
+    ]
+   }
+  ],
+  "effects": [
+   {
+    "metric": "Route",
+    "target": "route.temple_causeway",
+    "delta": 1
+   },
+   {
+    "metric": "SupplyStatus",
+    "target": "hekatombaia",
+    "delta": -6
+   },
+   {
+    "metric": "FactionStrength",
+    "target": "periegetes",
+    "delta": 2
+   }
+  ]
+ },
+ {
+  "id": "setpiece.cold_brazier",
+  "archetype": "beacon_tower",
+  "title": "The Cold Brazier",
+  "budget": 18,
+  "summary": "Relight the beacon and every faction on the ridge sees your road. Leave it dark and the last watchman keeps his secret.",
+  "nodes": [
+   {
+    "id": "a",
+    "entity": "beacon_tower",
+    "cost": 3,
+    "refusable": false,
+    "after": [],
+    "assumes": [
+     {
+      "subject": "beacon_tower",
+      "kind": "state",
+      "value": "dark"
+     }
+    ]
+   },
+   {
+    "id": "b",
+    "entity": "npc.last_watchman",
+    "cost": 4,
+    "refusable": true,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "c",
+    "entity": "npc.smoke_courier",
+    "cost": 3,
+    "refusable": false,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "d",
+    "entity": "diadochoi",
+    "cost": 5,
+    "refusable": true,
+    "after": [
+     "b"
+    ],
+    "assumes": [
+     {
+      "subject": "diadochoi",
+      "kind": "stance",
+      "value": "holding_ridge"
+     }
+    ]
+   },
+   {
+    "id": "e",
+    "entity": "route.ridge_signal",
+    "cost": 2,
+    "refusable": false,
+    "after": [
+     "d",
+     "c"
+    ],
+    "assumes": []
+   }
+  ],
+  "start": 1,
+  "steps": [
+   {
+    "id": 1,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 2
+     },
+     {
+      "choice": "Decline",
+      "next": 0,
+      "consequence": "declined:cold_brazier"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "other_side": "diadochoi",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 3
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:cold_brazier_stair"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 3,
+      "consequence": "told:diadochoi_of_the_light"
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 0
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:cold_brazier_crown"
+     }
+    ]
+   }
+  ],
+  "effects": [
+   {
+    "metric": "Territory",
+    "target": "diadochoi",
+    "delta": -3
+   },
+   {
+    "metric": "Route",
+    "target": "route.ridge_signal",
+    "delta": 1
+   }
+  ]
+ },
+ {
+  "id": "setpiece.stair_of_silence",
+  "archetype": "oracle_cleft",
+  "title": "The Stair of Silence",
+  "budget": 22,
+  "summary": "The pythia has not spoken since the oracles fell silent. Guide pilgrims up the stair or seal it for the faction that wants the question kept.",
+  "nodes": [
+   {
+    "id": "a",
+    "entity": "oracle_cleft",
+    "cost": 4,
+    "refusable": false,
+    "after": [],
+    "assumes": [
+     {
+      "subject": "oracle_cleft",
+      "kind": "state",
+      "value": "silent"
+     }
+    ]
+   },
+   {
+    "id": "b",
+    "entity": "npc.pilgrim_guide",
+    "cost": 4,
+    "refusable": false,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "c",
+    "entity": "npc.silent_pythia",
+    "cost": 6,
+    "refusable": true,
+    "after": [
+     "b"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "d",
+    "entity": "mnemones",
+    "cost": 4,
+    "refusable": true,
+    "after": [
+     "c"
+    ],
+    "assumes": [
+     {
+      "subject": "mnemones",
+      "kind": "stance",
+      "value": "keeping_question"
+     }
+    ]
+   },
+   {
+    "id": "e",
+    "entity": "route.pilgrim_stair",
+    "cost": 2,
+    "refusable": false,
+    "after": [
+     "c"
+    ],
+    "assumes": []
+   }
+  ],
+  "start": 1,
+  "steps": [
+   {
+    "id": 1,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 2
+     },
+     {
+      "choice": "Decline",
+      "next": 0,
+      "consequence": "declined:stair_of_silence"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "other_side": "mnemones",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 3
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:stair_of_silence_climb"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 3,
+      "consequence": "told:mnemones_of_the_pilgrims"
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 0
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:stair_of_silence_hall"
+     }
+    ]
+   }
+  ],
+  "effects": [
+   {
+    "metric": "Route",
+    "target": "route.pilgrim_stair",
+    "delta": 1
+   },
+   {
+    "metric": "FactionStrength",
+    "target": "mnemones",
+    "delta": -5
+   }
+  ]
+ },
+ {
+  "id": "setpiece.salt_oath",
+  "archetype": "salt_obelisk",
+  "title": "The Salt Oath",
+  "budget": 20,
+  "summary": "An oath is cut into the obelisk and the brokers want it read aloud. Reading it frees a salt road and binds whoever stands closest.",
+  "nodes": [
+   {
+    "id": "a",
+    "entity": "salt_obelisk",
+    "cost": 3,
+    "refusable": false,
+    "after": [],
+    "assumes": [
+     {
+      "subject": "salt_obelisk",
+      "kind": "state",
+      "value": "unread"
+     }
+    ]
+   },
+   {
+    "id": "b",
+    "entity": "npc.oath_reader",
+    "cost": 4,
+    "refusable": false,
+    "after": [
+     "a"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "c",
+    "entity": "horkos_brokers",
+    "cost": 5,
+    "refusable": true,
+    "after": [
+     "b"
+    ],
+    "assumes": [
+     {
+      "subject": "horkos_brokers",
+      "kind": "stance",
+      "value": "bidding"
+     }
+    ]
+   },
+   {
+    "id": "d",
+    "entity": "npc.brine_surveyor",
+    "cost": 4,
+    "refusable": true,
+    "after": [
+     "b"
+    ],
+    "assumes": []
+   },
+   {
+    "id": "e",
+    "entity": "route.salt_road",
+    "cost": 3,
+    "refusable": false,
+    "after": [
+     "c"
+    ],
+    "assumes": []
+   }
+  ],
+  "start": 1,
+  "steps": [
+   {
+    "id": 1,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 2
+     },
+     {
+      "choice": "Decline",
+      "next": 0,
+      "consequence": "declined:salt_oath"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "other_side": "horkos_brokers",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 3
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:salt_oath_tiles"
+     },
+     {
+      "choice": "TellOtherSide",
+      "next": 3,
+      "consequence": "told:horkos_brokers_of_the_reading"
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "other_side": "",
+    "options": [
+     {
+      "choice": "Accept",
+      "next": 0
+     },
+     {
+      "choice": "WalkAway",
+      "next": 0,
+      "consequence": "abandoned:salt_oath_spire"
+     }
+    ]
+   }
+  ],
+  "effects": [
+   {
+    "metric": "Route",
+    "target": "route.salt_road",
+    "delta": 1
+   },
+   {
+    "metric": "SupplyStatus",
+    "target": "horkos_brokers",
+    "delta": 5
+   },
+   {
+    "metric": "FactionStrength",
+    "target": "horkos_brokers",
+    "delta": 2
+   }
+  ]
+ }
+]
