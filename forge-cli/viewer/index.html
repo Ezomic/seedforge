@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'">
+<title>forge-cli map viewer</title>
+<style>
+    :root { color-scheme: light dark; --bg: #1b1d21; --panel: #25282e; --fg: #e6e8eb; --muted: #9aa1ab; --accent: #6aa9ff; --ok: #5fd08a; --bad: #ff6b6b; }
+    @media (prefers-color-scheme: light) { :root { --bg: #f2f3f5; --panel: #fff; --fg: #1d2127; --muted: #626a75; --accent: #1f6fe0; --ok: #1e8f4d; --bad: #c62828; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; display: flex; height: 100vh; }
+    aside { width: 340px; flex: none; background: var(--panel); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    main { flex: 1; overflow: auto; padding: 12px; }
+    h1 { font-size: 16px; margin: 0; }
+    h2 { font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    button, select, input[type=range] { font: inherit; }
+    .row { display: flex; align-items: center; gap: 6px; }
+    .layer { padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--muted) 25%, transparent); }
+    .layer .name { flex: 1; }
+    .layer .phase { color: var(--muted); font-size: 12px; }
+    .layer.selected .name { color: var(--accent); font-weight: 600; }
+    .layer .sub { display: none; gap: 6px; margin-top: 2px; }
+    .layer.selected .sub, .layer.on .sub { display: flex; }
+    .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+    #stage { position: relative; display: inline-block; line-height: 0; background: repeating-conic-gradient(#8884 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+    canvas { image-rendering: pixelated; cursor: crosshair; }
+    #hover table { border-collapse: collapse; width: 100%; }
+    #hover td { padding: 1px 4px 1px 0; vertical-align: top; }
+    #error { color: var(--bad); }
+    #empty { color: var(--muted); max-width: 40em; }
+</style>
+</head>
+<body>
+<aside>
+    <h1>forge-cli map viewer</h1>
+    <section>
+        <h2>Output folder</h2>
+        <input id="folder" type="file" webkitdirectory multiple>
+        <div id="error" role="alert"></div>
+    </section>
+    <section id="seedBox" hidden>
+        <h2>Seed</h2>
+        <div class="row"><select id="seed"></select><span id="runError" class="bad"></span></div>
+    </section>
+    <section id="layerBox" hidden>
+        <h2>Layers (drawn bottom to top)</h2>
+        <div id="layers"></div>
+    </section>
+    <section id="viewBox" hidden>
+        <h2>Zoom</h2>
+        <div class="row"><input id="zoom" type="range" min="1" max="16" step="1" value="4"><span id="zoomLabel">4x</span></div>
+    </section>
+    <section id="hover">
+        <h2>Cell <span id="cell" class="mono"></span></h2>
+        <table id="values"></table>
+    </section>
+    <section id="hashBox" hidden>
+        <h2>Selected layer hash</h2>
+        <div id="hashInfo" class="mono"></div>
+    </section>
+</aside>
+<main>
+    <div id="empty">Run <span class="mono">ichor_forge_cli --seed 1 --size 128 --out out/</span>, then choose the <span class="mono">out/</span> folder above. Nothing is uploaded: the files are read in this page only.</div>
+    <div id="stage" hidden><canvas id="map"></canvas></div>
+</main>
+<script src="core.js"></script>
+<script src="viewer.js"></script>
+</body>
+</html>
