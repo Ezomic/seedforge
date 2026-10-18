@@ -16,7 +16,7 @@ namespace {
 struct Fixture {
     RecordingUiRenderer renderer;
     UiContext ui{renderer, 1280, 720};
-    CombatHudScreen screen{ui, std::filesystem::path(ICHOR_REPO_DATA) / "ui" / "combat_hud.rml"};
+    CombatHudScreen screen{ui};
 
     Fixture()
     {
@@ -129,13 +129,4 @@ TEST_CASE("hostile view values draw without crashing", "[combat_hud_screen]")
     fixture.screen.bind(view);
     fixture.frame(0.0);
     REQUIRE(fixture.screen.markup().find("<b>") == std::string::npos);
-}
-
-TEST_CASE("a missing document leaves the screen not ok and bind harmless", "[combat_hud_screen]")
-{
-    RecordingUiRenderer renderer;
-    UiContext ui(renderer, 640, 360);
-    CombatHudScreen screen(ui, std::filesystem::path(ICHOR_REPO_DATA) / "ui" / "missing.rml");
-    REQUIRE_FALSE(screen.ok());
-    screen.bind(fullView());
 }

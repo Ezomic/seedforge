@@ -628,7 +628,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
-            combatHud = std::make_unique<ichor::CombatHudScreen>(*ui, options.data / "ui" / "combat_hud.rml");
+            combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");

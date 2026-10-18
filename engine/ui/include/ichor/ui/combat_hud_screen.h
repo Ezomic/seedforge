@@ -3,7 +3,6 @@
 #include "ichor/ui/combat_hud.h"
 #include "ichor/ui/ui_context.h"
 
-#include <filesystem>
 #include <string>
 
 namespace Rml {
@@ -14,11 +13,10 @@ class ElementDocument;
 namespace ichor {
 
 // The combat HUD drawn from a CombatHudView: health and stamina bars, the Law resource, a ring of
-// damage direction markers and the target's stagger tick. Always shown. The markup is the RML file
-// at `rml` (data/ui/combat_hud.rml); the context must have the Alegreya Sans face loaded.
+// damage direction markers and the target's stagger tick. Always shown. The context must have the Alegreya Sans face loaded.
 class CombatHudScreen {
 public:
-    CombatHudScreen(UiContext& ui, const std::filesystem::path& rml);
+    explicit CombatHudScreen(UiContext& ui);
     ~CombatHudScreen();
     CombatHudScreen(const CombatHudScreen&) = delete;
     CombatHudScreen& operator=(const CombatHudScreen&) = delete;
