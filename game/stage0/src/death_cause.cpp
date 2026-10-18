@@ -2,6 +2,15 @@
 
 namespace ichor::stage0 {
 
+const char* name(KillingAttack attack)
+{
+    switch (attack) {
+    case KillingAttack::Light: return "light";
+    case KillingAttack::Heavy: return "heavy";
+    default: return "unknown";
+    }
+}
+
 DeathCause classifyDeath(const DeathFacts& facts)
 {
     if (!facts.attackerOnScreen) return DeathCause::OffScreen;

@@ -8,6 +8,7 @@
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
+#include "ichor/stage0/camera_view.h"
 #include "ichor/stage0/combat.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -111,13 +112,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (player != entt::null && foe != entt::null) {
             const glm::dvec3 p = blend(scene.registry().get<ichor::PreviousTransform>(player), scene.registry().get<ichor::Transform>(player));
             const glm::dvec3 f = blend(scene.registry().get<ichor::PreviousTransform>(foe), scene.registry().get<ichor::Transform>(foe));
-            glm::dvec3 away = p - f;
-            away.y = 0.0;
-            away = glm::length(away) > 1e-6 ? glm::normalize(away) : glm::dvec3(0.0, 0.0, 1.0);
-            const glm::dvec3 eye = p + away * 3.2 + glm::dvec3(0.0, 2.0, 0.0);
-            const glm::dvec3 target = (p + f) * 0.5 + glm::dvec3(0.0, 0.9, 0.0);
-            view.camera.position = eye;
-            view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+            const ichor::stage0::CameraPose pose = ichor::stage0::followCamera(p, f);
+            view.camera.position = pose.position;
+            view.camera.rotation = pose.rotation;
+            view.camera.fovY = ichor::stage0::kCameraFovY;
+            view.camera.nearPlane = ichor::stage0::kCameraNear;
+            view.camera.farPlane = ichor::stage0::kCameraFar;
         }
         std::vector<ichor::LineSegment> lines;
         scene.physics().debugLines(lines);

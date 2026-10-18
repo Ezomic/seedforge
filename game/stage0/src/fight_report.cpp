@@ -54,7 +54,8 @@ bool causeFromName(std::string_view text, DeathCause& out)
 bool parseRow(std::string_view line, FightRow& row)
 {
     const std::vector<std::string_view> f = split(line);
-    if (f.size() != kColumns) {
+    // Columns are only ever appended, so a newer log with extra trailing fields still parses.
+    if (f.size() < kColumns) {
         return false;
     }
     if (f[3] != "player" && f[3] != "foe") {

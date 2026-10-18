@@ -205,6 +205,7 @@ private:
         float poiseDamage;
         bool onScreen;
     };
+    bool attackerInView(const Scene& scene, glm::dvec3 attackerAt) const;
     void attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits);
     void tickCombatant(Scene& scene, entt::entity entity, entt::entity opponent, float fdt, std::vector<PendingHit>& hits);
 
@@ -216,6 +217,8 @@ private:
     StableId foe_{};
     glm::dvec3 playerSpawn_{0.0};
     glm::dvec3 foeSpawn_{0.0};
+    // Telemetry only, fed by the input stream, so a replay rebuilds it.
+    float sinceInput_ = 0.0f;
 };
 
 glm::vec3 forwardFromYaw(float yaw);

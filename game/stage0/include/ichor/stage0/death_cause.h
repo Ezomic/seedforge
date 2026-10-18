@@ -15,6 +15,12 @@ constexpr std::size_t kDeathCauseCount = 8;
 // The CSV spelling: stamina, whiff_punished, cornered, mistimed_block, offscreen, unreadable, bleed, unknown.
 const char* name(DeathCause cause);
 
+// The swing that landed the killing blow; Unknown for a death with no swing behind it (bleed).
+enum class KillingAttack : std::uint8_t { Unknown, Light, Heavy };
+
+// The CSV spelling: light, heavy, unknown.
+const char* name(KillingAttack attack);
+
 // What the state machine knows at the killing blow.
 struct DeathFacts {
     bool attackerOnScreen = true;
@@ -22,6 +28,9 @@ struct DeathFacts {
     bool blocked = false;          // the blow landed on a raised guard
     bool outOfStamina = false;
     bool againstWall = false;
+    KillingAttack attack = KillingAttack::Unknown;
+    float staminaAtImpact = 0.0f;   // the victim's stamina before the blow's own drain
+    float secondsSinceInput = 0.0f; // time since the player last pressed or steered anything
 };
 
 // Precedence is the diagnosis order: a telegraph that was never visible outranks everything,
