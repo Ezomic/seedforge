@@ -125,6 +125,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     if (!options.replay.empty()) {
         ichor::InputStream stream;
         if (!stream.load(options.replay)) return 1;
+        if (stream.legacyControls && !options.record.empty()) {
+            ichor::log(ichor::LogLevel::Error, "a version 1 replay cannot be re-recorded: the new file would lose its legacy controls");
+            return 1;
+        }
         stage.setLegacyControls(stream.legacyControls);
         engine.replayInputs(std::move(stream));
     }

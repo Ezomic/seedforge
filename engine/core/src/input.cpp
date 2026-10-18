@@ -29,6 +29,7 @@ bool InputStream::save(const std::filesystem::path& path) const
 
 bool InputStream::load(const std::filesystem::path& path)
 {
+    legacyControls = false;
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         logf(LogLevel::Error, "cannot open {}", path.string());
@@ -39,7 +40,6 @@ bool InputStream::load(const std::filesystem::path& path)
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
     bool ok = r.read(magic) && magic == kMagic && r.read(version);
-    legacyControls = false;
     if (ok && version == kLegacyVersion) {
         std::uint32_t count = 0;
         constexpr std::size_t kLegacyFrameBytes = sizeof(std::uint32_t) + 2 * sizeof(float);

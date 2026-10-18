@@ -41,7 +41,7 @@ private:
     NavKeys navKeys_;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
-    float mouseDeltaX_ = 0.0f; // window units moved since the last pump
+    float mouseSpeedX_ = 0.0f; // window units per second, smoothed over a few pumps so ticks that skip a pump lose nothing
     double lastPump_ = 0.0;
     std::function<void(const SDL_Event&)> hook_;
 };
