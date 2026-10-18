@@ -59,10 +59,9 @@ seedforge/
     assets/             cooker, cooked formats, hot reload
     editor/             tooling app, built on ImGui. Late
     tests/              unit, headless, golden image, replay, benchmarks, fuzz
-  libworldforge/        pure C++, no engine. Phases 0–11
-    src/                tectonics, erosion, hydrology, climate,
-                        biomes, settlement, roads, politics, poi, binding
-    tests/              golden-image + determinism tests
+  libworldforge/        pure C++, no engine. Phases 0–11, header-only
+    include/worldforge/ one header per phase (tectonics … poi, subseed)
+    CMakeLists.txt      INTERFACE library `worldforge`; tests live in engine/tests
   forge-cli/            CLI wrapper → PNGs, manifest, batch runs
   data/                 SHARED source of truth (JSON)
     axioms/  synergies/  catalogue/  kits/  grammars/
