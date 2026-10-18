@@ -28,6 +28,8 @@ struct Options {
     std::filesystem::path fights;
     std::filesystem::path record;
     std::filesystem::path replay;
+    std::string session;
+    std::string variable;
 };
 
 template <class T>
@@ -49,6 +51,8 @@ bool parse(int argc, char** argv, Options& options)
         else if (arg == "--fights" && hasValue) options.fights = argv[++i];
         else if (arg == "--record" && hasValue) options.record = argv[++i];
         else if (arg == "--replay" && hasValue) options.replay = argv[++i];
+        else if (arg == "--session" && hasValue) options.session = argv[++i];
+        else if (arg == "--variable" && hasValue) options.variable = argv[++i];
         else {
             ichor::logf(ichor::LogLevel::Error, "unknown argument: {}", arg);
             return false;
@@ -86,6 +90,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const std::filesystem::path fights = !options.fights.empty() ? options.fights
         : std::filesystem::path(options.headless ? "fights_headless.csv" : "fights.csv");
     stage.recorder().open(fights);
+    stage.recorder().setSession({ichor::stage0::cleanField(options.session), ichor::stage0::cleanField(options.variable)});
+    ichor::log(ichor::LogLevel::Info, ichor::stage0::progressLine(stage.recorder().gateProgress()));
     stage.install(engine.scene(), {0.0, 0.0, 3.0}, {0.0, 0.0, -2.0});
     engine.scene().tick(0.0); // spawn, so the reset below has bodies to place
     stage.resetFight(engine.scene());
@@ -152,7 +158,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--session label] [--variable name]");
         return 2;
     }
     if (options.headless) {

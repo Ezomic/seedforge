@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/stage0/death_cause.h"
+#include "ichor/stage0/session_ledger.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -26,6 +27,12 @@ class FightRecorder {
 public:
     // No path means record in memory only.
     void open(const std::filesystem::path& csv);
+
+    // Stamps every later fight in the sidecar ledger (<csv>.sessions.csv) with this session and variable.
+    void setSession(SessionMarker marker) { session_ = std::move(marker); }
+    const SessionMarker& session() const { return session_; }
+    // Progress toward the 200-fight gate, read from the sidecar ledger.
+    GateProgress gateProgress() const;
 
     void noteAttack(bool playerSide, double now);
     void noteHit(bool attackerIsPlayer, float damage, bool blocked);
@@ -56,6 +63,7 @@ private:
     void begin(double now);
 
     std::filesystem::path csv_;
+    SessionMarker session_;
     SideRecord player_;
     SideRecord foe_;
     bool running_ = false;
