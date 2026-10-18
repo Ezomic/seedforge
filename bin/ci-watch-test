@@ -36,7 +36,7 @@ T=$'\t'
 jobs_ok() { printf '1\tsuccess\twindows runtime + tests\n2\tsuccess\tlinux headless + sanitizers\n' > "$mock/jobs.$1"; }
 check() { # name expected-rc output-regex ; rest: ci-watch args
   local name=$1 want=$2 re=$3; shift 3
-  local out; out=$("$here/ci-watch" "$@" 2>&1); local rc=$?
+  out=$("$here/ci-watch" "$@" 2>&1); local rc=$?
   if [ "$rc" = "$want" ] && echo "$out" | grep -qE "$re"; then echo "ok   $name"; else echo "FAIL $name (rc=$rc want $want)"; echo "$out" | sed 's/^/     /'; fail=1; fi
 }
 reset() { rm -f "$mock"/*; }
@@ -50,7 +50,6 @@ printf '11\tcompleted\tfailure\n' > "$mock/list.$c2"
 printf '1\tsuccess\twindows runtime + tests\n2\tfailure\tlinux headless + sanitizers\n' > "$mock/jobs.11"
 printf 'linux headless + sanitizers\tTest\t2026-10-17T19:36:34.3981665Z 1678/2697 Test #1680: persistent entities are preferred over fresh ones ....***Failed    0.17 sec\nwindows runtime + tests\tTest\t2026-10-17T19:36:34.3981665Z noise ***Failed other\n' > "$mock/log.11"
 check "failure names the test, only under its job" 1 "FAIL  linux.*" -i 0 "$c2"
-out=$("$here/ci-watch" -i 0 "$c2" 2>&1)
 echo "$out" | grep -q "persistent entities are preferred over fresh ones" && ! echo "$out" | grep -q "noise" && echo "ok   failure detail is per job" || { echo "FAIL failure detail is per job"; echo "$out"; fail=1; }
 
 reset; jobs_ok 13
