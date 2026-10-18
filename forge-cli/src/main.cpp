@@ -39,6 +39,10 @@ int main(int argc, char** argv)
             }
             return 0;
         }
+        if (arg == "--validate") {
+            options.validate = true;
+            continue;
+        }
         if (i + 1 >= argc) {
             usage();
             return 2;
@@ -82,8 +86,13 @@ int main(int argc, char** argv)
         return 1;
     }
     if (options.outDir.empty()) std::fputs(result.manifest.c_str(), stdout);
+    if (options.validate) std::fputs(result.validationTable.c_str(), stderr);
     int failed = 0;
     for (const auto& s : result.seeds) {
+        if (s.rejected) {
+            std::fprintf(stderr, "seed %llu rejected by validation\n", static_cast<unsigned long long>(s.seed));
+            ++failed;
+        }
         if (!s.error.empty()) {
             std::fprintf(stderr, "seed %llu failed: %s\n", static_cast<unsigned long long>(s.seed), s.error.c_str());
             ++failed;

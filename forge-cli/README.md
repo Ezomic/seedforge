@@ -9,6 +9,7 @@ over-constrained axioms before a player does.
     ichor_forge_cli --seed 10 --seed-end 19 --size 256 --phase tectonics --out out/
     ichor_forge_cli --seed 7              # manifest to stdout, nothing written
     ichor_forge_cli --list                # registered phases
+    ichor_forge_cli --seed 1 --seed-end 20 --validate --out out/   # pass/fail table per seed, out/validation.json
     ichor_forge_cli --seed 7 --data data  # phase 11 binds the item, NPC and dungeon ids found in data/
 
 Each seed writes `out/seed_N/<layer>.png` and one `out/manifest.json` lists every layer with its
@@ -33,6 +34,8 @@ there is no compressor dependency and the files are byte-identical on every plat
 (`ichor_forgecli`) includes only libworldforge, never engine code.
 
 ## Map viewer
+
+`--validate` forges the full world (it ignores `--phase`) and rerolls up to 8 times; the PNGs and manifest still describe the requested seed, not the accepted reroll.
 
 `viewer/` is a static, offline map viewer: no build step, no server needed, no network access
 (a CSP blocks it). Open `viewer/index.html` in a browser and choose an output folder (the one with
