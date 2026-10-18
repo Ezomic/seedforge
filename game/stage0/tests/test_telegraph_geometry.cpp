@@ -197,3 +197,18 @@ TEST_CASE("only the foe wind-up carries the arrow", "[telegraph_geometry]")
     appendWindupTelegraph(false, d, nullptr, 0.4f, without);
     CHECK(withCamera.size() == without.size() + 3);
 }
+
+TEST_CASE("a foe off screen by depth alone points the arrow down, and a non-finite radius draws nothing", "[telegraph_geometry]")
+{
+    const CameraPose camera = followCamera({0.0, 0.0, 3.0}, {0.0, 0.0, -2.0});
+    const glm::dvec3 behind = camera.position + glm::dvec3(camera.rotation * glm::vec3(0.0f, 0.0f, 5.0f));
+    std::vector<LineSegment> out;
+    REQUIRE(appendOffscreenArrow(camera, behind, 0.4f, glm::vec3(1.0f), out));
+    const glm::vec3 tip = glm::conjugate(camera.rotation) * glm::vec3(out.front().b - camera.position);
+    CHECK(tip.y < 0.0f);
+    CHECK(std::abs(tip.x) < 1e-3f);
+
+    std::vector<LineSegment> none;
+    CHECK_FALSE(appendOffscreenArrow(camera, behind, std::numeric_limits<float>::quiet_NaN(), glm::vec3(1.0f), none));
+    CHECK(none.empty());
+}

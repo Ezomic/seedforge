@@ -508,11 +508,9 @@ void Stage0::debugLines(const Scene& scene, std::vector<LineSegment>& out) const
     };
     const entt::entity playerEntity = scene.find(player_);
     const entt::entity foeAtStart = scene.find(foe_);
-    CameraPose camera;
-    if (playerEntity != entt::null && foeAtStart != entt::null) {
-        camera = followCamera(scene.registry().get<Transform>(playerEntity).position, scene.registry().get<Transform>(foeAtStart).position);
-    }
-    const CameraPose* foeCamera = playerEntity != entt::null && foeAtStart != entt::null ? &camera : nullptr;
+    const bool haveCamera = playerEntity != entt::null && foeAtStart != entt::null;
+    const CameraPose camera = haveCamera ? followCamera(scene.registry().get<Transform>(playerEntity).position, scene.registry().get<Transform>(foeAtStart).position) : CameraPose{};
+    const CameraPose* foeCamera = haveCamera ? &camera : nullptr;
     for (auto [entity, transform, c] : scene.registry().view<const Transform, const Combatant>().each()) {
         const glm::dvec3 base = transform.position + glm::dvec3(0.0, 0.9, 0.0);
         const glm::vec3 forward = forwardFromYaw(c.yaw);

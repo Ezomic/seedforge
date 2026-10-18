@@ -110,8 +110,9 @@ void addPattern(TelegraphPattern pattern, const Extent& e, const Frame& f, glm::
     case TelegraphPattern::Chevrons:
         for (int i = 1; i <= 3; ++i) {
             const double u = e.u0 + span * i / 4.0;
-            push(out, f, u - span * 0.1, -e.half * 0.6, u, 0, color);
-            push(out, f, u, 0, u - span * 0.1, e.half * 0.6, color);
+            const double v = e.half * 0.6 * (e.widens ? static_cast<double>(i) / 4.0 : 1.0);
+            push(out, f, u - span * 0.1, -v, u, 0, color);
+            push(out, f, u, 0, u - span * 0.1, v, color);
         }
         break;
     case TelegraphPattern::Solid:
@@ -145,10 +146,11 @@ void appendTelegraphLines(const VisualTelegraph& cue, const TelegraphDraw& draw,
 
 bool appendOffscreenArrow(const CameraPose& camera, glm::dvec3 target, float targetRadius, glm::vec3 color, std::vector<LineSegment>& out)
 {
-    if (!finite(target) || !finite(camera.position) || inFrustum(camera, target, targetRadius)) return false;
+    if (!finite(target) || !finite(camera.position) || !std::isfinite(targetRadius) || inFrustum(camera, target, targetRadius)) return false;
     constexpr double depth = 1.5;
     const glm::vec3 view = glm::conjugate(camera.rotation) * glm::vec3(target - camera.position);
-    const double a = offscreenBearing(0.0f, 0.0f, view.x, view.y) * (kPi / 180.0);
+    const bool depthOnly = std::hypot(view.x, view.y) < 1e-4f;
+    const double a = depthOnly ? -kPi / 2.0 : offscreenBearing(0.0f, 0.0f, view.x, view.y) * (kPi / 180.0);
     const glm::dvec2 dir(std::cos(a), std::sin(a));
     const double hx = depth * kTanHalfFovX * 0.85;
     const double hy = depth * kTanHalfFovY * 0.85;
