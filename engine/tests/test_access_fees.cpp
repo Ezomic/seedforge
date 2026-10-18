@@ -1,3 +1,4 @@
+#include "test_temp.h"
 #include "ichor/data/data_set.h"
 #include "ichor/economy/access_fees.h"
 
@@ -300,7 +301,7 @@ TEST_CASE("a bribe the wallet cannot cover changes nothing")
 
 TEST_CASE("a currency table that forbids the sink refuses the payment")
 {
-    const auto root = std::filesystem::path(ICHOR_TEST_OUTPUT) / "access-fees-nosink";
+    const auto root = ichor::test::outputPath(ICHOR_TEST_OUTPUT, "access-fees-nosink");
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root / "currency");
     std::ofstream(root / "currency" / "currencies.json", std::ios::binary)

@@ -1,3 +1,4 @@
+#include "../../../engine/tests/test_temp.h"
 #include "ichor/data/data_set.h"
 #include "ichor/stage0/weapon_class.h"
 
@@ -128,7 +129,7 @@ TEST_CASE("a weapon resolves its class by name and an unknown one by nothing")
 
 TEST_CASE("invalid class records are skipped when listing")
 {
-    const auto root = std::filesystem::temp_directory_path() / "ichor_weapon_class_test";
+    const auto root = ichor::test::tempPath("ichor_weapon_class_test");
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root / "weapon_classes");
     std::ofstream(root / "weapon_classes" / "x.json")
