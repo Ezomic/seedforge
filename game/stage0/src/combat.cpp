@@ -1,5 +1,7 @@
 #include "ichor/stage0/combat.h"
 
+#include "ichor/stage0/ai_knobs.h"
+
 #include "ichor/core/dmath.h"
 #include "ichor/core/log.h"
 
@@ -509,8 +511,16 @@ void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const
             lines.push_back(std::format("           {:<10} cooldown {}t  casts {}", name(brain->controllerState()), brain->cooldownTicks, brain->casts));
         }
         if (const auto* brain = scene.registry().try_get<SkirmisherBrain>(entity)) {
-            lines.push_back(std::format("           {:<10} desire {:4.2f}/{:4.2f}  pressure {:4.1f}s  commits {}",
-                name(brain->brainState()), brain->desire, brain->nextThreshold, brain->pressure, brain->commits));
+            const entt::entity playerEntity = scene.find(player_);
+            OverlayInput input{&c, brain, 0.0f, 0.0f, allowedTurnRate(c)};
+            if (const auto* playerTransform = playerEntity != entt::null ? scene.registry().try_get<Transform>(playerEntity) : nullptr) {
+                const glm::dvec3 here = scene.registry().get<Transform>(entity).position;
+                input.distance = static_cast<float>(glm::length(playerTransform->position - here));
+                input.trackingAngleDeg = std::abs(wrapAngle(yawTowards(here, playerTransform->position) - c.yaw)) * (180.0f / kPi);
+            }
+            for (const OverlayLine& line : overlayLines(input, tuning_)) {
+                lines.push_back(std::format("           {:<9} {}", line.label, line.value));
+            }
         }
     }
     lines.push_back(std::format("fights {}  {}", recorder_.fightsWritten(), recorder_.running() ? "[fight on]" : "J light  K heavy  L block  Space dodge  Enter retry"));
