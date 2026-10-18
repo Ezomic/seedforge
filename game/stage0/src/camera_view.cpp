@@ -6,16 +6,6 @@
 
 namespace ichor::stage0 {
 
-CameraPose followCamera(glm::dvec3 player, glm::dvec3 foe)
-{
-    glm::dvec3 away = player - foe;
-    away.y = 0.0;
-    away = glm::length(away) > 1e-6 ? glm::normalize(away) : glm::dvec3(0.0, 0.0, 1.0);
-    const glm::dvec3 eye = player + away * 3.2 + glm::dvec3(0.0, 2.0, 0.0);
-    const glm::dvec3 target = (player + foe) * 0.5 + glm::dvec3(0.0, 0.9, 0.0);
-    return {eye, glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f))};
-}
-
 bool inFrustum(const CameraPose& pose, glm::dvec3 centre, float radius)
 {
     if (!std::isfinite(centre.x) || !std::isfinite(centre.y) || !std::isfinite(centre.z) || !std::isfinite(radius)) {
