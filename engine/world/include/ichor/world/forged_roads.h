@@ -52,6 +52,9 @@ public:
     // The ribbon of one cell, positions relative to the cell origin like the terrain's, lying on the
     // heightfield. uv.x runs across the road from 0 to 1, uv.y along it in metres. A cell with no
     // road, or a heightfield that is not of this world's desc, comes back with no vertices.
+    // Each segment is its own quad, clipped to the cell, so a bend leaves a small wedge on its outer side and
+    // the ribbon's ends reach half a width past the cell edge. Segments between cells that are not neighbours
+    // are ignored.
     Mesh buildMesh(const Heightfield& heightfield, CellId id) const;
 
 private:

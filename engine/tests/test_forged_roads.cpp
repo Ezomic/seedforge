@@ -276,7 +276,7 @@ TEST_CASE("a cell with a road gets a ribbon lying on the ground, a cell without 
     CHECK(without > 0);
 }
 
-TEST_CASE("ribbons of neighbouring cells meet along their shared edge")
+TEST_CASE("the ribbons together cover no more than the roads once each")
 {
     const Fixture f = withRoads();
     const ForgedRoads roads(f.world, f.desc);

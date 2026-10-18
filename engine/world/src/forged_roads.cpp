@@ -5,11 +5,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <tuple>
 
 namespace ichor {
 
 namespace {
+
+constexpr float kMaxWidth = 1024.0f;
 
 double distanceSquaredToSegment(double px, double pz, double ax, double az, double bx, double bz)
 {
@@ -53,10 +56,10 @@ ForgedRoads::ForgedRoads(const worldforge::ForgedWorld& world, const WorldDesc& 
     : params_(params), desc_(desc)
 {
     const bool paramsOk = std::isfinite(params.widthMetres) && std::isfinite(params.shoulderMetres) && std::isfinite(params.lift) && params.widthMetres > 0.0f
-        && params.shoulderMetres >= 0.0f;
+        && params.shoulderMetres >= 0.0f && params.widthMetres <= kMaxWidth && params.shoulderMetres <= kMaxWidth;
     if (!desc.valid() || !paramsOk || !world.roads().has_value()) return;
     const worldforge::RoadMap& map = *world.roads();
-    if (map.width < 2 || map.width != map.height) return;
+    if (map.width < 2 || map.width > worldforge::kTectonicsMaxSize || map.width != map.height) return;
     grid_ = map.width;
     cellSize_ = static_cast<double>(desc.sizeMetres) / static_cast<double>(grid_ - 1);
 
@@ -64,6 +67,13 @@ ForgedRoads::ForgedRoads(const worldforge::ForgedWorld& world, const WorldDesc& 
         return std::pair{static_cast<double>(cell % static_cast<std::uint32_t>(grid_)) * cellSize_, static_cast<double>(cell / static_cast<std::uint32_t>(grid_)) * cellSize_};
     };
 
+    const std::uint32_t side = static_cast<std::uint32_t>(grid_);
+    const auto adjacent = [&](std::uint32_t a, std::uint32_t b) {
+        if (a >= side * side || b >= side * side || a == b) return false;
+        const std::int64_t dx = static_cast<std::int64_t>(a % side) - static_cast<std::int64_t>(b % side);
+        const std::int64_t dz = static_cast<std::int64_t>(a / side) - static_cast<std::int64_t>(b / side);
+        return std::abs(dx) <= 1 && std::abs(dz) <= 1;
+    };
     std::vector<std::tuple<std::uint32_t, std::uint32_t, std::uint32_t>> pairs; // low cell, high cell, edge
     edgeLength_.assign(map.edges.size(), 0.0);
     for (std::size_t e = 0; e < map.edges.size(); ++e) {
@@ -71,6 +81,7 @@ ForgedRoads::ForgedRoads(const worldforge::ForgedWorld& world, const WorldDesc& 
         if (static_cast<std::size_t>(edge.pathBegin) + edge.pathCount > map.pathCells.size()) continue;
         const std::uint32_t* path = map.pathCells.data() + edge.pathBegin;
         for (std::uint32_t i = 0; i + 1 < edge.pathCount; ++i) {
+            if (!adjacent(path[i], path[i + 1])) continue;
             const auto [ax, az] = position(path[i]);
             const auto [bx, bz] = position(path[i + 1]);
             edgeLength_[e] += std::hypot(bx - ax, bz - az);
@@ -110,7 +121,7 @@ RoadHit ForgedRoads::query(double x, double z) const
             for (const std::uint32_t id : buckets_[static_cast<std::size_t>(j) * static_cast<std::size_t>(grid_) + static_cast<std::size_t>(i)]) {
                 const Segment& s = segments_[id];
                 const double d2 = distanceSquaredToSegment(x, z, s.ax, s.az, s.bx, s.bz);
-                if (d2 < best || (found && d2 == best && s.edge < bestEdge)) {
+                if (d2 < best || (d2 == best && (!found || s.edge < bestEdge))) {
                     best = d2;
                     bestEdge = s.edge;
                     found = true;
@@ -135,7 +146,7 @@ double ForgedRoads::edgeLengthMetres(int edge) const
 Mesh ForgedRoads::buildMesh(const Heightfield& heightfield, CellId id) const
 {
     Mesh mesh;
-    if (segments_.empty() || heightfield.empty() || heightfield.desc().sizeMetres != desc_.sizeMetres || !heightfield.contains(id)) return mesh;
+    if (segments_.empty() || heightfield.empty() || heightfield.desc().sizeMetres != desc_.sizeMetres || heightfield.desc().cellMetres != desc_.cellMetres || !heightfield.contains(id)) return mesh;
     const double cellMetres = static_cast<double>(desc_.cellMetres);
     const double originX = heightfield.cellOriginX(id);
     const double originZ = heightfield.cellOriginZ(id);
