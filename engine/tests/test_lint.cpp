@@ -96,7 +96,7 @@ TEST_CASE("a bad data root or validator name is an error and runs nothing", "[li
     CHECK(unknown.results.empty());
 }
 
-TEST_CASE("--only style filtering runs just the named validators", "[lint]")
+TEST_CASE("filtering by name runs just the named validators", "[lint]")
 {
     const Report report = runLint(ICHOR_REPO_DATA, {"reskin"});
     REQUIRE(report.results.size() == 1);
