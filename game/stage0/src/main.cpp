@@ -10,6 +10,7 @@
 #include "ichor/platform/sdl_platform.h"
 #include "ichor/stage0/camera_view.h"
 #include "ichor/stage0/ai_knobs.h"
+#include "ichor/stage0/character_visuals.h"
 #include "ichor/stage0/combat.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -33,6 +34,7 @@ struct Options {
     std::filesystem::path knobs;
     std::string session;
     std::string variable;
+    std::string screenshot;
 };
 
 template <class T>
@@ -57,6 +59,7 @@ bool parse(int argc, char** argv, Options& options)
         else if (arg == "--knobs" && hasValue) options.knobs = argv[++i];
         else if (arg == "--session" && hasValue) options.session = argv[++i];
         else if (arg == "--variable" && hasValue) options.variable = argv[++i];
+        else if (arg == "--screenshot" && hasValue) options.screenshot = argv[++i];
         else {
             ichor::logf(ichor::LogLevel::Error, "unknown argument: {}", arg);
             return false;
@@ -74,7 +77,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::AudioHost& audio = device.init() ? device : static_cast<ichor::AudioHost&>(silent);
 
     ichor::SceneBundle bundle;
-    if (!ichor::readBundle(options.scene, bundle) || !renderer.uploadBundle(bundle)) {
+    if (!ichor::readBundle(options.scene, bundle)) {
+        return 1;
+    }
+    const ichor::stage0::GreyBoxMeshes greyBox = ichor::stage0::appendGreyBoxMeshes(bundle);
+    if (!renderer.uploadBundle(bundle)) {
         return 1;
     }
     audio.addBundle(bundle);
@@ -141,6 +148,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         std::vector<ichor::LineSegment> lines;
         scene.physics().debugLines(lines);
         stage.debugLines(scene, lines);
+        ichor::stage0::appendCharacterInstances(scene, alpha, tuning, greyBox, view.instances);
         for (const ichor::LineSegment& line : lines) {
             view.lines.push_back({line.a, line.b, line.color});
         }
@@ -153,6 +161,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const double now = platform.now();
         const double dt = options.headless ? config.fixedDt : now - last;
         last = now;
+        if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) renderer.requestScreenshot(options.screenshot);
         if (!engine.frame(dt)) break;
         if (options.frames != 0 && engine.frameCount() >= options.frames) break;
         if (engine.replayFinished() && options.frames == 0) break;
@@ -171,7 +180,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir] [--session label] [--variable name]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
         return 2;
     }
     if (options.headless) {
