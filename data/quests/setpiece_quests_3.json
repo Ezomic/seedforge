@@ -1,0 +1,127 @@
+[
+ {
+  "id": "setpiece.hull_that_waited",
+  "archetype": "stranded_hull",
+  "title": "The Hull That Waited",
+  "summary": "The watcher swears the ship will sail again with the next flood. The metallarchs want its fittings stripped, the xenoi want it left as a shelter for travellers.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|stranded_hull|3|0||stranded_hull:state:adrift",
+   "b|npc.hull_watcher|4|0|a|",
+   "c|metallarchs|5|1|b|metallarchs:stance:stripping_fittings",
+   "d|npc.salvage_rigger|4|1|b|",
+   "e|route.hull_track|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:hull_that_waited",
+   "2|metallarchs|Accept>3>;WalkAway>0>abandoned:hull_that_waited_a;TellOtherSide>3>told:metallarchs_of_xenoi",
+   "3|xenoi|Accept>0>;WalkAway>0>abandoned:hull_that_waited_b;TellOtherSide>0>told:xenoi_of_metallarchs"
+  ],
+  "effects": [
+   "Route|route.hull_track|1",
+   "Territory|xenoi|2",
+   "FactionStrength|metallarchs|-3"
+  ]
+ },
+ {
+  "id": "setpiece.blank_catalogue",
+  "archetype": "silent_archive",
+  "title": "The Blank Catalogue",
+  "summary": "Someone wiped every label and left the tablets whole. The mnemones want the catalogue rebuilt from memory, the asebeis want the tablets broken.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|silent_archive|3|0||silent_archive:state:sealed",
+   "b|npc.blank_cataloguer|4|0|a|",
+   "c|mnemones|5|1|b|mnemones:stance:rebuilding_catalogue",
+   "d|npc.dust_courier|4|1|b|",
+   "e|route.archive_steps|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:blank_catalogue",
+   "2|mnemones|Accept>3>;WalkAway>0>abandoned:blank_catalogue_a;TellOtherSide>3>told:mnemones_of_asebeis",
+   "3|asebeis|Accept>0>;WalkAway>0>abandoned:blank_catalogue_b;TellOtherSide>0>told:asebeis_of_mnemones"
+  ],
+  "effects": [
+   "Route|route.archive_steps|1",
+   "FactionStrength|mnemones|3",
+   "FactionStrength|asebeis|-4"
+  ]
+ },
+ {
+  "id": "setpiece.well_that_keeps",
+  "archetype": "bottomless_well",
+  "title": "The Well That Keeps",
+  "summary": "A pail lowered here comes up full of something that is not water. The horkos brokers want to sell the draw, the periegetes want to chart the shaft first.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|bottomless_well|3|0||bottomless_well:state:drawing",
+   "b|npc.rope_tender|4|0|a|",
+   "c|horkos_brokers|5|1|b|horkos_brokers:stance:selling_draw",
+   "d|npc.coin_diver|4|1|b|",
+   "e|route.well_path|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:well_that_keeps",
+   "2|horkos_brokers|Accept>3>;WalkAway>0>abandoned:well_that_keeps_a;TellOtherSide>3>told:horkos_brokers_of_periegetes",
+   "3|periegetes|Accept>0>;WalkAway>0>abandoned:well_that_keeps_b;TellOtherSide>0>told:periegetes_of_horkos_brokers"
+  ],
+  "effects": [
+   "Route|route.well_path|1",
+   "SupplyStatus|horkos_brokers|6",
+   "FactionStrength|periegetes|-2"
+  ]
+ },
+ {
+  "id": "setpiece.two_statues",
+  "archetype": "hanging_bridge",
+  "title": "Two Statues, One Span",
+  "summary": "The warden collects a toll in stories. The diadochoi want the bridge garrisoned, the isonomoi want the toll abolished.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|hanging_bridge|3|0||hanging_bridge:state:fraying",
+   "b|npc.bridge_warden|4|0|a|",
+   "c|diadochoi|5|1|b|diadochoi:stance:garrisoning_span",
+   "d|npc.plank_mender|4|1|b|",
+   "e|route.gorge_crossing|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:two_statues",
+   "2|diadochoi|Accept>3>;WalkAway>0>abandoned:two_statues_a;TellOtherSide>3>told:diadochoi_of_isonomoi",
+   "3|isonomoi|Accept>0>;WalkAway>0>abandoned:two_statues_b;TellOtherSide>0>told:isonomoi_of_diadochoi"
+  ],
+  "effects": [
+   "Route|route.gorge_crossing|1",
+   "Territory|diadochoi|3",
+   "FactionStrength|isonomoi|-2"
+  ]
+ },
+ {
+  "id": "setpiece.orchard_harvest",
+  "archetype": "bone_orchard",
+  "title": "The Orchard Harvest",
+  "summary": "The reaper must pick before the first frost or the grove goes barren. The hekatombaia want the fruit for the feast, the thesauroi want it stored.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|bone_orchard|3|0||bone_orchard:state:fruiting",
+   "b|npc.orchard_reaper|4|0|a|",
+   "c|hekatombaia|5|1|b|hekatombaia:stance:harvesting_fruit",
+   "d|npc.fruit_taster|4|1|b|",
+   "e|route.orchard_lane|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:orchard_harvest",
+   "2|hekatombaia|Accept>3>;WalkAway>0>abandoned:orchard_harvest_a;TellOtherSide>3>told:hekatombaia_of_thesauroi",
+   "3|thesauroi|Accept>0>;WalkAway>0>abandoned:orchard_harvest_b;TellOtherSide>0>told:thesauroi_of_hekatombaia"
+  ],
+  "effects": [
+   "Route|route.orchard_lane|1",
+   "SupplyStatus|hekatombaia|7",
+   "SupplyStatus|thesauroi|-5"
+  ]
+ }
+]
