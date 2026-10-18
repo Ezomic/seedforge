@@ -25,6 +25,9 @@ if(ENGINE_RUNTIME)
     endif()
 endif()
 
+add_executable(stage0_report tools/report_main.cpp)
+target_link_libraries(stage0_report PRIVATE ichor_stage0)
+
 if(BUILD_TESTING)
     find_package(Catch2 3 CONFIG REQUIRED)
     include(Catch)
