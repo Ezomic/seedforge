@@ -16,22 +16,20 @@ CameraPose followCamera(glm::dvec3 player, glm::dvec3 foe)
     return {eye, glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f))};
 }
 
-bool inFrustum(const CameraPose& pose, glm::dvec3 centre, float radius, float fovY, float aspect, float nearPlane, float farPlane)
+bool inFrustum(const CameraPose& pose, glm::dvec3 centre, float radius)
 {
     if (!std::isfinite(centre.x) || !std::isfinite(centre.y) || !std::isfinite(centre.z) || !std::isfinite(radius)) {
         return false;
     }
     const glm::vec3 view = glm::conjugate(pose.rotation) * glm::vec3(centre - pose.position);
     const float depth = -view.z;
-    if (depth + radius < nearPlane || depth - radius > farPlane) {
+    if (depth + radius < kCameraNear || depth - radius > kCameraFar) {
         return false;
     }
-    const float halfV = fovY * 0.5f;
-    const float halfH = std::atan(std::tan(halfV) * aspect);
-    // Distance of the centre outside each side plane; inside is negative.
-    const float outsideX = std::abs(view.x) * std::cos(halfH) - depth * std::sin(halfH);
-    const float outsideY = std::abs(view.y) * std::cos(halfV) - depth * std::sin(halfV);
-    return outsideX <= radius && outsideY <= radius;
+    // A sphere touches a side plane when its centre is within radius / cos(half angle) = radius * sqrt(1 + tan^2) of it.
+    const float marginX = radius * std::sqrt(1.0f + kTanHalfFovX * kTanHalfFovX);
+    const float marginY = radius * std::sqrt(1.0f + kTanHalfFovY * kTanHalfFovY);
+    return std::abs(view.x) <= depth * kTanHalfFovX + marginX && std::abs(view.y) <= depth * kTanHalfFovY + marginY;
 }
 
 }

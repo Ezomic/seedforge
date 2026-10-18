@@ -124,6 +124,7 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
 
 void Stage0::resetFight(Scene& scene)
 {
+    sinceInput_ = 0.0f;
     recorder_.noteRetry(scene.time());
     for (auto [entity, id, transform] : scene.registry().view<const StableId, Transform>().each()) {
         const bool isPlayer = id == player_;
@@ -243,11 +244,16 @@ void Stage0::tickStatus(Scene& scene, entt::entity who, Combatant& c)
     if (c.health > 0.0f) {
         return;
     }
+    DeathFacts facts;
+    facts.victimRecovering = c.combatState() == CombatState::Recovery;
+    facts.outOfStamina = c.stamina <= 1.0f;
+    facts.staminaAtImpact = c.stamina;
+    facts.secondsSinceInput = sinceInput_;
     c.deathCause = static_cast<std::uint8_t>(DeathCause::Bleed);
     enterState(scene, who, c, CombatState::Dead);
     const Combatant& playerC = scene.registry().get<Combatant>(scene.find(player_));
     const Combatant& foeC = scene.registry().get<Combatant>(scene.find(foe_));
-    recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time());
+    recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time(), facts);
 }
 
 void Stage0::parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon)

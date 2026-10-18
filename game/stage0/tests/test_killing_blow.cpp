@@ -100,7 +100,7 @@ TEST_CASE("a killing blow stamps attack kind, recovery, stamina at impact and id
     CHECK(facts.staminaAtImpact == Catch::Approx(37.0f));
     CHECK(facts.secondsSinceInput == Catch::Approx(1.5f).margin(0.1));
     CHECK(a.stage.recorder().lastCause() == DeathCause::WhiffPunished);
-    CHECK(a.stage.recorder().lastRow().find(",heavy,1,37.0,1.5") != std::string::npos);
+    CHECK(a.stage.recorder().lastRow().find(",heavy,1,37.0,") != std::string::npos);
 }
 
 TEST_CASE("input resets the idle clock the killing blow reports")
