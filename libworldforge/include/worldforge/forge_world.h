@@ -45,7 +45,8 @@
 //  - Politics: eroded + resources + settlement sites + ForgeConfig::factions.
 //  - POIs: the road map (deformed terrain) and the settlements; landmark coverage is then measured
 //    over the POIs as landmarks of ForgeConfig::landmarkHeightM on the roads' terrain. The report
-//    is carried, never used as a gate (validation gates and reroll belong to the caller).
+//    is carried, never used as a gate (validation gates and reroll belong to the caller). Only the
+//    first kLandmarkMaxLandmarks (128) POIs, which are the best scored, are measured.
 //  - Content: settlements and POIs become PoiInputs with ids "settlement_NNNN" and "poi_NNNN".
 //    A POI is a Dungeon (when dungeonArchetypes is non-empty), a Ruin or a Landmark by a hash of
 //    its cell and the world seed.
@@ -258,7 +259,7 @@ constexpr std::uint64_t kForgePoiDomain = 0x666f7267655f706full;
 inline std::string forgeSettlementId(std::size_t i) { return "settlement_" + std::string(4 - std::min<std::size_t>(4, std::to_string(i).size()), '0') + std::to_string(i); }
 inline std::string forgePoiId(std::size_t i) { return "poi_" + std::string(4 - std::min<std::size_t>(4, std::to_string(i).size()), '0') + std::to_string(i); }
 
-std::vector<std::uint8_t> forgeLookup(const std::vector<std::uint8_t>& biome, const std::array<std::uint8_t, kBiomeCount>& table)
+inline std::vector<std::uint8_t> forgeLookup(const std::vector<std::uint8_t>& biome, const std::array<std::uint8_t, kBiomeCount>& table)
 {
     std::vector<std::uint8_t> out(biome.size());
     for (std::size_t c = 0; c < biome.size(); ++c) out[c] = table[biome[c] % kBiomeCount];
@@ -315,7 +316,7 @@ inline ForgedWorld forgeWorld(std::uint64_t seed, int size = kForgeDefaultSize, 
     detail::ForgedParts w;
     w.seed = seed;
     w.size = size;
-    w.stopAfter = stopAfter;
+    w.stopAfter = static_cast<ForgePhase>(std::clamp(static_cast<int>(stopAfter), 0, kForgePhaseCount));
     std::uint64_t chain = detail::forgeChainStart(seed, size);
 
     const auto step = [&](ForgePhase phase, auto&& body) -> bool {

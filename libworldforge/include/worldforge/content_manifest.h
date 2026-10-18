@@ -323,7 +323,7 @@ inline std::vector<std::uint8_t> encodeManifest(const ContentManifest& m)
     return o;
 }
 
-// Returns nullopt for anything that is not a well-formed version-1 manifest: bad magic or version, truncation, over-cap counts, empty or over-long ids, unsorted or
+// Returns nullopt for anything that is not a well-formed version-1 or version-2 manifest: bad magic or version, truncation, over-cap counts, empty or over-long ids, unsorted or
 // duplicate ids, references to POIs not in poiIds, a dungeon seed that is not dungeonSeed(worldSeed, poi),
 // or trailing bytes. Cast order is not checked beyond unique NPC ids.
 inline std::optional<ContentManifest> decodeManifest(std::span<const std::uint8_t> bytes)

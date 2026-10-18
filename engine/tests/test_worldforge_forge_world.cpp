@@ -128,8 +128,10 @@ TEST_CASE("stop-after N equals the first N phases of a full run", "[worldforge][
     }
     const ForgedWorld none = forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(0));
     CHECK(none.ok());
+    CHECK(none.complete());
     CHECK(none.completedPhases() == 0);
     CHECK_FALSE(none.tectonics().has_value());
+    CHECK(forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(200)).complete());
     CHECK(forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(200)).worldHash() == full.worldHash());
 }
 
