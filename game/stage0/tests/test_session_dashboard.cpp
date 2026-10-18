@@ -122,7 +122,7 @@ TEST_CASE("hostile input never crashes and still yields a table")
         "",
         "\n\n\n",
         ",,,,",
-        std::string("\0\xff\xfe,,\n", 8),
+        std::string("\0\xff\xfe,,\n", 6),
         "1,nan,inf,player,stamina,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n",
         "99999999999999999999,1,1,player,stamina,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n",
         "garbage row without commas\n",
