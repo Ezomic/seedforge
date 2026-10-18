@@ -63,10 +63,12 @@ struct BotConfig {
     int fights = 20;
     int maxFightTicks = 60 * 90; // a fight that runs longer is abandoned and counted as a timeout
     std::filesystem::path csv;   // empty keeps the log in memory only
+    bool captureFirstFight = false; // keep the first fight's inputs in BotResult::firstFightInputs
 };
 
 struct BotResult {
     int timeouts = 0;
+    std::vector<InputFrame> firstFightInputs; // one frame per tick after the settle ticks, up to the killing blow
     std::vector<FightRow> rows;
     FightSummary summary;
 };
