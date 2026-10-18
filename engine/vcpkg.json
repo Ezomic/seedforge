@@ -17,7 +17,8 @@
     "rmlui",
     "lua",
     "ozz-animation",
-    "miniaudio"
+    "miniaudio",
+    "zlib"
   ],
   "default-features": [
     "runtime"
