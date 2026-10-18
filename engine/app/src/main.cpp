@@ -21,6 +21,7 @@
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/character_screen.h"
 #include "ichor/ui/journal_screen.h"
+#include "ichor/ui/landmark_compass_screen.h"
 #include "ichor/ui/journal_screen_bind.h"
 #include "ichor/data/journal.h"
 #include "ichor/script/journal_bindings.h"
@@ -601,6 +602,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::CharacterScreen> characterScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
+    std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::MapScreenBinding> mapBinding;
     ichor::MapAnnotationStore mapMarks;
     ichor::WaypointSet mapWaypoints;
@@ -633,6 +635,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
             characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
+            landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
             mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
@@ -640,11 +643,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             combatHud.reset();
             newGameScreen.reset();
             pauseMenu.reset();
+            landmarkCompass.reset();
             mapBinding.reset();
             mapScreen.reset();
             characterScreen.reset();
@@ -681,6 +685,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
                 hud->setGuide(hudGuide);
+                {
+                    // The only landmark the app knows is the compass target; z is south, the compass wants y north.
+                    std::vector<ichor::NavLandmark> marks;
+                    if (options.compassTarget) {
+                        marks.push_back({"target", "the marked place", {static_cast<float>(options.compassTarget->first), static_cast<float>(-options.compassTarget->second)}});
+                    }
+                    const glm::dvec3 feet = playerPosition(engine.scene());
+                    ichor::bindLandmarkCompass(*landmarkCompass, {static_cast<float>(feet.x), static_cast<float>(-feet.z)}, {std::sin(hudHeading), std::cos(hudHeading)}, marks);
+                }
                 combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = 100.0f, .maxStamina = 100.0f}));
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;

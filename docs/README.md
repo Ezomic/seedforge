@@ -68,6 +68,7 @@ system needs designing.
 
 Design complete. A first Stage 0 combat prototype was built in Unreal in August 2026 and its
 gate was never run; on 2026-10-12 the project left Unreal for its own engine, see
-**[17-tech-stack.md](17-tech-stack.md)**. Engine milestones E1 to E4 come first, then Stage 0
-runs again on the engine, gated on *"is one ordinary fight tense?"*, see
+**[17-tech-stack.md](17-tech-stack.md)**. Engine milestones E1 to E4 are built and Stage 0 has been
+rebuilt on the engine, and a human has not run its gate yet (see
+[17](17-tech-stack.md#order-of-work)). The gate is *"is one ordinary fight tense?"*, see
 **[18-vertical-slice.md](18-vertical-slice.md)**.
