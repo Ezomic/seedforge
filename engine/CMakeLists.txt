@@ -69,6 +69,7 @@ add_subdirectory(platform)
 add_subdirectory(gfx)
 add_subdirectory(loop)
 add_subdirectory(tools)
+add_subdirectory(lint)
 add_subdirectory(content)
 
 if(ENGINE_RUNTIME)
