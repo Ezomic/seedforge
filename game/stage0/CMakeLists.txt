@@ -28,6 +28,9 @@ endif()
 add_executable(stage0_report tools/report_main.cpp)
 target_link_libraries(stage0_report PRIVATE ichor_stage0)
 
+add_executable(stage0_bot tools/bot_main.cpp)
+target_link_libraries(stage0_bot PRIVATE ichor_stage0)
+
 if(BUILD_TESTING)
     find_package(Catch2 3 CONFIG REQUIRED)
     include(Catch)
