@@ -24,8 +24,8 @@ struct FightRow {
     double playerDamageTaken = 0.0;
 };
 
-// Rows that do not parse (wrong column count, non-numeric or non-finite fields, unknown loser) are skipped,
-// so a half-written or hostile file yields fewer rows rather than a crash.
+// Rows that do not parse (fewer than 23 columns, non-numeric or non-finite fields, unknown loser) are skipped,
+// so a half-written or hostile file yields fewer rows rather than a crash. Extra trailing columns are ignored.
 std::vector<FightRow> parseFightLog(std::string_view csv);
 
 struct FightSummary {
