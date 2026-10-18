@@ -1,0 +1,17 @@
+{
+  "synergies": [
+    {
+      "id": "flood_orichalcum_league",
+      "tier": "triple",
+      "axioms": ["cataclysm.flood", "law.orichalcum", "powers.league"],
+      "content_tier": 1,
+      "faction": "metallarchs",
+      "dungeon_type": "company_shaft",
+      "mechanic": "company_town_charter",
+      "world_name": "The Charter Shore",
+      "flavour": {
+        "world_description": "The water took Atlantis and left its metal under the new shoreline. The League sank the first shafts and then the first towns around them, and a miner here is paid in credit that only the company store will honour."
+      }
+    }
+  ]
+}
