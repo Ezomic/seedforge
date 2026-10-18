@@ -87,7 +87,7 @@ jobs:
         run: ctest --preset windows-ci
         working-directory: engine
       - name: Headless smoke run
-        run: ./build/windows-ci/app/ichor.exe --headless --frames 120
+        run: python ../tools/check_smoke_hash.py build/windows-ci/app/ichor.exe
         working-directory: engine
 
   linux-headless:

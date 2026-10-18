@@ -22,6 +22,21 @@ struct NavParams {
     float maxSlopeDegrees = 45.0f;
 };
 
+// Detour area ids a surface can hand out. Ground is Recast's walkable area; a lower id is cheaper to
+// path over once NavWorld::findPath weighs it.
+constexpr unsigned char kNavAreaGround = 63;
+constexpr unsigned char kNavAreaFord = 61;
+constexpr unsigned char kNavAreaRoad = 62;
+constexpr unsigned char kNavAreaBlocked = 0;
+
+// Which ground an agent may stand on, asked once per voxel column of a tile after the heightfield is
+// voxelised. Return kNavAreaBlocked for ground that is not walkable, or one of the walkable areas.
+class NavSurface {
+public:
+    virtual ~NavSurface() = default;
+    virtual unsigned char areaAt(double x, double z) const = 0;
+};
+
 // One cell's navmesh tile as Detour serialises it, built off the game thread
 // from the heightfield alone. The tile covers its cell and was rasterised
 // with a border into the neighbours, so adjoining tiles meet at the seam.
@@ -32,7 +47,8 @@ struct NavTile {
 
 // Returns false on a build failure. A cell with nothing to walk on returns
 // true with an empty tile.
-bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& params, NavTile& out);
+// A surface, when given, can rule out voxels (water) and mark others as road or ford.
+bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& params, NavTile& out, const NavSurface* surface = nullptr);
 
 // The tiles of the resident cells, linked to their neighbours as they arrive.
 class NavWorld {
