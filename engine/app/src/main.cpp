@@ -13,6 +13,7 @@
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
+#include "ichor/ui/combat_hud_screen.h"
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
@@ -602,6 +603,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
+    std::unique_ptr<ichor::CombatHudScreen> combatHud;
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -632,9 +634,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
+            combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            combatHud.reset();
             newGameScreen.reset();
             pauseMenu.reset();
             mapBinding.reset();
@@ -672,6 +676,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
                 hud->setGuide(hudGuide);
+                combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = 100.0f, .maxStamina = 100.0f}));
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
