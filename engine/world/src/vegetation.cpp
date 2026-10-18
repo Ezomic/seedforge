@@ -176,7 +176,7 @@ void scatterVegetation(const Heightfield& heightfield, CellId id, const Vegetati
             if (1.0f - heightfield.normalAt(worldX, worldZ).y > params.maxSlope) {
                 continue;
             }
-            if (acceptRoll > forestDensity(worldX, worldZ, params.forestScale)) {
+            if (acceptRoll > forestDensity(worldX, worldZ, params.forestScale) * params.forestDensity) {
                 continue;
             }
             VegetationInstance tree;
