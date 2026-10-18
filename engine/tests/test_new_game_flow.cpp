@@ -13,7 +13,7 @@ using namespace ichor;
 
 namespace {
 
-constexpr int kGrid = 32;
+constexpr int kGrid = 64;
 
 WorldDesc descFor(std::uint64_t seed)
 {
@@ -140,6 +140,7 @@ TEST_CASE("the flow forges the chosen seed and hands over the job", "[new_game_f
         flow.update();
         return flow.stage() != NewGameStage::Forging;
     }));
+    INFO(flow.error());
     REQUIRE(flow.stage() == NewGameStage::Ready);
     CHECK(flow.loadingView().percent == 100);
     const std::unique_ptr<ForgeJob> job = flow.takeJob();
