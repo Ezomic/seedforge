@@ -56,7 +56,10 @@ std::optional<Cost> phaseCost(const CostModel& model, std::string_view phase, in
     if (size < worldforge::kTectonicsMinSize || size > worldforge::kTectonicsMaxSize) return std::nullopt;
     const PhaseModel* pm = nullptr;
     for (const PhaseModel& p : model.phases) {
-        if (p.phase == phase) pm = &p;
+        if (p.phase == phase) {
+            pm = &p;
+            break;
+        }
     }
     if (pm == nullptr) return std::nullopt;
 
@@ -68,7 +71,12 @@ std::optional<Cost> phaseCost(const CostModel& model, std::string_view phase, in
     for (std::string_view name : pm->stages) {
         const Stage* s = findStage(model, name);
         if (s == nullptr) return std::nullopt;
-        passes += name == kErosionStage ? worldforge::erosionCellPasses(size, size, model.erosion) : s->passesPerCell * cells;
+        std::int64_t stagePasses = s->passesPerCell * cells;
+        if (name == kErosionStage) {
+            stagePasses = worldforge::erosionCellPasses(size, size, model.erosion);
+            if (stagePasses == 0) return std::nullopt;
+        }
+        passes += stagePasses;
         retained += s->retainedBytesPerCell;
         transient = std::max(transient, s->transientBytesPerCell);
         maxAlloc = std::max(maxAlloc, s->maxAllocBytesPerCell);

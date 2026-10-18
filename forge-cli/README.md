@@ -61,8 +61,9 @@ iterations moves the total. A phase with no entry in the model fails
 To change the numbers:
 
 - A phase got slower or bigger on purpose: edit its stage factors in `defaultCostModel()`, then raise
-  `kForgeBudget` in `budget.h` if the test says the total is over. Keep about 25% headroom; the test
-  `the budget is tight enough to notice growth` fails if the budget is more than a third too loose.
+  `kForgeBudget` in `budget.h` if the test says the total is over. Keep 25% to 30% headroom (now 28% for
+  passes, 39% for peak bytes, 50% for the largest allocation); the test `the budget is tight enough
+  to notice growth` fails if the budget is more than 50% above the model.
 - A new phase: add a `PhaseModel` (and a `Stage` if it adds shared work). The output-bytes test
   checks the model against the layers the phase really writes.
 - Sizes above 1024: raise `kTectonicsMaxSize` first; until then `planErosionBudget` with

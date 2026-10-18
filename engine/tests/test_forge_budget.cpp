@@ -35,9 +35,9 @@ TEST_CASE("the budget is tight enough to notice growth", "[forge_budget]")
 {
     const auto cost = forgeCost(defaultCostModel(), kForgeTargetSize);
     REQUIRE(cost.has_value());
-    CHECK(cost->cellPasses * 10 >= kForgeBudget.cellPasses * 6);
-    CHECK(cost->peakBytes * 10 >= kForgeBudget.peakBytes * 6);
-    CHECK(cost->maxAllocBytes * 10 >= kForgeBudget.maxAllocBytes * 6);
+    CHECK(cost->cellPasses * 3 >= kForgeBudget.cellPasses * 2);
+    CHECK(cost->peakBytes * 3 >= kForgeBudget.peakBytes * 2);
+    CHECK(cost->maxAllocBytes * 3 >= kForgeBudget.maxAllocBytes * 2);
 }
 
 TEST_CASE("doubling the erosion iterations goes over budget", "[forge_budget]")
@@ -50,7 +50,7 @@ TEST_CASE("doubling the erosion iterations goes over budget", "[forge_budget]")
     CHECK_FALSE(withinBudget(*cost, kForgeBudget));
 }
 
-TEST_CASE("a phase whose per-cell cost doubles goes over budget", "[forge_budget]")
+TEST_CASE("raising any stage's passes raises the total, and a broad rise goes over budget", "[forge_budget]")
 {
     for (std::size_t i = 0; i < defaultCostModel().stages.size(); ++i) {
         CostModel model = defaultCostModel();
@@ -82,6 +82,21 @@ TEST_CASE("a bigger scratch buffer trips the memory and allocation bounds", "[fo
     REQUIRE(cost.has_value());
     CHECK(cost->peakBytes > kForgeBudget.peakBytes);
     CHECK(cost->maxAllocBytes > kForgeBudget.maxAllocBytes);
+}
+
+TEST_CASE("erosion params that cost nothing are rejected, not costed as free", "[forge_budget]")
+{
+    CostModel model = defaultCostModel();
+    model.erosion.iterations = 0;
+    CHECK_FALSE(forgeCost(model, kForgeTargetSize).has_value());
+}
+
+TEST_CASE("phase names in the model are unique", "[forge_budget]")
+{
+    const auto& phases = defaultCostModel().phases;
+    for (std::size_t i = 0; i < phases.size(); ++i) {
+        for (std::size_t j = i + 1; j < phases.size(); ++j) CHECK(phases[i].phase != phases[j].phase);
+    }
 }
 
 TEST_CASE("a phase missing a stage in the model is rejected, not costed as free", "[forge_budget]")
