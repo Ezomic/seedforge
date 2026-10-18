@@ -1,6 +1,8 @@
 #include <forgecli/forge.h>
 #include <forgecli/png.h>
 
+#include <worldforge/world_validation.h>
+
 #include <algorithm>
 #include <exception>
 #include <cstdio>
@@ -66,6 +68,26 @@ bool writeFile(const std::filesystem::path& path, const std::vector<std::uint8_t
     return static_cast<bool>(f);
 }
 
+// The CLI binds no item or NPC ids, so the quest gates stay open here; the thresholds are otherwise the defaults.
+void validateSeed(const RunOptions& options, SeedRecord& record, RunResult& result)
+{
+    worldforge::GateThresholds thresholds;
+    thresholds.minQuestItems = 0;
+    thresholds.minQuestCast = 0;
+    const worldforge::ValidatedForge v = worldforge::forgeValidated(record.seed, options.size, {}, thresholds);
+    record.validated = true;
+    record.rejected = !v.accepted;
+    const worldforge::ValidationReport& last = v.attempts.back().report;
+    if (!last.error.empty()) record.causes.push_back(last.error);
+    for (const worldforge::GateResult& g : last.gates) {
+        if (g.status == worldforge::GateStatus::Fail) record.causes.push_back(g.id + ": " + g.cause);
+    }
+    for (const worldforge::ValidationAttempt& a : v.attempts) result.validationTable += "attempt " + std::to_string(a.index) + " " + worldforge::validationText(a.report);
+    std::string json = worldforge::validatedForgeJson(v);
+    json.pop_back();
+    result.validation += (result.validation.empty() ? "" : ",") + ("\n" + json);
+}
+
 }
 
 std::string manifestJson(const RunOptions& options, const std::vector<SeedRecord>& seeds)
@@ -77,6 +99,11 @@ std::string manifestJson(const RunOptions& options, const std::vector<SeedRecord
         const SeedRecord& s = seeds[i];
         out += std::string(i ? ",\n" : "\n") + "    {\"seed\": " + std::to_string(s.seed);
         if (!s.error.empty()) out += ", \"error\": " + jsonString(s.error);
+        if (s.validated) {
+            out += std::string(", \"validation\": {\"rejected\": ") + (s.rejected ? "true" : "false") + ", \"causes\": [";
+            for (std::size_t c = 0; c < s.causes.size(); ++c) out += (c ? ", " : "") + jsonString(s.causes[c]);
+            out += "]}";
+        }
         out += ", \"layers\": [";
         for (std::size_t j = 0; j < s.layers.size(); ++j) {
             const LayerRecord& l = s.layers[j];
@@ -179,14 +206,20 @@ RunResult runForge(const RunOptions& in)
             }
             if (!record.error.empty() || failedWrite) break;
         }
+        if (options.validate && record.error.empty()) validateSeed(options, record, result);
         result.seeds.push_back(std::move(record));
         if (failedWrite || seed == options.seedEnd) break;
     }
 
     result.manifest = manifestJson(options, result.seeds);
+    if (options.validate) result.validation = "{\"tool\": \"forge-cli\", \"size\": " + std::to_string(options.size) + ", \"seeds\": [" + result.validation + "\n]}\n";
     if (!options.outDir.empty()) {
         const std::vector<std::uint8_t> bytes(result.manifest.begin(), result.manifest.end());
         if (!writeFile(outDir / "manifest.json", bytes) && result.error.empty()) result.error = "cannot write manifest.json";
+        if (options.validate) {
+            const std::vector<std::uint8_t> report(result.validation.begin(), result.validation.end());
+            if (!writeFile(outDir / "validation.json", report) && result.error.empty()) result.error = "cannot write validation.json";
+        }
     }
     return result;
 }

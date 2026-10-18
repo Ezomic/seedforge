@@ -337,3 +337,40 @@ TEST_CASE("a write failure keeps the manifest of the seeds already done", "[forg
     CHECK(result.seeds.size() == 2);
     CHECK(nlohmann::json::parse(result.manifest)["runs"][0]["layers"].size() == 3);
 }
+
+TEST_CASE("validate scores each seed, writes validation.json next to the manifest and still writes rejected layers", "[forge_cli][validation]")
+{
+    auto options = oneSeed(1, 64);
+    options.seedEnd = 6;
+    options.validate = true;
+    options.outDir = scratch("validate").string();
+    const auto result = forgecli::runForge(options);
+    REQUIRE(result.error.empty());
+
+    std::ifstream f(std::filesystem::path(options.outDir) / "validation.json");
+    const std::string onDisk((std::istreambuf_iterator<char>(f)), {});
+    CHECK(onDisk == result.validation);
+    const auto validation = nlohmann::json::parse(result.validation);
+    const auto manifest = nlohmann::json::parse(result.manifest);
+    REQUIRE(validation["seeds"].size() == 6);
+    REQUIRE(manifest["runs"].size() == 6);
+    CHECK(result.validationTable.find("settlement_density") != std::string::npos);
+    for (std::size_t i = 0; i < 6; ++i) {
+        const auto& v = validation["seeds"][i];
+        const auto& run = manifest["runs"][i];
+        CHECK(v["world_seed"] == run["seed"]);
+        CHECK(v["rejected"] == run["validation"]["rejected"]);
+        CHECK(run["validation"]["causes"].empty() == !v["rejected"].get<bool>());
+        CHECK(v["attempts"].size() >= 1);
+        CHECK(v["attempts"].size() <= 8);
+        CHECK(run["layers"].size() >= 4);
+        CHECK(result.seeds[i].rejected == v["rejected"].get<bool>());
+    }
+
+    auto plain = oneSeed(1, 64);
+    plain.outDir = scratch("validate_off").string();
+    const auto off = forgecli::runForge(plain);
+    CHECK(off.validation.empty());
+    CHECK_FALSE(std::filesystem::exists(std::filesystem::path(plain.outDir) / "validation.json"));
+    CHECK_FALSE(nlohmann::json::parse(off.manifest)["runs"][0].contains("validation"));
+}

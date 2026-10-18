@@ -48,6 +48,9 @@ struct SeedRecord {
     std::uint64_t seed = 0;
     std::string error; // non-empty when a phase failed for this seed
     std::vector<LayerRecord> layers;
+    bool validated = false;
+    bool rejected = false;                // set when validated and no attempt passed every gate
+    std::vector<std::string> causes;      // failed gates of the last attempt, "gate: cause"
 };
 
 struct RunOptions {
@@ -56,6 +59,7 @@ struct RunOptions {
     int size = 256;
     std::vector<std::string> phases; // empty means every registered phase
     std::string outDir;              // empty means compute and hash only, write nothing
+    bool validate = false;           // score each seed with forgeValidated (reroll included) and write validation.json
 };
 
 constexpr std::uint64_t kMaxBatchSeeds = 100000;
@@ -63,6 +67,8 @@ constexpr std::uint64_t kMaxBatchSeeds = 100000;
 struct RunResult {
     std::vector<SeedRecord> seeds;
     std::string manifest;
+    std::string validation; // the validation.json text, empty unless options.validate
+    std::string validationTable; // one text table per seed, empty unless options.validate
     std::string error; // set when the options are invalid or a file cannot be written
 };
 
