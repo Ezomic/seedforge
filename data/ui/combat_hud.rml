@@ -1,0 +1,25 @@
+<rml><head><style>
+    body, div { display: block; }
+    body { width: 100%; height: 100%; }
+    .bar { position: absolute; left: 24px; width: 260px; height: 14px; background-color: #1a0d0dcc; border: 1px #a08850; }
+    .fill { width: 0%; height: 14px; }
+    #health { bottom: 56px; }
+    #healthfill { background-color: #a83232; }
+    #health.low #healthfill { background-color: #e04040; }
+    #stamina { bottom: 36px; height: 10px; }
+    #stamina .fill { height: 10px; background-color: #5a9a48; }
+    #stamina.low .fill { background-color: #b0a040; }
+    #law { position: absolute; left: 24px; bottom: 74px; width: 260px; font-family: Alegreya Sans; font-size: 18px; color: #e8d8a8; }
+    #lawbar { width: 260px; height: 6px; background-color: #10141acc; border: 1px #a08850; }
+    #lawfill { width: 0%; height: 6px; background-color: #d8b048; }
+    #ring { position: absolute; left: 50%; top: 50%; width: 0px; height: 0px; }
+    .hit { position: absolute; width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; }
+    #reticle { position: absolute; left: 50%; top: 50%; margin-left: 18px; margin-top: -20px; width: 6px; height: 40px; background-color: #10141acc; border: 1px #a08850; }
+    #staggerfill { position: absolute; left: 0px; bottom: 0px; width: 6px; height: 0%; background-color: #e8d8a8; }
+</style></head><body>
+    <div id="health" class="bar"><div id="healthfill" class="fill"></div></div>
+    <div id="stamina" class="bar"><div id="staminafill" class="fill"></div></div>
+    <div id="law"><div id="lawtext"></div><div id="lawbar"><div id="lawfill"></div></div></div>
+    <div id="ring"></div>
+    <div id="reticle"><div id="staggerfill"></div></div>
+</body></rml>
