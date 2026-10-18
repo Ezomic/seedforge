@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdint>
 #include <map>
 #include <string>
 
@@ -322,6 +323,9 @@ worldforge::ForgeConfig defaultForgeConfig(int size)
     const int spacing = std::clamp(size / 16, 2, 24);
     config.settlements.minSpacing = spacing;
     config.pois.minSpacing = spacing;
+    const std::int64_t clamped = std::clamp(size, worldforge::kTectonicsMinSize, worldforge::kTectonicsMaxSize);
+    const std::int64_t area = clamped * clamped;
+    config.hydrology.riverThreshold = std::max<std::int64_t>(16, config.hydrology.riverThreshold * area / (1024 * 1024));
     worldforge::FactionSpec contiguous;
     worldforge::FactionSpec ore;
     ore.strategy = worldforge::ClaimStrategy::ResourceFollowing;

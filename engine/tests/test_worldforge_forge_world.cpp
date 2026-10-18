@@ -468,9 +468,9 @@ TEST_CASE("golden world hashes for fixed seeds", "[worldforge][forge][golden]")
         std::uint64_t hash;
     };
     const std::array<Case, 3> cases = { {
-        { 1, 0x8a45b5bc0a9b3091ull },
-        { 42, 0xd6ae1c5248535db6ull },
-        { 0xDEADBEEFull, 0xd7df2ea0b0374f01ull },
+        { 1, 0xb0330e6d6627c309ull },
+        { 42, 0xabde616061158aa5ull },
+        { 0xDEADBEEFull, 0xb9724b4e6d9275efull },
     } };
     for (const Case& c : cases) {
         INFO("seed " << c.seed);

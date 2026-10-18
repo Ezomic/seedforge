@@ -42,11 +42,11 @@ constexpr std::int64_t kErosionMaxCellPasses = 1'000'000'000;
 struct ErosionParams {
     int iterations = 24;       // rounds of hydraulic then thermal, in [0, kErosionMaxIterations]
     int thermalPasses = 2;     // thermal passes per round, in [0, kErosionMaxIterations]
-    int strength = 64;         // sediment capacity scale per unit of flux times drop, in [0, 256]
-    int erodeRate = 96;        // share (of 256) of spare capacity converted to erosion per pass
-    int depositRate = 160;     // share (of 256) of excess sediment deposited per pass
+    int strength = 128;        // sediment capacity scale per unit of flux times drop, in [0, 256]
+    int erodeRate = 160;       // share (of 256) of spare capacity converted to erosion per pass
+    int depositRate = 128;     // share (of 256) of excess sediment deposited per pass
     int thermalRate = 128;     // share (of 256) of the steepest excess moved per thermal pass
-    int talusM = 6;            // largest stable height step between orthogonal neighbours, [0, 1000]
+    int talusM = 5;            // largest stable height step between orthogonal neighbours, [0, 1000]
 };
 
 struct ErodedMap {

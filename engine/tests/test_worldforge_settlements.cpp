@@ -93,7 +93,7 @@ TEST_CASE("settlements are deterministic and match the golden hash", "[worldforg
     const SettlementMap b = settle(w);
     CHECK(hashSettlementMap(a) == hashSettlementMap(b));
     CHECK(a.sites.size() == b.sites.size());
-    CHECK(hashSettlementMap(a) == 0xab7784bc5338e41full);
+    CHECK(hashSettlementMap(a) == 0x531a200cc4d68b38ull);
 }
 
 TEST_CASE("different seeds give different settlements", "[worldforge][settlements]")

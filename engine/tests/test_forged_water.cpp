@@ -30,7 +30,9 @@ Fixture makeFixture(std::uint64_t seed)
     base.metresPerSample = 8;
     base.cellMetres = 512;
     const WorldDesc desc = forgedWorldDesc(base);
-    worldforge::ForgedWorld world = worldforge::forgeWorld(desc.seed, kGrid, {}, worldforge::ForgePhase::Hydrology);
+    worldforge::ForgeConfig config;
+    config.hydrology.riverThreshold = 48;
+    worldforge::ForgedWorld world = worldforge::forgeWorld(desc.seed, kGrid, config, worldforge::ForgePhase::Hydrology);
     REQUIRE(world.ok());
     ForgedHeightfield forged = heightfieldFromForgedWorld(world, desc);
     REQUIRE(forged.ok());

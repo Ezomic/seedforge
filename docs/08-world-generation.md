@@ -75,6 +75,13 @@ into the heightfield.
 > Rivers **must** come from flow accumulation. A river running uphill or ending nowhere is
 > the most immersion-breaking thing a generated world can do, and everyone notices.
 
+> **Tuned defaults (SEED-416).** Chosen by eye in the map viewer at the 1024 grid (4 m per cell), checked
+> at 256, over eight fixed seeds. `ErosionParams`: 24 rounds, 2 thermal passes, strength 128, erode 160,
+> deposit 128, thermal 128, talus 5 m. `HydrologyParams`: river threshold 700 cells, carve 128 per sqrt(flow),
+> deepest channel 60 m. A softer set left the terrain close to the raw tectonics; a heavier set (160 rounds,
+> threshold 250) turned plains into dense comb-like river networks. Changing any of these changes every
+> world hash.
+
 **4 — Climate.** Temperature from latitude plus elevation lapse rate. Moisture from
 prevailing wind with orographic lift, producing **rain shadows** — the single effect that
 does most for perceived design intent.
