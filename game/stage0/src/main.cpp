@@ -182,7 +182,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-=======
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name]");
         return 2;
     }
     if (!options.review.empty()) {
