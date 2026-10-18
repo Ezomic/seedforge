@@ -209,7 +209,7 @@ TEST_CASE("the shipped data has no dangling reference", "[xref]")
     REQUIRE(data.loadDirectory(root));
     REQUIRE(axioms.loadDirectory(root));
     const XrefReport report = checkReferences(data, axioms, root);
-    INFO("run ichor_tests [xref] to list them");
+    INFO("run the ichor_tests_* executable that holds it with [xref] to list them");
     for (const DanglingRef& ref : report.dangling) {
         UNSCOPED_INFO(describe(ref));
     }
