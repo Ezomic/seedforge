@@ -30,6 +30,8 @@ struct Options {
     std::filesystem::path record;
     std::filesystem::path replay;
     std::filesystem::path knobs;
+    std::string session;
+    std::string variable;
 };
 
 template <class T>
@@ -52,6 +54,8 @@ bool parse(int argc, char** argv, Options& options)
         else if (arg == "--record" && hasValue) options.record = argv[++i];
         else if (arg == "--replay" && hasValue) options.replay = argv[++i];
         else if (arg == "--knobs" && hasValue) options.knobs = argv[++i];
+        else if (arg == "--session" && hasValue) options.session = argv[++i];
+        else if (arg == "--variable" && hasValue) options.variable = argv[++i];
         else {
             ichor::logf(ichor::LogLevel::Error, "unknown argument: {}", arg);
             return false;
@@ -99,6 +103,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     stage.recorder().open(fights);
     ichor::stage0::appendKnobStamp(fights, ichor::stage0::knobStampLine(knobLoad.knobs,
         options.knobs.empty() ? std::string("defaults") : options.knobs.string(), stage.recorder().fightsWritten() + 1));
+    stage.recorder().setSession({ichor::stage0::cleanField(options.session), ichor::stage0::cleanField(options.variable)});
+    ichor::log(ichor::LogLevel::Info, ichor::stage0::progressLine(stage.recorder().gateProgress()));
     stage.install(engine.scene(), {0.0, 0.0, 3.0}, {0.0, 0.0, -2.0});
     engine.scene().tick(0.0); // spawn, so the reset below has bodies to place
     stage.resetFight(engine.scene());
@@ -165,7 +171,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir] [--session label] [--variable name]");
         return 2;
     }
     if (options.headless) {
