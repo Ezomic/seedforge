@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace ichor;
@@ -112,4 +113,77 @@ TEST_CASE("an unloadable data root reports problems instead of throwing", "[axio
     std::vector<std::string> problems;
     CHECK_FALSE(generateAxiomCoverage(fs::path(ICHOR_TEST_OUTPUT) / "axiom_coverage_no_such_dir", markdown, problems));
     CHECK(markdown.empty());
+}
+
+namespace {
+
+Synergy pairSynergy(std::string id, std::string a, std::string b, ContentTier tier)
+{
+    Synergy synergy;
+    synergy.id = std::move(id);
+    synergy.axioms = {std::move(a), std::move(b)};
+    synergy.contentTier = tier;
+    return synergy;
+}
+
+// Four shipped axioms (two cataclysms, one law, one powers) in a scratch data root.
+struct SmallRoot {
+    fs::path root = fs::path(ICHOR_TEST_OUTPUT) / "axiom_coverage_small";
+    AxiomSet axioms;
+
+    SmallRoot()
+    {
+        fs::remove_all(root);
+        fs::create_directories(root / "axioms");
+        for (const char* name : {"flood", "kronos", "orichalcum", "league"})
+            fs::copy_file(fs::path(ICHOR_REPO_DATA) / "axioms" / (std::string(name) + ".json"), root / "axioms" / (std::string(name) + ".json"));
+        REQUIRE(axioms.loadDirectory(root));
+    }
+    ~SmallRoot()
+    {
+        std::error_code code;
+        fs::remove_all(root, code);
+    }
+};
+
+}
+
+TEST_CASE("each pair lands in the right matrix cell, and a flagship beats a duplicate text-only entry", "[axiom_coverage]")
+{
+    const SmallRoot small;
+    const std::vector<Synergy> synergies = {
+        pairSynergy("a_text", "law.orichalcum", "cataclysm.flood", ContentTier::TextOnly),
+        pairSynergy("b_flagship", "cataclysm.flood", "law.orichalcum", ContentTier::Flagship),
+        pairSynergy("c_text", "powers.league", "law.orichalcum", ContentTier::TextOnly),
+    };
+    for (const auto& order : {synergies, std::vector<Synergy>(synergies.rbegin(), synergies.rend())}) {
+        const std::string text = renderAxiomCoverage(small.axioms, order);
+        CHECK(text.find("\n| 1 | - | x | F | . |\n") != std::string::npos);
+        CHECK(text.find("\n| 2 | x | - | . | . |\n") != std::string::npos);
+        CHECK(text.find("\n| 3 | F | . | - | T |\n") != std::string::npos);
+        CHECK(text.find("\n| 4 | . | . | T | - |\n") != std::string::npos);
+        CHECK(text.find("| Flagship synergy (content tier 1) | 1 |") != std::string::npos);
+        CHECK(text.find("| Text-only synergy (content tier 2) | 1 |") != std::string::npos);
+        CHECK(text.find("| No synergy, can roll together | 3 |") != std::string::npos);
+        CHECK(text.find("| Excluded (same slot or declared conflict) | 1 |") != std::string::npos);
+        CHECK(text.find("- `cataclysm.flood` + `powers.league`\n") != std::string::npos);
+    }
+}
+
+TEST_CASE("a synergy on an unknown axiom or a self pair is ignored", "[axiom_coverage]")
+{
+    const SmallRoot small;
+    const std::vector<Synergy> synergies = {
+        pairSynergy("ghost", "cataclysm.flood", "cataclysm.no_such", ContentTier::Flagship),
+        pairSynergy("self", "law.orichalcum", "law.orichalcum", ContentTier::Flagship),
+    };
+    CHECK(renderAxiomCoverage(small.axioms, synergies) == renderAxiomCoverage(small.axioms, {}));
+}
+
+TEST_CASE("an empty axiom set renders an empty matrix", "[axiom_coverage]")
+{
+    const AxiomSet none;
+    const std::string text = renderAxiomCoverage(none, {});
+    CHECK(text.find("Axioms: 0.") != std::string::npos);
+    CHECK(text.find("| Total | 0 |") != std::string::npos);
 }

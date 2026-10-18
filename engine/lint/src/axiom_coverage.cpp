@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <map>
+#include <tuple>
 #include <utility>
 
 namespace ichor::lint {
@@ -53,10 +54,13 @@ std::string renderAxiomCoverage(const AxiomSet& axioms, const std::vector<Synerg
     std::map<Pair, const Synergy*> pairSynergies;
     std::vector<const Synergy*> triples;
     for (const Synergy& synergy : synergies) {
-        if (synergy.axioms.size() == 2) pairSynergies[orderedPair(synergy.axioms[0], synergy.axioms[1])] = &synergy;
+        if (synergy.axioms.size() == 2) {
+            const Synergy*& slot = pairSynergies[orderedPair(synergy.axioms[0], synergy.axioms[1])];
+            if (slot == nullptr || (synergy.contentTier == ContentTier::Flagship && slot->contentTier != ContentTier::Flagship)) slot = &synergy;
+        }
         else if (synergy.axioms.size() == 3) triples.push_back(&synergy);
     }
-    std::sort(triples.begin(), triples.end(), [](const Synergy* a, const Synergy* b) { return a->id < b->id; });
+    std::sort(triples.begin(), triples.end(), [](const Synergy* a, const Synergy* b) { return std::tie(a->id, a->axioms) < std::tie(b->id, b->axioms); });
 
     const std::size_t count = order.size();
     std::vector<std::vector<PairState>> grid(count, std::vector<PairState>(count, PairState::None));

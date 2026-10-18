@@ -59,7 +59,13 @@ int main(int argc, char** argv)
             for (const std::string& problem : problems) std::fprintf(stderr, "ichor_lint: %s\n", problem.c_str());
             return 1;
         }
-        std::ofstream(coverageOut, std::ios::binary) << markdown;
+        std::ofstream file(coverageOut, std::ios::binary);
+        file << markdown;
+        file.flush();
+        if (!file) {
+            std::fprintf(stderr, "ichor_lint: cannot write %s\n", coverageOut.string().c_str());
+            return 1;
+        }
         return 0;
     }
 
