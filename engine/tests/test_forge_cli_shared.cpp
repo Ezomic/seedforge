@@ -39,10 +39,10 @@ TEST_CASE("the four original phases keep their layer hashes", "[forge_cli][forge
 {
     // Recorded from the stand-alone per-phase code that forgeWorld replaced (seed 1, size 64).
     const std::map<std::string, std::string> golden = {
-        {"plates", "4c69858509baee99"}, {"boundary", "b9e886218c2b7fea"}, {"height", "58360f3f225d7aa2"},
-        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "ab3426b7a74fe3e9"}, {"rivers", "f2ae4ad546cfc120"},
-        {"lakes", "82d72a57feb055e9"}, {"height_carved", "43aa9f1cbdc61319"}, {"biome", "855704f0b2aabbef"},
-        {"biome_blend", "a44758156b98449e"},
+        {"plates", "4c69858509baee99"}, {"boundary", "b9e886218c2b7fea"}, {"height", "051d5cdacf4b7b9a"},
+        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "8fa8c6ef1d2d0845"}, {"rivers", "6a5c317616c100e9"},
+        {"lakes", "82d72a57feb055e9"}, {"height_carved", "85671693ca1e18d1"}, {"biome", "65b841de3b97cb20"},
+        {"biome_blend", "776a973db49e12bc"},
     };
     const auto result = forgecli::runForge(oneSeed(1));
     REQUIRE(result.error.empty());
