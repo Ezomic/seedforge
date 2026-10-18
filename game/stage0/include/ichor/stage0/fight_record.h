@@ -43,7 +43,7 @@ struct FightRecord {
     bool operator==(const FightRecord&) const = default;
 };
 
-struct FightSummary {
+struct FightRecordSummary {
     std::uint32_t durationMs = 0;
     int playerHits = 0; // blows the player landed, blocked ones included
     int foeHits = 0;
@@ -55,7 +55,7 @@ struct FightSummary {
     std::uint64_t foeDamageTenths = 0;
 };
 
-FightSummary summarize(const FightRecord& record);
+FightRecordSummary summarize(const FightRecord& record);
 
 std::vector<std::uint8_t> encode(const FightRecord& record);
 
@@ -73,6 +73,8 @@ public:
     bool end(FightSide loser, DeathCause cause, double now);
     // An abandoned fight is not recorded.
     void abandon();
+    // The number the next closed fight gets; zero is ignored (indices are 1-based).
+    void setNextIndex(std::uint32_t index) { if (index != 0) nextIndex_ = index; }
 
     bool running() const { return running_; }
     const std::vector<FightRecord>& fights() const { return fights_; }

@@ -11,6 +11,7 @@
 #include "ichor/stage0/camera_view.h"
 #include "ichor/stage0/ai_knobs.h"
 #include "ichor/stage0/combat.h"
+#include "ichor/stage0/fight_review.h"
 
 #include <glm/gtc/quaternion.hpp>
 #include <tracy/Tracy.hpp>
@@ -30,6 +31,7 @@ struct Options {
     std::filesystem::path fights;
     std::filesystem::path record;
     std::filesystem::path replay;
+    std::filesystem::path review;
     std::filesystem::path knobs;
     std::string session;
     std::string variable;
@@ -54,6 +56,7 @@ bool parse(int argc, char** argv, Options& options)
         else if (arg == "--fights" && hasValue) options.fights = argv[++i];
         else if (arg == "--record" && hasValue) options.record = argv[++i];
         else if (arg == "--replay" && hasValue) options.replay = argv[++i];
+        else if (arg == "--review-fight" && hasValue) options.review = argv[++i];
         else if (arg == "--knobs" && hasValue) options.knobs = argv[++i];
         else if (arg == "--session" && hasValue) options.session = argv[++i];
         else if (arg == "--variable" && hasValue) options.variable = argv[++i];
@@ -171,8 +174,11 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir] [--session label] [--variable name]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name]");
         return 2;
+    }
+    if (!options.review.empty()) {
+        return ichor::stage0::reviewFight(options.review);
     }
     if (options.headless) {
         ichor::NullPlatform platform;

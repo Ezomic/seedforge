@@ -82,7 +82,7 @@ struct ConditionResult {
     bool stuck = false;
     bool passed = false;
     std::optional<FightRecord> record;
-    FightSummary summary;
+    FightRecordSummary summary;
 };
 
 ConditionResult runCondition(const EnemyProbe& probe, const TerrainDescriptor& terrain, int maxTicks = kHarnessMaxTicks);
