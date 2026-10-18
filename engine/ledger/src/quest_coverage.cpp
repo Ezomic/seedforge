@@ -215,9 +215,9 @@ CoverageReport run(const graph::quest::Ruleset& rules, const Options& options)
             report.rules.push_back({rule.name, phase.name, 0, 0});
         }
     }
-    std::map<std::string, std::size_t> slotOf;
-    for (std::size_t i = 0; i < report.rules.size(); ++i) {
-        slotOf.emplace(report.rules[i].id, i);
+    std::size_t base[std::size(kPhases)] = {};
+    for (std::size_t p = 1; p < std::size(kPhases); ++p) {
+        base[p] = base[p - 1] + (rules.*kPhases[p - 1].rules).rules.size();
     }
 
     for (std::uint32_t n = 0; n < report.seeds; ++n) {
@@ -244,9 +244,8 @@ CoverageReport run(const graph::quest::Ruleset& rules, const Options& options)
             } else {
                 std::set<std::size_t> touched;
                 for (std::size_t p = 0; p < applied.size(); ++p) {
-                    const auto& phaseRules = (rules.*kPhases[p].rules).rules;
                     for (const std::uint32_t index : applied[p]) {
-                        const std::size_t slot = slotOf.at(phaseRules.at(index).name);
+                        const std::size_t slot = base[p] + index;
                         ++report.rules[slot].fires;
                         touched.insert(slot);
                     }

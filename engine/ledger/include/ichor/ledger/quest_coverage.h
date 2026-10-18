@@ -55,10 +55,11 @@ struct CoverageReport {
     }
 };
 
-// What a finished quest declares it changes. The tension moves one number by 8, more than the beats can undo
-// (contested_cell and pressure_front the territory, broken_dependency the
-// settlement, hostility_pair and custodian_secret a faction, player_consequence
-// a route; pressure_front loses it). Then the beats: trade and deliver
+// What a finished quest declares it changes. The tension is the headline and
+// moves one number by 8, which the few beats of a quest cannot undo:
+// contested_cell the territory, pressure_front loses it, broken_dependency the
+// settlement, hostility_pair and custodian_secret a faction,
+// player_consequence a route. Then the beats: trade and deliver
 // stock the settlement, escort opens a route, evacuate closes one, defend holds
 // territory, confront and sabotage weaken a faction, persuade strengthens one,
 // heist drains the settlement. Other beats move nothing. Effects on one metric
