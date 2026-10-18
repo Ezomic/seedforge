@@ -81,8 +81,8 @@ PlacedPois placeForgedPois(const worldforge::ForgedWorld& world, const Heightfie
         return failure(world.ok() ? "the forged world stopped before the content phase" : world.error());
     }
     if (world.size() < 2) return failure("the forged world has no grid");
-    if (!std::isfinite(params.landmarkHeightM) || !std::isfinite(params.dungeonHeightM) || !std::isfinite(params.settlementHeightM)) {
-        return failure("a silhouette height is not finite");
+    if (!(params.landmarkHeightM >= 0.0f) || !(params.dungeonHeightM >= 0.0f) || !(params.settlementHeightM >= 0.0f)) {
+        return failure("a silhouette height is negative or not finite");
     }
     const worldforge::ContentManifest& manifest = *world.manifest();
     const worldforge::SettlementMap& settlements = *world.settlements();

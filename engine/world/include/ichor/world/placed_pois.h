@@ -3,6 +3,7 @@
 #include "ichor/assets/bundle.h"
 #include "ichor/world/heightfield.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <string>

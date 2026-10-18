@@ -196,6 +196,8 @@ TEST_CASE("a world that cannot be placed says why", "[bake][pois]")
     PlacedPoiParams bad;
     bad.landmarkHeightM = std::numeric_limits<float>::quiet_NaN();
     REQUIRE_FALSE(placeForgedPois(f.world, f.field, bad).ok());
+    bad.landmarkHeightM = -1.0f;
+    REQUIRE_FALSE(placeForgedPois(f.world, f.field, bad).ok());
 }
 
 TEST_CASE("the placeholder marker is a closed pillar of the asked height", "[bake][pois]")
