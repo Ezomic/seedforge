@@ -60,8 +60,8 @@ struct ForgeBudget {
 
 // The committed budget for the full forge at kForgeTargetSize.
 constexpr ForgeBudget kForgeBudget = {
-    350'000'000,        // cell passes, about 28% above the model at the target size
-    96ll * 1024 * 1024, // peak bytes of one phase run
+    260'000'000,        // cell passes, about 28% above the model at the target size
+    96ll * 1024 * 1024, // peak bytes of the whole shared run
     24ll * 1024 * 1024, // largest single allocation
 };
 
@@ -70,9 +70,10 @@ const CostModel& defaultCostModel();
 // nullopt when the phase is not in the model or size is outside [kTectonicsMinSize, kTectonicsMaxSize].
 std::optional<Cost> phaseCost(const CostModel& model, std::string_view phase, int size);
 
-// Every phase in phaseRegistry() run in turn, as the CLI does by default: passes add up, memory is
-// the worst phase because each phase frees its maps before the next. nullopt when a registered
-// phase has no model entry or the size is out of range.
+// Every phase in phaseRegistry() off one shared forge, as the CLI does by default: each stage is paid
+// once however many phases list it, each phase adds its layer work, and the maps of every stage stay
+// alive together, so memory is the sum of what they retain plus the largest scratch and layer set.
+// nullopt when a registered phase has no model entry or the size is out of range.
 std::optional<Cost> forgeCost(const CostModel& model, int size);
 
 bool withinBudget(const Cost& cost, const ForgeBudget& budget);

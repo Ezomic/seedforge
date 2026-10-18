@@ -15,10 +15,11 @@ bool parseUnsigned(std::string_view text, std::uint64_t& out)
 
 void usage()
 {
-    std::fputs("usage: ichor_forge_cli --seed N [--seed-end M] [--size S] [--phase a,b] [--out DIR] [--list]\n"
+    std::fputs("usage: ichor_forge_cli --seed N [--seed-end M] [--size S] [--phase a,b] [--out DIR] [--data DIR] [--list]\n"
                "  --seed-end   last seed of an inclusive batch range (default: --seed)\n"
                "  --size       square grid size (default 256)\n"
                "  --phase      comma separated phases (default: all)\n"
+               "  --data       data directory scanned for the item, NPC and dungeon ids phase 11 binds (default: none)\n"
                "  --out        write PNGs and manifest.json here; without it the manifest goes to stdout\n",
         stderr);
 }
@@ -54,6 +55,8 @@ int main(int argc, char** argv)
             options.size = static_cast<int>(n);
         } else if (arg == "--out") {
             options.outDir = value;
+        } else if (arg == "--data") {
+            options.dataDir = value;
         } else if (arg == "--phase") {
             std::size_t start = 0;
             while (start <= value.size()) {
