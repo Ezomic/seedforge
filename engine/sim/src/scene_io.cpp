@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <span>
 #include <iterator>
@@ -17,6 +18,31 @@ namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'A', 'V'};
 constexpr std::uint32_t kVersion = 5; // 2: montage cues; 3: registered game components; 4: combatant status effects; 5: combatant guard ticks
+
+bool finite(float v) { return std::isfinite(v); }
+bool finite(const glm::vec3& v) { return finite(v.x) && finite(v.y) && finite(v.z); }
+bool inRange(float v, float lo, float hi) { return finite(v) && v >= lo && v <= hi; }
+
+// The physics engine asserts on degenerate shapes and non-unit rotations, and a snapshot is untrusted bytes.
+bool plausible(const SpawnCommand& spawn, const std::optional<MontagePlayer>& montage)
+{
+    constexpr double kWorldLimit = 1.0e6;
+    const Transform& t = spawn.transform;
+    const glm::quat& q = t.rotation;
+    const float length = std::sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
+    if (!(std::abs(t.position.x) <= kWorldLimit && std::abs(t.position.y) <= kWorldLimit && std::abs(t.position.z) <= kWorldLimit)) return false;
+    if (!finite(q.w) || !finite(q.x) || !finite(q.y) || !finite(q.z) || !(std::abs(length - 1.0f) <= 1.0e-3f) || !finite(t.scale)) return false;
+    if (spawn.spin && !(finite(spawn.spin->axis) && finite(spawn.spin->radiansPerSecond))) return false;
+    if (spawn.player && !finite(spawn.player->metresPerSecond)) return false;
+    if (spawn.staticBox && !(inRange(spawn.staticBox->halfExtents.x, 0.05f, 1.0e4f) && inRange(spawn.staticBox->halfExtents.y, 0.05f, 1.0e4f) && inRange(spawn.staticBox->halfExtents.z, 0.05f, 1.0e4f))) return false;
+    if (spawn.character) {
+        const CharacterBody& c = *spawn.character;
+        if (!inRange(c.radius, 0.01f, 100.0f) || !inRange(c.halfHeight, 0.01f, 100.0f) || !finite(c.intent) || !finite(c.velocity) || !finite(c.fallSpeed)) return false;
+    }
+    if (spawn.animator && !(finite(spawn.animator->time) && finite(spawn.animator->speed))) return false;
+    if (montage && !(finite(montage->activeStart) && finite(montage->activeEnd) && finite(montage->recoveryEnd) && finite(montage->time))) return false;
+    return true;
+}
 
 enum ComponentBits : std::uint32_t {
     HasMesh = 1u << 0,
@@ -195,6 +221,7 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
             if (!r.read(player)) return bad("truncated montage");
             montage = player;
         }
+        if (!plausible(spawn, montage)) return bad("an entity holds values the simulation cannot use");
         spawns.push_back(std::move(spawn));
         montages.push_back(montage);
         // Game components are validated now by skipping, and applied once the entity exists.
