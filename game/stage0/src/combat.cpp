@@ -1,4 +1,5 @@
 #include "ichor/stage0/combat.h"
+#include "ichor/stage0/run_prompt.h"
 
 #include "ichor/stage0/ai_knobs.h"
 
@@ -553,7 +554,18 @@ void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const
             }
         }
     }
-    lines.push_back(std::format("fights {}  {}", recorder_.fightsWritten(), recorder_.running() ? "[fight on]" : "J light  K heavy  L block  Space dodge  Enter retry"));
+    PromptInput prompt{FightOutcome::Ongoing, DeathCause::Unknown, recorder_.fightsWritten()};
+    const entt::entity playerEntity = scene.find(player_);
+    const entt::entity foeEntity = scene.find(foe_);
+    if (const auto* p = playerEntity != entt::null ? scene.registry().try_get<Combatant>(playerEntity) : nullptr; p && !p->alive()) {
+        prompt.outcome = FightOutcome::PlayerDied;
+        prompt.cause = static_cast<DeathCause>(p->deathCause);
+    } else if (const auto* f = foeEntity != entt::null ? scene.registry().try_get<Combatant>(foeEntity) : nullptr; f && !f->alive()) {
+        prompt.outcome = FightOutcome::FoeDied;
+    }
+    for (const std::string& line : promptLines(prompt)) {
+        lines.push_back(line);
+    }
 }
 
 }

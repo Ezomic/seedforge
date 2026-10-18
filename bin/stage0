@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Stage 0 launcher. Builds the game if it is stale, then runs it from a fixed folder
+# so fights.csv and its sidecars always land in the same place.
+#
+#   bin/stage0 [--knobs dir] [--session label] [--variable name] [other stage0 options]
+#
+# Env: STAGE0_HOME (output folder, default <repo>/stage0-run), ICHOR_PRESET (default windows-ci).
+set -u
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+preset=${ICHOR_PRESET:-windows-ci}
+home=${STAGE0_HOME:-$repo/stage0-run}
+
+case "${1:-}" in
+  -h|--help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+esac
+
+"$repo/bin/build" -p "$preset" stage0 || { echo "stage0: build failed" >&2; exit 1; }
+
+exe=$repo/engine/build/$preset/stage0/stage0
+[ -f "$exe.exe" ] && exe=$exe.exe
+if [ ! -f "$exe" ]; then
+  exe=$(find "$repo/engine/build/$preset" -type f -name 'stage0*' ! -name '*.pdb' ! -name '*.lib' 2>/dev/null | head -n 1)
+fi
+[ -n "$exe" ] && [ -f "$exe" ] || { echo "stage0: executable not found under engine/build/$preset" >&2; exit 1; }
+
+mkdir -p "$home" || exit 1
+cd "$home" || exit 1
+echo "stage0: results go to $home/fights.csv"
+exec "$exe" "$@"
