@@ -1,0 +1,62 @@
+[
+ {
+  "id": "stranded_hull",
+  "name": "Stranded Hull",
+  "silhouette": "a ship's ribs standing in a dry salt flat, the keel buried to the deck",
+  "roles": [
+   "npc.hull_watcher",
+   "npc.salvage_rigger"
+  ],
+  "routes": [
+   "route.hull_track"
+  ]
+ },
+ {
+  "id": "silent_archive",
+  "name": "Silent Archive",
+  "silhouette": "a windowless vault of clay tablets, every shelf labelled and every label blank",
+  "roles": [
+   "npc.blank_cataloguer",
+   "npc.dust_courier"
+  ],
+  "routes": [
+   "route.archive_steps"
+  ]
+ },
+ {
+  "id": "bottomless_well",
+  "name": "Bottomless Well",
+  "silhouette": "a ring of black stone around a shaft that returns no echo",
+  "roles": [
+   "npc.rope_tender",
+   "npc.coin_diver"
+  ],
+  "routes": [
+   "route.well_path"
+  ]
+ },
+ {
+  "id": "hanging_bridge",
+  "name": "Hanging Bridge",
+  "silhouette": "a rope and plank span over a gorge, strung from two statues that face away from each other",
+  "roles": [
+   "npc.bridge_warden",
+   "npc.plank_mender"
+  ],
+  "routes": [
+   "route.gorge_crossing"
+  ]
+ },
+ {
+  "id": "bone_orchard",
+  "name": "Bone Orchard",
+  "silhouette": "a grove of pale trees whose fruit is carved knucklebone, ripe and never falling",
+  "roles": [
+   "npc.orchard_reaper",
+   "npc.fruit_taster"
+  ],
+  "routes": [
+   "route.orchard_lane"
+  ]
+ }
+]

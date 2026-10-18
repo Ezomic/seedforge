@@ -97,6 +97,11 @@ CameraPose frameCamera(glm::dvec3 player, glm::dvec3 foe, glm::dvec3 away, const
     return {eye, glm::quatLookAt(glm::normalize(glm::vec3(look)), glm::vec3(0.0f, 1.0f, 0.0f))};
 }
 
+CameraPose CameraRig::updateFree(glm::dvec3 player, float yaw, double dt)
+{
+    return update(player, lookFocus(player, yaw), dt);
+}
+
 CameraPose CameraRig::update(glm::dvec3 player, glm::dvec3 foe, double dt)
 {
     if (!finite(player) || !finite(foe) || !std::isfinite(dt)) {
@@ -112,6 +117,18 @@ CameraPose CameraRig::update(glm::dvec3 player, glm::dvec3 foe, double dt)
 CameraPose followCamera(glm::dvec3 player, glm::dvec3 foe)
 {
     return frameCamera(player, foe, awayFrom(player, foe), CameraTuning{});
+}
+
+glm::dvec3 lookFocus(glm::dvec3 player, float yaw)
+{
+    constexpr double kFocusAhead = 4.0;
+    const glm::vec3 forward = forwardFromYaw(std::isfinite(yaw) ? yaw : 0.0f);
+    return player + glm::dvec3(forward) * kFocusAhead;
+}
+
+CameraPose freeLookCamera(glm::dvec3 player, float yaw)
+{
+    return followCamera(player, lookFocus(player, yaw));
 }
 
 }

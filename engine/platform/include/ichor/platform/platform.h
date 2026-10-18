@@ -57,6 +57,8 @@ public:
     virtual NavKeys navKeys() const { return {}; }
     // While set, the arrow keys are not the player's movement (the editor nudges with them).
     virtual void reserveArrowKeys(bool reserved) { (void)reserved; }
+    // While set, the mouse (captured) and the left and right arrows turn the player (InputFrame::lookX) instead of moving.
+    virtual void enableLook(bool enabled) { (void)enabled; }
 };
 
 }
