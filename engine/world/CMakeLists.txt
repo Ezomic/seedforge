@@ -1,6 +1,6 @@
 file(GLOB ichor_world_sources CONFIGURE_DEPENDS src/*.cpp)
 add_library(ichor_world ${ichor_world_sources})
-target_include_directories(ichor_world PUBLIC include)
+target_include_directories(ichor_world PUBLIC include ${CMAKE_SOURCE_DIR}/../libworldforge/include)
 find_package(recastnavigation CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
