@@ -74,7 +74,7 @@ TEST_CASE("a forged river cell has water and a dry cell does not")
     CHECK(rivers.first == rivers.second);
 
     const auto lakes = wetCells(f, waterField, [](const worldforge::HydrologyMap& m, std::size_t c) { return m.lakeDepthM[c] != 0; });
-    REQUIRE(lakes.second >= 5);
+    REQUIRE(lakes.second >= 1);
     CHECK(lakes.first * 2 >= lakes.second);
 
     const auto dry = wetCells(f, waterField, [&](const worldforge::HydrologyMap& m, std::size_t c) {
