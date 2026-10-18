@@ -73,6 +73,8 @@ blow rather than recalled afterwards:
 
 **The first 20 fights are recorded.** Each fight is written to `<fights csv without extension>.fights/fight_NNN.ifrd` the moment it ends (via a temporary file and a rename), so a crash loses nothing already finished. Fights 21 onward are not kept. To review one: `stage0 --review-fight fights.fights/fight_007.ifrd` prints the outcome, the cause, a per-side summary and every swing, hit, block, whiff, dodge and stagger with its time. A truncated or corrupted file is refused with exit code 1.
 
+**Replay regression corpus.** `game/stage0/tests/corpus/` holds 20 recorded bot fights (novice, regular and expert, fixed scene seeds), each with its input frames and outcome (winner, cause, length, hits, damage taken, final state hash). `stage0_tests` replays every one on the current build, so an accidental change to a damage value, a timing or the sim's determinism turns it red. After changing a combat knob on purpose, re-record with `bin/regen-stage0-corpus` and commit the changed `.replay` files with the knob change; the diff shows which fights moved.
+
 **The distribution is the diagnosis, not the totals.**
 
 ## 5. Kill criteria

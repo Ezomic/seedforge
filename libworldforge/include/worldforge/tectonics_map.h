@@ -68,7 +68,7 @@ namespace detail {
 
 constexpr std::uint64_t kTectonicsDomain = 0x7465637431706c74ull;
 
-enum TectonicsSalt : std::uint32_t { kSaltPosition = 1, kSaltType = 2, kSaltDrift = 3, kSaltBase = 4, kSaltWarpX = 5, kSaltWarpY = 6, kSaltRidge = 7 };
+enum TectonicsSalt : std::uint32_t { kSaltPosition = 1, kSaltType = 2, kSaltDrift = 3, kSaltBase = 4, kSaltWarpX = 5, kSaltWarpY = 6, kSaltRidge = 7, kSaltRelief = 8 };
 
 constexpr std::uint64_t tectonicsHash(std::uint64_t seed, std::uint32_t salt, std::uint32_t a)
 {
@@ -89,6 +89,60 @@ inline std::int64_t latticeNoise(std::uint64_t channelSeed, std::int64_t x, std:
     const std::int64_t top = corner(gx, gy) * (step - fx) + corner(gx + 1, gy) * fx;
     const std::int64_t bottom = corner(gx, gy + 1) * (step - fx) + corner(gx + 1, gy + 1) * fx;
     return (top * (step - fy) + bottom * fy) / (step * step);
+}
+
+// Smoothstep-weighted variant of latticeNoise: the same corners, but the blend weight eases in and
+// out so the field has no creases along lattice lines. Result in [0, 1023]; step must be <= 256 so
+// the products stay inside int64.
+inline std::int64_t smoothNoise(std::uint64_t channelSeed, std::int64_t x, std::int64_t y, std::int64_t step)
+{
+    const std::int64_t gx = x / step;
+    const std::int64_t gy = y / step;
+    const std::int64_t s3 = step * step * step;
+    const std::int64_t fx0 = x % step;
+    const std::int64_t fy0 = y % step;
+    const std::int64_t fx = fx0 * fx0 * (3 * step - 2 * fx0);
+    const std::int64_t fy = fy0 * fy0 * (3 * step - 2 * fy0);
+    const auto corner = [&](std::int64_t cx, std::int64_t cy) {
+        return static_cast<std::int64_t>(splitmix64(channelSeed ^ hashCell(static_cast<std::int32_t>(cx), static_cast<std::int32_t>(cy))) & 1023u);
+    };
+    const std::int64_t top = corner(gx, gy) * (s3 - fx) + corner(gx + 1, gy) * fx;
+    const std::int64_t bottom = corner(gx, gy + 1) * (s3 - fx) + corner(gx + 1, gy + 1) * fx;
+    return (top * (s3 - fy) + bottom * fy) / (s3 * s3);
+}
+
+// Separable box blur with clamped edges, in place; softens the step in base height between plates.
+inline void boxBlur(std::vector<std::int32_t>& field, int w, int h, int radius)
+{
+    const std::int64_t window = 2 * static_cast<std::int64_t>(radius) + 1;
+    std::vector<std::int64_t> line(static_cast<std::size_t>(std::max(w, h)));
+    const auto pass = [&](std::size_t start, std::size_t stride, int n) {
+        std::int64_t sum = 0;
+        for (int i = -radius; i <= radius; ++i) sum += field[start + static_cast<std::size_t>(std::clamp(i, 0, n - 1)) * stride];
+        for (int i = 0; i < n; ++i) {
+            line[static_cast<std::size_t>(i)] = sum / window;
+            sum += field[start + static_cast<std::size_t>(std::min(i + radius + 1, n - 1)) * stride];
+            sum -= field[start + static_cast<std::size_t>(std::max(i - radius, 0)) * stride];
+        }
+        for (int i = 0; i < n; ++i) field[start + static_cast<std::size_t>(i) * stride] = static_cast<std::int32_t>(line[static_cast<std::size_t>(i)]);
+    };
+    for (int y = 0; y < h; ++y) pass(static_cast<std::size_t>(y) * static_cast<std::size_t>(w), 1, w);
+    for (int x = 0; x < w; ++x) pass(static_cast<std::size_t>(x), static_cast<std::size_t>(w), h);
+}
+
+// Multi-scale relief in metres added everywhere, so plates are never flat: five octaves of smooth
+// value noise from a quarter of the map down to 1/64 of it, centred on zero.
+inline std::int64_t reliefM(std::uint64_t reliefSeed, int x, int y, int minSide)
+{
+    constexpr int kDivisor[5] = { 4, 8, 16, 32, 64 };
+    constexpr int kAmpM[5] = { 70, 44, 26, 14, 8 };
+    std::int64_t sum = 0;
+    for (int o = 0; o < 5; ++o) {
+        const std::int64_t step = std::clamp(minSide / kDivisor[o], 2, 256);
+        const std::uint64_t seed = splitmix64(reliefSeed + static_cast<std::uint64_t>(o));
+        sum += (smoothNoise(seed, x, y, step) - 512) * kAmpM[o] / 512;
+    }
+    return sum;
 }
 
 constexpr std::int64_t absInt(std::int64_t v) { return v < 0 ? -v : v; }
@@ -272,10 +326,10 @@ inline std::optional<TectonicMap> generateTectonics(std::uint64_t worldSeed, con
     const std::uint64_t ridgeSeed = detail::tectonicsHash(worldSeed, detail::kSaltRidge, 0);
     const std::int64_t ridgeStep = std::max(4, minSide / 16);
     const std::int64_t reach2 = static_cast<std::int64_t>(reach) * reach;
-    map.heightM.assign(cells, 0);
+    std::vector<std::int32_t> field(cells);
+    std::vector<std::int32_t> ridgeField(cells, 0);
     for (std::size_t c = 0; c < cells; ++c) {
-        const TectonicPlate& plate = map.plates[map.plateId[c]];
-        std::int64_t height = plate.baseHeightM;
+        field[c] = map.plates[map.plateId[c]].baseHeightM;
         if (dist[c] != kFar) {
             const std::size_t s = source[c];
             const int sx = static_cast<int>(s % static_cast<std::size_t>(w));
@@ -283,11 +337,24 @@ inline std::optional<TectonicMap> generateTectonics(std::uint64_t worldSeed, con
             const BoundaryKind kind = static_cast<BoundaryKind>(map.boundary[s]);
             const int pairContinental = (map.plates[map.plateId[s]].type == PlateType::Continental ? 1 : 0)
                 + (map.plates[otherPlate[s]].type == PlateType::Continental ? 1 : 0);
-            const std::int64_t peak = detail::boundaryPeakM(kind, plate.type, pairContinental);
+            const std::int64_t peak = detail::boundaryPeakM(kind, map.plates[map.plateId[c]].type, pairContinental);
             const std::int64_t along = 640 + (detail::latticeNoise(ridgeSeed, sx, sy, ridgeStep) * 384 >> 10);
             const std::int64_t t = reach - dist[c];
-            height += peak * along / 1024 * (t * t) / reach2;
+            ridgeField[c] = static_cast<std::int32_t>(peak * along / 1024 * (t * t) / reach2);
         }
+    }
+
+    // Both layers step by thousands of metres across a plate edge; two box blurs turn each cliff into a slope.
+    // The base is blurred wide, the ridges narrower so ranges keep their height.
+    detail::boxBlur(field, w, h, std::max(2, minSide / 24));
+    detail::boxBlur(field, w, h, std::max(2, minSide / 24));
+    detail::boxBlur(ridgeField, w, h, std::max(2, minSide / 48));
+    detail::boxBlur(ridgeField, w, h, std::max(2, minSide / 48));
+
+    const std::uint64_t reliefSeed = detail::tectonicsHash(worldSeed, detail::kSaltRelief, 0);
+    map.heightM.assign(cells, 0);
+    for (std::size_t c = 0; c < cells; ++c) {
+        const std::int64_t height = static_cast<std::int64_t>(field[c]) + ridgeField[c] + detail::reliefM(reliefSeed, static_cast<int>(c % static_cast<std::size_t>(w)), static_cast<int>(c / static_cast<std::size_t>(w)), minSide);
         map.heightM[c] = static_cast<std::int16_t>(std::clamp<std::int64_t>(height, kTectonicsMinHeightM, kTectonicsMaxHeightM));
     }
     return map;

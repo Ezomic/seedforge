@@ -35,10 +35,13 @@
 //  - river:      1 on land cells with accumulation >= riverThreshold, else 0. Ocean cells are
 //                never rivers.
 //
-// Algorithm: priority-flood from the outlets (a binary heap keyed by (filled height, index)); each
+// Algorithm: priority-flood from the outlets (a binary heap keyed by (filled height, seeded tie hash, index)); each
 // cell is reached once and its receiver is the cell it was reached from, which makes the flow
 // graph a forest rooted at the outlets by construction. Accumulation sums children into parents in
-// reverse visit order.
+// reverse visit order. Cells at equal filled height are visited in a seeded hash order rather than
+// index order: on flat ground index order floods outward in parallel straight lines, so rivers ran
+// as long diagonals; a hashed order makes the receiver choice on ties meander. Indices fit 20 bits
+// because cells <= kTectonicsMaxSize^2 = 2^20.
 //
 // Determinism: integer only, no libm, no floating point, no unordered container; heap keys are
 // unique, so the result is bit-identical on every platform. Memory is O(cells), at most about 40
@@ -74,6 +77,7 @@ struct HydrologyMap {
 namespace detail {
 
 constexpr std::uint64_t kHydrologyDomain = 0x6879647230336d70ull;
+constexpr std::uint64_t kHydrologyIndexMask = (1u << 20) - 1;
 constexpr int kHydrologyDx[8] = { 1, 1, 0, -1, -1, -1, 0, 1 };
 constexpr int kHydrologyDy[8] = { 0, 1, 1, 1, 0, -1, -1, -1 };
 
@@ -115,10 +119,12 @@ inline std::optional<HydrologyMap> computeHydrology(const ErodedMap& map, const 
     std::vector<std::uint32_t> order;
     order.reserve(cells);
     std::vector<std::uint8_t> queued(cells, 0);
+    const std::uint64_t tieSeed = splitmix64(map.seed ^ detail::kHydrologyDomain);
     std::priority_queue<std::uint64_t, std::vector<std::uint64_t>, std::greater<std::uint64_t>> heap;
     const auto push = [&](std::size_t c) {
         const std::uint64_t level = static_cast<std::uint64_t>(static_cast<std::int64_t>(out.filledM[c]) - kTectonicsMinHeightM);
-        heap.push((level << 32) | static_cast<std::uint64_t>(c));
+        const std::uint64_t tie = splitmix64(tieSeed ^ static_cast<std::uint64_t>(c)) & detail::kHydrologyIndexMask;
+        heap.push((level << 40) | (tie << 20) | static_cast<std::uint64_t>(c));
         queued[c] = 1;
     };
 
@@ -130,7 +136,7 @@ inline std::optional<HydrologyMap> computeHydrology(const ErodedMap& map, const 
     }
 
     while (!heap.empty()) {
-        const std::size_t c = static_cast<std::size_t>(heap.top() & 0xFFFFFFFFu);
+        const std::size_t c = static_cast<std::size_t>(heap.top() & detail::kHydrologyIndexMask);
         heap.pop();
         order.push_back(static_cast<std::uint32_t>(c));
         const int cx = static_cast<int>(c % static_cast<std::size_t>(w));

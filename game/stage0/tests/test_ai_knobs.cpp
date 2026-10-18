@@ -1,3 +1,4 @@
+#include "../../../engine/tests/test_temp.h"
 #include "ichor/stage0/ai_knobs.h"
 
 #include <catch2/catch_approx.hpp>
@@ -176,7 +177,7 @@ namespace {
 
 std::filesystem::path scratchDir(const char* name)
 {
-    const auto dir = std::filesystem::temp_directory_path() / "ichor_stage0_knobs" / name;
+    const auto dir = ichor::test::outputPath(std::filesystem::temp_directory_path(), "ichor_stage0_knobs") / name;
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir / "ai_knobs");
     return dir;
@@ -206,7 +207,7 @@ TEST_CASE("knob files in a data directory reach the tuning", "[knobs][startup]")
 
 TEST_CASE("a directory that fails to load gives defaults and a problem", "[knobs][startup]")
 {
-    const auto missing = std::filesystem::temp_directory_path() / "ichor_stage0_knobs" / "does_not_exist";
+    const auto missing = ichor::test::outputPath(std::filesystem::temp_directory_path(), "ichor_stage0_knobs") / "does_not_exist";
     const auto load = loadKnobsFromDirectory(missing);
     CHECK(load.problems.size() == 1);
     CHECK(load.knobs.windupScale == 1.0f);

@@ -21,6 +21,7 @@ struct VegetationParams {
     float minHeight = 2.0f;   // metres above the height range's floor
     float maxHeight = 220.0f; // above this is the snow line
     float forestScale = 600.0f; // metres across a forest patch or a clearing
+    float forestDensity = 1.0f; // scales how much of the forest pattern grows trees; 0 is bare, 1 the full pattern
     float rockSpacing = 9.0f;    // metres between the jittered grid points that rock candidates come from
     float rockChance = 0.07f;    // the chance a candidate on level ground holds a rock
     float rockSteepBoost = 0.55f; // added chance on steep ground, where rock shows through

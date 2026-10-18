@@ -130,6 +130,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     out.nav.data.clear();
     out.plants.clear();
     out.water = Mesh{};
+    out.pois = config.pois ? config.pois->inCell(id) : std::vector<PlacedPoi>{};
     if (lodCount > 0) {
         out.lods.push_back(buildLod(heightfield, out.cell, 1));
     }

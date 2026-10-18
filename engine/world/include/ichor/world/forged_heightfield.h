@@ -47,6 +47,11 @@ WorldDesc forgedWorldDesc(WorldDesc base);
 // at least 2 cells a side.
 ForgedHeightfield heightfieldFromForgedWorld(const worldforge::ForgedWorld& world, const WorldDesc& desc);
 
+// The same adapter over the terrain after the roads phase deformed it (RoadMap::heightM): road cells cut
+// and filled to a smooth profile, their land neighbours pulled half way. Fails as above, with the roads
+// phase in place of hydrology.
+ForgedHeightfield heightfieldFromForgedRoads(const worldforge::ForgedWorld& world, const WorldDesc& desc);
+
 // Forges phases 1 to 3 with desc.seed on a gridSize x gridSize grid and adapts the result. gridSize
 // must lie in worldforge's limits (16 to 1024, within the erosion budget); a world it refuses comes
 // back as an error. The default keeps the forge fast; the sample grid is finer than the forged one.

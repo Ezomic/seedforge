@@ -1,4 +1,5 @@
 #include <forgecli/forge.h>
+#include <forgecli/gallery.h>
 
 #include <charconv>
 #include <cstdio>
@@ -28,6 +29,7 @@ void usage()
 
 int main(int argc, char** argv)
 {
+    if (argc > 1 && std::string_view(argv[1]) == "gallery") return forgecli::galleryMain(argc, argv);
     forgecli::RunOptions options;
     bool haveSeed = false;
     bool haveEnd = false;
