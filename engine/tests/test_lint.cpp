@@ -9,6 +9,14 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include <process.h>
+#define ICHOR_PID _getpid()
+#else
+#include <unistd.h>
+#define ICHOR_PID getpid()
+#endif
+
 using namespace ichor::lint;
 
 namespace {
@@ -21,7 +29,7 @@ public:
     DataCopy()
     {
         static int counter = 0;
-        root_ = fs::path(ICHOR_TEST_OUTPUT) / ("lint_copy_" + std::to_string(counter++));
+        root_ = fs::path(ICHOR_TEST_OUTPUT) / ("lint_copy_" + std::to_string(ICHOR_PID) + "_" + std::to_string(counter++));
         fs::remove_all(root_);
         fs::create_directories(root_);
         fs::copy(ICHOR_REPO_DATA, root_, fs::copy_options::recursive);
@@ -117,7 +125,7 @@ TEST_CASE("a malformed table file and a positional id are both reported", "[lint
 
     const std::vector<Problem> tables = from(report, "tables");
     REQUIRE(tables.size() == 1);
-    CHECK(tables.front().file.find("zz_broken.json") != std::string::npos);
+    CHECK(tables.front().file == "traversal/zz_broken.json");
 
     const std::vector<Problem> ids = from(report, "ids");
     REQUIRE_FALSE(ids.empty());
@@ -135,15 +143,43 @@ TEST_CASE("a synergy naming unknown axioms is reported with its file", "[lint]")
     CHECK_FALSE(report.ok());
     const std::vector<Problem> found = from(report, "synergies");
     REQUIRE_FALSE(found.empty());
-    CHECK(found.front().file.find("zz_dangling.json") != std::string::npos);
+    CHECK(found.front().file == "synergies/zz_dangling.json");
 }
 
-TEST_CASE("the report is identical across runs", "[lint]")
+TEST_CASE("every reported file is data-root-relative with forward slashes", "[lint]")
 {
     const DataCopy copy;
-    copy.write("reskin/broken.json", R"([{"id":"a","kind":"x","key":"k"},{"id":"a","kind":"biome","key":"k","tint":"red"}])");
-    const Report a = runLint(copy.root());
-    const Report b = runLint(copy.root());
-    REQUIRE(a.problems.size() == b.problems.size());
-    for (std::size_t i = 0; i < a.problems.size(); ++i) CHECK(describe(a.problems[i]) == describe(b.problems[i]));
+    copy.write("reskin/broken.json", R"([{"id":"a","kind":"x","key":"k"}])");
+    copy.write("traversal/zz_broken.json", "{not json");
+    copy.write("synergies/zz_dangling.json",
+        R"({"synergies":[{"id":"zz.dangling","tier":"cataclysm_powers","axioms":["cataclysm.no_such","powers.no_such"],"content_tier":2,"world_name":"X","flavour":{"a":"b"}}]})");
+    const Report report = runLint(copy.root());
+    REQUIRE_FALSE(report.problems.empty());
+    for (const Problem& p : report.problems) {
+        INFO(describe(p));
+        CHECK(p.file.find(':') == std::string::npos);
+        CHECK(p.file.find('\\') == std::string::npos);
+        CHECK(p.file.rfind('/', 0) != 0);
+        CHECK(p.message.find(copy.root().generic_string()) == std::string::npos);
+    }
+}
+
+TEST_CASE("a validator that depends on a failed load reports a problem instead of a false green", "[lint]")
+{
+    const DataCopy copy;
+    copy.write("traversal/zz_broken.json", "{not json");
+    for (const char* name : {"xref", "loot_ratios"}) {
+        const Report report = runLint(copy.root(), {name});
+        INFO(name);
+        CHECK_FALSE(report.ok());
+    }
+}
+
+TEST_CASE("an oversized reskin file is reported, not read", "[lint]")
+{
+    const DataCopy copy;
+    copy.write("reskin/huge.json", std::string(1024 * 1024 + 1, ' '));
+    const std::vector<Problem> found = from(runLint(copy.root(), {"reskin"}), "reskin");
+    REQUIRE(found.size() == 1);
+    CHECK(found.front().file == "reskin/huge.json");
 }

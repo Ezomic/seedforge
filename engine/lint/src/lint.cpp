@@ -10,6 +10,7 @@
 #include "ichor/world/enemy_reskin.h"
 
 #include <algorithm>
+#include <exception>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -60,7 +61,10 @@ void runXref(const fs::path& root, std::vector<Problem>& out)
 {
     DataSet data;
     AxiomSet axioms;
-    if (!data.loadDirectory(root) || !axioms.loadDirectory(root)) return; // reported by tables and axioms
+    if (!data.loadDirectory(root) || !axioms.loadDirectory(root)) {
+        out.push_back(make("xref", "", "", "skipped: the tables or axioms did not load (see those validators)"));
+        return;
+    }
     const XrefReport report = checkReferences(data, axioms, root);
     for (const DanglingRef& ref : report.dangling)
         out.push_back(make("xref", ref.file, ref.record, ref.field + ": no " + ref.target + " record \"" + ref.value + "\""));
@@ -70,7 +74,10 @@ void runXref(const fs::path& root, std::vector<Problem>& out)
 void runSynergies(const fs::path& root, std::vector<Problem>& out)
 {
     AxiomSet axioms;
-    if (!axioms.loadDirectory(root)) return; // reported by axioms
+    if (!axioms.loadDirectory(root)) {
+        out.push_back(make("synergies", "", "", "skipped: the axioms did not load (see the axioms validator)"));
+        return;
+    }
     std::vector<Synergy> synergies;
     std::vector<std::string> problems;
     if (!loadSynergyContentDirectory(root / "synergies", axiomPool(axioms), synergies, problems)) addLabelled("synergies", problems, out);
@@ -87,6 +94,11 @@ void runReskin(const fs::path& root, std::vector<Problem>& out)
     std::sort(files.begin(), files.end());
     for (const fs::path& file : files) {
         const std::string label = "reskin/" + file.filename().generic_string();
+        const std::uintmax_t size = fs::file_size(file, code);
+        if (code || size > kMaxReskinBytes) {
+            out.push_back(make("reskin", label, "", code ? "cannot read file" : "file is larger than " + std::to_string(kMaxReskinBytes) + " bytes"));
+            continue;
+        }
         std::ifstream in(file, std::ios::binary);
         const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         if (!in && !in.eof()) {
@@ -102,7 +114,10 @@ void runReskin(const fs::path& root, std::vector<Problem>& out)
 void runLootRatios(const fs::path& root, std::vector<Problem>& out)
 {
     DataSet data;
-    if (!data.loadDirectory(root)) return; // reported by tables
+    if (!data.loadDirectory(root)) {
+        out.push_back(make("loot_ratios", "", "", "skipped: the tables did not load (see the tables validator)"));
+        return;
+    }
     const DataTable* catalogue = data.table("catalogue");
     if (catalogue == nullptr) return;
     const LootRatioReport report = checkLootRatios(*catalogue);
@@ -125,6 +140,19 @@ const std::vector<Validator> kValidators = {
     {"reskin", "enemy reskin layers parse within their limits", runReskin},
     {"loot_ratios", "catalogue records have a known class and tier", runLootRatios},
 };
+
+// The data layer spells paths its own way: absolute for some loaders, bare names for others. Reports must not depend on the checkout.
+void normalise(const fs::path& root, Problem& problem)
+{
+    std::string prefix = root.generic_string();
+    if (!prefix.empty() && prefix.back() != '/') prefix += '/';
+    for (std::string* text : {&problem.file, &problem.message}) {
+        std::replace(text->begin(), text->end(), '\\', '/');
+        for (std::size_t at = text->find(prefix); at != std::string::npos; at = text->find(prefix)) text->erase(at, prefix.size());
+    }
+    if (problem.validator == "synergies" && !problem.file.empty() && problem.file.find('/') == std::string::npos)
+        problem.file = "synergies/" + problem.file;
+}
 
 bool lessProblem(const Problem& a, const Problem& b)
 {
@@ -165,7 +193,12 @@ Report runLint(const fs::path& dataRoot, const std::vector<std::string>& only)
     for (const Validator& validator : kValidators) {
         if (!wanted.empty() && !wanted.contains(std::string(validator.name))) continue;
         std::vector<Problem> found;
-        validator.run(dataRoot, found);
+        try {
+            validator.run(dataRoot, found);
+        } catch (const std::exception& e) {
+            found.push_back(make(validator.name, "", "", std::string("validator threw: ") + e.what()));
+        }
+        for (Problem& problem : found) normalise(dataRoot, problem);
         std::stable_sort(found.begin(), found.end(), lessProblem);
         report.results.push_back({std::string(validator.name), found.size()});
         report.problems.insert(report.problems.end(), std::make_move_iterator(found.begin()), std::make_move_iterator(found.end()));

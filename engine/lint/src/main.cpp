@@ -14,8 +14,9 @@ namespace {
 
 void usage()
 {
-    std::puts("usage: ichor_lint [--data DIR] [--only NAME]... [--list]\n"
-              "  Runs every data validator and prints one report. Exit 0 when clean, 1 on any problem, 2 on bad arguments.");
+    std::fputs("usage: ichor_lint [--data DIR] [--only NAME]... [--list]\n"
+               "  Runs every data validator and prints one report. Exit 0 when clean, 1 on any problem, 2 on bad arguments.\n",
+        stderr);
 }
 
 }
@@ -26,6 +27,10 @@ int main(int argc, char** argv)
     std::vector<std::string> only;
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            usage();
+            return 0;
+        }
         if (arg == "--list") {
             for (const ichor::lint::Validator& v : ichor::lint::validators())
                 std::printf("%-12s %s\n", std::string(v.name).c_str(), std::string(v.summary).c_str());
