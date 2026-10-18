@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -97,7 +98,7 @@ TEST_CASE("hydrology is deterministic across repeat runs", "[worldforge][hydrolo
 
 TEST_CASE("hydrology golden hash is stable", "[worldforge][hydrology]")
 {
-    CHECK(hashHydrologyMap(hydrology(makeEroded(kSeed, 128, 96, 12))) == 0xf831cefa80216496ull);
+    CHECK(hashHydrologyMap(hydrology(makeEroded(kSeed, 128, 96, 12))) == 0x80f9c9efc083e15bull);
 }
 
 TEST_CASE("hydrology does not mutate the input and keeps the grid", "[worldforge][hydrology]")
@@ -349,4 +350,32 @@ TEST_CASE("hydrology survives degenerate and extreme terrain", "[worldforge][hyd
         }
         CHECK(atOutlets == out.accumulation.size());
     }
+}
+
+TEST_CASE("hydrology: flow on flat ground has no long straight runs", "[worldforge][hydrology][ties]")
+{
+    for (const int size : { 96, 200 }) {
+        const auto m = hydrology(flatMap(size, size, 100));
+        int longest = 0;
+        for (std::size_t c = 0; c < m.flowDir.size(); ++c) {
+            if (isOutlet(m, c)) continue;
+            const std::uint8_t dir = m.flowDir[c];
+            int run = 0;
+            std::size_t at = c;
+            while (!isOutlet(m, at) && m.flowDir[at] == dir) {
+                ++run;
+                at = receiver(m, at);
+            }
+            longest = std::max(longest, run);
+        }
+        CHECK(longest <= 12);
+    }
+}
+
+TEST_CASE("hydrology: tie-break depends on the seed", "[worldforge][hydrology][ties]")
+{
+    auto a = flatMap(64, 64, 100);
+    auto b = flatMap(64, 64, 100);
+    b.seed = 2;
+    CHECK(hydrology(a).flowDir != hydrology(b).flowDir);
 }
