@@ -33,6 +33,12 @@ function from the `ForgedWorld` to layers. PNGs use stored deflate, so
 there is no compressor dependency and the files are byte-identical on every platform. The library
 (`ichor_forgecli`) includes only libworldforge, never engine code.
 
+## Seed gallery
+
+    ichor_forge_cli gallery --seeds 1..16 [--size 128] [--out gallery.png]
+
+One grid PNG with a cell per seed (at most 256), labelled with the seed: hillshade of the carved terrain tinted by biome, rivers in blue. It is for eyeballing many worlds at once while tuning erosion or the tectonics substrate. Cells use the same `defaultForgeConfig` as every other run; the bytes depend only on the arguments. A seed that fails to forge is a red cell and the exit code is 1.
+
 ## Map viewer
 
 `--validate` forges the full world (it ignores `--phase`) and rerolls up to 8 times; the PNGs and manifest still describe the requested seed, not the accepted reroll.
