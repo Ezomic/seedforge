@@ -6,6 +6,8 @@ add_library(ichor_forgecli ${forgecli_sources})
 target_include_directories(ichor_forgecli PUBLIC include)
 target_link_libraries(ichor_forgecli PUBLIC worldforge)
 target_compile_features(ichor_forgecli PUBLIC cxx_std_20)
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(ichor_forgecli PRIVATE nlohmann_json::nlohmann_json)
 
 add_executable(ichor_forge_cli src/main.cpp)
 target_link_libraries(ichor_forge_cli PRIVATE ichor_forgecli)

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 namespace forgecli {
 
@@ -120,6 +121,20 @@ RunResult runForge(const RunOptions& in)
         selected.push_back(p);
     }
 
+    worldforge::ForgeConfig config = defaultForgeConfig(options.size);
+    if (!options.dataDir.empty()) {
+        std::string scanError;
+        ContentPools pools = scanContentPools(options.dataDir, scanError);
+        if (!scanError.empty()) {
+            result.error = scanError;
+            return result;
+        }
+        config.itemIds = std::move(pools.itemIds);
+        config.npcArchetypes = std::move(pools.npcArchetypes);
+        config.dungeonArchetypes = std::move(pools.dungeonArchetypes);
+    }
+    const worldforge::ForgePhase stopAfter = highestNeed(selected);
+
     const std::filesystem::path outDir = options.outDir;
     std::error_code ec;
     if (!options.outDir.empty()) {
@@ -136,12 +151,23 @@ RunResult runForge(const RunOptions& in)
         const std::string dirName = "seed_" + std::to_string(seed);
         bool dirReady = options.outDir.empty();
         bool failedWrite = false;
+        std::optional<worldforge::ForgedWorld> world;
+        std::string forgeError;
+        try {
+            world.emplace(worldforge::forgeWorld(seed, options.size, config, stopAfter));
+        } catch (const std::exception& e) {
+            forgeError = e.what();
+        }
         for (const Phase* phase : selected) {
             PhaseResult r;
-            try {
-                r = phase->run(seed, options.size);
-            } catch (const std::exception& e) {
-                r.error = e.what();
+            if (!world) {
+                r.error = forgeError;
+            } else {
+                try {
+                    r = phaseLayers(*phase, *world);
+                } catch (const std::exception& e) {
+                    r.error = e.what();
+                }
             }
             if (!r.error.empty()) {
                 record.error = std::string(phase->name) + ": " + r.error;
