@@ -25,6 +25,7 @@ public:
     Pointer pointer() const override { return pointer_; }
     NavKeys navKeys() const override { return navKeys_; }
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
+    void enableLook(bool enabled) override;
 
     SDL_Window* window() const { return window_; }
 
@@ -39,6 +40,9 @@ private:
     Pointer pointer_;
     NavKeys navKeys_;
     bool arrowsReserved_ = false;
+    bool lookEnabled_ = false;
+    float mouseDeltaX_ = 0.0f; // window units moved since the last pump
+    double lastPump_ = 0.0;
     std::function<void(const SDL_Event&)> hook_;
 };
 

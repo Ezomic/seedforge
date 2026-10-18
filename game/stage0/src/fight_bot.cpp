@@ -179,6 +179,7 @@ BotResult runBotFights(const BotConfig& config)
 
     Scene scene(config.seed);
     Stage0 stage;
+    stage.setLegacyControls(true); // the bot steers in world axes and needs the foe in front of it
     stage.recorder().open(config.csv);
     stage.recorder().setSession({cleanField("bot-" + skill.name), cleanField(std::format("seed-{}", config.seed))});
     stage.install(scene, {0.0, 0.0, 3.0}, {0.0, 0.0, -2.0});

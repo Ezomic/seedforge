@@ -181,6 +181,7 @@ TEST_CASE("a death is classified and written as one CSV row")
 TEST_CASE("facing away from the foe does not stamp off-screen while the camera still sees it")
 {
     Arena a(7);
+    a.stage.setLockOn(true); // under free look the camera follows the facing, so an attacker behind the player is off screen
     for (int i = 0; i < 60 * 60 && a.player().alive(); ++i) {
         // Keep the player facing away from the foe every tick.
         auto& player = a.scene.registry().get<Combatant>(a.scene.find(a.stage.playerId()));

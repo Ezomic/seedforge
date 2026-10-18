@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cmath>
 
 namespace ichor {
@@ -30,12 +31,30 @@ bool SdlPlatform::init(const WindowDesc& desc)
     return true;
 }
 
+void SdlPlatform::enableLook(bool enabled)
+{
+    lookEnabled_ = enabled;
+    mouseDeltaX_ = 0.0f;
+    if (window_ != nullptr) {
+        SDL_SetWindowRelativeMouseMode(window_, enabled);
+    }
+}
+
 void SdlPlatform::pumpEvents()
 {
+    // Mouse speed that counts as a full-rate turn, in window units per second.
+    constexpr float kFullTurnMouseSpeed = 1500.0f;
+    const double pumpedAt = now();
+    const double elapsed = pumpedAt - lastPump_;
+    lastPump_ = pumpedAt;
+    mouseDeltaX_ = 0.0f;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (hook_) {
             hook_(event);
+        }
+        if (lookEnabled_ && event.type == SDL_EVENT_MOUSE_MOTION) {
+            mouseDeltaX_ += event.motion.xrel;
         }
         if (event.type == SDL_EVENT_QUIT) {
             quit_ = true;
@@ -48,7 +67,8 @@ void SdlPlatform::pumpEvents()
     const bool* keys = SDL_GetKeyboardState(nullptr);
     const auto down = [&](SDL_Scancode a, SDL_Scancode b) { return keys[a] || keys[b]; };
     InputFrame frame;
-    const auto walk = [&](SDL_Scancode letter, SDL_Scancode arrow) { return arrowsReserved_ ? keys[letter] : down(letter, arrow); };
+    const bool arrowsWalk = !arrowsReserved_ && !lookEnabled_;
+    const auto walk = [&](SDL_Scancode letter, SDL_Scancode arrow) { return arrowsWalk ? down(letter, arrow) : keys[letter]; };
     frame.moveX = (walk(SDL_SCANCODE_D, SDL_SCANCODE_RIGHT) ? 1.0f : 0.0f) - (walk(SDL_SCANCODE_A, SDL_SCANCODE_LEFT) ? 1.0f : 0.0f);
     frame.moveY = (walk(SDL_SCANCODE_W, SDL_SCANCODE_UP) ? 1.0f : 0.0f) - (walk(SDL_SCANCODE_S, SDL_SCANCODE_DOWN) ? 1.0f : 0.0f);
     if (down(SDL_SCANCODE_RETURN, SDL_SCANCODE_KP_ENTER)) frame.buttons |= InputFrame::Confirm;
@@ -64,6 +84,13 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_ESCAPE]) frame.buttons |= InputFrame::Menu;
     if (keys[SDL_SCANCODE_M]) frame.buttons |= InputFrame::Map;
     if (keys[SDL_SCANCODE_N]) frame.buttons |= InputFrame::Notes;
+    if (lookEnabled_) {
+        if (keys[SDL_SCANCODE_E]) frame.buttons |= InputFrame::LockOn;
+        // The mouse reads as a turn speed, so the turn per frame does not depend on the frame time.
+        const float mouse = elapsed > 1e-4 && elapsed < 0.5 ? mouseDeltaX_ / static_cast<float>(elapsed) / kFullTurnMouseSpeed : 0.0f;
+        const float arrows = (keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
+        frame.lookX = std::clamp(mouse + arrows, -1.0f, 1.0f);
+    }
 
     // The mouse is reported in window units; the UI works in drawable pixels, which differ on a scaled display.
     float mouseX = 0.0f;

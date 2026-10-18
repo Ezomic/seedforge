@@ -37,6 +37,11 @@ public:
 
     CameraPose update(glm::dvec3 player, glm::dvec3 foe, double dt);
 
+    // Free look: the camera swings round to sit behind `yaw` (the player's facing).
+    CameraPose updateFree(glm::dvec3 player, float yaw, double dt);
+
+    void setFraming(CameraFraming framing) { tuning_.framing = framing; }
+
     const CameraTuning& tuning() const { return tuning_; }
 
 private:

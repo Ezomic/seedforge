@@ -13,7 +13,8 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'I', 'N', 'P'};
-constexpr std::uint32_t kVersion = 1;
+constexpr std::uint32_t kVersion = 2;
+constexpr std::uint32_t kLegacyVersion = 1; // buttons, moveX, moveY per frame
 
 }
 
@@ -37,9 +38,25 @@ bool InputStream::load(const std::filesystem::path& path)
     BinaryReader r(bytes);
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
-    if (!r.read(magic) || magic != kMagic || !r.read(version) || version != kVersion || !r.read(frames) || !r.atEnd()) {
-        logf(LogLevel::Error, "{} is not a version {} input stream", path.string(), kVersion);
+    bool ok = r.read(magic) && magic == kMagic && r.read(version);
+    legacyControls = false;
+    if (ok && version == kLegacyVersion) {
+        std::uint32_t count = 0;
+        constexpr std::size_t kLegacyFrameBytes = sizeof(std::uint32_t) + 2 * sizeof(float);
+        ok = r.read(count) && count <= r.remaining() / kLegacyFrameBytes;
         frames.clear();
+        frames.resize(ok ? count : 0);
+        for (InputFrame& frame : frames) {
+            ok = ok && r.read(frame.buttons) && r.read(frame.moveX) && r.read(frame.moveY);
+        }
+        legacyControls = ok;
+    } else {
+        ok = ok && version == kVersion && r.read(frames);
+    }
+    if (!ok || !r.atEnd()) {
+        logf(LogLevel::Error, "{} is not a version {} or {} input stream", path.string(), kLegacyVersion, kVersion);
+        frames.clear();
+        legacyControls = false;
         return false;
     }
     return true;
