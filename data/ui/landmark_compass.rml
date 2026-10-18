@@ -1,8 +1,0 @@
-<rml>
-<head>
-    <link type="text/rcss" href="landmark_compass.rcss"/>
-</head>
-<body>
-    <div id="landmark-compass"><div id="landmarks"></div></div>
-</body>
-</rml>

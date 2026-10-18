@@ -16,8 +16,6 @@ using namespace ichor;
 
 namespace {
 
-const std::filesystem::path kUiDirectory = std::filesystem::path(ICHOR_REPO_DATA) / "ui";
-
 struct Fixture {
     RecordingUiRenderer renderer;
     UiContext ui{renderer, 800, 600};
@@ -60,19 +58,17 @@ std::string landmarksText(Fixture& f)
 
 }
 
-TEST_CASE("the landmark compass loads its RML and CSS from data/ui")
+TEST_CASE("the landmark compass starts with its document")
 {
     Fixture f;
-    LandmarkCompassScreen screen(f.ui, kUiDirectory);
+    LandmarkCompassScreen screen(f.ui);
     REQUIRE(screen.ok());
-    LandmarkCompassScreen missing(f.ui, kUiDirectory / "nowhere");
-    REQUIRE_FALSE(missing.ok());
 }
 
 TEST_CASE("binding a reading draws the landmark sentence and unbinding it draws less")
 {
     Fixture f;
-    LandmarkCompassScreen screen(f.ui, kUiDirectory);
+    LandmarkCompassScreen screen(f.ui);
     REQUIRE(screen.ok());
     const std::size_t empty = f.drawnVertices();
 
@@ -91,7 +87,7 @@ TEST_CASE("binding a reading draws the landmark sentence and unbinding it draws 
 TEST_CASE("the compass lists landmarks nearest first and follows the player")
 {
     Fixture f;
-    LandmarkCompassScreen screen(f.ui, kUiDirectory);
+    LandmarkCompassScreen screen(f.ui);
     REQUIRE(screen.ok());
     std::vector<NavLandmark> marks = tower();
     marks.push_back({"salt", "the salt flats", {-500.0f, 0.0f}});
@@ -110,7 +106,7 @@ TEST_CASE("the compass lists landmarks nearest first and follows the player")
 TEST_CASE("a bad reading shows nothing and landmark names cannot inject markup")
 {
     Fixture f;
-    LandmarkCompassScreen screen(f.ui, kUiDirectory);
+    LandmarkCompassScreen screen(f.ui);
     REQUIRE(screen.ok());
 
     bindLandmarkCompass(screen, {0.0f, 0.0f}, {0.0f, 0.0f}, tower());

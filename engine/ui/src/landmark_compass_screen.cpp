@@ -7,6 +7,15 @@ namespace ichor {
 
 namespace {
 
+constexpr const char* kCompassDocument = R"(<rml><head><style>
+    body, div { display: block; }
+    body { width: 100%; height: 100%; }
+    #landmark-compass { position: absolute; bottom: 14px; left: 14px; width: 420px; }
+    .line { margin-top: 4px; padding: 4px 8px 4px 8px; font-family: Alegreya Sans; font-size: 17px; color: #e8d8a8; background-color: #10141acc; border: 1px #a08850; }
+</style></head><body>
+    <div id="landmark-compass"><div id="landmarks"></div></div>
+</body></rml>)";
+
 std::string escaped(const std::string& text)
 {
     std::string out;
@@ -24,10 +33,10 @@ std::string escaped(const std::string& text)
 
 }
 
-LandmarkCompassScreen::LandmarkCompassScreen(UiContext& ui, const std::filesystem::path& uiDirectory)
+LandmarkCompassScreen::LandmarkCompassScreen(UiContext& ui)
     : ui_(ui)
 {
-    document_ = ui_.loadDocument(uiDirectory / "landmark_compass.rml");
+    document_ = ui_.loadDocumentFromMemory(kCompassDocument, "[landmark compass]");
     if (document_ == nullptr) {
         return;
     }

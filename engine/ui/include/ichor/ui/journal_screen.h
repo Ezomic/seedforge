@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/ui/journal_screen_model.h"
 #include "ichor/ui/ui_context.h"
 
 #include <optional>
@@ -44,6 +45,13 @@ public:
     // the ones already on the card.
     void setRows(const std::vector<JournalRow>& rows);
 
+    // The two tabs of the journal model, shown in place of the rows. Nothing is rewritten when the
+    // tabs and the chosen tab are the ones already on the card.
+    void setTabs(const std::vector<JournalModelTab>& tabs);
+
+    JournalTab activeTab() const { return active_; }
+    void selectTab(JournalTab tab) { active_ = tab; }
+
     // True once after the close button was clicked.
     bool takeCloseRequest();
 
@@ -56,8 +64,19 @@ private:
         bool requested = false;
     };
 
+    struct TabClick final : Rml::EventListener {
+        void ProcessEvent(Rml::Event& event) override;
+        JournalScreen* screen = nullptr;
+    };
+
     UiContext& ui_;
     Click click_;
+    TabClick tabClick_;
+    Rml::Element* tabs_ = nullptr;
+    std::vector<JournalModelTab> shownTabs_;
+    JournalTab shownTab_ = JournalTab::Prose;
+    JournalTab active_ = JournalTab::Prose;
+    bool tabsWritten_ = false;
     Rml::Element* close_ = nullptr;
     Rml::ElementDocument* document_ = nullptr;
     Rml::Element* list_ = nullptr;

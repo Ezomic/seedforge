@@ -3,7 +3,6 @@
 #include "ichor/ui/landmark_compass.h"
 #include "ichor/ui/ui_context.h"
 
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -14,12 +13,12 @@ class ElementDocument;
 
 namespace ichor {
 
-// The always-on landmark compass: one line per nearby landmark, nearest first, drawn from
-// landmark_compass.rml and landmark_compass.rcss in the data/ui directory. The context must
+// The always-on landmark compass: one line per nearby landmark, nearest first, drawn in the
+// game's font. The context must
 // have the Alegreya Sans face loaded.
 class LandmarkCompassScreen {
 public:
-    LandmarkCompassScreen(UiContext& ui, const std::filesystem::path& uiDirectory);
+    explicit LandmarkCompassScreen(UiContext& ui);
     ~LandmarkCompassScreen();
     LandmarkCompassScreen(const LandmarkCompassScreen&) = delete;
     LandmarkCompassScreen& operator=(const LandmarkCompassScreen&) = delete;

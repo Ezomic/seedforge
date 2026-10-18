@@ -1,4 +1,0 @@
-body, div { display: block; }
-body { width: 100%; height: 100%; }
-#landmark-compass { position: absolute; bottom: 14px; left: 14px; width: 420px; }
-.line { margin-top: 4px; padding: 4px 8px 4px 8px; font-family: Alegreya Sans; font-size: 17px; color: #e8d8a8; background-color: #10141acc; border: 1px #a08850; }

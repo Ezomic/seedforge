@@ -46,6 +46,7 @@ if(ENGINE_RUNTIME)
     endif()
 endif()
 
+add_subdirectory(${CMAKE_SOURCE_DIR}/../libworldforge libworldforge)
 add_subdirectory(core)
 add_subdirectory(assets)
 add_subdirectory(audio)
