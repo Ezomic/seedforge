@@ -69,6 +69,8 @@ std::vector<std::string> problems(const DataRecord& item, const AxiomSet& axioms
     return found;
 }
 
+const std::set<std::string> kOtherClasses = {"consumable", "relic", "key"};
+
 const DataSet& shipped()
 {
     static DataSet set;
@@ -91,7 +93,7 @@ TEST_CASE("the first notable tranche is a coherent set of at least thirty gear i
     std::set<std::string> slots;
     std::size_t gear = 0;
     for (const auto& [id, item] : notable().records) {
-        if (text(item, "class") != "gear") continue;
+        if (kOtherClasses.contains(text(item, "class"))) continue;
         ++gear;
         slots.insert(text(item, "slot"));
     }
@@ -104,7 +106,7 @@ TEST_CASE("every notable item is a trade-off inside the notable weight cap")
     AxiomSet axioms;
     REQUIRE(axioms.loadDirectory(ICHOR_REPO_DATA));
     for (const auto& [id, item] : notable().records) {
-        if (text(item, "class") != "gear") continue;
+        if (kOtherClasses.contains(text(item, "class"))) continue;
         INFO(id);
         const std::vector<std::string> found = problems(item, axioms);
         INFO((found.empty() ? std::string() : found.front()));

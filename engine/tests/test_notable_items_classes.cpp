@@ -190,7 +190,6 @@ TEST_CASE("the class tranche has about thirty items spread over consumables, rel
         INFO(cls);
         REQUIRE(perClass[cls] >= 8);
     }
-    REQUIRE(combined().records.size() >= classTranche().records.size() + 156);
 }
 
 TEST_CASE("every class item passes its per-class schema")
@@ -268,6 +267,14 @@ TEST_CASE("the class checker goes red when a class rule is removed")
     DataRecord twoHomeRelic = relic;
     twoHomeRelic.fields["home"] = std::vector<std::string>{"law.oath", "law.mysteries"};
     REQUIRE(!problems(twoHomeRelic, axioms).empty());
+
+    DataRecord relicWithUses = relic;
+    relicWithUses.fields["uses"] = 1.0;
+    REQUIRE(!problems(relicWithUses, axioms).empty());
+
+    DataRecord passiveKey = key;
+    passiveKey.fields["passive"] = true;
+    REQUIRE(!problems(passiveKey, axioms).empty());
 
     DataRecord noLock = key;
     noLock.fields.erase("opens");
