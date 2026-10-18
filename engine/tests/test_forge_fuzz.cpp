@@ -33,6 +33,8 @@ TEST_CASE("fuzz: invalid options are rejected", "[forgefuzz]")
     o.phases.clear();
     o.size = 0;
     CHECK_FALSE(runFuzz(o).error.empty());
+    o.size = 1025;
+    CHECK_FALSE(runFuzz(o).error.empty());
     o.size = 128;
     o.seedEnd = 5000000;
     CHECK_FALSE(runFuzz(o).error.empty());

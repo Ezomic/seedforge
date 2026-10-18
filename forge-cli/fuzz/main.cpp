@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         } else if (arg == "--seed-end" && parseUnsigned(value, n)) {
             options.seedEnd = n;
             haveEnd = true;
-        } else if (arg == "--size" && parseUnsigned(value, n) && n <= 4096) {
+        } else if (arg == "--size" && parseUnsigned(value, n) && n <= 1024) {
             options.size = static_cast<int>(n);
         } else if (arg == "--phase") {
             std::size_t start = 0;

@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <exception>
-#include <map>
 #include <set>
 
 namespace forgecli {
@@ -113,8 +112,8 @@ FuzzResult runFuzz(const FuzzOptions& in)
         result.error = "seed range exceeds " + std::to_string(kMaxFuzzSeeds) + " seeds";
         return result;
     }
-    if (in.size < 1 || in.size > 4096) {
-        result.error = "size is outside 1..4096";
+    if (in.size < 1 || in.size > worldforge::kTectonicsMaxSize) {
+        result.error = "size is outside 1..1024";
         return result;
     }
     std::vector<const Phase*> selected;
