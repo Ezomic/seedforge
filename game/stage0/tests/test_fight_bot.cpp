@@ -144,6 +144,9 @@ TEST_CASE("hostile skill and fight counts are clamped, never crash")
     c.skill = {"x", 1 << 30, nan, nan, nan};
     const BotResult result = runBotFights(c);
     REQUIRE(result.timeouts + static_cast<int>(result.rows.size()) == 2);
+    const std::string header = formatBotResult(c, result);
+    REQUIRE(header.find("nan") == std::string::npos);
+    REQUIRE(header.find("reaction 63 ticks") != std::string::npos);
 }
 
 TEST_CASE("a fight that never ends times out and is not logged")

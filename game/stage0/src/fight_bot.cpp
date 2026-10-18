@@ -216,8 +216,9 @@ BotResult runBotFights(const BotConfig& config)
 
 std::string formatBotResult(const BotConfig& config, const BotResult& result)
 {
+    const BotSkill skill = sanitise(config.skill);
     std::string text = std::format("bot {} (reaction {} ticks, block {:.2f}, dodge {:.2f}, aggression {:.2f}), seed {}, {} fights played, {} timed out\n",
-        config.skill.name, config.skill.reactionTicks, config.skill.blockChance, config.skill.dodgeChance, config.skill.aggression,
+        skill.name, skill.reactionTicks, skill.blockChance, skill.dodgeChance, skill.aggression,
         config.seed, std::clamp(config.fights, 0, kMaxFights), result.timeouts);
     text += formatReport(result.summary);
     text += "note: bot results are a rough early signal, not a substitute for the 200-fight protocol.\n";
