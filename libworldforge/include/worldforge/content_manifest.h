@@ -45,6 +45,9 @@
 namespace worldforge {
 
 constexpr std::uint32_t kManifestVersion = 1;
+// Version 2 adds genVersion (the generator version, doc 08 determinism note 5) right after the world
+// seed. Version 1 manifests stay readable and decode with genVersion 0.
+constexpr std::uint32_t kManifestVersionGen = 2;
 constexpr std::size_t kManifestMaxPois = 4096;
 constexpr std::size_t kManifestMaxEntries = 65536;
 constexpr std::size_t kManifestMaxIdLength = 64;
@@ -100,6 +103,7 @@ struct DungeonSlot {
 struct ContentManifest {
     std::uint32_t version = kManifestVersion;
     std::uint64_t worldSeed = 0;
+    std::uint32_t genVersion = 0; // encoded only when version is kManifestVersionGen
     std::vector<std::string> poiIds; // every POI the manifest may reference, sorted, unique
     std::vector<ItemPlacement> items;
     std::vector<CastMember> cast;
@@ -290,6 +294,7 @@ inline std::vector<std::uint8_t> encodeManifest(const ContentManifest& m)
     std::vector<std::uint8_t> o(std::begin(detail::kManifestMagic), std::end(detail::kManifestMagic));
     detail::putU32(o, m.version);
     detail::putU64(o, m.worldSeed);
+    if (m.version == kManifestVersionGen) detail::putU32(o, m.genVersion);
     detail::putU32(o, static_cast<std::uint32_t>(m.poiIds.size()));
     for (const std::string& id : m.poiIds) detail::putStr(o, id);
     detail::putU32(o, static_cast<std::uint32_t>(m.items.size()));
@@ -318,7 +323,7 @@ inline std::vector<std::uint8_t> encodeManifest(const ContentManifest& m)
     return o;
 }
 
-// Returns nullopt for anything that is not a well-formed version-1 manifest: bad magic or version, truncation, over-cap counts, empty or over-long ids, unsorted or
+// Returns nullopt for anything that is not a well-formed version-1 or version-2 manifest: bad magic or version, truncation, over-cap counts, empty or over-long ids, unsorted or
 // duplicate ids, references to POIs not in poiIds, a dungeon seed that is not dungeonSeed(worldSeed, poi),
 // or trailing bytes. Cast order is not checked beyond unique NPC ids.
 inline std::optional<ContentManifest> decodeManifest(std::span<const std::uint8_t> bytes)
@@ -330,7 +335,8 @@ inline std::optional<ContentManifest> decodeManifest(std::span<const std::uint8_
     }
     ContentManifest m;
     std::size_t n = 0;
-    if (!r.u32(m.version) || m.version != kManifestVersion || !r.u64(m.worldSeed)) return std::nullopt;
+    if (!r.u32(m.version) || (m.version != kManifestVersion && m.version != kManifestVersionGen) || !r.u64(m.worldSeed)) return std::nullopt;
+    if (m.version == kManifestVersionGen && !r.u32(m.genVersion)) return std::nullopt;
 
     if (!r.count(kManifestMaxPois, 2, n)) return std::nullopt;
     m.poiIds.resize(n);
