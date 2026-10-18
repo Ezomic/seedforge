@@ -6,7 +6,7 @@ Audit of the three promises SEED-272 names: determinism on every commit, golden 
 
 | Job | Preset | What runs |
 |---|---|---|
-| `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `ichor.exe --headless --frames 120` (a smoke run: it must exit cleanly; it logs the scene state hash but nothing compares it) |
+| `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `tools/check_smoke_hash.py` (runs `ichor.exe --headless --frames 120`: it must exit cleanly and its logged scene state hash must equal `engine/tests/data/app_smoke_hash.txt`) |
 | `linux headless + sanitizers` | `linux-headless-asan` (Debug, clang, ASan/UBSan, `ENGINE_RUNTIME=OFF`) | `ctest --preset linux-headless-asan` |
 
 Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/`, `bin/` and the workflow file. A change that touches only `docs/` or `art/` (other than audio and fonts) runs neither.
@@ -33,5 +33,5 @@ Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/
 
 1. **GPU golden images never compare in CI.** See the table. Proposal: software Vulkan on the Linux job, then a tolerance study; size is about a day plus regenerating goldens.
 2. **Closed by SEED-410:** `engine/tests/test_forge_determinism.cpp` pins the chained world hash and every phase hash of `forgeWorld` for 52 (size, seed) pairs against `engine/tests/data/forge_world_digests.json`, on both OSes. After an intended phase change, regenerate with `ICHOR_UPDATE_FORGE_DIGESTS=1 bin/build -t "forge world digests"` and commit the file.
-3. **The headless smoke run's hash is not compared.** `ichor.exe --headless --frames 120` logs the scene state hash (`app/src/main.cpp`) but CI only checks the exit code. Proposal: have CI compare that hash with the value in `determinism.json` so the shipped executable, not just the test binary, is pinned. A workflow change, left out of this audit PR.
+3. **The headless smoke run's hash is compared** (SEED-472). `tools/check_smoke_hash.py` checks the shipped executable's end-of-run state against `engine/tests/data/app_smoke_hash.txt`. The app populates its own scene, so this value differs from `determinism.json`'s `engine` entry on purpose. After an intended sim change, build `windows-ci` and run `python tools/check_smoke_hash.py engine/build/windows-ci/app/ichor.exe --update`.
 4. **A save of a fully forged world (not just the hydrology) is not round-tripped**, because the world is not yet baked to disk as in `docs/14-save-system.md`. Revisit when the campaign `world/` folder is written for real.
