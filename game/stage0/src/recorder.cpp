@@ -54,7 +54,8 @@ void FightRecorder::open(const std::filesystem::path& csv)
         std::ofstream out(csv_);
         out << "fight,seconds,gap_to_retry,loser,cause,"
                "p_hp,p_attacks,p_hits,p_whiffs,p_blocked,p_dodges,p_staggers,p_dealt,p_taken,"
-               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken\n";
+               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken,"
+               "kill_attack,kill_victim_recovering,kill_stamina,kill_since_input,kill_onscreen\n";
         return;
     }
     // Carry the count across sessions so rows stay numbered in order.
@@ -68,7 +69,8 @@ void FightRecorder::open(const std::filesystem::path& csv)
         std::ofstream out(csv_, std::ios::app);
         out << "fight,seconds,gap_to_retry,loser,cause,"
                "p_hp,p_attacks,p_hits,p_whiffs,p_blocked,p_dodges,p_staggers,p_dealt,p_taken,"
-               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken\n";
+               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken,"
+               "kill_attack,kill_victim_recovering,kill_stamina,kill_since_input,kill_onscreen\n";
     }
     fights_ = std::max(0, lines - 1);
     logf(LogLevel::Info, "fight log has {} fights already; next is #{}", fights_, fights_ + 1);
@@ -131,7 +133,7 @@ void FightRecorder::noteSwarmStrike(double now)
     noteAttack(false, now);
 }
 
-void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now)
+void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now, const DeathFacts& facts)
 {
     if (!running_) {
         return;
@@ -139,14 +141,16 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
     player_.healthLeft = playerHealth;
     foe_.healthLeft = foeHealth;
     lastCause_ = cause;
+    lastFacts_ = facts;
     if (playerDied) {
         playerDeaths_.add(cause);
     }
     const double gap = retryGap_;
-    lastRow_ = std::format("{},{:.2f},{:.2f},{},{},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f}\n",
+    lastRow_ = std::format("{},{:.2f},{:.2f},{},{},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{},{},{:.1f},{:.2f},{}\n",
         fights_ + 1, now - start_, gap, playerDied ? "player" : "foe", causeName(cause),
         player_.healthLeft, player_.attacks, player_.hits, player_.whiffs, player_.blocked, player_.dodges, player_.staggers, player_.damageDealt, player_.damageTaken,
-        foe_.healthLeft, foe_.attacks, foe_.hits, foe_.whiffs, foe_.blocked, foe_.dodges, foe_.staggers, foe_.damageDealt, foe_.damageTaken);
+        foe_.healthLeft, foe_.attacks, foe_.hits, foe_.whiffs, foe_.blocked, foe_.dodges, foe_.staggers, foe_.damageDealt, foe_.damageTaken,
+        name(facts.attack), facts.victimRecovering ? 1 : 0, facts.staminaAtImpact, facts.secondsSinceInput, facts.attackerOnScreen ? 1 : 0);
     if (!csv_.empty()) {
         std::ofstream out(csv_, std::ios::app);
         out << lastRow_;

@@ -178,7 +178,7 @@ TEST_CASE("a death is classified and written as one CSV row")
     REQUIRE(glm::distance(a.playerPosition(), glm::dvec3(0.0, 0.0, 3.0)) < 0.2);
 }
 
-TEST_CASE("a hit from behind is stamped off-screen")
+TEST_CASE("facing away from the foe does not stamp off-screen while the camera still sees it")
 {
     Arena a(7);
     for (int i = 0; i < 60 * 60 && a.player().alive(); ++i) {
@@ -188,7 +188,19 @@ TEST_CASE("a hit from behind is stamped off-screen")
         a.scene.tick(kDt);
     }
     REQUIRE_FALSE(a.player().alive());
+    REQUIRE(a.player().deathCause != static_cast<std::uint8_t>(DeathCause::OffScreen));
+    REQUIRE(a.stage.recorder().lastFacts().attackerOnScreen);
+}
+
+TEST_CASE("an attacker the camera cannot see is stamped off-screen")
+{
+    Arena a(7);
+    a.stage.recorder().noteAttack(false, a.scene.time());
+    auto& foe = a.scene.registry().get<Combatant>(a.scene.find(a.stage.foeId()));
+    foe.attack = static_cast<std::uint8_t>(AttackKind::Light);
+    a.stage.receiveHit(a.scene, a.scene.find(a.stage.playerId()), a.scene.find(a.stage.foeId()), 1000.0f, 0.0f, false);
     REQUIRE(a.player().deathCause == static_cast<std::uint8_t>(DeathCause::OffScreen));
+    REQUIRE_FALSE(a.stage.recorder().lastFacts().attackerOnScreen);
 }
 
 TEST_CASE("blocking turns damage into stamina drain")

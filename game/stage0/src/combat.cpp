@@ -4,6 +4,7 @@
 
 #include "ichor/core/dmath.h"
 #include "ichor/core/log.h"
+#include "ichor/stage0/camera_view.h"
 
 #include <glm/geometric.hpp>
 
@@ -125,6 +126,7 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
 
 void Stage0::resetFight(Scene& scene)
 {
+    sinceInput_ = 0.0f;
     recorder_.noteRetry(scene.time());
     for (auto [entity, id, transform] : scene.registry().view<const StableId, Transform>().each()) {
         const bool isPlayer = id == player_;
@@ -244,11 +246,16 @@ void Stage0::tickStatus(Scene& scene, entt::entity who, Combatant& c)
     if (c.health > 0.0f) {
         return;
     }
+    DeathFacts facts;
+    facts.victimRecovering = c.combatState() == CombatState::Recovery;
+    facts.outOfStamina = c.stamina <= 1.0f;
+    facts.staminaAtImpact = c.stamina;
+    facts.secondsSinceInput = sinceInput_;
     c.deathCause = static_cast<std::uint8_t>(DeathCause::Bleed);
     enterState(scene, who, c, CombatState::Dead);
     const Combatant& playerC = scene.registry().get<Combatant>(scene.find(player_));
     const Combatant& foeC = scene.registry().get<Combatant>(scene.find(foe_));
-    recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time());
+    recorder_.noteDeath(c.side == 0, DeathCause::Bleed, playerC.health, foeC.health, scene.time(), facts);
 }
 
 void Stage0::parry(Scene& scene, entt::entity attacker, const WeaponProfile& weapon)
@@ -271,6 +278,7 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     if (!c.alive()) {
         return;
     }
+    const float staminaAtImpact = c.stamina;
     const bool guarded = c.blocking && c.combatState() == CombatState::Idle;
     const WeaponProfile& weapon = weapons_[c.side];
     if (guarded && weapon.parries() && c.blockTicks >= 1 && c.blockTicks <= weapon.parryWindowTicks) {
@@ -300,17 +308,38 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
     if (c.health <= 0.0f) {
         const glm::dvec3 at = scene.registry().get<Transform>(victim).position;
         const bool againstWall = std::max(std::abs(at.x), std::abs(at.z)) > kArenaHalf - tuning_.bodyRadius - 0.6;
-        const DeathCause cause = classifyDeath({attackerOnScreen, c.combatState() == CombatState::Recovery, blocked, c.stamina <= 1.0f, againstWall});
+        DeathFacts facts;
+        facts.attackerOnScreen = attackerOnScreen;
+        facts.victimRecovering = c.combatState() == CombatState::Recovery;
+        facts.blocked = blocked;
+        facts.outOfStamina = c.stamina <= 1.0f;
+        facts.againstWall = againstWall;
+        facts.attack = a.attack == static_cast<std::uint8_t>(AttackKind::Heavy) ? KillingAttack::Heavy : KillingAttack::Light;
+        facts.staminaAtImpact = staminaAtImpact;
+        facts.secondsSinceInput = sinceInput_;
+        const DeathCause cause = classifyDeath(facts);
         c.deathCause = static_cast<std::uint8_t>(cause);
         enterState(scene, victim, c, CombatState::Dead);
         const Combatant& playerC = scene.registry().get<Combatant>(scene.find(player_));
         const Combatant& foeC = scene.registry().get<Combatant>(scene.find(foe_));
-        recorder_.noteDeath(c.side == 0, cause, playerC.health, foeC.health, scene.time());
+        recorder_.noteDeath(c.side == 0, cause, playerC.health, foeC.health, scene.time(), facts);
         return;
     }
     if (c.poise <= 0.0f && c.combatState() != CombatState::Staggered) {
         enterState(scene, victim, c, CombatState::Staggered);
     }
+}
+
+bool Stage0::attackerInView(const Scene& scene, glm::dvec3 attackerAt) const
+{
+    const entt::entity player = scene.find(player_);
+    const entt::entity foe = scene.find(foe_);
+    if (player == entt::null || foe == entt::null) {
+        return true;
+    }
+    const auto& registry = scene.registry();
+    const CameraPose pose = followCamera(registry.get<Transform>(player).position, registry.get<Transform>(foe).position);
+    return inFrustum(pose, attackerAt, tuning_.bodyRadius);
 }
 
 void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits)
@@ -335,9 +364,7 @@ void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std:
             continue;
         }
         struck = true;
-        // Was the attacker in front of the victim? A forward-facing test stands in for the camera.
-        const glm::vec3 toAttacker = glm::normalize(glm::vec3(origin - otherT.position));
-        const bool onScreen = glm::dot(forwardFromYaw(otherC.yaw), toAttacker) > -0.2f;
+        const bool onScreen = attackerInView(scene, origin);
         hits.push_back({other, attacker, damage, poiseDamage, onScreen});
     }
     if (!struck) {
@@ -353,6 +380,9 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
     if (playerEntity == entt::null || foeEntity == entt::null || !scene.registry().all_of<Combatant>(playerEntity)) {
         return;
     }
+
+    const bool steering = std::isfinite(input.moveX) && std::isfinite(input.moveY) && (std::abs(input.moveX) > 0.1f || std::abs(input.moveY) > 0.1f);
+    sinceInput_ = input.buttons != 0 || steering ? 0.0f : sinceInput_ + fdt;
 
     // Retry lives in the input stream, so a recorded session replays its restarts too.
     {

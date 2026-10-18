@@ -42,7 +42,7 @@ public:
     // A swarm unit's strike is a foe attack; the grant count shows how the tokens were paced.
     void noteSwarmGrant();
     void noteSwarmStrike(double now);
-    void noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now);
+    void noteDeath(bool playerDied, DeathCause cause, float playerHealth, float foeHealth, double now, const DeathFacts& facts = {});
     // A retry press: an unfinished fight is dropped, and the time since the
     // last death becomes the next row's gap_to_retry.
     void noteRetry(double now);
@@ -54,6 +54,7 @@ public:
     const SideRecord& player() const { return player_; }
     const SideRecord& foe() const { return foe_; }
     DeathCause lastCause() const { return lastCause_; }
+    const DeathFacts& lastFacts() const { return lastFacts_; }
     // Player deaths only, this session; the live read of the distribution.
     const DeathTally& playerDeaths() const { return playerDeaths_; }
     const std::string& lastRow() const { return lastRow_; }
@@ -74,6 +75,7 @@ private:
     double lastEnd_ = -1.0;
     double retryGap_ = 0.0;
     DeathCause lastCause_ = DeathCause::Unknown;
+    DeathFacts lastFacts_;
     DeathTally playerDeaths_;
     std::string lastRow_;
 };
