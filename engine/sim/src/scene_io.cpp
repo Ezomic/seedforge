@@ -29,9 +29,9 @@ bool plausible(const SpawnCommand& spawn, const std::optional<MontagePlayer>& mo
     constexpr double kWorldLimit = 1.0e6;
     const Transform& t = spawn.transform;
     const glm::quat& q = t.rotation;
-    const float length = std::sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
+    const double lengthSq = double(q.w) * q.w + double(q.x) * q.x + double(q.y) * q.y + double(q.z) * q.z;
     if (!(std::abs(t.position.x) <= kWorldLimit && std::abs(t.position.y) <= kWorldLimit && std::abs(t.position.z) <= kWorldLimit)) return false;
-    if (!finite(q.w) || !finite(q.x) || !finite(q.y) || !finite(q.z) || !(std::abs(length - 1.0f) <= 1.0e-3f) || !finite(t.scale)) return false;
+    if (!finite(q.w) || !finite(q.x) || !finite(q.y) || !finite(q.z) || !(std::abs(lengthSq - 1.0) <= 1.0e-6) || !finite(t.scale)) return false;
     if (spawn.spin && !(finite(spawn.spin->axis) && finite(spawn.spin->radiansPerSecond))) return false;
     if (spawn.player && !finite(spawn.player->metresPerSecond)) return false;
     if (spawn.staticBox && !(inRange(spawn.staticBox->halfExtents.x, 0.05f, 1.0e4f) && inRange(spawn.staticBox->halfExtents.y, 0.05f, 1.0e4f) && inRange(spawn.staticBox->halfExtents.z, 0.05f, 1.0e4f))) return false;
