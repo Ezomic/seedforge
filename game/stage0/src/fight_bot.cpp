@@ -195,7 +195,9 @@ BotResult runBotFights(const BotConfig& config)
         const int before = stage.recorder().fightsWritten();
         bool finished = false;
         for (int tick = 0; tick < maxTicks; ++tick) {
-            scene.tick(kDt, bot.next(scene, stage));
+            const InputFrame frame = bot.next(scene, stage);
+            if (config.captureFirstFight && attempt == 0) result.firstFightInputs.push_back(frame);
+            scene.tick(kDt, frame);
             if (stage.recorder().fightsWritten() > before) {
                 finished = true;
                 break;
