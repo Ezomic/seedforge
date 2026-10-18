@@ -19,6 +19,7 @@
 #include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/journal_screen.h"
+#include "ichor/ui/landmark_compass_screen.h"
 #include "ichor/data/journal.h"
 #include "ichor/script/journal_bindings.h"
 #include "ichor/ui/map_screen.h"
@@ -595,6 +596,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::Ledger> ledger;
     std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
+    std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
     bool paused = false;
@@ -622,15 +624,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ledger = std::make_unique<ichor::Ledger>(*ui);
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
+            landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui, options.data / "ui");
             mapScreen->setImage(ichor::renderMapImage(heightfield));
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             newGameScreen.reset();
             pauseMenu.reset();
+            landmarkCompass.reset();
             mapScreen.reset();
             journalScreen.reset();
             ledger.reset();
@@ -665,6 +669,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
                 hud->setGuide(hudGuide);
+                {
+                    // The only landmark the app knows is the compass target; z is south, the compass wants y north.
+                    std::vector<ichor::NavLandmark> marks;
+                    if (options.compassTarget) {
+                        marks.push_back({"target", "the marked place", {static_cast<float>(options.compassTarget->first), static_cast<float>(-options.compassTarget->second)}});
+                    }
+                    const glm::dvec3 feet = playerPosition(engine.scene());
+                    ichor::bindLandmarkCompass(*landmarkCompass, {static_cast<float>(feet.x), static_cast<float>(-feet.z)}, {std::sin(hudHeading), std::cos(hudHeading)}, marks);
+                }
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
