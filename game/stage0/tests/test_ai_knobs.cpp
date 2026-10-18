@@ -189,7 +189,7 @@ void writeKnobs(const std::filesystem::path& root, const std::string& body)
 
 }
 
-TEST_CASE("--knobs directory values reach the tuning", "[knobs][startup]")
+TEST_CASE("knob files in a data directory reach the tuning", "[knobs][startup]")
 {
     const auto root = scratchDir("applied");
     writeKnobs(root, R"([{"id":"skirmisher","windup_scale":2.0,"preferred_spacing":4.0,"rest_duration":3.0}])");
