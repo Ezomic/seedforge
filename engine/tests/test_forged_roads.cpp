@@ -149,7 +149,6 @@ TEST_CASE("a point on a road is reported as road and a point far off it is not")
         }
     }
 
-    const double cell = static_cast<double>(f.desc.sizeMetres) / (kGrid - 1);
     std::size_t offRoad = 0;
     for (std::uint32_t c = 0; c < map.road.size(); ++c) {
         if (map.road[c] != 0) continue;
@@ -169,7 +168,6 @@ TEST_CASE("a point on a road is reported as road and a point far off it is not")
         CHECK(hit.edge == -1);
     }
     CHECK(offRoad > 100);
-    CHECK(cell > 0.0);
 }
 
 TEST_CASE("coverage falls off across the shoulder and never leaves 0 to 1")
@@ -179,16 +177,23 @@ TEST_CASE("coverage falls off across the shoulder and never leaves 0 to 1")
     const ForgedRoads roads(f.world, f.desc);
     const worldforge::RoadEdge& edge = map.edges.front();
     const Point a = cellPoint(map, f.desc, map.pathCells[edge.pathBegin]);
+    const Point b = cellPoint(map, f.desc, map.pathCells[edge.pathBegin + 1]);
+    const double length = std::hypot(b.x - a.x, b.z - a.z);
+    const double sideX = -(b.z - a.z) / length;
+    const double sideZ = (b.x - a.x) / length;
 
-    float last = 2.0f;
-    for (double d = 0.0; d <= 12.0; d += 0.5) {
-        for (const double dir : {1.0, -1.0}) {
-            const float c = roads.coverageAt(a.x + dir * d, a.z);
-            CHECK(c >= 0.0f);
-            CHECK(c <= 1.0f);
-        }
-        last = std::min(last, roads.coverageAt(a.x + d, a.z));
+    // Across the road from the middle of its first segment: 2 m of surface each side, then a 2 m shoulder.
+    const double midX = (a.x + b.x) * 0.5;
+    const double midZ = (a.z + b.z) * 0.5;
+    float last = 1.0f;
+    for (double d = 0.0; d <= 4.0; d += 0.25) {
+        const float c = roads.coverageAt(midX + sideX * d, midZ + sideZ * d);
+        CHECK(c >= 0.0f);
+        CHECK(c <= last + 1e-6f);
+        if (d <= 2.0) CHECK(c == Catch::Approx(1.0f));
+        last = c;
     }
+    CHECK(roads.coverageAt(midX + sideX * 3.0, midZ + sideZ * 3.0) == Catch::Approx(0.5f).margin(0.01));
     CHECK(last == 0.0f);
 }
 
