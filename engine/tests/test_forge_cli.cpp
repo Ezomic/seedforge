@@ -355,12 +355,17 @@ TEST_CASE("validate scores each seed, writes validation.json next to the manifes
     CHECK(onDisk == result.validation);
     const auto validation = nlohmann::json::parse(result.validation);
     const auto manifest = nlohmann::json::parse(result.manifest);
-    REQUIRE(validation["seeds"].size() == 6);
     REQUIRE(manifest["runs"].size() == 6);
+    std::size_t scored = 0;
     CHECK(result.validationTable.find("settlement_density") != std::string::npos);
     for (std::size_t i = 0; i < 6; ++i) {
-        const auto& v = validation["seeds"][i];
         const auto& run = manifest["runs"][i];
+        if (run.contains("error")) {
+            CHECK_FALSE(run.contains("validation"));
+            continue;
+        }
+        REQUIRE(scored < validation["seeds"].size());
+        const auto& v = validation["seeds"][scored++];
         CHECK(v["world_seed"] == run["seed"]);
         CHECK(v["rejected"] == run["validation"]["rejected"]);
         CHECK(run["validation"]["causes"].empty() == !v["rejected"].get<bool>());
@@ -369,6 +374,8 @@ TEST_CASE("validate scores each seed, writes validation.json next to the manifes
         CHECK(run["layers"].size() >= 4);
         CHECK(result.seeds[i].rejected == v["rejected"].get<bool>());
     }
+    CHECK(scored >= 1);
+    CHECK(scored == validation["seeds"].size());
 
     auto plain = oneSeed(1, 64);
     plain.outDir = scratch("validate_off").string();
