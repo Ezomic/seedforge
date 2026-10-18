@@ -4,8 +4,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <map>
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
@@ -88,7 +90,7 @@ const DataTable& otherTranche()
 {
     static DataSet set;
     static const bool loaded = [] {
-        const std::filesystem::path root = std::filesystem::temp_directory_path() / "ichor_notable_items_other_1_scratch";
+        const std::filesystem::path root = std::filesystem::temp_directory_path() / ("ichor_notable_items_other_1_" + std::to_string((std::uint64_t{std::random_device{}()} << 32) | std::random_device{}()));
         std::filesystem::remove_all(root);
         std::filesystem::create_directories(root / "notable_items");
         std::filesystem::copy_file(std::filesystem::path(ICHOR_REPO_DATA) / "notable_items" / "other_1.json",
