@@ -47,6 +47,7 @@ TEST_CASE("the gallery lays seeds out in a square-ish grid", "[forge_cli][galler
     CHECK(sixteen.width == 2 + 4 * (64 + 2));
     CHECK(sixteen.height == 2 + 4 * (64 + 14 + 2));
     CHECK(seventeen.width == 2 + 5 * (64 + 2));
+    CHECK(seventeen.height == 2 + 4 * (64 + 14 + 2));
     CHECK(one.width == 2 + 64 + 2);
 }
 
@@ -86,5 +87,6 @@ TEST_CASE("the gallery rejects hostile options", "[forge_cli][gallery]")
     CHECK_FALSE(forgecli::makeGallery(options(1, 2, 0)).error.empty());
     CHECK_FALSE(forgecli::makeGallery(options(1, 2, -5)).error.empty());
     CHECK_FALSE(forgecli::makeGallery(options(1, 2, 1 << 20)).error.empty());
+    CHECK_FALSE(forgecli::makeGallery(options(1, 256, 1024)).error.empty());
     CHECK(forgecli::makeGallery(options(~std::uint64_t{0}, ~std::uint64_t{0})).error.empty());
 }

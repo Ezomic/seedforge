@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <string_view>
@@ -22,6 +23,7 @@ constexpr std::uint8_t kFailed[3] = {120, 20, 20};
 constexpr std::uint8_t kRiver[3] = {40, 110, 230};
 constexpr std::uint8_t kLabelInk[3] = {235, 235, 235};
 constexpr int kLitBase = 160;
+constexpr std::uint64_t kMaxCanvasBytes = 128ull << 20;
 
 // 3x5 digits, one row per entry, bit 2 is the left column.
 constexpr std::uint8_t kDigits[10][5] = {
@@ -79,9 +81,10 @@ bool drawWorld(Canvas& canvas, int x0, int y0, const worldforge::ForgedWorld& wo
     if (world.completedPhases() < static_cast<int>(worldforge::ForgePhase::Biomes)) return false;
     const PhaseResult biomes = phaseLayers(*findPhase("biomes"), world);
     if (!biomes.error.empty()) return false;
+    const int size = world.size();
+    if (biomes.layers.empty() || biomes.layers[0].width != size || biomes.layers[0].height != size || biomes.layers[0].channels != 3) return false;
     const Layer& color = biomes.layers[0];
     const auto& hydro = *world.hydrology();
-    const int size = world.size();
     const auto height = [&](int x, int y) { return static_cast<int>(hydro.heightM[hydro.index(std::clamp(x, 0, size - 1), std::clamp(y, 0, size - 1))]); };
     for (int y = 0; y < size; ++y) {
         for (int x = 0; x < size; ++x) {
@@ -127,6 +130,10 @@ GalleryResult makeGallery(const GalleryOptions& options)
     Canvas canvas;
     canvas.width = kGutter + columns * (cellW + kGutter);
     canvas.height = kGutter + rows * (cellH + kGutter);
+    if (static_cast<std::uint64_t>(canvas.width) * static_cast<std::uint64_t>(canvas.height) * 3 > kMaxCanvasBytes) {
+        result.error = "the gallery would be larger than 128 MiB, use fewer seeds or a smaller --size";
+        return result;
+    }
     canvas.pixels.assign(static_cast<std::size_t>(canvas.width) * static_cast<std::size_t>(canvas.height) * 3, 0);
     fillRect(canvas, 0, 0, canvas.width, canvas.height, kBackground);
 
@@ -134,8 +141,13 @@ GalleryResult makeGallery(const GalleryOptions& options)
         const std::uint64_t seed = options.seedBegin + static_cast<std::uint64_t>(n);
         const int x0 = kGutter + (n % columns) * (cellW + kGutter);
         const int y0 = kGutter + (n / columns) * (cellH + kGutter);
-        const worldforge::ForgedWorld world = worldforge::forgeWorld(seed, options.size, options.config ? *options.config : defaultForgeConfig(options.size), worldforge::ForgePhase::Biomes);
-        if (!drawWorld(canvas, x0, y0, world)) {
+        bool drawn = false;
+        try {
+            const worldforge::ForgedWorld world = worldforge::forgeWorld(seed, options.size, options.config ? *options.config : defaultForgeConfig(options.size), worldforge::ForgePhase::Biomes);
+            drawn = drawWorld(canvas, x0, y0, world);
+        } catch (const std::exception&) {
+        }
+        if (!drawn) {
             fillRect(canvas, x0, y0, cellW, options.size, kFailed);
             result.failedSeeds.push_back(seed);
         }
@@ -202,8 +214,10 @@ int galleryMain(int argc, char** argv)
         return 1;
     }
     const std::filesystem::path path = out;
-    if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path());
+    std::error_code ec;
+    if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
     std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (ec) file.setstate(std::ios::failbit);
     file.write(reinterpret_cast<const char*>(result.png.data()), static_cast<std::streamsize>(result.png.size()));
     if (!file) {
         std::fprintf(stderr, "forge_cli gallery: cannot write %s\n", out.c_str());
