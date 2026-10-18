@@ -24,12 +24,15 @@ float smooth(float t)
 
 float progress(float time, float duration)
 {
-    return duration > 1e-6f && std::isfinite(duration) ? clamp01(time / duration) : 1.0f;
+    if (!(duration > 1e-6f) || !std::isfinite(duration)) return 1.0f;
+    if (!std::isfinite(time)) return 0.0f;
+    return time >= duration ? 1.0f : clamp01(time / duration);
 }
 
 PartPose mix(const PartPose& a, const PartPose& b, float t)
 {
-    return {glm::mix(a.position, b.position, t), glm::normalize(glm::mix(a.axis, b.axis, t))};
+    const glm::vec3 axis = glm::mix(a.axis, b.axis, t);
+    return {glm::mix(a.position, b.position, t), glm::dot(axis, axis) < 1e-12f ? a.axis : glm::normalize(axis)};
 }
 
 struct Rig {
@@ -150,20 +153,17 @@ CharacterTransforms characterTransforms(const CharacterPose& pose, glm::dvec3 fe
     const float angle = -(pose.lean * (1.0f - pose.fall) - pose.fall * kPi * 0.5f);
     const glm::mat3 tip = glm::mat3_cast(glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f)));
     const glm::vec3 pivot(0.0f, 0.9f * (1.0f - pose.fall), 0.0f);
-    const glm::vec3 drop(0.0f, -pose.crouch, 0.0f);
+    // A body lying on its side rests on the ground, not half in it.
+    const glm::vec3 drop(0.0f, -pose.crouch + kBodyRadius * pose.fall, 0.0f);
 
     const auto place = [&](glm::vec3 local, const glm::mat3& basis) {
         const glm::vec3 moved = pivot + tip * (local - pivot) + drop;
-        return PartTransform{feet + glm::dvec3(facing * moved), facing * tip * basis};
-    };
-    const auto placeFixed = [&](const PartPose& part) {
-        const glm::vec3 moved = pivot + tip * (part.position - pivot) + drop;
-        return PartTransform{feet + glm::dvec3(facing * moved), facing * (tip * basisAlong(part.axis))};
+        return PartTransform{feet + glm::dvec3(facing * moved), facing * (tip * basis)};
     };
     CharacterTransforms out;
     out.body = place(glm::vec3(0.0f), glm::mat3(1.0f));
-    out.spear = placeFixed(pose.spear);
-    out.shield = placeFixed(pose.shield);
+    out.spear = place(pose.spear.position, basisAlong(pose.spear.axis));
+    out.shield = place(pose.shield.position, basisAlong(pose.shield.axis));
     return out;
 }
 

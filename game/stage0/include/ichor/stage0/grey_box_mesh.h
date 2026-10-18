@@ -8,7 +8,7 @@ namespace ichor::stage0 {
 
 // Procedural grey-box geometry, so Stage 0 needs no art assets. All of it is revolved from a
 // profile about +Y, with outward normals and counter-clockwise front faces.
-Mesh capsuleMesh(float radius, float cylinderHalfHeight, std::uint32_t material);
+Mesh capsuleMesh(float radius, float cylinderHalfHeight, std::uint32_t material); // feet at the origin
 Mesh spearMesh(std::uint32_t material); // grip at the origin, butt at -0.6, tip at +1.4
 Mesh shieldMesh(std::uint32_t material); // round disc, face normal +Y
 

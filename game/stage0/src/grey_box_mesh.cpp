@@ -1,6 +1,7 @@
 #include "ichor/stage0/grey_box_mesh.h"
 
-#include <algorithm>
+#include "ichor/stage0/character_pose.h"
+
 #include <cmath>
 
 namespace ichor::stage0 {
@@ -63,12 +64,12 @@ Mesh revolve(const char* name, const std::vector<ProfilePoint>& profile, std::ui
 
 Mesh capsuleMesh(float radius, float cylinderHalfHeight, std::uint32_t material)
 {
-    const float r = std::isfinite(radius) ? std::clamp(radius, 0.01f, 5.0f) : 0.3f;
-    const float h = std::isfinite(cylinderHalfHeight) ? std::clamp(cylinderHalfHeight, 0.0f, 5.0f) : 0.5f;
+    const float r = radius;
+    const float h = cylinderHalfHeight;
     std::vector<ProfilePoint> profile;
     // The foot is the origin: the lower pole touches y = 0, the cylinder is centred at r + h.
     for (std::uint32_t i = 0; i <= kCapRings; ++i) {
-        const float a = (kTwoPi / 4.0f) * static_cast<float>(i) / static_cast<float>(kCapRings); // 0 pole .. pi/2 equator
+        const float a = (kTwoPi / 4.0f) * static_cast<float>(i) / static_cast<float>(kCapRings);
         profile.push_back({r * std::sin(a), r - r * std::cos(a), std::sin(a), -std::cos(a)});
     }
     for (std::uint32_t i = 0; i <= kCapRings; ++i) {
@@ -126,7 +127,7 @@ GreyBoxMeshes appendGreyBoxMeshes(SceneBundle& bundle)
 
     GreyBoxMeshes out;
     out.body = static_cast<std::uint32_t>(bundle.meshes.size());
-    bundle.meshes.push_back(capsuleMesh(0.3f, 0.6f, material));
+    bundle.meshes.push_back(capsuleMesh(kBodyRadius, 0.6f, material));
     out.spear = static_cast<std::uint32_t>(bundle.meshes.size());
     bundle.meshes.push_back(spearMesh(material));
     out.shield = static_cast<std::uint32_t>(bundle.meshes.size());

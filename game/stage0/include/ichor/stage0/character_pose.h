@@ -7,6 +7,8 @@
 
 namespace ichor::stage0 {
 
+constexpr float kBodyRadius = 0.3f; // the capsule mesh and the lying pose agree on this
+
 // Render-only: nothing here touches hashed state. The local frame is x right, y up, forward -Z,
 // origin at the character's feet, matching yaw 0 in the combat code.
 struct PoseInput {
