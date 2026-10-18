@@ -27,23 +27,18 @@ WorldDesc forgedWorldDesc(WorldDesc base)
     return base;
 }
 
-ForgedHeightfield heightfieldFromForgedWorld(const worldforge::ForgedWorld& world, const WorldDesc& desc)
+namespace {
+
+ForgedHeightfield adaptGrid(const std::vector<std::int16_t>& heights, int width, int gridHeight, const WorldDesc& desc)
 {
-    if (!desc.valid() || !std::isfinite(desc.minHeight) || !std::isfinite(desc.heightRange)) {
-        return failure("the world description is not valid");
-    }
-    if (!world.hydrology().has_value()) {
-        return failure(world.ok() ? "the forged world stopped before hydrology" : world.error());
-    }
-    const worldforge::HydrologyMap& map = *world.hydrology();
-    const std::int64_t cells = static_cast<std::int64_t>(map.width) * map.height;
-    if (map.width < 2 || map.width != map.height || static_cast<std::int64_t>(map.heightM.size()) != cells) {
-        return failure(std::format("the forged terrain is {}x{} with {} heights, not a square grid", map.width, map.height, map.heightM.size()));
+    const std::int64_t cells = static_cast<std::int64_t>(width) * gridHeight;
+    if (width < 2 || width != gridHeight || static_cast<std::int64_t>(heights.size()) != cells) {
+        return failure(std::format("the forged terrain is {}x{} with {} heights, not a square grid", width, gridHeight, heights.size()));
     }
 
     const std::int64_t n = desc.samplesPerSide();
     const std::int64_t span = n - 1;            // sample steps across the world
-    const std::int64_t last = map.width - 1;    // cell steps across the world
+    const std::int64_t last = width - 1;    // cell steps across the world
     const std::int64_t weightScale = span * span;
     const double minHeight = desc.minHeight;
     const double range = desc.heightRange;
@@ -57,7 +52,7 @@ ForgedHeightfield heightfieldFromForgedWorld(const worldforge::ForgedWorld& worl
             const std::int64_t px = sx * last;
             const std::int64_t x0 = std::min(px / span, last - 1);
             const std::int64_t rx = px - x0 * span;
-            const auto at = [&](std::int64_t x, std::int64_t z) { return static_cast<std::int64_t>(map.heightM[static_cast<std::size_t>(z * map.width + x)]); };
+            const auto at = [&](std::int64_t x, std::int64_t z) { return static_cast<std::int64_t>(heights[static_cast<std::size_t>(z * width + x)]); };
             const std::int64_t blended = (span - rx) * (span - rz) * at(x0, z0) + rx * (span - rz) * at(x0 + 1, z0) + (span - rx) * rz * at(x0, z0 + 1)
                 + rx * rz * at(x0 + 1, z0 + 1);
             const double metres = static_cast<double>(blended) / static_cast<double>(weightScale);
@@ -69,6 +64,37 @@ ForgedHeightfield heightfieldFromForgedWorld(const worldforge::ForgedWorld& worl
     ForgedHeightfield out;
     out.field = Heightfield(desc, std::move(samples));
     return out;
+}
+
+bool descUsable(const WorldDesc& desc)
+{
+    return desc.valid() && std::isfinite(desc.minHeight) && std::isfinite(desc.heightRange);
+}
+
+}
+
+ForgedHeightfield heightfieldFromForgedWorld(const worldforge::ForgedWorld& world, const WorldDesc& desc)
+{
+    if (!descUsable(desc)) {
+        return failure("the world description is not valid");
+    }
+    if (!world.hydrology().has_value()) {
+        return failure(world.ok() ? "the forged world stopped before hydrology" : world.error());
+    }
+    const worldforge::HydrologyMap& map = *world.hydrology();
+    return adaptGrid(map.heightM, map.width, map.height, desc);
+}
+
+ForgedHeightfield heightfieldFromForgedRoads(const worldforge::ForgedWorld& world, const WorldDesc& desc)
+{
+    if (!descUsable(desc)) {
+        return failure("the world description is not valid");
+    }
+    if (!world.roads().has_value()) {
+        return failure(world.ok() ? "the forged world stopped before roads" : world.error());
+    }
+    const worldforge::RoadMap& map = *world.roads();
+    return adaptGrid(map.heightM, map.width, map.height, desc);
 }
 
 ForgedHeightfield forgeHeightfieldFromWorldforge(const WorldDesc& desc, int gridSize)
