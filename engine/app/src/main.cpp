@@ -19,6 +19,7 @@
 #include "ichor/world/water_field.h"
 #include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
+#include "ichor/ui/character_screen.h"
 #include "ichor/ui/journal_screen.h"
 #include "ichor/ui/landmark_compass_screen.h"
 #include "ichor/ui/journal_screen_bind.h"
@@ -599,6 +600,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::Hud> hud;
     std::unique_ptr<ichor::Ledger> ledger;
     std::unique_ptr<ichor::JournalScreen> journalScreen;
+    std::unique_ptr<ichor::CharacterScreen> characterScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::MapScreenBinding> mapBinding;
@@ -631,6 +633,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             hud = std::make_unique<ichor::Hud>(*ui, hudLayout.layout);
             ledger = std::make_unique<ichor::Ledger>(*ui);
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
+            characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
@@ -640,7 +643,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             combatHud.reset();
             newGameScreen.reset();
@@ -648,6 +651,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             landmarkCompass.reset();
             mapBinding.reset();
             mapScreen.reset();
+            characterScreen.reset();
             journalScreen.reset();
             ledger.reset();
             hud.reset();
@@ -702,6 +706,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     ichor::bindJournalModel(*journalScreen, ichor::journalEntries(chronicle.entries(), config.fixedDt));
                 }
                 mapBinding->setVisible(mapScreen->visible());
+                if (characterScreen->visible()) {
+                    // The app has no progression state yet, so only health is known.
+                    characterScreen->bind({{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}});
+                }
                 if (mapScreen->visible()) {
                     const glm::dvec3 feet = playerPosition(engine.scene());
                     mapScreen->setPlayer(ichor::mapPosition(heightfield.desc(), feet.x, feet.z), hudHeading);
@@ -805,6 +813,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool quickLoadHeld = false;
     bool journalHeld = false;
     bool notesHeld = false;
+    bool characterHeld = false;
     bool mapHeld = false;
     bool menuHeld = false;
     bool pointerHeld = false;
@@ -853,6 +862,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             journalScreen->setVisible(!journalScreen->visible());
         }
         notesHeld = notes;
+        const bool characterKey = (buttons & ichor::InputFrame::Character) != 0;
+        if (characterKey && !characterHeld && characterScreen && !editing) {
+            characterScreen->setVisible(!characterScreen->visible());
+        }
+        characterHeld = characterKey;
         // The pointer drives the game UI (the game itself does not use the mouse); the editor's
         // own windows have it while they are up. Away from the window, or under the editor, a
         // press the UI still holds is let go and nothing stays hovered.
@@ -879,6 +893,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             }
             if (journalScreen->takeCloseRequest()) {
                 journalScreen->setVisible(false);
+            }
+            if (characterScreen->takeCloseRequest()) {
+                characterScreen->setVisible(false);
             }
             if (ledger->takeCloseRequest()) {
                 ledger->setVisible(false);
