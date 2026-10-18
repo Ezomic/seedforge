@@ -1,6 +1,7 @@
 #include "ichor/stage0/recorder.h"
 
 #include "ichor/core/log.h"
+#include "ichor/stage0/fight_review.h"
 
 #include <format>
 #include <fstream>
@@ -50,6 +51,7 @@ void FightRecorder::open(const std::filesystem::path& csv)
     if (csv_.empty()) {
         return;
     }
+    recordDir_ = fightRecordDirectory(csv_);
     if (!std::filesystem::exists(csv_)) {
         std::ofstream out(csv_);
         out << "fight,seconds,gap_to_retry,loser,cause,"
@@ -87,11 +89,22 @@ void FightRecorder::begin(double now)
     start_ = now;
 }
 
+void FightRecorder::saveFight(const FightRecord& record) const
+{
+    if (recordDir_.empty() || record.index == 0 || record.index > kMaxRecordedFights) {
+        return;
+    }
+    if (!saveFightRecord(fightRecordPath(recordDir_, record.index), record)) {
+        logf(LogLevel::Warn, "fight #{} could not be saved to {}", record.index, recordDir_.string());
+    }
+}
+
 void FightRecorder::noteAttack(bool playerSide, double now)
 {
     // A fight starts at the first swing, not at aggro.
     begin(now);
     side(playerSide).attacks += 1;
+    buffer_.noteEvent(FightEventKind::Attack, playerSide ? FightSide::Player : FightSide::Foe, now);
 }
 
 void FightRecorder::noteHit(bool attackerIsPlayer, float damage, bool blocked)
@@ -105,21 +118,28 @@ void FightRecorder::noteHit(bool attackerIsPlayer, float damage, bool blocked)
     if (blocked) {
         side(!attackerIsPlayer).blocked += 1;
     }
+    buffer_.noteEvent(blocked ? FightEventKind::Block : FightEventKind::Hit, attackerIsPlayer ? FightSide::Player : FightSide::Foe, clock_, damage);
 }
 
 void FightRecorder::noteWhiff(bool playerSide)
 {
-    if (running_) side(playerSide).whiffs += 1;
+    if (!running_) return;
+    side(playerSide).whiffs += 1;
+    buffer_.noteEvent(FightEventKind::Whiff, playerSide ? FightSide::Player : FightSide::Foe, clock_);
 }
 
 void FightRecorder::noteDodge(bool playerSide)
 {
-    if (running_) side(playerSide).dodges += 1;
+    if (!running_) return;
+    side(playerSide).dodges += 1;
+    buffer_.noteEvent(FightEventKind::Dodge, playerSide ? FightSide::Player : FightSide::Foe, clock_);
 }
 
 void FightRecorder::noteStagger(bool playerSide)
 {
-    if (running_) side(playerSide).staggers += 1;
+    if (!running_) return;
+    side(playerSide).staggers += 1;
+    buffer_.noteEvent(FightEventKind::Stagger, playerSide ? FightSide::Player : FightSide::Foe, clock_);
 }
 
 void FightRecorder::noteSwarmGrant()
@@ -144,6 +164,10 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
     lastFacts_ = facts;
     if (playerDied) {
         playerDeaths_.add(cause);
+    }
+    buffer_.setNextIndex(static_cast<std::uint32_t>(fights_ + 1));
+    if (buffer_.end(playerDied ? FightSide::Player : FightSide::Foe, cause, now)) {
+        saveFight(buffer_.fights().back());
     }
     const double gap = retryGap_;
     lastRow_ = std::format("{},{:.2f},{:.2f},{},{},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{:.0f},{},{},{},{},{},{},{:.0f},{:.0f},{},{},{:.1f},{:.2f},{}\n",
@@ -176,6 +200,7 @@ void FightRecorder::noteRetry(double now)
     if (running_) {
         logf(LogLevel::Info, "fight #{} abandoned on retry, not recorded", fights_ + 1);
         running_ = false;
+        buffer_.abandon();
     }
     // Hesitation before restarting is what frustration looks like in telemetry.
     retryGap_ = lastEnd_ >= 0.0 ? now - lastEnd_ : 0.0;

@@ -1,0 +1,74 @@
+[
+ {
+  "id": "sunken_amphitheatre",
+  "name": "Sunken Amphitheatre",
+  "silhouette": "a bowl of stone seats half swallowed by a sinkhole, a stage still dry at the bottom",
+  "roles": [
+   "npc.chorus_master",
+   "npc.rope_climber"
+  ],
+  "routes": [
+   "route.amphitheatre_rim"
+  ]
+ },
+ {
+  "id": "weeping_kiln",
+  "name": "Weeping Kiln",
+  "silhouette": "a domed kiln whose seams run with molten glaze that never cools",
+  "roles": [
+   "npc.glaze_warden",
+   "npc.ash_carter"
+  ],
+  "routes": [
+   "route.kiln_track"
+  ]
+ },
+ {
+  "id": "amphora_hill",
+  "name": "Amphora Hill",
+  "silhouette": "a hillside built of stacked storage jars, thousands deep and sealed with wax",
+  "roles": [
+   "npc.jar_counter",
+   "npc.wax_sealer"
+  ],
+  "routes": [
+   "route.jar_stair"
+  ]
+ },
+ {
+  "id": "boundary_ring",
+  "name": "Boundary Ring",
+  "silhouette": "a circle of waist-high stones, each carved with a different border",
+  "roles": [
+   "npc.stone_walker",
+   "npc.dispute_witness"
+  ],
+  "routes": [
+   "route.march_path"
+  ]
+ },
+ {
+  "id": "mirror_quarry",
+  "name": "Mirror Quarry",
+  "silhouette": "a pit of polished black stone that shows the sky and nothing else",
+  "roles": [
+   "npc.quarry_reader",
+   "npc.glass_hauler"
+  ],
+  "routes": [
+   "route.quarry_ramp"
+  ]
+ },
+ {
+  "id": "tide_gate",
+  "name": "Tide Gate",
+  "silhouette": "a sluice of green bronze at the mouth of a drained estuary, one leaf still shut",
+  "roles": [
+   "npc.gate_keeper",
+   "npc.silt_surveyor"
+  ],
+  "routes": [
+   "route.estuary_cut"
+  ]
+ }
+]

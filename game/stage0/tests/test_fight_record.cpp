@@ -39,7 +39,7 @@ TEST_CASE("a record round-trips through the codec")
 
 TEST_CASE("the summary counts hits, blocks, whiffs and damage per side")
 {
-    const FightSummary s = summarize(sample());
+    const FightRecordSummary s = summarize(sample());
     CHECK(s.durationMs == 9000);
     CHECK(s.playerHits == 1);
     CHECK(s.foeHits == 2);

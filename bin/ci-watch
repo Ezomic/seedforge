@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Post-merge CI watcher for the Ichor loop: wait for the engine workflow on a main commit, print pass/fail per job.
+#
+#   bin/ci-watch [-t timeout-s] [-i poll-s] [-g grace-s] [sha]
+#
+# Default sha is origin/main (fetched). Exit: 0 all jobs green, 1 a job failed, 2 usage/gh error, 3 no run appeared within the grace period
+# (the push trigger is path filtered, so a docs-only merge has none), 4 run cancelled with no newer head to follow, 5 timeout.
+# A cancelled run whose commit has a newer descendant on origin/main is followed to that head instead.
+# Env: GH (gh binary, for tests), CI_WATCH_REPO (owner/name, default: the checkout's), CI_WATCH_SLEEP (sleep binary, for tests).
+set -u
+
+gh_bin=${GH:-gh}
+sleeper=${CI_WATCH_SLEEP:-sleep}
+timeout=5400
+interval=30
+grace=180
+while getopts "t:i:g:" opt; do
+  case "$opt" in
+    t) timeout=$OPTARG ;;
+    i) interval=$OPTARG ;;
+    g) grace=$OPTARG ;;
+    *) echo "usage: ci-watch [-t timeout-s] [-i poll-s] [-g grace-s] [sha]" >&2; exit 2 ;;
+  esac
+done
+shift $((OPTIND - 1))
+for n in "$timeout" "$interval" "$grace"; do
+  case "$n" in ''|*[!0-9]*) echo "ci-watch: -t/-i/-g need whole seconds" >&2; exit 2 ;; esac
+done
+
+repo_args=()
+[ -n "${CI_WATCH_REPO:-}" ] && repo_args=(--repo "$CI_WATCH_REPO")
+
+git fetch -q origin main || { echo "ci-watch: git fetch origin main failed" >&2; exit 2; }
+sha=$(git rev-parse --verify -q "${1:-origin/main}^{commit}") || { echo "ci-watch: cannot resolve ${1:-origin/main}" >&2; exit 2; }
+
+start=$(date +%s)
+elapsed() { echo $(( $(date +%s) - start )); }
+
+failure_detail() {
+  local run=$1 job=$2
+  "$gh_bin" run view "$run" "${repo_args[@]}" --log-failed 2>/dev/null \
+    | grep -aE '\*\*\*[A-Za-z]+|[0-9]+ - .*\((Failed|Timeout|Exception|SEGFAULT|Child aborted|Not Run|NOT_BUILT)\)|runtime error:|ERROR: (Address|Leak|Undefined|Thread)Sanitizer|error C[0-9]+|: error:' \
+    | grep -aF -- "$job" \
+    | sed -E 's/^[^\t]*\t[^\t]*\t[0-9TZ:.-]+ //; s/ \.{5,}/ ../' | cut -c1-200 | sort -u | head -15
+}
+
+# prints each job and returns 0 if all green
+report() {
+  local run=$1 bad=0 jid conc name
+  while IFS=$'\t' read -r jid conc name; do
+    [ -n "$jid" ] || continue
+    if [ "$conc" = success ]; then
+      echo "  PASS  $name"
+    else
+      echo "  FAIL  $name ($conc)"
+      bad=1
+      failure_detail "$run" "$name" | sed 's/^/        /'
+    fi
+  done < <("$gh_bin" run view "$run" "${repo_args[@]}" --json jobs --jq '.jobs[] | [.databaseId, .conclusion, .name] | @tsv')
+  return $bad
+}
+
+echo "ci-watch: waiting for the engine run on ${sha:0:10}"
+while :; do
+  if [ "$(elapsed)" -ge "$timeout" ]; then
+    echo "ci-watch: timed out after ${timeout}s waiting on ${sha:0:10}" >&2; exit 5
+  fi
+  line=$("$gh_bin" run list --workflow engine.yml --branch main --commit "$sha" -L 1 "${repo_args[@]}" \
+    --json databaseId,status,conclusion --jq '.[] | [.databaseId, .status, .conclusion] | @tsv') || { echo "ci-watch: gh run list failed" >&2; exit 2; }
+  if [ -z "$line" ]; then
+    if [ "$(elapsed)" -ge "$grace" ]; then
+      echo "ci-watch: no engine run for ${sha:0:10} after ${grace}s (path filtered, or CI is down)" >&2; exit 3
+    fi
+  else
+    IFS=$'\t' read -r run status conc <<<"$line"
+    if [ "$status" = completed ]; then
+      if [ "$conc" = cancelled ]; then
+        git fetch -q origin main
+        head=$(git rev-parse origin/main)
+        if [ "$head" != "$sha" ] && git merge-base --is-ancestor "$sha" "$head"; then
+          echo "ci-watch: run on ${sha:0:10} was cancelled, following newer head ${head:0:10}"
+          sha=$head; continue
+        fi
+        echo "ci-watch: run $run on ${sha:0:10} was cancelled and there is no newer main head" >&2; exit 4
+      fi
+      echo "ci-watch: run $run on ${sha:0:10}: $conc"
+      if report "$run" && [ "$conc" = success ]; then exit 0; fi
+      exit 1
+    fi
+  fi
+  "$sleeper" "$interval"
+done

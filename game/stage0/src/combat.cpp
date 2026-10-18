@@ -1,10 +1,12 @@
 #include "ichor/stage0/combat.h"
+#include "ichor/stage0/run_prompt.h"
 
 #include "ichor/stage0/ai_knobs.h"
 
 #include "ichor/core/dmath.h"
 #include "ichor/core/log.h"
 #include "ichor/stage0/camera_view.h"
+#include "ichor/stage0/telegraph_geometry.h"
 
 #include <glm/geometric.hpp>
 
@@ -380,6 +382,7 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
     if (playerEntity == entt::null || foeEntity == entt::null || !scene.registry().all_of<Combatant>(playerEntity)) {
         return;
     }
+    recorder_.setClock(scene.time());
 
     const bool steering = std::isfinite(input.moveX) && std::isfinite(input.moveY) && (std::abs(input.moveX) > 0.1f || std::abs(input.moveY) > 0.1f);
     sinceInput_ = input.buttons != 0 || steering ? 0.0f : sinceInput_ + fdt;
@@ -505,6 +508,11 @@ void Stage0::debugLines(const Scene& scene, std::vector<LineSegment>& out) const
             out.push_back({centre + glm::dvec3(std::cos(a0) * radius, 0.0, std::sin(a0) * radius), centre + glm::dvec3(std::cos(a1) * radius, 0.0, std::sin(a1) * radius), color});
         }
     };
+    const entt::entity playerEntity = scene.find(player_);
+    const entt::entity foeAtStart = scene.find(foe_);
+    const bool haveCamera = playerEntity != entt::null && foeAtStart != entt::null;
+    const CameraPose camera = haveCamera ? followCamera(scene.registry().get<Transform>(playerEntity).position, scene.registry().get<Transform>(foeAtStart).position) : CameraPose{};
+    const CameraPose* foeCamera = haveCamera ? &camera : nullptr;
     for (auto [entity, transform, c] : scene.registry().view<const Transform, const Combatant>().each()) {
         const glm::dvec3 base = transform.position + glm::dvec3(0.0, 0.9, 0.0);
         const glm::vec3 forward = forwardFromYaw(c.yaw);
@@ -513,9 +521,8 @@ void Stage0::debugLines(const Scene& scene, std::vector<LineSegment>& out) const
         if (c.combatState() == CombatState::Windup) {
             // The charge reads as the reach growing out to where the blow will land.
             const float t = std::clamp(c.stateTime / (heavy ? tuning_.heavyWindup : tuning_.lightWindup), 0.0f, 1.0f);
-            const glm::vec3 color = heavy ? glm::vec3(1.0f, 0.35f, 0.0f) : glm::vec3(1.0f, 0.82f, 0.25f);
-            out.push_back({base, base + glm::dvec3(forward) * static_cast<double>(tuning_.attackRange * t), color});
-            ring(base + glm::dvec3(forward) * static_cast<double>(tuning_.attackRange * t), tuning_.attackRadius * (0.4 + 0.6 * t), color, 12);
+            // Light and heavy share a colour: the table's shape and pattern carry the difference.
+            appendWindupTelegraph(heavy, {base, forward, tuning_.attackRange, tuning_.attackRadius, t, glm::vec3(1.0f, 0.7f, 0.15f)}, c.side == 1 ? foeCamera : nullptr, tuning_.bodyRadius, out);
         } else if (c.combatState() == CombatState::Active) {
             ring(base + glm::dvec3(forward) * static_cast<double>(tuning_.attackRange), tuning_.attackRadius, glm::vec3(1.0f, 0.1f, 0.1f), 12);
         }
@@ -553,7 +560,18 @@ void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const
             }
         }
     }
-    lines.push_back(std::format("fights {}  {}", recorder_.fightsWritten(), recorder_.running() ? "[fight on]" : "J light  K heavy  L block  Space dodge  Enter retry"));
+    PromptInput prompt{FightOutcome::Ongoing, DeathCause::Unknown, recorder_.fightsWritten()};
+    const entt::entity playerEntity = scene.find(player_);
+    const entt::entity foeEntity = scene.find(foe_);
+    if (const auto* p = playerEntity != entt::null ? scene.registry().try_get<Combatant>(playerEntity) : nullptr; p && !p->alive()) {
+        prompt.outcome = FightOutcome::PlayerDied;
+        prompt.cause = static_cast<DeathCause>(p->deathCause);
+    } else if (const auto* f = foeEntity != entt::null ? scene.registry().try_get<Combatant>(foeEntity) : nullptr; f && !f->alive()) {
+        prompt.outcome = FightOutcome::FoeDied;
+    }
+    for (const std::string& line : promptLines(prompt)) {
+        lines.push_back(line);
+    }
 }
 
 }

@@ -43,9 +43,9 @@ std::uint32_t clampedMs(double seconds)
 
 }
 
-FightSummary summarize(const FightRecord& record)
+FightRecordSummary summarize(const FightRecord& record)
 {
-    FightSummary s;
+    FightRecordSummary s;
     s.durationMs = record.durationMs;
     for (const FightEvent& e : record.events) {
         const bool player = e.actor == FightSide::Player;
