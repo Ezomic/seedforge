@@ -380,6 +380,7 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
     if (playerEntity == entt::null || foeEntity == entt::null || !scene.registry().all_of<Combatant>(playerEntity)) {
         return;
     }
+    recorder_.setClock(scene.time());
 
     const bool steering = std::isfinite(input.moveX) && std::isfinite(input.moveY) && (std::abs(input.moveX) > 0.1f || std::abs(input.moveY) > 0.1f);
     sinceInput_ = input.buttons != 0 || steering ? 0.0f : sinceInput_ + fdt;
