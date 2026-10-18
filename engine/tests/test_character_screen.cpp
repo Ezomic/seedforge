@@ -21,7 +21,6 @@ void frame(UiContext& ui, RecordingUiRenderer& renderer, double time)
 struct Fixture {
     RecordingUiRenderer renderer;
     UiContext ui{renderer, 1280, 720};
-    std::filesystem::path document = std::filesystem::path(ICHOR_REPO_DATA) / "ui" / "character_screen.rml";
 
     Fixture()
     {
@@ -47,7 +46,7 @@ CharacterScreenInput sample()
 TEST_CASE("the character screen draws nothing until shown, then more as the model fills it, and only relays out on change")
 {
     Fixture f;
-    CharacterScreen screen(f.ui, f.document);
+    CharacterScreen screen(f.ui);
     REQUIRE(screen.ok());
     REQUIRE_FALSE(screen.visible());
 
@@ -77,7 +76,7 @@ TEST_CASE("the character screen draws nothing until shown, then more as the mode
 TEST_CASE("the character screen shows the model's sections, lines and values as text")
 {
     Fixture f;
-    CharacterScreen screen(f.ui, f.document);
+    CharacterScreen screen(f.ui);
     screen.setVisible(true);
     screen.bind(sample());
     frame(f.ui, f.renderer, 0.0);
@@ -91,7 +90,7 @@ TEST_CASE("the character screen shows the model's sections, lines and values as 
 TEST_CASE("model text is shown as text, never markup")
 {
     Fixture f;
-    CharacterScreen screen(f.ui, f.document);
+    CharacterScreen screen(f.ui);
     screen.setVisible(true);
     CharacterScreenInput input;
     input.capabilities = {{"x", "<div style=\"background-color: #ff0000; width: 900px; height: 900px\">hi</div>", true}};
@@ -102,20 +101,10 @@ TEST_CASE("model text is shown as text, never markup")
     }
 }
 
-TEST_CASE("a missing document leaves the character screen not ok and binding harmless")
-{
-    Fixture f;
-    CharacterScreen screen(f.ui, "no/such/character_screen.rml");
-    REQUIRE_FALSE(screen.ok());
-    screen.bind(sample());
-    screen.setVisible(true);
-    REQUIRE_FALSE(screen.visible());
-}
-
 TEST_CASE("clicking the character screen's close button asks for it to be closed, and clicking elsewhere does not")
 {
     Fixture f;
-    CharacterScreen screen(f.ui, f.document);
+    CharacterScreen screen(f.ui);
     REQUIRE_FALSE(screen.closeButtonCentre().has_value());
     screen.setVisible(true);
     frame(f.ui, f.renderer, 0.0);

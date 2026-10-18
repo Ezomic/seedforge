@@ -623,7 +623,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             hud = std::make_unique<ichor::Hud>(*ui, hudLayout.layout);
             ledger = std::make_unique<ichor::Ledger>(*ui);
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
-            characterScreen = std::make_unique<ichor::CharacterScreen>(*ui, options.data / "ui" / "character_screen.rml");
+            characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);

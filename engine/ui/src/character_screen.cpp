@@ -10,6 +10,25 @@ namespace ichor {
 
 namespace {
 
+constexpr const char* kCharacterDocument = R"(<rml><head><style>
+    body, div { display: block; }
+    body { width: 100%; height: 100%; }
+    #card { position: absolute; top: 12%; bottom: 12%; left: 12%; right: 12%; overflow: hidden; padding: 22px 28px 22px 28px; background-color: #14161af0; border: 3px #a08850; }
+    #close { position: absolute; top: 10px; right: 14px; width: 34px; height: 34px; font-family: Alegreya Sans; font-size: 30px; line-height: 34px; text-align: center; color: #a08850; }
+    #close:hover { color: #e8d8a8; background-color: #3a3426; }
+    #title { font-family: Cinzel; font-size: 34px; color: #e8d8a8; letter-spacing: 3px; text-align: center; padding-bottom: 12px; }
+    .heading { font-family: Cinzel; font-size: 22px; color: #a08850; letter-spacing: 2px; padding: 10px 0px 4px 0px; border-bottom: 1px #3a3426; }
+    .line { font-family: Alegreya Sans; font-size: 20px; color: #e0d8c0; padding: 3px 0px 3px 0px; word-break: break-word; }
+    .mark { padding-right: 10px; color: #8c8468; }
+    .mark.on { color: #b8d890; }
+    .value { padding-left: 12px; color: #e8d8a8; }
+    .growth { padding-left: 8px; color: #b8d890; font-size: 16px; }
+    .detail { font-size: 16px; color: #8c8468; padding-left: 24px; }
+    .empty { font-family: Alegreya Sans; font-size: 21px; color: #8c8468; text-align: center; padding: 18px 0px 18px 0px; }
+</style></head><body>
+    <div id="card"><div id="close">&#215;</div><div id="title">CHARACTER</div><div id="list"></div></div>
+</body></rml>)";
+
 std::string lineMarkup(const CharacterScreenSection& section, const CharacterScreenLine& line)
 {
     std::string markup = "<div class=\"line\">";
@@ -31,10 +50,10 @@ std::string lineMarkup(const CharacterScreenSection& section, const CharacterScr
 
 }
 
-CharacterScreen::CharacterScreen(UiContext& ui, const std::filesystem::path& document)
+CharacterScreen::CharacterScreen(UiContext& ui)
     : ui_(ui)
 {
-    document_ = ui_.loadDocument(document);
+    document_ = ui_.loadDocumentFromMemory(kCharacterDocument, "[character screen]");
     if (document_ == nullptr) {
         return;
     }

@@ -1,8 +1,0 @@
-<rml>
-<head>
-    <link type="text/rcss" href="character_screen.rcss"/>
-</head>
-<body>
-    <div id="card"><div id="close">&#215;</div><div id="title">CHARACTER</div><div id="list"></div></div>
-</body>
-</rml>

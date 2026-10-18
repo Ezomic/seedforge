@@ -3,7 +3,6 @@
 #include "ichor/ui/character_screen_model.h"
 #include "ichor/ui/ui_context.h"
 
-#include <filesystem>
 #include <optional>
 #include <string>
 #include <utility>
@@ -19,11 +18,11 @@ class ElementDocument;
 namespace ichor {
 
 // The character screen: the spine stats, capabilities, verbs and faction standing as a card over
-// the world. The document and its style are read from `document` (data/ui/character_screen.rml).
+// the world.
 // Hidden until shown. The context must have the Cinzel and Alegreya Sans faces loaded.
 class CharacterScreen {
 public:
-    CharacterScreen(UiContext& ui, const std::filesystem::path& document);
+    explicit CharacterScreen(UiContext& ui);
     ~CharacterScreen();
     CharacterScreen(const CharacterScreen&) = delete;
     CharacterScreen& operator=(const CharacterScreen&) = delete;
