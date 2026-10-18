@@ -3,7 +3,7 @@
 #
 #   bin/build [-p preset] [-c config] [-t ctest-regex] [target ...]
 #
-# Defaults: preset "windows-ci" (Ninja, so sccache works), target ichor_tests. With -t, ctest -R <regex> runs after the build.
+# Defaults: preset "windows-ci" (Ninja, so sccache works), target all (the same set CI builds, so every registered ctest has its executable). With -t, ctest -R <regex> runs after the build.
 # Config: Ninja presets are single-config; the preset's own build type is used unless -c is given. The Visual Studio preset
 # ("windows") defaults to Debug. Ninja output goes to engine/build/<preset>, the MSVC environment is imported automatically.
 # Env: ICHOR_BUILD_SLOTS (concurrent builds; else the number in $ICHOR_BUILD_QUEUE/slots.conf; else 2), ICHOR_BUILD_JOBS (compile jobs per build, default cores/slots),
@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
     *) targets+=("$1"); shift ;;
   esac
 done
-[ ${#targets[@]} -gt 0 ] || targets=(ichor_tests)
+[ ${#targets[@]} -gt 0 ] || targets=(all)
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 engine=$repo/engine
