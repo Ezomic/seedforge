@@ -98,6 +98,10 @@ is acceptable at this stage and catastrophic later, which is why the gate is her
 
 Append-only. One variable per session; never tune mid-session.
 
+Generate the rows from the recordings with `stage0_report fights.csv --table`. It reads `fights.sessions.csv` next to the
+CSV and prints one row per session: variable changed, fights, deaths by cause, mean time to kill (mean length of the fights
+the player lost) and the diagnosis. Fights 1 to 20 are not counted.
+
 | # | Date | Variable changed | Fights | Deaths by cause | Notes |
 |---|---|---|---|---|---|
 | — | — | *(none yet)* | — | — | — |
