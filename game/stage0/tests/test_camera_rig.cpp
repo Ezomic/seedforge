@@ -160,3 +160,24 @@ TEST_CASE("smoothAway moves toward the target, never past it, and settles on it"
     const glm::dvec3 negative = smoothAway({0.0, 0.0, 1.0}, target, -5.0, 8.0f);
     CHECK(negative == glm::dvec3(0.0, 0.0, 1.0));
 }
+
+TEST_CASE("hostile coordinates and tuning still give a finite pose inside the arena", "[camera]")
+{
+    const auto finitePose = [](const CameraPose& pose) {
+        return std::isfinite(pose.position.x) && std::isfinite(pose.position.y) && std::isfinite(pose.position.z)
+            && std::isfinite(pose.rotation.w) && std::isfinite(pose.rotation.x) && std::isfinite(pose.rotation.y) && std::isfinite(pose.rotation.z);
+    };
+    CameraTuning lockOn;
+    lockOn.framing = CameraFraming::LockOn;
+    CHECK(finitePose(frameCamera({1e39, 0.0, 0.0}, {1e39, 0.0, 1.0}, {0.0, 0.0, 1.0}, {})));
+    CHECK(finitePose(frameCamera({1e308, 0.0, 0.0}, {-1e308, 0.0, 0.0}, {1.0, 0.0, 0.0}, lockOn)));
+    CameraTuning wide;
+    wide.wallClearance = 11.0f;
+    CHECK(finitePose(frameCamera({0.0, 0.0, 3.0}, {0.0, 0.0, -2.0}, {0.0, 0.0, 1.0}, wide)));
+    CameraTuning nan;
+    nan.wallClearance = std::numeric_limits<float>::quiet_NaN();
+    CHECK(finitePose(frameCamera({0.0, 0.0, 3.0}, {0.0, 0.0, -2.0}, {0.0, 0.0, 1.0}, nan)));
+    const glm::dvec3 out = smoothAway({0.0, 0.0, 1.0}, {1.0, 0.0, 0.0}, 1e308, std::numeric_limits<float>::quiet_NaN());
+    CHECK(std::isfinite(out.x));
+    CHECK(std::isfinite(out.z));
+}

@@ -31,17 +31,22 @@ glm::dvec3 smoothAway(glm::dvec3 current, glm::dvec3 target, double dt, float ra
         return target;
     }
     const double step = std::max(dt, 0.0) * std::max(rate, 0.0f);
-    const double blend = step / (1.0 + step);
+    const double blend = std::isfinite(step) ? step / (1.0 + step) : 1.0;
     const glm::dvec3 mixed = current * (1.0 - blend) + target * blend;
     return mixed;
 }
 
 CameraPose frameCamera(glm::dvec3 player, glm::dvec3 foe, glm::dvec3 away, const CameraTuning& tuning)
 {
-    if (!finite(player) || !finite(foe) || !finite(away) || !std::isfinite(tuning.distance) || !std::isfinite(tuning.height)) {
+    if (!finite(player) || !finite(foe) || !finite(away) || !std::isfinite(tuning.distance) || !std::isfinite(tuning.height)
+        || !std::isfinite(tuning.wallClearance) || !std::isfinite(tuning.minBoom)) {
         return {};
     }
-    const double limit = static_cast<double>(kArenaHalf) - tuning.wallClearance;
+    // Nothing legitimate is outside the arena; this keeps every product below far from overflow.
+    constexpr double kReach = 1000.0;
+    player = glm::clamp(player, glm::dvec3(-kReach), glm::dvec3(kReach));
+    foe = glm::clamp(foe, glm::dvec3(-kReach), glm::dvec3(kReach));
+    const double limit = std::max(0.0, static_cast<double>(kArenaHalf) - std::max(0.0, static_cast<double>(tuning.wallClearance)));
     const bool lockOn = tuning.framing == CameraFraming::LockOn;
     const double separation = glm::length(glm::dvec3(foe.x - player.x, 0.0, foe.z - player.z));
     const double boom = std::max(0.0, static_cast<double>(tuning.distance)) + (lockOn ? 0.15 * separation : 0.0);
