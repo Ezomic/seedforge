@@ -28,8 +28,6 @@ struct Fixture {
     }
 };
 
-const std::filesystem::path kDocument = std::filesystem::path(ICHOR_REPO_DATA) / "ui" / "map_screen.rml";
-
 MapScreenView sampleView()
 {
     MapScreenView view;
@@ -61,7 +59,7 @@ MapScreenView sampleView()
 TEST_CASE("the map binding shows the model's marks, player and waypoint")
 {
     Fixture f;
-    MapScreenBinding binding(f.ui, kDocument);
+    MapScreenBinding binding(f.ui);
     REQUIRE(binding.ok());
     binding.setVisible(true);
     const std::size_t empty = f.drawCount();
@@ -78,7 +76,7 @@ TEST_CASE("the map binding shows the model's marks, player and waypoint")
 TEST_CASE("an invalid or empty map view clears the binding")
 {
     Fixture f;
-    MapScreenBinding binding(f.ui, kDocument);
+    MapScreenBinding binding(f.ui);
     REQUIRE(binding.ok());
     binding.bind(sampleView());
     binding.bind(MapScreenView{});
@@ -87,14 +85,10 @@ TEST_CASE("an invalid or empty map view clears the binding")
     CHECK(binding.textOf("waypoint") == "None.");
 }
 
-TEST_CASE("the map binding draws nothing while hidden and fails on a missing document")
+TEST_CASE("the map binding draws nothing while hidden")
 {
     Fixture f;
-    MapScreenBinding binding(f.ui, kDocument);
+    MapScreenBinding binding(f.ui);
     binding.bind(sampleView());
     CHECK(f.drawCount() == 0);
-    MapScreenBinding missing(f.ui, kDocument.parent_path() / "nope.rml");
-    CHECK_FALSE(missing.ok());
-    missing.bind(sampleView());
-    missing.setVisible(true);
 }

@@ -628,7 +628,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
-            mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui, options.data / "ui" / "map_screen.rml");
+            mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
