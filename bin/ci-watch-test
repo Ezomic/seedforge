@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Logic test for bin/ci-watch against a mocked gh and a throwaway git origin. Run: bin/ci-watch-test
+set -u
+here=$(cd "$(dirname "$0")" && pwd)
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+mock=$tmp/mock; mkdir "$mock"
+
+cat > "$tmp/gh" <<'GHEOF'
+#!/usr/bin/env bash
+# args: run list ... --commit SHA ...   |   run view ID --json jobs ...   |   run view ID --log-failed
+if [ "$1 $2" = "run list" ]; then
+  while [ $# -gt 0 ]; do [ "$1" = --commit ] && sha=$2; shift; done
+  f=$MOCK/list.$sha; [ -f "$f" ] || exit 0
+  n=$(cat "$MOCK/n.$sha" 2>/dev/null || echo 0); echo $((n + 1)) > "$MOCK/n.$sha"
+  total=$(wc -l < "$f"); [ "$n" -ge "$total" ] && n=$((total - 1))
+  sed -n "$((n + 1))p" "$f"
+elif [ "$1 $2" = "run view" ]; then
+  case "$*" in *--log-failed*) cat "$MOCK/log.$3" 2>/dev/null ;; *) cat "$MOCK/jobs.$3" ;; esac
+fi
+GHEOF
+chmod +x "$tmp/gh"
+printf '#!/bin/sh\nexit 0\n' > "$tmp/nosleep"; chmod +x "$tmp/nosleep"
+
+git init -q --bare "$tmp/origin.git"
+git clone -q "$tmp/origin.git" "$tmp/work" 2>/dev/null
+cd "$tmp/work" || exit 1
+git config user.email t@t; git config user.name t
+git checkout -q -b main
+git commit -q --allow-empty -m one; c1=$(git rev-parse HEAD)
+git commit -q --allow-empty -m two; c2=$(git rev-parse HEAD)
+git push -q origin main 2>/dev/null
+
+export MOCK=$mock GH=$tmp/gh CI_WATCH_SLEEP=$tmp/nosleep
+fail=0
+T=$'\t'
+jobs_ok() { printf '1\tsuccess\twindows runtime + tests\n2\tsuccess\tlinux headless + sanitizers\n' > "$mock/jobs.$1"; }
+check() { # name expected-rc output-regex ; rest: ci-watch args
+  local name=$1 want=$2 re=$3; shift 3
+  local out; out=$("$here/ci-watch" "$@" 2>&1); local rc=$?
+  if [ "$rc" = "$want" ] && echo "$out" | grep -qE "$re"; then echo "ok   $name"; else echo "FAIL $name (rc=$rc want $want)"; echo "$out" | sed 's/^/     /'; fail=1; fi
+}
+reset() { rm -f "$mock"/*; }
+
+reset; jobs_ok 10
+printf '10\tin_progress\t\n10\tin_progress\t\n10\tcompleted\tsuccess\n' > "$mock/list.$c2"
+check "waits then passes" 0 "PASS  windows.*" -i 0 "$c2"
+
+reset
+printf '11\tcompleted\tfailure\n' > "$mock/list.$c2"
+printf '1\tsuccess\twindows runtime + tests\n2\tfailure\tlinux headless + sanitizers\n' > "$mock/jobs.11"
+printf 'linux headless + sanitizers\tTest\t2026-10-17T19:36:34.3981665Z 1678/2697 Test #1680: persistent entities are preferred over fresh ones ....***Failed    0.17 sec\nwindows runtime + tests\tTest\t2026-10-17T19:36:34.3981665Z noise ***Failed other\n' > "$mock/log.11"
+check "failure names the test, only under its job" 1 "FAIL  linux.*" -i 0 "$c2"
+out=$("$here/ci-watch" -i 0 "$c2" 2>&1)
+echo "$out" | grep -q "persistent entities are preferred over fresh ones" && ! echo "$out" | grep -q "noise" && echo "ok   failure detail is per job" || { echo "FAIL failure detail is per job"; echo "$out"; fail=1; }
+
+reset; jobs_ok 13
+printf '12\tcompleted\tcancelled\n' > "$mock/list.$c1"
+printf '13\tin_progress\t\n13\tcompleted\tsuccess\n' > "$mock/list.$c2"
+check "cancelled run follows the newer head" 0 "following newer head" -i 0 "$c1"
+
+reset
+printf '14\tcompleted\tcancelled\n' > "$mock/list.$c2"
+check "cancelled with no newer head" 4 "cancelled" -i 0 "$c2"
+
+reset
+check "no run within grace" 3 "no engine run" -i 0 -g 0 "$c2"
+
+reset
+printf '15\tin_progress\t\n' > "$mock/list.$c2"
+check "timeout" 5 "timed out" -i 0 -t 0 "$c2"
+
+check "bad sha" 2 "cannot resolve" -i 0 deadbeefnotasha
+check "bad number" 2 "whole seconds" -t abc "$c2"
+
+exit $fail
