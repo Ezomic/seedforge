@@ -25,10 +25,12 @@ struct InputFrame {
         Menu = 1u << 10,
         Map = 1u << 11,
         Notes = 1u << 12,
+        LockOn = 1u << 13, // toggles the lock-on camera and auto-facing; acts on the press
     };
     std::uint32_t buttons = 0;
     float moveX = 0.0f; // right positive
     float moveY = 0.0f; // forward positive
+    float lookX = 0.0f; // turn rate as a fraction of the game's look speed, right positive; readers must sanitise it
 
     bool operator==(const InputFrame&) const = default;
 };
@@ -37,12 +39,14 @@ template <>
 struct Reflect<InputFrame> {
     static constexpr auto fields()
     {
-        return std::make_tuple(field("buttons", &InputFrame::buttons), field("moveX", &InputFrame::moveX), field("moveY", &InputFrame::moveY));
+        return std::make_tuple(field("buttons", &InputFrame::buttons), field("moveX", &InputFrame::moveX), field("moveY", &InputFrame::moveY), field("lookX", &InputFrame::lookX));
     }
 };
 
 struct InputStream {
     std::vector<InputFrame> frames;
+    // Set by load() for a version 1 file, which predates look input and the camera-relative controls.
+    bool legacyControls = false;
 
     bool save(const std::filesystem::path& path) const;
     bool load(const std::filesystem::path& path);

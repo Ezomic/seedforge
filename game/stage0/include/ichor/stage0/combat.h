@@ -5,6 +5,7 @@
 #include "ichor/sim/physics.h"
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/anchor.h"
+#include "ichor/stage0/camera_view.h"
 #include "ichor/stage0/artillery.h"
 #include "ichor/stage0/recorder.h"
 #include "ichor/stage0/status_effect.h"
@@ -182,6 +183,15 @@ public:
     StableId playerId() const { return player_; }
     StableId foeId() const { return foe_; }
 
+    // Controls. The default is free look: the stick moves relative to the view, the look axis turns the player, and
+    // the camera follows the player's facing. Lock-on (toggled by InputFrame::LockOn) turns the player toward the foe
+    // as before. Legacy controls (world-axis stick, always facing the foe) exist so a version 1 replay reproduces its
+    // hash. None of these flags are hashed, so a replay must start with the same ones.
+    void setLockOn(bool lockOn) { lockOn_ = lockOn; }
+    void setLegacyControls(bool legacy) { legacyControls_ = legacy; }
+    bool lockedOn() const { return lockOn_ || legacyControls_; }
+    bool legacyControls() const { return legacyControls_; }
+
     // Shared by both systems.
     bool tryAttack(Scene& scene, entt::entity who, AttackKind kind);
     bool tryDodge(Scene& scene, entt::entity who, glm::vec3 direction);
@@ -206,6 +216,7 @@ private:
         bool onScreen;
     };
     bool attackerInView(const Scene& scene, glm::dvec3 attackerAt) const;
+    CameraPose viewPose(const Scene& scene, entt::entity player, entt::entity foe) const;
     void attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits);
     void tickCombatant(Scene& scene, entt::entity entity, entt::entity opponent, float fdt, std::vector<PendingHit>& hits);
 
@@ -219,6 +230,10 @@ private:
     glm::dvec3 foeSpawn_{0.0};
     // Telemetry only, fed by the input stream, so a replay rebuilds it.
     float sinceInput_ = 0.0f;
+    bool lockOn_ = false;
+    bool legacyControls_ = false;
+    bool lockHeld_ = false; // edge detection for the lock-on button
+    float look_ = 0.0f;     // this tick's sanitised look axis
 };
 
 glm::vec3 forwardFromYaw(float yaw);

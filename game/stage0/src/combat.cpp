@@ -6,6 +6,7 @@
 #include "ichor/core/dmath.h"
 #include "ichor/core/log.h"
 #include "ichor/stage0/camera_view.h"
+#include "ichor/stage0/free_look.h"
 #include "ichor/stage0/telegraph_geometry.h"
 
 #include <glm/geometric.hpp>
@@ -23,13 +24,6 @@ constexpr float kPi = 3.14159265358979323846f;
 bool elapsed(float stateTime, float duration, float dt)
 {
     return stateTime + 0.5f * dt >= duration;
-}
-
-float wrapAngle(float a)
-{
-    while (a > kPi) a -= 2.0f * kPi;
-    while (a < -kPi) a += 2.0f * kPi;
-    return a;
 }
 
 }
@@ -339,9 +333,17 @@ bool Stage0::attackerInView(const Scene& scene, glm::dvec3 attackerAt) const
     if (player == entt::null || foe == entt::null) {
         return true;
     }
+    return inFrustum(viewPose(scene, player, foe), attackerAt, tuning_.bodyRadius);
+}
+
+CameraPose Stage0::viewPose(const Scene& scene, entt::entity player, entt::entity foe) const
+{
     const auto& registry = scene.registry();
-    const CameraPose pose = followCamera(registry.get<Transform>(player).position, registry.get<Transform>(foe).position);
-    return inFrustum(pose, attackerAt, tuning_.bodyRadius);
+    const glm::dvec3 at = registry.get<Transform>(player).position;
+    if (lockedOn()) {
+        return followCamera(at, registry.get<Transform>(foe).position);
+    }
+    return freeLookCamera(at, registry.get<Combatant>(player).yaw);
 }
 
 void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits)
@@ -385,7 +387,12 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
     recorder_.setClock(scene.time());
 
     const bool steering = std::isfinite(input.moveX) && std::isfinite(input.moveY) && (std::abs(input.moveX) > 0.1f || std::abs(input.moveY) > 0.1f);
-    sinceInput_ = input.buttons != 0 || steering ? 0.0f : sinceInput_ + fdt;
+    look_ = sanitisedLook(input.lookX);
+    sinceInput_ = input.buttons != 0 || steering || look_ != 0.0f ? 0.0f : sinceInput_ + fdt;
+
+    const bool lockPress = (input.buttons & InputFrame::LockOn) != 0;
+    if (lockPress && !lockHeld_ && !legacyControls_) lockOn_ = !lockOn_;
+    lockHeld_ = lockPress;
 
     // Retry lives in the input stream, so a recorded session replays its restarts too.
     {
@@ -406,6 +413,14 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
             // Replay files are data: the stick is sanitised here as applyInput does.
             glm::vec3 stick(std::isfinite(input.moveX) ? input.moveX : 0.0f, 0.0f, std::isfinite(input.moveY) ? -input.moveY : 0.0f);
             if (glm::dot(stick, stick) > 1.0f) stick = glm::normalize(stick);
+            if (!legacyControls_) {
+                const glm::dvec3 toFoe = scene.registry().get<Transform>(foeEntity).position - scene.registry().get<Transform>(playerEntity).position;
+                const float yawToFoe = yawTowards(glm::dvec3(0.0), toFoe);
+                const float yaw = viewYaw(lockOn_, c.yaw, yawToFoe);
+                stick = cameraRelativeIntent(stick, yaw);
+                auto& body = scene.registry().get<CharacterBody>(playerEntity);
+                body.intent = cameraRelativeIntent(body.intent, yaw);
+            }
             c.blocking = (input.buttons & InputFrame::Block) != 0;
             if ((input.buttons & InputFrame::Attack) != 0) tryAttack(scene, playerEntity, AttackKind::Light);
             else if ((input.buttons & InputFrame::Heavy) != 0) tryAttack(scene, playerEntity, AttackKind::Heavy);
@@ -456,8 +471,12 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
 
         // Face the opponent, as fast as the state allows. This clamp replaces i-frames.
         const float wanted = yawTowards(transform.position, registry.get<Transform>(opponent).position);
-        const float maxStep = allowedTurnRate(c) * (kPi / 180.0f) * fdt;
-        c.yaw = wrapAngle(c.yaw + std::clamp(wrapAngle(wanted - c.yaw), -maxStep, maxStep));
+        if (c.side == 0 && !legacyControls_) {
+            c.yaw = nextPlayerYaw({c.yaw, lockOn_, look_, wanted, allowedTurnRate(c), fdt});
+        } else {
+            const float maxStep = allowedTurnRate(c) * (kPi / 180.0f) * fdt;
+            c.yaw = wrapAngle(c.yaw + std::clamp(wrapAngle(wanted - c.yaw), -maxStep, maxStep));
+        }
 
         const bool heavy = c.attack == static_cast<std::uint8_t>(AttackKind::Heavy);
         switch (c.combatState()) {
@@ -511,7 +530,7 @@ void Stage0::debugLines(const Scene& scene, std::vector<LineSegment>& out) const
     const entt::entity playerEntity = scene.find(player_);
     const entt::entity foeAtStart = scene.find(foe_);
     const bool haveCamera = playerEntity != entt::null && foeAtStart != entt::null;
-    const CameraPose camera = haveCamera ? followCamera(scene.registry().get<Transform>(playerEntity).position, scene.registry().get<Transform>(foeAtStart).position) : CameraPose{};
+    const CameraPose camera = haveCamera ? viewPose(scene, playerEntity, foeAtStart) : CameraPose{};
     const CameraPose* foeCamera = haveCamera ? &camera : nullptr;
     for (auto [entity, transform, c] : scene.registry().view<const Transform, const Combatant>().each()) {
         const glm::dvec3 base = transform.position + glm::dvec3(0.0, 0.9, 0.0);

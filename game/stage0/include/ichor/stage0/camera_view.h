@@ -25,6 +25,13 @@ struct CameraPose {
 // The default-tuned follow pose. The telemetry always uses it, even when --lock-on changes what is rendered.
 CameraPose followCamera(glm::dvec3 player, glm::dvec3 foe);
 
+// The pose of the free-look camera for a player at `player` facing `yaw`: behind the player's facing, aimed ahead of it.
+// Pure, so the killing-blow telemetry and the render agree on it.
+CameraPose freeLookCamera(glm::dvec3 player, float yaw);
+
+// The point a free-look camera aims past: a fixed distance ahead of the player along `yaw`. A non-finite yaw gives -Z.
+glm::dvec3 lookFocus(glm::dvec3 player, float yaw);
+
 // Whether a sphere of the given radius touches the view frustum. A non-finite input is off screen.
 bool inFrustum(const CameraPose& pose, glm::dvec3 centre, float radius);
 

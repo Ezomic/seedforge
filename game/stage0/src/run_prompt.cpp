@@ -20,7 +20,7 @@ const char* plainCause(DeathCause cause)
 
 const char* controlsHint()
 {
-    return "Move WASD  J light  K heavy  L block  Space dodge  Enter retry  Esc quit";
+    return "Move WASD  Look mouse or arrows  E lock-on  J light  K heavy  L block  Space dodge  Enter retry  Esc quit";
 }
 
 std::vector<std::string> promptLines(const PromptInput& input)

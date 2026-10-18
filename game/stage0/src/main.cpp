@@ -125,13 +125,21 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     if (!options.replay.empty()) {
         ichor::InputStream stream;
         if (!stream.load(options.replay)) return 1;
+        if (stream.legacyControls && !options.record.empty()) {
+            ichor::log(ichor::LogLevel::Error, "a version 1 replay cannot be re-recorded: the new file would lose its legacy controls");
+            return 1;
+        }
+        stage.setLegacyControls(stream.legacyControls);
         engine.replayInputs(std::move(stream));
     }
     engine.recordInputs(!options.record.empty());
+    stage.setLockOn(options.lockOn);
+    platform.enableLook(options.replay.empty());
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::stage0::CameraTuning cameraTuning;
-    if (options.lockOn) cameraTuning.framing = ichor::stage0::CameraFraming::LockOn;
+    const ichor::stage0::CameraFraming lockedFraming = options.lockOn ? ichor::stage0::CameraFraming::LockOn : ichor::stage0::CameraFraming::Follow;
+    cameraTuning.framing = lockedFraming;
     ichor::stage0::CameraRig cameraRig(cameraTuning);
     double cameraClock = platform.now();
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
@@ -148,7 +156,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             const glm::dvec3 p = blend(scene.registry().get<ichor::PreviousTransform>(player), scene.registry().get<ichor::Transform>(player));
             const glm::dvec3 f = blend(scene.registry().get<ichor::PreviousTransform>(foe), scene.registry().get<ichor::Transform>(foe));
             const double renderNow = platform.now();
-            const ichor::stage0::CameraPose pose = cameraRig.update(p, f, renderNow - cameraClock);
+            const double frameSeconds = renderNow - cameraClock;
+            cameraRig.setFraming(stage.lockedOn() ? lockedFraming : ichor::stage0::CameraFraming::Follow);
+            const ichor::stage0::CameraPose pose = stage.lockedOn() ? cameraRig.update(p, f, frameSeconds)
+                : cameraRig.updateFree(p, scene.registry().get<ichor::stage0::Combatant>(player).yaw, frameSeconds);
             cameraClock = renderNow;
             view.camera.position = pose.position;
             view.camera.rotation = pose.rotation;
