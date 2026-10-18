@@ -19,6 +19,7 @@ using Json = nlohmann::json;
 constexpr std::uintmax_t kMaxFileBytes = 4 * 1024 * 1024;
 constexpr std::size_t kMaxText = 400;
 constexpr std::size_t kMaxId = 64;
+constexpr std::size_t kMaxProblems = 100;
 constexpr std::size_t kMaxConditionPart = 64;
 constexpr std::string_view kEmDash = "\xE2\x80\x94";
 
@@ -173,7 +174,7 @@ std::optional<DialoguePool> DialoguePool::load(const std::filesystem::path& file
     const std::size_t before = problems.size();
     std::vector<DialogueLine> lines;
     std::set<std::string> seenIds;
-    for (std::size_t i = 0; i < json.size(); ++i) {
+    for (std::size_t i = 0; i < json.size() && problems.size() - before < kMaxProblems; ++i) {
         const std::string base = "[" + std::to_string(i) + "]";
         const Json& item = json[i];
         if (!item.is_object()) {
