@@ -1,6 +1,7 @@
 # viewer
 
-Local web map viewer (Node). Built as soon as there is anything to look at.
+Placeholder. The map viewer is built and lives in `forge-cli/viewer/` (static, offline HTML/JS, see
+`forge-cli/README.md`); this folder is kept because doc 17 lists it and holds nothing else.
 
-Doc 17 puts this third in the order of work, ahead of most of the generator, because a
-generator you cannot see the output of is a generator you cannot tune.
+Doc 17 put the viewer early in the order of work because a generator you cannot see the output of
+is a generator you cannot tune.

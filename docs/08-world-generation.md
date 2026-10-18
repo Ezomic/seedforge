@@ -40,7 +40,19 @@ correct — a seed is a campaign, not a level.
 | 11 | **Binding** | Item distribution, NPC cast, quest tensions, manifest |
 | 12 | **Bake** | Terrain tiles, scatter inputs, navmesh, streaming cells, impostors |
 
-**Only Phase 12 needs the engine.** Phases 0–11 are a standalone library, see [17](17-tech-stack.md).
+**Only Phase 12 needs the engine.** Phases 1–11 are the standalone header-only library `libworldforge`, see [17](17-tech-stack.md).
+Phase 0 (axioms) is not a libworldforge phase yet: `forge-cli` stands in with a default config until the
+axiom-resolved `WorldConfig` exists.
+
+**Where each phase stands today:**
+
+- **1–11** exist in `libworldforge/include/worldforge/`, one header per phase, and run through
+  `forge-cli` (PNGs plus a manifest with per-layer hashes).
+- **The engine does not use them yet.** `engine/world/forge.h` still draws a stand-in terrain
+  (seeded value noise with a coastline, standing in for phases 1 to 3), and the engine's
+  `forgeWorld` feeds that to the validation gate. Replacing the stand-in with the real phases is
+  open work (SEED-449).
+- **12** is the engine side of the pipeline and is partly built, see [Phase notes](#phase-notes).
 
 ### Phase notes
 
@@ -93,8 +105,15 @@ dungeon archetypes; place landmark silhouettes.
 **11 — Binding.** Distribute the item catalogue, generate the named NPC cast, seed initial
 quest tensions, forge dungeon layouts, write the manifest.
 
-**12 — Bake.** Heightmap and weightmaps into the engine's terrain tiles, biome scatter
-inputs, a Recast navmesh per cell, the streaming cell manifest, impostors.
+**12 — Bake.** The engine bake. Heightmap and weightmaps into the engine's terrain tiles, biome
+scatter inputs, a Recast navmesh per cell, the streaming cell manifest, impostors. It lives in
+`engine/world/` and writes the engine's own formats.
+
+Built today: the 16-bit heightfield cut into streaming cells with terrain LODs, a Recast/Detour
+navmesh per cell, vegetation scatter, water meshes and the cell streamer, all running on the
+stand-in terrain described above. Not built: impostors, and weightmaps derived from the real biome
+map (the engine blends three procedural splat layers: grass, rock, snow). Whether the bake reads
+libworldforge layers in memory or through files on disk is undecided.
 
 ---
 
@@ -104,7 +123,7 @@ inputs, a Recast navmesh per cell, the streaming cell manifest, impostors.
 |---|---|
 | Elevation, erosion, hydrology | **4096² at 1 m** (64 MB per float field — trivial offline) |
 | Plates, climate | **256²**, upsampled — low-frequency by nature, saves enormous time |
-| Terrain target | 4096 × 4096 at 1 m scale ≈ 4 km, tiled for streaming |
+| Terrain target | 4096 × 4096 at 1 m scale ≈ 4 km, tiled for streaming. The engine's stand-in terrain is 4096 m at 4 m per sample in 512 m cells; the 1 m target is not reached yet |
 
 If over performance budget, drop erosion to 2048² and upsample before Phase 3 — flow
 accumulation cares about large-scale structure, and fine detail returns from materials and
@@ -151,8 +170,8 @@ lootSeed    = splitmix64(dungeonSeed ^ hash(chestId))
 
 The gotchas that actually cost days:
 
-1. **Never iterate an unordered container during generation.** `HashMap` / `TSet` /
-   `unordered_map` iteration order is not guaranteed and *will* differ between runs or
+1. **Never iterate an unordered container during generation.** `std::unordered_map` /
+   `std::unordered_set` iteration order is not guaranteed and *will* differ between runs or
    builds. **Sort keys before looping.** This is the number-one source of "the same seed
    made a different world."
 2. **Parallelism must be order-independent.** Each cell computes from its own derived seed

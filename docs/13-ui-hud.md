@@ -116,6 +116,6 @@ Also:
 
 ## Implementation
 
-UMG is fine. Keep the HUD data-driven so the Law swap is configuration rather than six
-implementations. The usual performance trap is complex widgets ticking every frame — bind to
-events, invalidate deliberately, and check it early rather than at the end.
+The game UI is RmlUi ([17](17-tech-stack.md#the-stack)); Dear ImGui is for tools only. Keep the HUD data-driven so the Law swap is configuration rather than six
+implementations. The usual performance trap is complex documents updating every frame: bind to
+events, mark dirty deliberately, and check it early rather than at the end.

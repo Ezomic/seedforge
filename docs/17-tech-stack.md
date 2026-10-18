@@ -12,7 +12,9 @@
 > - into a **CLI tool** for iteration, testing, and batch runs
 > - into the **engine** for the shipped forge step
 
-Same code, two hosts. Two-second compile cycles and image-diffable output while designing
+Same code, two hosts. Today only the first host is wired up: `forge-cli` and the engine's tests
+include `libworldforge`, but the engine's own forge still draws a stand-in terrain
+(`engine/world/forge.h`) until SEED-449 swaps in the real phases. Two-second compile cycles and image-diffable output while designing
 world generation, and a single implementation at ship time. This rule predates the engine
 decision and survives it untouched, which is the best argument for it.
 
@@ -48,28 +50,25 @@ visible, not hidden in optimism.
 seedforge/
   docs/                 this design document
   engine/               the engine. C++20, CMake, vcpkg
-    core/               math, memory, jobs, log, reflection, serialisation, rng
-    platform/           window, input, timing, filesystem (SDL3)
-    gfx/                Vulkan renderer, shaders, materials, terrain, sky
-    sim/                ECS, fixed-step scheduler, physics (Jolt), navigation, streaming
-    anim/               skeletal animation (ozz), montages, root motion
-    audio/              mixer, spatialisation, reverb stamps (miniaudio)
-    script/             Lua host (sol2), bindings
-    ui/                 Dear ImGui for tools, in-game UI
-    assets/             cooker, cooked formats, hot reload
-    editor/             tooling app, built on ImGui. Late
-    tests/              unit, headless, golden image, replay, benchmarks, fuzz
-  libworldforge/        pure C++, no engine. Phases 0–11, header-only
+    core/ platform/ gfx/ sim/ anim/ audio/ script/ assets/ ui/ editor/ tools/
+                        the E1 to E7 subsystems: math, rng and logging; SDL3 window and input;
+                        the Vulkan renderer; ECS, Jolt and fixed-step scheduler; ozz animation;
+                        miniaudio; Lua host; cooker; RmlUi screens and ImGui tools; the editor
+    world/              forge validation, the engine bake (phase 12), streaming, navmesh, weather
+    data/ save/ ledger/ factions/ npc/ economy/ progression/ traversal/ loop/ net/ ...
+                        the game rule modules, one per system (C++ with tests, per rule 10 below)
+    tests/              unit, headless, golden image, replay, fuzz (benchmarks are not set up)
+  libworldforge/        pure C++, no engine. Phases 1–11, header-only
     include/worldforge/ one header per phase (tectonics … poi, subseed)
-    CMakeLists.txt      INTERFACE library `worldforge`; tests live in engine/tests
+    CMakeLists.txt      INTERFACE library `worldforge`; no src/ or tests/ here, tests live in engine/tests
   forge-cli/            CLI wrapper → PNGs, manifest, batch runs
+    viewer/             the map viewer: static offline HTML/JS, no Node needed
   data/                 SHARED source of truth (JSON)
-    axioms/  synergies/  catalogue/  kits/  grammars/
-  viewer/               local web map viewer (Node)
-  game/                 Ichor itself: gameplay, quests, ledger, AI, UI screens
+    axioms/  synergies/  catalogue/  kits/  grammars/  ... (one folder per feature)
+  viewer/               placeholder README only; the working viewer is forge-cli/viewer/
+  game/                 Ichor itself
     stage0/             the doc 18 combat experiment, first code on the engine
-    content/            cooked assets, kits, Lua
-  tools/                data validation, asset cooking scripts
+  tools/                check_deps.py, check_content_layout.py (both run in ctest)
   art/                  Blender sources, generated textures and audio
   tracker/              the backlog, as JSON
 ```
@@ -108,10 +107,13 @@ Tuesday.
 | Navigation | **Recast / Detour** | Navmesh per streaming cell, stitched at borders |
 | UI | **Dear ImGui** (tools), **RmlUi** (game) | Tools first; the game UI is minimal by design |
 | Scripting | **Lua** via **sol2** | Quests, dialogue and encounter scripts live in data |
-| Data in | **nlohmann-json** | `data/` is JSON; the cooker, the generator and the data loaders parse it |
+| Data in | **nlohmann-json** | `data/` is JSON; the generator tools and the data loaders parse it |
 | Serialisation | own reflection + binary writer | The ledger is a few hundred thousand small facts; see [14](14-save-system.md) |
 | Profiling | **Tracy**, **RenderDoc** | |
 | Tests | **Catch2**, **Google Benchmark**, **libFuzzer** | |
+
+Not wired up yet: Google Benchmark (it is not in the vcpkg manifest, so the Performance row below
+has no runner), and the fuzz targets are `ichor_forge_fuzz` and friends rather than a nightly job.
 
 Not chosen, on purpose: Wwise and FMOD (licence tier, integration time, miniaudio is enough
 until the music system proves otherwise), flecs (EnTT is simpler and the ECS is not where
@@ -151,12 +153,14 @@ Unchanged; see [08](08-world-generation.md#prototype-first).
 Lua for composition: dialogue, quest steps, encounter dressing, tuning tables that change
 fifty times a day.
 
-**Data:** author in **JSON**. The cooker turns it into the engine's binary formats at build
-time, so the runtime never parses JSON. The generator reads the same JSON directly.
+**Data:** author in **JSON**. The engine loads `data/` directly today (`DataSet::loadDirectory`),
+and so does the generator. The cooker handles glTF and audio only. Cooking the JSON into a binary
+format so the runtime never parses it is a goal, not built, and undecided until load time shows a
+cost.
 
 ## Version control
 
-**Git + LFS.** Everything except `game/content/` and `art/` is pure text. Perforce only if
+**Git + LFS.** Everything except cooked content and `art/` is pure text. Perforce only if
 LFS operations start costing minutes; do not pre-empt it solo.
 
 Ignore from day one: `build/`, `.cache/`, `*.cooked`, cooked content directories, and any
@@ -205,9 +209,11 @@ dependency is not necessarily wrong; one that arrived without anyone recording w
 
 ## The map viewer
 
-Unchanged: the CLI emits a manifest plus phase PNGs, and a small **local web viewer**
-renders them with toggleable overlays. Node 22 is installed. Building it in a browser keeps
-it fast to change, and it stays useful after the engine has its own editor.
+The CLI emits a manifest plus phase PNGs, and a small **local web viewer** renders them with
+toggleable overlays. It is built: `forge-cli/viewer/` is a static, offline page (open
+`index.html`, no server, no Node needed to use it; `check.js` is a Node smoke test). The top-level
+`viewer/` folder is a placeholder that points there. Building it in a browser keeps it fast to
+change, and it stays useful after the engine has its own editor.
 
 ## Order of work
 
@@ -228,14 +234,15 @@ Status: E1 through E6 are merged apart from the pieces listed here, and E7 is mo
 The Stage 0 gate has not been run by a human yet. Still open:
 
 - E6: RmlUi screens in the window (no font chosen, so no text), and the doc 18 500 m slice itself.
+- E5: the terrain is still the stand-in noise (see the layout note above); impostors are not built.
 - E7: volumetric fog, vegetation impostors, and editor tools for kits and dungeons.
 - The window paths (`--editor`, time of day and weather in the app, the UI renderer) are covered by offscreen golden images and headless tests but have never been run in a real window.
 
-In parallel, engine-independent and startable today:
-
-1. **NumPy generator, phases 1–6**, with PNG output
-2. **The web viewer**, as soon as there is anything to look at
-3. **Phases 7–11**, then the C++ port, then the batch harness
+Engine-independent work that already landed: libworldforge phases 1 to 11 in C++ (the NumPy
+prototype step was skipped for them), the web viewer, and the batch seed harness
+(`ichor_forge_cli --validate`, plus `engine/tools/seed_harness`). Still open on that side: phase 0
+(axioms into a `WorldConfig`) and wiring the real phases into the engine's forge (SEED-449), then the
+phase 12 bake in doc 08.
 
 E1 through E4 is a general 3D engine. E5 through E7 is where the open-world cost lives and
 each is a multi-month effort for one person. The Stage 0 gate sits at the end of E4
