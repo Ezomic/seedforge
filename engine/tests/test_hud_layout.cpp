@@ -1,3 +1,4 @@
+#include "test_temp.h"
 #include "ichor/ui/hud.h"
 #include "ichor/ui/hud_layout.h"
 #include "ichor/ui/recording_renderer.h"
@@ -113,7 +114,7 @@ TEST_CASE("a huge list is refused and the report stays short")
 
 TEST_CASE("a missing layout file falls back to the default; a bad one reports why")
 {
-    const std::filesystem::path dir = std::filesystem::path(ICHOR_TEST_OUTPUT) / "hud_layout_file_test";
+    const std::filesystem::path dir = ichor::test::outputPath(ICHOR_TEST_OUTPUT, "hud_layout_file_test");
     std::filesystem::create_directories(dir);
 
     const HudLayoutResult missing = loadHudLayout(dir / "absent.json");

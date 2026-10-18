@@ -19,6 +19,9 @@ struct ForgeRequest {
     WorldDesc desc;
     HydrologyParams rivers;
     bool carveRivers = false;
+    // Take the land from libworldforge (forged_heightfield.h) instead of the value-noise stand-in. Off by
+    // default, so the stand-in and every golden made from it stay as they are.
+    bool forgedTerrain = false;
 };
 
 struct ForgedWorld {

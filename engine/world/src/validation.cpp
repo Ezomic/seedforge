@@ -3,9 +3,11 @@
 #include "ichor/core/binary.h"
 #include "ichor/core/hash.h"
 #include "ichor/world/forge.h"
+#include "ichor/world/forged_heightfield.h"
 
 #include <algorithm>
 #include <exception>
+#include <stdexcept>
 #include <format>
 #include <string_view>
 #include <utility>
@@ -17,6 +19,15 @@ namespace {
 constexpr std::uint64_t kMinLandPerMille = 20;
 constexpr std::uint16_t kMinSampleRange = 256;
 constexpr std::uint32_t kRerollCeiling = 64;
+
+Heightfield forgedTerrainOrThrow(const WorldDesc& desc)
+{
+    ForgedHeightfield forged = forgeHeightfieldFromWorldforge(desc);
+    if (!forged.ok()) {
+        throw std::runtime_error(std::format("forged terrain: {}", forged.error));
+    }
+    return std::move(forged.field);
+}
 
 std::uint64_t hydrologyDigest(const Hydrology& h)
 {
@@ -113,7 +124,8 @@ PhasePipeline forgePipeline(const ForgeRequest& request)
 {
     return PhasePipeline({
         makePhase<Heightfield>(
-            kPhaseTerrain, [request](const PhaseView&) { return forgeHeightfield(request.desc); }, heightfieldDigest),
+            kPhaseTerrain, [request](const PhaseView&) { return request.forgedTerrain ? forgedTerrainOrThrow(request.desc) : forgeHeightfield(request.desc); },
+            heightfieldDigest),
         makePhase<Heightfield>(
             kPhaseRivers,
             [request](const PhaseView& earlier) {

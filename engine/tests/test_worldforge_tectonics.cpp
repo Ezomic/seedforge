@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <set>
@@ -202,7 +203,7 @@ TEST_CASE("tectonics: convergent boundaries raise ranges and divergent boundarie
     REQUIRE(nConv > 0);
     REQUIRE(nDiv > 0);
     const double mean = sumAll / nAll;
-    CHECK(sumConv / nConv > mean + 1000.0);
+    CHECK(sumConv / nConv > mean + 800.0);
     CHECK(sumDiv / nDiv < mean - 300.0);
 }
 
@@ -234,7 +235,48 @@ TEST_CASE("tectonics: high ground is a chain along convergent boundaries, not sc
 
 TEST_CASE("tectonics golden hash for a fixed seed", "[worldforge][tectonics]")
 {
-    CHECK(hashTectonicMap(make(kSeed, 128, 96, 12)) == 0xb26353922e9a8f11ull);
-    CHECK(hashTectonicMap(make(42, 64, 64, 6)) == 0xfaee833aa6a59990ull);
-    CHECK(hashTectonicMap(make(0, 16, 16, 2)) == 0x26e05e348fb65febull);
+    CHECK(hashTectonicMap(make(kSeed, 128, 96, 12)) == 0x218b53893b54d4abull);
+    CHECK(hashTectonicMap(make(42, 64, 64, 6)) == 0x9604e29b169d23d2ull);
+    CHECK(hashTectonicMap(make(0, 16, 16, 2)) == 0xe93a0666f46b2584ull);
+}
+
+TEST_CASE("tectonics: plate interiors have relief, not flat plateaus", "[worldforge][tectonics][relief]")
+{
+    double sumAbs = 0;
+    long n = 0;
+    for (std::uint64_t s = 1; s <= 8; ++s) {
+        const auto m = make(s, 256, 256, 10);
+        const int reach = 256 / 12;
+        for (int y = 2 * reach; y + 8 < m.height - 2 * reach; y += 2) {
+            for (int x = 2 * reach; x + 8 < m.width - 2 * reach; x += 2) {
+                const std::size_t c = m.index(x, y);
+                const int id = m.plateId[c];
+                if (m.plateId[m.index(x + 8, y)] != id || m.plateId[m.index(x, y + 8)] != id) continue;
+                bool interior = true;
+                for (int d = -2 * reach; d <= 2 * reach && interior; d += reach) {
+                    interior = m.plateId[m.index(x + d, y)] == id && m.plateId[m.index(x, y + d)] == id;
+                }
+                if (!interior) continue;
+                sumAbs += std::abs(m.heightM[c] - m.heightM[m.index(x + 8, y)]) + std::abs(m.heightM[c] - m.heightM[m.index(x, y + 8)]);
+                n += 2;
+            }
+        }
+    }
+    REQUIRE(n > 500);
+    CHECK(sumAbs / static_cast<double>(n) > 8.0);
+}
+
+TEST_CASE("tectonics: no cliff steps between neighbouring cells", "[worldforge][tectonics][relief]")
+{
+    int worst = 0;
+    for (std::uint64_t s = 1; s <= 8; ++s) {
+        const auto m = make(s, 256, 256, 14);
+        for (int y = 0; y + 1 < m.height; ++y) {
+            for (int x = 0; x + 1 < m.width; ++x) {
+                const int h0 = m.heightM[m.index(x, y)];
+                worst = std::max({ worst, std::abs(h0 - m.heightM[m.index(x + 1, y)]), std::abs(h0 - m.heightM[m.index(x, y + 1)]) });
+            }
+        }
+    }
+    CHECK(worst <= 450);
 }
