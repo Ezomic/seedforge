@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <fstream>
 
 namespace ichor::stage0 {
 
@@ -45,6 +46,44 @@ KnobLoad loadKnobs(const DataSet& data)
         return load;
     }
     return knobsFromRecord(*record);
+}
+
+KnobLoad loadKnobsFromDirectory(const std::filesystem::path& root)
+{
+    DataSet data;
+    if (!data.loadDirectory(root)) {
+        KnobLoad load;
+        load.problems.push_back(std::format("could not load {}: {}, using defaults", root.string(), data.lastError()));
+        return load;
+    }
+    return loadKnobs(data);
+}
+
+std::string knobStampLine(const AiKnobs& knobs, std::string_view source, int firstFight)
+{
+    std::string line = std::format("first_fight={}", firstFight);
+    for (const auto& spec : kKnobSpecs) {
+        line += std::format(",{}={}", spec.key, knobs.*spec.member);
+    }
+    std::string clean(source);
+    std::replace_if(clean.begin(), clean.end(), [](char c) { return c == '\n' || c == '\r'; }, ' ');
+    line += std::format(",source={}", clean);
+    return line;
+}
+
+std::filesystem::path knobStampPath(const std::filesystem::path& csv)
+{
+    std::filesystem::path out = csv;
+    out += ".knobs.txt";
+    return out;
+}
+
+bool appendKnobStamp(const std::filesystem::path& csv, const std::string& line)
+{
+    if (csv.empty()) return false;
+    std::ofstream out(knobStampPath(csv), std::ios::app);
+    out << line << '\n';
+    return static_cast<bool>(out);
 }
 
 Tuning applyKnobs(Tuning base, const AiKnobs& knobs)
