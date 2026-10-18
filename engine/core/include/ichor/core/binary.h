@@ -70,7 +70,12 @@ public:
     template <class T>
     bool read(T& value)
     {
-        if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
+        if constexpr (std::is_same_v<T, bool>) {
+            std::uint8_t raw = 0;
+            if (!take(&raw, 1) || raw > 1) return false;
+            value = raw == 1;
+            return true;
+        } else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
             return take(&value, sizeof(T));
         } else if constexpr (std::is_same_v<T, std::string>) {
             std::uint32_t size = 0;
