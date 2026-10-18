@@ -13,6 +13,7 @@
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
+#include "ichor/ui/combat_hud_screen.h"
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
@@ -20,9 +21,12 @@
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/character_screen.h"
 #include "ichor/ui/journal_screen.h"
+#include "ichor/ui/journal_screen_bind.h"
 #include "ichor/data/journal.h"
 #include "ichor/script/journal_bindings.h"
 #include "ichor/ui/map_screen.h"
+#include "ichor/ui/map_screen_binding.h"
+#include "ichor/ui/map_screen_model.h"
 #include "ichor/ui/new_game_screen.h"
 #include "ichor/ui/pause_menu.h"
 #include "ichor/ui/ui_context.h"
@@ -597,8 +601,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::CharacterScreen> characterScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
+    std::unique_ptr<ichor::MapScreenBinding> mapBinding;
+    ichor::MapAnnotationStore mapMarks;
+    ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
+    std::unique_ptr<ichor::CombatHudScreen> combatHud;
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -626,14 +634,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             mapScreen->setImage(ichor::renderMapImage(heightfield));
+            mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
+            combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !mapScreen->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            combatHud.reset();
             newGameScreen.reset();
             pauseMenu.reset();
+            mapBinding.reset();
             mapScreen.reset();
             characterScreen.reset();
             journalScreen.reset();
@@ -669,6 +681,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 ui->setSize(width, height);
                 hud->update(hudHeading, hudHour, hudWater, hudHealth, hudMaxHealth);
                 hud->setGuide(hudGuide);
+                combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = 100.0f, .maxStamina = 100.0f}));
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -677,12 +690,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     ledger->setRows(rows);
                 }
                 if (journalScreen->visible()) {
-                    std::vector<ichor::JournalRow> rows;
-                    for (auto& line : chronicle.recentIn(ichor::kJournalCategory, config.fixedDt, ichor::JournalScreen::kMaxRows)) {
-                        rows.push_back({std::move(line.time), std::move(line.text)});
-                    }
-                    journalScreen->setRows(rows);
+                    ichor::bindJournalModel(*journalScreen, ichor::journalEntries(chronicle.entries(), config.fixedDt));
                 }
+                mapBinding->setVisible(mapScreen->visible());
                 if (characterScreen->visible()) {
                     // The app has no progression state yet, so only health is known.
                     characterScreen->bind({{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}});
@@ -690,6 +700,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 if (mapScreen->visible()) {
                     const glm::dvec3 feet = playerPosition(engine.scene());
                     mapScreen->setPlayer(ichor::mapPosition(heightfield.desc(), feet.x, feet.z), hudHeading);
+                    mapBinding->bind(ichor::buildMapScreen({.viewport = {static_cast<float>(feet.x), static_cast<float>(-feet.z), 1.0f, static_cast<float>(width), static_cast<float>(height)}, .annotations = &mapMarks, .player = ichor::WaypointPosition{static_cast<float>(feet.x), static_cast<float>(-feet.z)}, .playerHeading = hudHeading, .waypoints = &mapWaypoints}));
                 }
                 ui->update(engine.scene().time());
             },
