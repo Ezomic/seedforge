@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <optional>
 #include <set>
 
 namespace forgecli {
@@ -12,7 +13,7 @@ namespace forgecli {
 namespace {
 
 constexpr std::uint64_t kMaxFuzzSeeds = 1000000;
-constexpr std::int64_t kLayerBytesPerCell = 16;
+constexpr std::int64_t kLayerBytesPerCell = 40;
 constexpr int kMinRiverSize = 32;
 
 const Layer* findLayer(const std::vector<Layer>& layers, std::string_view name)
@@ -90,17 +91,6 @@ const std::vector<PhaseRule>& phaseRules()
     return rules;
 }
 
-std::int64_t phaseCellPasses(std::string_view phase, int size, std::size_t layerCount)
-{
-    const std::int64_t cells = static_cast<std::int64_t>(size) * size;
-    std::int64_t passes = cells * static_cast<std::int64_t>(layerCount);
-    if (phase == "hydrology" || phase == "biomes") {
-        const worldforge::ErosionParams erosion;
-        passes += cells * erosion.iterations * (1 + erosion.thermalPasses);
-    }
-    return passes;
-}
-
 FuzzResult runFuzz(const FuzzOptions& in)
 {
     FuzzResult result;
@@ -133,6 +123,8 @@ FuzzResult runFuzz(const FuzzOptions& in)
         selected.push_back(p);
     }
 
+    const worldforge::ForgeConfig config = defaultForgeConfig(in.size);
+    const worldforge::ForgePhase stopAfter = highestNeed(selected);
     const std::int64_t cells = static_cast<std::int64_t>(in.size) * in.size;
     const std::int64_t maxPasses = in.maxCellPasses > 0 ? in.maxCellPasses : worldforge::kErosionMaxCellPasses;
     const std::int64_t maxBytes = in.maxLayerBytes > 0 ? in.maxLayerBytes : cells * kLayerBytesPerCell;
@@ -142,14 +134,34 @@ FuzzResult runFuzz(const FuzzOptions& in)
         const auto flag = [&](std::string_view phase, std::string_view rule, std::string detail) {
             result.violations.push_back({seed, std::string(phase), std::string(rule), std::move(detail)});
         };
+        std::optional<worldforge::ForgedWorld> first;
+        std::optional<worldforge::ForgedWorld> second;
+        std::string thrown;
+        try {
+            first.emplace(worldforge::forgeWorld(seed, in.size, config, stopAfter));
+            second.emplace(worldforge::forgeWorld(seed, in.size, config, stopAfter));
+        } catch (const std::exception& e) {
+            thrown = e.what();
+        } catch (...) {
+            thrown = "unknown exception";
+        }
         std::int64_t passes = 0;
         std::int64_t bytes = 0;
+        if (first && static_cast<int>(stopAfter) >= static_cast<int>(worldforge::ForgePhase::Erosion)) {
+            const worldforge::ErosionParams erosion = config.erosion;
+            passes += static_cast<std::int64_t>(in.size) * in.size * erosion.iterations * (1 + erosion.thermalPasses);
+        }
+        if (first && second && first->worldHash() != second->worldHash()) flag("", "deterministic", "world hash differs on repeat run");
         for (const Phase* phase : selected) {
-            PhaseResult first;
-            PhaseResult second;
+            if (!first || !second) {
+                flag(phase->name, "no_throw", thrown);
+                continue;
+            }
+            PhaseResult firstLayers;
+            PhaseResult secondLayers;
             try {
-                first = phase->run(seed, in.size);
-                second = phase->run(seed, in.size);
+                firstLayers = phaseLayers(*phase, *first);
+                secondLayers = phaseLayers(*phase, *second);
             } catch (const std::exception& e) {
                 flag(phase->name, "no_throw", e.what());
                 continue;
@@ -157,25 +169,25 @@ FuzzResult runFuzz(const FuzzOptions& in)
                 flag(phase->name, "no_throw", "unknown exception");
                 continue;
             }
-            if (!first.error.empty()) {
-                flag(phase->name, "no_error", first.error);
+            if (!firstLayers.error.empty()) {
+                flag(phase->name, "no_error", firstLayers.error);
                 continue;
             }
-            if (!second.error.empty() || first.layers.size() != second.layers.size()) {
+            if (!secondLayers.error.empty() || firstLayers.layers.size() != secondLayers.layers.size()) {
                 flag(phase->name, "deterministic", "repeat run differs in outcome");
                 continue;
             }
-            for (std::size_t i = 0; i < first.layers.size(); ++i) {
-                if (layerHash(first.layers[i]) != layerHash(second.layers[i])) {
-                    flag(phase->name, "deterministic", "layer " + first.layers[i].name + " hash differs on repeat run");
+            for (std::size_t i = 0; i < firstLayers.layers.size(); ++i) {
+                if (layerHash(firstLayers.layers[i]) != layerHash(secondLayers.layers[i])) {
+                    flag(phase->name, "deterministic", "layer " + firstLayers.layers[i].name + " hash differs on repeat run");
                 }
             }
-            if (auto e = layerShapeRule(first.layers, in.size); !e.empty()) flag(phase->name, "layer_shape", e);
-            passes += phaseCellPasses(phase->name, in.size, first.layers.size());
-            for (const Layer& l : first.layers) bytes += static_cast<std::int64_t>(l.pixels.size());
+            if (auto e = layerShapeRule(firstLayers.layers, in.size); !e.empty()) flag(phase->name, "layer_shape", e);
+            passes += cells * static_cast<std::int64_t>(firstLayers.layers.size());
+            for (const Layer& l : firstLayers.layers) bytes += static_cast<std::int64_t>(l.pixels.size());
             for (const PhaseRule& rule : phaseRules()) {
                 if (rule.phase != phase->name) continue;
-                if (auto e = rule.check(first.layers, in.size); !e.empty()) flag(phase->name, rule.name, e);
+                if (auto e = rule.check(firstLayers.layers, in.size); !e.empty()) flag(phase->name, rule.name, e);
             }
         }
         if (passes > maxPasses) flag("", "cell_pass_budget", std::to_string(passes) + " cell passes exceeds " + std::to_string(maxPasses));

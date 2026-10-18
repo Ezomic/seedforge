@@ -9,13 +9,26 @@ over-constrained axioms before a player does.
     ichor_forge_cli --seed 10 --seed-end 19 --size 256 --phase tectonics --out out/
     ichor_forge_cli --seed 7              # manifest to stdout, nothing written
     ichor_forge_cli --list                # registered phases
+    ichor_forge_cli --seed 7 --data data  # phase 11 binds the item, NPC and dungeon ids found in data/
 
 Each seed writes `out/seed_N/<layer>.png` and one `out/manifest.json` lists every layer with its
 size and a 64-bit FNV-1a hash, so a changed phase shows up as a changed hash. A seed whose phase
 fails (for example a size outside the phase's limits) gets an `error` in the manifest and the exit
 code is 1; the rest of the batch still runs.
 
-Adding a phase is one entry in `phaseRegistry()` (`src/registry.cpp`). PNGs use stored deflate, so
+Every phase runs on the shared `worldforge::forgeWorld` pipeline: a batch forges each seed once, up
+to the latest phase any selected phase needs, and each phase only draws layers from that world. The
+registry follows the phase numbers and names of doc 08: tectonics (1), erosion (2), hydrology (3),
+climate (4), biomes (5), resources (6), settlements (7), roads (8), politics (9), pois (10) and
+binding (11); `region_tiers` is derived from phase 1 and has no number. Phase 0 (axioms) is not
+here yet, so `defaultForgeConfig()` stands in for the axiom-resolved config (library defaults,
+settlement and POI spacing scaled to the grid, two fixed factions). `--data DIR` scans
+`catalogue/` and `notable_items/` for item ids, `npcs/` for NPC archetypes (the closest table until
+a dedicated archetype table exists) and `dungeon_skeletons/` for dungeon archetypes; without it
+phase 11 binds empty pools. Bake (12) needs the engine and is not a phase here.
+
+Adding a phase is one entry in `phaseRegistry()` (`src/registry.cpp`): its `needs` phase and a
+function from the `ForgedWorld` to layers. PNGs use stored deflate, so
 there is no compressor dependency and the files are byte-identical on every platform. The library
 (`ichor_forgecli`) includes only libworldforge, never engine code.
 
@@ -46,12 +59,12 @@ Committed budget (`kForgeBudget`), against the model at 1024 x 1024:
 
 | Limit | Budget | Model today | Meaning |
 | --- | --- | --- | --- |
-| cell passes | 350,000,000 | about 273,000,000 | every phase run in turn; one pass is one stage visiting one cell |
-| peak bytes | 96 MiB | about 69 MiB | the worst single phase (biomes): kept maps plus largest scratch plus layer pixels |
+| cell passes | 260,000,000 | about 202,000,000 | every phase off one shared forge: each stage paid once; one pass is one stage visiting one cell |
+| peak bytes | 96 MiB | about 83 MiB | every stage's kept maps together, plus the largest scratch and the largest layer set |
 | largest allocation | 24 MiB | 16 MiB | the biggest single vector, a guard against one buffer blowing up |
 
 The model (`defaultCostModel()` in `src/budget.cpp`) lists per-cell factors for each shared stage
-(tectonics, erosion, hydrology, climate, biomes) and which stages each registered phase reruns.
+(tectonics, erosion, hydrology, climate, biomes, resources, settlements, roads, politics, pois) and which stages each registered phase lists; the full forge pays each listed stage once.
 The factors are estimates read off the code (vector element sizes, loop counts, a heap or sort step
 counted as about 8 passes), not profiler output. Erosion is the exception: it costs
 `erosionCellPasses()` from `erosion_budget.h` with the model's `ErosionParams`, so tuning erosion
@@ -62,7 +75,7 @@ To change the numbers:
 
 - A phase got slower or bigger on purpose: edit its stage factors in `defaultCostModel()`, then raise
   `kForgeBudget` in `budget.h` if the test says the total is over. Keep 25% to 30% headroom (now 28% for
-  passes, 39% for peak bytes, 50% for the largest allocation); the test `the budget is tight enough
+  passes, 16% for peak bytes, 50% for the largest allocation); the test `the budget is tight enough
   to notice growth` fails if the budget is more than 50% above the model.
 - A new phase: add a `PhaseModel` (and a `Stage` if it adds shared work). The output-bytes test
   checks the model against the layers the phase really writes.

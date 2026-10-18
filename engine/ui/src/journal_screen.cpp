@@ -1,5 +1,6 @@
 #include "ichor/ui/journal_screen.h"
 
+#include "ichor/ui/journal_screen_bind.h"
 #include "ichor/ui/ledger.h"
 
 #include <RmlUi/Core/Element.h>
@@ -19,11 +20,19 @@ constexpr const char* kJournalDocument = R"(<rml><head><style>
     #close { position: absolute; top: 10px; right: 14px; width: 34px; height: 34px; font-family: Alegreya Sans; font-size: 30px; line-height: 34px; text-align: center; color: #a08850; }
     #close:hover { color: #e8d8a8; background-color: #3a3426; }
     #title { font-family: Cinzel; font-size: 34px; color: #e8d8a8; letter-spacing: 3px; text-align: center; padding-bottom: 12px; }
+    #tabs { text-align: center; padding-bottom: 10px; }
+    .tab { display: inline-block; padding: 4px 18px 4px 18px; margin: 0px 6px 0px 6px; font-family: Cinzel; font-size: 20px; color: #8c8468; border-bottom: 2px #3a3426; }
+    #list { position: absolute; top: 135px; bottom: 22px; left: 28px; right: 28px; overflow-y: auto; }
+    .tab:hover { color: #e8d8a8; }
+    .tab.active { color: #e8d8a8; border-bottom: 2px #a08850; }
+    .group { font-family: Cinzel; font-size: 20px; color: #a08850; letter-spacing: 2px; padding: 12px 0px 4px 0px; }
+    .major { color: #f4e8c0; }
+    .more { font-family: Alegreya Sans; font-size: 16px; color: #8c8468; padding: 6px 0px 6px 0px; }
     .entry { word-break: break-word; padding: 8px 0px 8px 0px; border-bottom: 1px #3a3426; font-family: Alegreya Sans; font-size: 21px; color: #e0d8c0; }
     .when { color: #8c8468; font-size: 16px; padding-right: 10px; }
     .empty { font-family: Alegreya Sans; font-size: 21px; color: #8c8468; text-align: center; padding: 18px 0px 18px 0px; }
 </style></head><body>
-    <div id="card"><div id="close">&#215;</div><div id="title">THE JOURNAL</div><div id="list"></div></div>
+    <div id="card"><div id="close">&#215;</div><div id="title">THE JOURNAL</div><div id="tabs"></div><div id="list"></div></div>
 </body></rml>)";
 
 }
@@ -43,10 +52,29 @@ JournalScreen::JournalScreen(UiContext& ui)
         return;
     }
     close_->AddEventListener("click", &click_);
+    tabs_ = document_->GetElementById("tabs");
+    if (tabs_ != nullptr) {
+        tabClick_.screen = this;
+        tabs_->AddEventListener("click", &tabClick_);
+    }
+}
+
+void JournalScreen::TabClick::ProcessEvent(Rml::Event& event)
+{
+    const Rml::Element* target = event.GetTargetElement();
+    while (target != nullptr && target->GetId() != "tab-prose" && target->GetId() != "tab-consequences") {
+        target = target->GetParentNode();
+    }
+    if (target != nullptr) {
+        screen->selectTab(target->GetId() == "tab-prose" ? JournalTab::Prose : JournalTab::Consequences);
+    }
 }
 
 JournalScreen::~JournalScreen()
 {
+    if (tabs_ != nullptr) {
+        tabs_->RemoveEventListener("click", &tabClick_);
+    }
     if (close_ != nullptr) {
         // The element may live on until the context next updates, and the listener goes first.
         close_->RemoveEventListener("click", &click_);
@@ -106,6 +134,21 @@ void JournalScreen::setRows(const std::vector<JournalRow>& rows)
         markup += "<div class=\"entry\"><span class=\"when\">" + escapeRml(row.time) + "</span>" + escapeRml(row.text) + "</div>";
     }
     list_->SetInnerRML(markup);
+}
+
+void JournalScreen::setTabs(const std::vector<JournalModelTab>& tabs)
+{
+    if (list_ == nullptr || tabs_ == nullptr) {
+        return;
+    }
+    if (tabsWritten_ && shownTab_ == active_ && shownTabs_ == tabs) {
+        return;
+    }
+    shownTabs_ = tabs;
+    shownTab_ = active_;
+    tabsWritten_ = true;
+    tabs_->SetInnerRML(journalTabBarMarkup(shownTabs_, active_));
+    list_->SetInnerRML(journalTabBodyMarkup(shownTabs_, active_));
 }
 
 }

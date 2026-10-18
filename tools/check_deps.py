@@ -196,6 +196,8 @@ def port_of(item):
     """Third-party port behind a link item: '' for one of ours, None when nothing provides it."""
     if item.startswith("ichor_") and "::" not in item:
         return ""
+    if item in ("worldforge", "worldforge::worldforge"):
+        return ""
     for prefix in sorted(PACKAGE_PORTS, key=len, reverse=True):
         if item == prefix or item.startswith(prefix + "::"):
             return PACKAGE_PORTS[prefix]
