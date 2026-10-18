@@ -22,6 +22,7 @@ struct CameraPose {
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f}; // looks down -Z, Y up
 };
 
+// The default-tuned follow pose; defined in camera_rig.cpp, which owns the tuning and the wall clamp.
 CameraPose followCamera(glm::dvec3 player, glm::dvec3 foe);
 
 // Whether a sphere of the given radius touches the view frustum. A non-finite input is off screen.

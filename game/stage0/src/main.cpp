@@ -8,7 +8,7 @@
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
-#include "ichor/stage0/camera_view.h"
+#include "ichor/stage0/camera_rig.h"
 #include "ichor/stage0/ai_knobs.h"
 #include "ichor/stage0/combat.h"
 
@@ -24,6 +24,7 @@ namespace {
 
 struct Options {
     bool headless = false;
+    bool lockOn = false;
     std::uint64_t frames = 0;
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
@@ -48,6 +49,7 @@ bool parse(int argc, char** argv, Options& options)
         const std::string_view arg = argv[i];
         const bool hasValue = i + 1 < argc;
         if (arg == "--headless") options.headless = true;
+        else if (arg == "--lock-on") options.lockOn = true;
         else if (arg == "--frames" && hasValue) { if (!parseNumber(argv[++i], options.frames)) return false; }
         else if (arg == "--seed" && hasValue) { if (!parseNumber(argv[++i], options.seed)) return false; }
         else if (arg == "--scene" && hasValue) options.scene = argv[++i];
@@ -118,6 +120,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     engine.recordInputs(!options.record.empty());
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
+    ichor::stage0::CameraTuning cameraTuning;
+    if (options.lockOn) cameraTuning.framing = ichor::stage0::CameraFraming::LockOn;
+    ichor::stage0::CameraRig cameraRig(cameraTuning);
+    double cameraClock = platform.now();
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
@@ -131,7 +137,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (player != entt::null && foe != entt::null) {
             const glm::dvec3 p = blend(scene.registry().get<ichor::PreviousTransform>(player), scene.registry().get<ichor::Transform>(player));
             const glm::dvec3 f = blend(scene.registry().get<ichor::PreviousTransform>(foe), scene.registry().get<ichor::Transform>(foe));
-            const ichor::stage0::CameraPose pose = ichor::stage0::followCamera(p, f);
+            const double renderNow = platform.now();
+            const ichor::stage0::CameraPose pose = cameraRig.update(p, f, renderNow - cameraClock);
+            cameraClock = renderNow;
             view.camera.position = pose.position;
             view.camera.rotation = pose.rotation;
             view.camera.fovY = ichor::stage0::kCameraFovY;
@@ -171,7 +179,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir] [--session label] [--variable name]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on][--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--knobs data_dir] [--session label] [--variable name]");
         return 2;
     }
     if (options.headless) {
