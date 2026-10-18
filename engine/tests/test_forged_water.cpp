@@ -166,3 +166,22 @@ TEST_CASE("the same forged world gives the same water")
     CHECK(a.water.hydrology->direction == b.water.hydrology->direction);
     CHECK(a.water.rivers.riverThreshold == b.water.rivers.riverThreshold);
 }
+
+TEST_CASE("the flow of forged water ends, whichever sample it starts from")
+{
+    const Fixture f = makeFixture(23);
+    const Hydrology& h = *f.water.hydrology;
+    const std::size_t total = h.filled.size();
+    for (std::size_t start = 0; start < total; ++start) {
+        std::size_t at = start;
+        std::size_t steps = 0;
+        while (!h.isOutlet(at) && steps <= total) {
+            at = h.downstream(at);
+            ++steps;
+        }
+        REQUIRE(steps <= total);
+    }
+    for (const std::uint32_t acc : h.accumulation) {
+        REQUIRE(acc >= 1);
+    }
+}

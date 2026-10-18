@@ -24,7 +24,7 @@ namespace ichor {
 // its ground where that is higher, which is what rounds the shore.
 //
 // Pair the Hydrology with `rivers`, not with the engine's defaults: the river threshold is the
-// smallest catchment of any forged river cell, so exactly the forged river cells are rivers.
+// smallest catchment of any forged river cell (at least 2, dry samples count 1), so exactly the forged river cells are rivers.
 struct ForgedWater {
     std::shared_ptr<const Hydrology> hydrology;
     HydrologyParams rivers;
