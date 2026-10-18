@@ -1,7 +1,11 @@
 #include "ichor/stage0/session_ledger.h"
 
+#include "ichor/stage0/recorder.h"
+
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 using namespace ichor::stage0;
@@ -92,4 +96,38 @@ TEST_CASE("progress lists the distinct sessions")
     CHECK(p.sessions.size() == 2);
     CHECK(p.sessions.contains("s2"));
     CHECK(progressLine(p) == "9/200 fights (9 bug-fix window, 0 tuning), 191 to go, 2 sessions");
+}
+
+TEST_CASE("the recorder stamps each fight with the session and counts toward the gate")
+{
+    const std::filesystem::path csv = std::filesystem::temp_directory_path() / "ichor_seed428_fights.csv";
+    std::filesystem::path side = csv;
+    side.replace_extension(".sessions.csv");
+    std::filesystem::remove(csv);
+    std::filesystem::remove(side);
+
+    FightRecorder recorder;
+    recorder.open(csv);
+    recorder.setSession({"s3", "stagger"});
+    for (int i = 0; i < 3; ++i) {
+        recorder.noteAttack(true, i * 10.0);
+        recorder.noteDeath(i % 2 == 0, DeathCause::Unreadable, 0.0f, 0.0f, i * 10.0 + 5.0);
+    }
+    const GateProgress progress = recorder.gateProgress();
+    CHECK(progress.recorded == 3);
+    CHECK(progress.bugFix == 3);
+    CHECK(progress.sessions.contains("s3"));
+
+    {
+        std::ifstream in(side);
+        std::string header;
+        std::getline(in, header);
+        std::string first;
+        std::getline(in, first);
+        CHECK(header == "fight,session,variable,bug_fix");
+        CHECK(first == "1,s3,stagger,1");
+    }
+
+    std::filesystem::remove(csv);
+    std::filesystem::remove(side);
 }
