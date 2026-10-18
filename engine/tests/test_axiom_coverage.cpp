@@ -1,3 +1,4 @@
+#include "test_temp.h"
 #include "ichor/lint/axiom_coverage.h"
 
 #include "ichor/data/synergy_content.h"
@@ -128,7 +129,7 @@ Synergy pairSynergy(std::string id, std::string a, std::string b, ContentTier ti
 
 // Four shipped axioms (two cataclysms, one law, one powers) in a scratch data root.
 struct SmallRoot {
-    fs::path root = fs::path(ICHOR_TEST_OUTPUT) / "axiom_coverage_small";
+    fs::path root = ichor::test::outputPath(ICHOR_TEST_OUTPUT, "axiom_coverage_small");
     AxiomSet axioms;
 
     SmallRoot()

@@ -1,3 +1,4 @@
+#include "test_temp.h"
 #include <catch2/catch_test_macros.hpp>
 
 #include <forgecli/forge.h>
@@ -14,7 +15,7 @@ namespace {
 
 std::filesystem::path scratch(const char* name)
 {
-    const auto dir = std::filesystem::path(ICHOR_TEST_OUTPUT) / "forge_cli_shared" / name;
+    const auto dir = ichor::test::outputPath(ICHOR_TEST_OUTPUT, "forge_cli_shared") / name;
     std::filesystem::remove_all(dir);
     return dir;
 }
