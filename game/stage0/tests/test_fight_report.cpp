@@ -193,3 +193,50 @@ TEST_CASE("classifier matches the original inline chain for every combination")
         CHECK(classifyDeath(f) == legacy);
     }
 }
+
+TEST_CASE("extra trailing columns are tolerated")
+{
+    std::string line = row(1, "player", "stamina");
+    line.insert(line.size() - 1, ",7,extra,,more");
+    const auto rows = parseFightLog(line);
+    REQUIRE(rows.size() == 1);
+    CHECK(rows[0].cause == DeathCause::OutOfStamina);
+    CHECK(rows[0].playerDamageTaken == 100.0);
+    std::string many = row(2, "foe", "unreadable");
+    many.insert(many.size() - 1, std::string(5000, ','));
+    CHECK(parseFightLog(many).size() == 1);
+}
+
+TEST_CASE("one column short is skipped")
+{
+    std::string line = row(1, "player", "stamina");
+    line.resize(line.rfind(','));
+    line += "\n";
+    CHECK(parseFightLog(line).empty());
+}
+
+TEST_CASE("huge fields and huge files never crash")
+{
+    const std::string huge(2'000'000, '9');
+    CHECK(parseFightLog(huge + ",1,2,player,stamina\n").empty());
+    CHECK(parseFightLog(row(1, "player", huge.c_str())).empty());
+    std::string big;
+    for (int i = 0; i < 20000; ++i) big += row(i, i % 2 == 0 ? "player" : "foe", "unreadable");
+    const FightSummary s = summarise(parseFightLog(big));
+    CHECK(s.fights == 20000);
+    CHECK(s.playerLosses == 10000);
+}
+
+TEST_CASE("session report text is stable")
+{
+    std::string text = kHeader;
+    for (int i = 0; i < 6; ++i) text += row(i + 1, "player", "unreadable");
+    for (int i = 0; i < 5; ++i) text += row(i + 7, "player", "offscreen", "0.00");
+    text += row(12, "foe", "stamina");
+    text += row(13, "foe", "stamina");
+    const char* expected = "fights 13 (won 2, lost 11), median 12.0s, median retry gap 2.5s\n"
+                           "  offscreen         5   45.5%\n"
+                           "  unreadable        6   54.5%\n"
+                           "diagnosis: telegraph problem\n";
+    CHECK(formatReport(summarise(parseFightLog(text))) == expected);
+}

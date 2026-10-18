@@ -4,6 +4,8 @@
 
 #include <format>
 #include <fstream>
+#include <iterator>
+#include <sstream>
 
 namespace ichor::stage0 {
 
@@ -23,6 +25,23 @@ const char* causeName(DeathCause cause)
     }
 }
 
+std::filesystem::path ledgerPath(const std::filesystem::path& csv)
+{
+    std::filesystem::path path = csv;
+    path.replace_extension(".sessions.csv");
+    return path;
+}
+
+}
+
+GateProgress FightRecorder::gateProgress() const
+{
+    if (csv_.empty()) {
+        return {};
+    }
+    std::ifstream in(ledgerPath(csv_), std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return readProgress(text);
 }
 
 void FightRecorder::open(const std::filesystem::path& csv)
@@ -135,6 +154,13 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
     if (!csv_.empty()) {
         std::ofstream out(csv_, std::ios::app);
         out << lastRow_;
+        const std::filesystem::path ledger = ledgerPath(csv_);
+        const bool fresh = !std::filesystem::exists(ledger);
+        std::ofstream side(ledger, std::ios::app);
+        if (fresh) {
+            side << ledgerHeader();
+        }
+        side << ledgerRow(fights_ + 1, session_);
     }
     logf(LogLevel::Info, "fight #{} {} in {:.1f}s: {} died ({}) | player {}/{} hits, {} whiffs, {} dodges, {:.0f} hp left",
         fights_ + 1, playerDied ? "LOST" : "won", now - start_, playerDied ? "player" : "foe", causeName(cause),
