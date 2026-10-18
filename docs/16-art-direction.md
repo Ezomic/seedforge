@@ -50,6 +50,13 @@ never per asset, never hand-tuned per region.
 **6. A weathering pass.** The scatter pass spreads grime, moss, and damage decals uniformly. This is what
 disguises kit seams and makes assembled architecture look weathered rather than snapped together.
 
+**Where the engine is on this list.** The engine's own renderer (Vulkan, HLSL) carries it. Built:
+a per-world `Palette` with one colour grade and one clamp on roughness and brightness (items 2 and
+3), exponential height fog and one sun and sky model with time of day (items 4 and 5), and a
+ground-colour blend that tints objects toward the terrain at their base (a first cut at item 1; true
+terrain-material blending at the base is not built). Not built: volumetric fog, and the weathering
+pass (item 6). The per-axiom palettes below are design; the engine ships one default palette.
+
 ## Silhouette discipline
 
 Navigation depends on landmarks readable at a kilometre; combat depends on enemies readable
