@@ -14,6 +14,8 @@ namespace {
 
 constexpr unsigned short kWalkFlag = 1;
 
+static_assert(kNavAreaBlocked == RC_NULL_AREA && kNavAreaGround == RC_WALKABLE_AREA);
+
 class SilentContext final : public rcContext {
 public:
     SilentContext()
@@ -35,7 +37,7 @@ struct Owned {
 
 }
 
-bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& params, NavTile& out)
+bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& params, NavTile& out, const NavSurface* surface)
 {
     out.data.clear();
     const WorldDesc& desc = heightfield.desc();
@@ -134,8 +136,23 @@ bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& pa
     rcFilterWalkableLowHeightSpans(&ctx, config.walkableHeight, *solid.value);
 
     Owned<rcCompactHeightfield> compact{rcAllocCompactHeightfield(), rcFreeCompactHeightfield};
-    if (compact.value == nullptr || !rcBuildCompactHeightfield(&ctx, config.walkableHeight, config.walkableClimb, *solid.value, *compact.value)
-        || !rcErodeWalkableArea(&ctx, config.walkableRadius, *compact.value) || !rcBuildDistanceField(&ctx, *compact.value)
+    if (compact.value == nullptr || !rcBuildCompactHeightfield(&ctx, config.walkableHeight, config.walkableClimb, *solid.value, *compact.value)) {
+        return false;
+    }
+    if (surface != nullptr) {
+        for (int z = 0; z < compact.value->height; ++z) {
+            for (int x = 0; x < compact.value->width; ++x) {
+                const rcCompactCell& column = compact.value->cells[x + z * compact.value->width];
+                if (column.count == 0) continue;
+                const unsigned char asked = surface->areaAt(originX + (static_cast<double>(x - border) + 0.5) * cs, originZ + (static_cast<double>(z - border) + 0.5) * cs);
+                const unsigned char area = asked > RC_WALKABLE_AREA ? RC_NULL_AREA : asked;
+                for (unsigned int i = column.index; i < column.index + column.count; ++i) {
+                    if (compact.value->areas[i] != RC_NULL_AREA) compact.value->areas[i] = area;
+                }
+            }
+        }
+    }
+    if (!rcErodeWalkableArea(&ctx, config.walkableRadius, *compact.value) || !rcBuildDistanceField(&ctx, *compact.value)
         || !rcBuildRegions(&ctx, *compact.value, config.borderSize, config.minRegionArea, config.mergeRegionArea)) {
         return false;
     }
@@ -157,7 +174,6 @@ bool buildNavTile(const Heightfield& heightfield, CellId id, const NavParams& pa
     }
     for (int i = 0; i < polys.value->npolys; ++i) {
         polys.value->flags[i] = kWalkFlag;
-        polys.value->areas[i] = RC_WALKABLE_AREA;
     }
 
     dtNavMeshCreateParams create{};
@@ -272,6 +288,10 @@ bool NavWorld::findPath(glm::dvec3 from, glm::dvec3 to, std::vector<glm::dvec3>&
     const float extents[3] = {2.0f, 6.0f, 2.0f};
     dtQueryFilter filter;
     filter.setIncludeFlags(kWalkFlag);
+    // No area costs less than 1, which keeps Detour's straight-line heuristic admissible.
+    filter.setAreaCost(kNavAreaRoad, 1.0f);
+    filter.setAreaCost(kNavAreaGround, 2.5f);
+    filter.setAreaCost(kNavAreaFord, 10.0f);
     const float start[3] = {static_cast<float>(from.x), static_cast<float>(from.y), static_cast<float>(from.z)};
     const float end[3] = {static_cast<float>(to.x), static_cast<float>(to.y), static_cast<float>(to.z)};
     dtPolyRef startRef = 0;
