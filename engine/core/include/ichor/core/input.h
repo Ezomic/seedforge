@@ -26,6 +26,7 @@ struct InputFrame {
         Map = 1u << 11,
         Notes = 1u << 12,
         LockOn = 1u << 13, // toggles the lock-on camera and auto-facing; acts on the press
+        Character = 1u << 14,
     };
     std::uint32_t buttons = 0;
     float moveX = 0.0f; // right positive
