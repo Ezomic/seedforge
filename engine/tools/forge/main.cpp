@@ -5,6 +5,7 @@
 #include "ichor/data/data_set.h"
 #include "ichor/world/debug_images.h"
 #include "ichor/world/forge.h"
+#include "ichor/world/forged_heightfield.h"
 #include "ichor/world/hydrology.h"
 #include "ichor/world/validation.h"
 #include "ichor/world/world_io.h"
@@ -77,7 +78,8 @@ bool dumpPngs(const std::filesystem::path& dir, std::uint32_t seed, const ichor:
 
 }
 
-// ichor_forge <out dir> <seed> [size] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold] [--data <dir>] [--dump-png <dir>] [--verbose]
+// ichor_forge <out dir> <seed> [size] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold] [--data <dir>] [--dump-png <dir>] [--forged] [--verbose]
+// --forged takes the land from libworldforge phases 1 to 3 (and sets the height range and water level to match) instead of the value-noise stand-in.
 // Loads the data directory (default: the repo data/) first and stops if it is invalid. Writes manifest.iworld, heightmap.r16 and terrain.iscene. Stands in for
 // libworldforge until the real phases exist; the layout is the shipped one.
 int main(int argc, char** argv)
@@ -87,9 +89,12 @@ int main(int argc, char** argv)
     std::filesystem::path dataDir = ICHOR_DATA_DIR;
     bool dataGiven = false;
     bool verbose = false;
+    bool forged = false;
     for (int i = 1; i < argc; ++i) {
         if (std::string_view(argv[i]) == "--verbose") {
             verbose = true;
+        } else if (std::string_view(argv[i]) == "--forged") {
+            forged = true;
         } else if (std::string_view(argv[i]) == "--data") {
             if (i + 1 >= argc || dataGiven) {
                 ichor::log(ichor::LogLevel::Error, "--data takes one directory");
@@ -110,7 +115,7 @@ int main(int argc, char** argv)
     argc = static_cast<int>(positional.size());
     argv = positional.data();
     if (argc < 3) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor_forge <out dir> <seed> [sizeMetres] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold, 0 for no rivers] [--data <dir>] [--dump-png <dir>] [--verbose]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor_forge <out dir> <seed> [sizeMetres] [metresPerSample] [cellMetres] [waterHeight] [riverThreshold, 0 for no rivers] [--data <dir>] [--dump-png <dir>] [--forged] [--verbose]");
         return 2;
     }
     ichor::WorldDesc desc;
@@ -130,6 +135,9 @@ int main(int argc, char** argv)
     ichor::HydrologyParams rivers;
     if (riverThreshold > 0) rivers.riverThreshold = riverThreshold;
     rivers.maxLakeDepth = ichor::kPlayableLakeDepth;
+    if (forged) {
+        desc = ichor::forgedWorldDesc(desc);
+    }
     if (!desc.valid()) {
         ichor::log(ichor::LogLevel::Error, "the world description is not valid");
         return 2;
@@ -153,6 +161,7 @@ int main(int argc, char** argv)
     request.desc = desc;
     request.rivers = rivers;
     request.carveRivers = riverThreshold > 0;
+    request.forgedTerrain = forged;
     ichor::ValidatedWorld validated = ichor::forgeValidated(request, ichor::defaultGates());
     for (const ichor::AttemptReport& report : validated.rejected) {
         for (const ichor::GateFailure& failure : report.failures) {

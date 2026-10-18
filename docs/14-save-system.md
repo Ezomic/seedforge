@@ -20,16 +20,20 @@
 Saves/
   Campaign_KRAKEN-77/
     world/                    immutable, written once
-      manifest.json
+      manifest.bin            written last; names every file with size and hash,
+                              and carries genVersion
       heightmap.r16
-      weightmaps/
       dungeon_layouts.bin
-      genVersion
+      ...                     one flat file per baked blob (weightmaps etc. when the bake writes them)
     slots/
       autosave_01.sav         ~1 MB
       quicksave.sav
       manual_03.sav
 ```
+
+`engine/save` implements this split (`Campaign`, `SaveSlots`); a world folder with no `manifest.bin`
+is treated as an interrupted forge. The blob list is whatever the bake hands it, so the exact
+file set above is a sketch until the real bake (doc 08 phase 12) exists.
 
 Twenty saves in one campaign cost one world folder and twenty tiny files. Without the split,
 every quicksave writes 300 MB, which is unshippable.
