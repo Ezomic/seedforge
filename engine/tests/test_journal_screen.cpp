@@ -144,3 +144,85 @@ TEST_CASE("clicking the journal's close button asks for it to be closed, and cli
     REQUIRE(journal.takeCloseRequest());
     REQUIRE_FALSE(journal.takeCloseRequest());
 }
+
+#include "ichor/ui/journal_screen_bind.h"
+
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Element.h>
+
+#include <cmath>
+
+namespace {
+
+std::size_t drawsWith(const std::vector<JournalModelEntry>& entries, JournalTab tab)
+{
+    Fixture f;
+    JournalScreen journal(f.ui);
+    REQUIRE(journal.ok());
+    journal.setVisible(true);
+    journal.selectTab(tab);
+    bindJournalModel(journal, entries);
+    frame(f.ui, f.renderer, 0.0);
+    return f.renderer.draws().size();
+}
+
+const std::vector<JournalModelEntry> kEntries = {
+    {10, "0:00:01", "journal", "I agreed to carry the ash.", 200},
+    {20, "0:00:02", "trade", "Sold a pelt.", 10},
+    {30, "0:00:03", "combat-log", "Killed a wolf.", 0},
+};
+
+}
+
+TEST_CASE("the bound journal draws its entries, tab by tab, and a different model draws differently")
+{
+    const std::size_t none = drawsWith({}, JournalTab::Prose);
+    const std::size_t prose = drawsWith(kEntries, JournalTab::Prose);
+    const std::size_t consequences = drawsWith(kEntries, JournalTab::Consequences);
+    REQUIRE(prose > none);
+    REQUIRE(consequences > prose);
+}
+
+TEST_CASE("clicking the other tab of the bound journal shows it, and unchanged models are not rewritten")
+{
+    Fixture f;
+    JournalScreen journal(f.ui);
+    journal.setVisible(true);
+    const auto model = buildJournalModel(kEntries);
+    journal.setTabs(model);
+    frame(f.ui, f.renderer, 0.0);
+    const std::size_t prose = f.renderer.draws().size();
+    journal.setTabs(model);
+    frame(f.ui, f.renderer, 0.1);
+    REQUIRE(f.renderer.draws().size() == prose);
+
+    Rml::Element* tab = f.ui.context()->GetRootElement()->GetElementById("tab-consequences");
+    REQUIRE(tab != nullptr);
+    const Rml::Vector2f at = tab->GetAbsoluteOffset(Rml::BoxArea::Border) + tab->GetBox().GetSize(Rml::BoxArea::Border) * 0.5f;
+    f.ui.mouseMove(static_cast<int>(at.x), static_cast<int>(at.y));
+    frame(f.ui, f.renderer, 0.2);
+    f.ui.mouseButton(0, true);
+    f.ui.mouseButton(0, false);
+    frame(f.ui, f.renderer, 0.3);
+    REQUIRE(journal.activeTab() == JournalTab::Consequences);
+    journal.setTabs(model);
+    frame(f.ui, f.renderer, 0.4);
+    REQUIRE(f.renderer.draws().size() > prose);
+}
+
+TEST_CASE("bound journal text is never markup")
+{
+    Fixture f;
+    JournalScreen journal(f.ui);
+    journal.setVisible(true);
+    bindJournalModel(journal, {{1, "0:00:01", "journal", "<div style=\"background-color: #ff0000; width: 900px; height: 900px\">x</div>", 0}});
+    frame(f.ui, f.renderer, 0.0);
+    REQUIRE_FALSE(drewColour(f.renderer, 255, 0, 0));
+}
+
+TEST_CASE("play time formats and survives a bad rate")
+{
+    REQUIRE(journalPlayTime(3725, 1.0) == "1:02:05");
+    REQUIRE(journalPlayTime(5, -1.0) == "0:00:00");
+    REQUIRE(journalPlayTime(5, std::nan("")) == "0:00:00");
+}

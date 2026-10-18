@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 namespace forgecli {
 
@@ -68,13 +69,13 @@ bool writeFile(const std::filesystem::path& path, const std::vector<std::uint8_t
     return static_cast<bool>(f);
 }
 
-// The CLI binds no item or NPC ids, so the quest gates stay open here; the thresholds are otherwise the defaults.
-void validateSeed(const RunOptions& options, SeedRecord& record, RunResult& result)
+// Without --data no item or NPC ids are bound, so the quest gates stay open; the thresholds are otherwise the defaults.
+void validateSeed(const RunOptions& options, const worldforge::ForgeConfig& config, SeedRecord& record, RunResult& result)
 {
     worldforge::GateThresholds thresholds;
     thresholds.minQuestItems = 0;
     thresholds.minQuestCast = 0;
-    const worldforge::ValidatedForge v = worldforge::forgeValidated(record.seed, options.size, {}, thresholds);
+    const worldforge::ValidatedForge v = worldforge::forgeValidated(record.seed, options.size, config, thresholds);
     record.validated = true;
     record.rejected = !v.accepted;
     const worldforge::ValidationReport& last = v.attempts.back().report;
@@ -147,6 +148,20 @@ RunResult runForge(const RunOptions& in)
         selected.push_back(p);
     }
 
+    worldforge::ForgeConfig config = defaultForgeConfig(options.size);
+    if (!options.dataDir.empty()) {
+        std::string scanError;
+        ContentPools pools = scanContentPools(options.dataDir, scanError);
+        if (!scanError.empty()) {
+            result.error = scanError;
+            return result;
+        }
+        config.itemIds = std::move(pools.itemIds);
+        config.npcArchetypes = std::move(pools.npcArchetypes);
+        config.dungeonArchetypes = std::move(pools.dungeonArchetypes);
+    }
+    const worldforge::ForgePhase stopAfter = highestNeed(selected);
+
     const std::filesystem::path outDir = options.outDir;
     std::error_code ec;
     if (!options.outDir.empty()) {
@@ -163,12 +178,23 @@ RunResult runForge(const RunOptions& in)
         const std::string dirName = "seed_" + std::to_string(seed);
         bool dirReady = options.outDir.empty();
         bool failedWrite = false;
+        std::optional<worldforge::ForgedWorld> world;
+        std::string forgeError;
+        try {
+            world.emplace(worldforge::forgeWorld(seed, options.size, config, stopAfter));
+        } catch (const std::exception& e) {
+            forgeError = e.what();
+        }
         for (const Phase* phase : selected) {
             PhaseResult r;
-            try {
-                r = phase->run(seed, options.size);
-            } catch (const std::exception& e) {
-                r.error = e.what();
+            if (!world) {
+                r.error = forgeError;
+            } else {
+                try {
+                    r = phaseLayers(*phase, *world);
+                } catch (const std::exception& e) {
+                    r.error = e.what();
+                }
             }
             if (!r.error.empty()) {
                 record.error = std::string(phase->name) + ": " + r.error;
@@ -206,7 +232,7 @@ RunResult runForge(const RunOptions& in)
             }
             if (!record.error.empty() || failedWrite) break;
         }
-        if (options.validate && record.error.empty()) validateSeed(options, record, result);
+        if (options.validate && record.error.empty()) validateSeed(options, config, record, result);
         result.seeds.push_back(std::move(record));
         if (failedWrite || seed == options.seedEnd) break;
     }

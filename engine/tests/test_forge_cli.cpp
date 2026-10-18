@@ -134,9 +134,12 @@ TEST_CASE("the registry names every phase once and finds them", "[forge_cli]")
     for (const auto& p : forgecli::phaseRegistry()) {
         CHECK(names.insert(p.name).second);
         CHECK(p.run != nullptr);
+        CHECK(p.layers != nullptr);
+        CHECK(p.description.starts_with("phase ") == (p.name != "region_tiers"));
         CHECK(forgecli::findPhase(p.name) == &p);
     }
     CHECK(names.count("tectonics") == 1);
+    CHECK(names.size() == 12);
     CHECK(forgecli::findPhase("nope") == nullptr);
     CHECK(forgecli::findPhase("") == nullptr);
 }

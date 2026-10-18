@@ -42,9 +42,6 @@ struct FuzzResult {
     std::string error; // set when the options are invalid
 };
 
-// Cell passes one seed costs for a phase: output cells plus the erosion work hydrology and biomes do.
-std::int64_t phaseCellPasses(std::string_view phase, int size, std::size_t layerCount);
-
 FuzzResult runFuzz(const FuzzOptions& options);
 
 std::string fuzzSummary(const FuzzOptions& options, const FuzzResult& result);
