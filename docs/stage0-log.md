@@ -71,6 +71,8 @@ blow rather than recalled afterwards:
 | `offscreen` | Attacker not on screen at wind-up |
 | `unreadable` | Attack was on screen and still not reacted to |
 
+**The first 20 fights are recorded.** Each fight is written to `<fights csv without extension>.fights/fight_NNN.ifrd` the moment it ends (via a temporary file and a rename), so a crash loses nothing already finished. Fights 21 onward are not kept. To review one: `stage0 --review-fight fights.fights/fight_007.ifrd` prints the outcome, the cause, a per-side summary and every swing, hit, block, whiff, dodge and stagger with its time. A truncated or corrupted file is refused with exit code 1.
+
 **The distribution is the diagnosis, not the totals.**
 
 ## 5. Kill criteria

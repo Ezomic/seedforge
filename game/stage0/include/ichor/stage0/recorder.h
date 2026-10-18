@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/stage0/death_cause.h"
+#include "ichor/stage0/fight_record.h"
 #include "ichor/stage0/session_ledger.h"
 
 #include <cstdint>
@@ -34,6 +35,11 @@ public:
     // Progress toward the 200-fight gate, read from the sidecar ledger.
     GateProgress gateProgress() const;
 
+    // The sim time the hit, whiff, dodge and stagger notes (which carry none) are stamped with.
+    void setClock(double now) { clock_ = now; }
+    // Where each of the first kMaxRecordedFights fights is saved the moment it ends; empty without a CSV.
+    const std::filesystem::path& recordDirectory() const { return recordDir_; }
+
     void noteAttack(bool playerSide, double now);
     void noteHit(bool attackerIsPlayer, float damage, bool blocked);
     void noteWhiff(bool playerSide);
@@ -62,8 +68,12 @@ public:
 private:
     SideRecord& side(bool playerSide) { return playerSide ? player_ : foe_; }
     void begin(double now);
+    void saveFight(const FightRecord& record) const;
 
     std::filesystem::path csv_;
+    std::filesystem::path recordDir_;
+    FightRecordBuffer buffer_;
+    double clock_ = 0.0;
     SessionMarker session_;
     SideRecord player_;
     SideRecord foe_;
