@@ -84,6 +84,7 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_ESCAPE]) frame.buttons |= InputFrame::Menu;
     if (keys[SDL_SCANCODE_M]) frame.buttons |= InputFrame::Map;
     if (keys[SDL_SCANCODE_N]) frame.buttons |= InputFrame::Notes;
+    if (keys[SDL_SCANCODE_C]) frame.buttons |= InputFrame::Character;
     if (lookEnabled_) {
         if (keys[SDL_SCANCODE_E]) frame.buttons |= InputFrame::LockOn;
         // The mouse reads as a turn speed, so the turn per frame does not depend on the frame or tick rate.
