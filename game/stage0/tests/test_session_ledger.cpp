@@ -1,3 +1,4 @@
+#include "../../../engine/tests/test_temp.h"
 #include "ichor/stage0/session_ledger.h"
 
 #include "ichor/stage0/recorder.h"
@@ -100,7 +101,7 @@ TEST_CASE("progress lists the distinct sessions")
 
 TEST_CASE("the recorder stamps each fight with the session and counts toward the gate")
 {
-    const std::filesystem::path csv = std::filesystem::temp_directory_path() / "ichor_seed428_fights.csv";
+    const std::filesystem::path csv = ichor::test::tempPath("ichor_seed428_fights.csv");
     std::filesystem::path side = csv;
     side.replace_extension(".sessions.csv");
     std::filesystem::remove(csv);
