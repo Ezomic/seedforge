@@ -19,6 +19,7 @@
 #include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/journal_screen.h"
+#include "ichor/ui/journal_screen_bind.h"
 #include "ichor/data/journal.h"
 #include "ichor/script/journal_bindings.h"
 #include "ichor/ui/map_screen.h"
@@ -673,11 +674,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     ledger->setRows(rows);
                 }
                 if (journalScreen->visible()) {
-                    std::vector<ichor::JournalRow> rows;
-                    for (auto& line : chronicle.recentIn(ichor::kJournalCategory, config.fixedDt, ichor::JournalScreen::kMaxRows)) {
-                        rows.push_back({std::move(line.time), std::move(line.text)});
-                    }
-                    journalScreen->setRows(rows);
+                    ichor::bindJournalModel(*journalScreen, ichor::journalEntries(chronicle.entries(), config.fixedDt));
                 }
                 if (mapScreen->visible()) {
                     const glm::dvec3 feet = playerPosition(engine.scene());
