@@ -11,6 +11,7 @@ namespace ichor::stage0 {
 // Positions are millimetres, times are whole ticks, fractions are permille. No floats, so replays match everywhere.
 constexpr std::int32_t kMaxBowCoordMm = 1000000;
 constexpr std::int32_t kMaxProjectileSpeedMm = 10000;
+constexpr std::int32_t kMaxBowStateTicks = 1000000;
 
 struct BowTuning {
     std::int32_t baseReachMm = 1000;         // the class's reach_permille is a multiple of this
@@ -42,7 +43,8 @@ struct BowEvent {
 };
 
 // One fixed tick. drawHeld is the attack button. Drawing takes the class windup, Releasing its strike, Recovering its
-// recovery; nothing after the release can be cancelled, so there is no second shot until the nock is done.
+// recovery; nothing after the release can be cancelled, so there is no second shot until the nock is done. A held button
+// starts the next draw as soon as the bow is idle. A class that is not ranged or has a non-positive time never fires.
 BowEvent bowStep(BowBrain& brain, bool drawHeld, const WeaponClass& cls, const BowTuning& tuning);
 
 // Draw power in permille: minDrawPermille at minDrawTicks rising linearly to 1000 at full draw.

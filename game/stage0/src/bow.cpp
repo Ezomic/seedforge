@@ -53,8 +53,8 @@ std::int32_t drawPermille(std::int32_t drawnTicks, const WeaponClass& cls, const
     if (drawnTicks >= cls.windupTicks) {
         return 1000;
     }
-    const std::int64_t span = std::max<std::int32_t>(cls.windupTicks - tuning.minDrawTicks, 1);
-    const std::int64_t above = std::max<std::int64_t>(drawnTicks - tuning.minDrawTicks, 0);
+    const std::int64_t span = std::max<std::int64_t>(std::int64_t{cls.windupTicks} - tuning.minDrawTicks, 1);
+    const std::int64_t above = std::max<std::int64_t>(std::int64_t{drawnTicks} - tuning.minDrawTicks, 0);
     const std::int64_t power = tuning.minDrawPermille + (1000 - tuning.minDrawPermille) * above / span;
     return static_cast<std::int32_t>(std::clamp<std::int64_t>(power, 0, 1000));
 }
@@ -67,6 +67,13 @@ std::int32_t bowRangeMm(const WeaponClass& cls, const BowTuning& tuning)
 BowEvent bowStep(BowBrain& brain, bool drawHeld, const WeaponClass& cls, const BowTuning& tuning)
 {
     BowEvent event;
+    if (!cls.ranged || cls.windupTicks <= 0 || cls.strikeTicks <= 0 || cls.recoveryTicks <= 0 || cls.staminaCost < 0) {
+        brain = BowBrain{};
+        return event;
+    }
+    if (brain.stateTicks < 0 || brain.stateTicks > kMaxBowStateTicks) {
+        brain = BowBrain{};
+    }
     const auto enter = [&](BowState next) {
         brain.state = static_cast<std::uint8_t>(next);
         brain.stateTicks = 0;
@@ -124,12 +131,15 @@ std::optional<Projectile> launchProjectile(std::int32_t x, std::int32_t y, std::
         || !validTuning(tuning)) {
         return std::nullopt;
     }
-    const std::int64_t length = isqrt(std::int64_t{dirX} * dirX + std::int64_t{dirY} * dirY);
+    // Scaled up before the square root so a short aim vector keeps its direction and the speed stays true.
+    const std::int64_t sx = std::int64_t{dirX} * 1024;
+    const std::int64_t sy = std::int64_t{dirY} * 1024;
+    const std::int64_t length = isqrt(sx * sx + sy * sy);
     Projectile arrow;
     arrow.x = x;
     arrow.y = y;
-    arrow.vx = static_cast<std::int32_t>(std::int64_t{dirX} * tuning.projectileSpeedMm / length);
-    arrow.vy = static_cast<std::int32_t>(std::int64_t{dirY} * tuning.projectileSpeedMm / length);
+    arrow.vx = static_cast<std::int32_t>(sx * tuning.projectileSpeedMm / length);
+    arrow.vy = static_cast<std::int32_t>(sy * tuning.projectileSpeedMm / length);
     arrow.remainingMm = bowRangeMm(cls, tuning);
     arrow.drawPermille = drawPermille;
     arrow.alive = arrow.remainingMm > 0 && (arrow.vx != 0 || arrow.vy != 0);
@@ -142,13 +152,13 @@ ProjectileResult projectileStep(Projectile& arrow, std::int32_t targetX, std::in
     if (!arrow.alive) {
         return result;
     }
-    if (!inRange(arrow.x) || !inRange(arrow.y) || std::abs(std::int64_t{arrow.vx}) > kMaxProjectileSpeedMm
-        || std::abs(std::int64_t{arrow.vy}) > kMaxProjectileSpeedMm || arrow.remainingMm <= 0 || !validTuning(tuning)) {
+    if (!inRange(arrow.x) || !inRange(arrow.y) || std::abs(std::int64_t{arrow.vx}) > 2 * kMaxProjectileSpeedMm
+        || std::abs(std::int64_t{arrow.vy}) > 2 * kMaxProjectileSpeedMm || arrow.remainingMm <= 0 || !validTuning(tuning)) {
         arrow.alive = false;
         return result;
     }
     const std::int64_t vv = std::int64_t{arrow.vx} * arrow.vx + std::int64_t{arrow.vy} * arrow.vy;
-    if (vv == 0) {
+    if (vv == 0 || vv > std::int64_t{kMaxProjectileSpeedMm} * kMaxProjectileSpeedMm * 2) {
         arrow.alive = false;
         return result;
     }
@@ -200,6 +210,9 @@ void openingNoteShot(RangedOpening& opening)
 
 std::int32_t openingNoteHit(RangedOpening& opening, std::int32_t drawPermille, bool targetUnaware, const BowTuning& tuning)
 {
+    if (drawPermille < 0 || drawPermille > 1000 || !validTuning(tuning)) {
+        return 0;
+    }
     const bool opener = targetUnaware && !opening.openerSpent;
     opening.openerSpent = true;
     if (opening.hits < INT32_MAX) {

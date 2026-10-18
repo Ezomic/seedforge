@@ -242,3 +242,59 @@ TEST_CASE("a two-shot opening on an unaware target outdamages two plain full dra
     CHECK(opening.hits == 2);
     CHECK(damage > 2 * arrowDamage(1000, false, kTuning));
 }
+
+TEST_CASE("a short aim vector keeps the true arrow speed", "[bow][projectile]")
+{
+    const WeaponClass cls = bowClass();
+    for (const auto& dir : {std::pair{1, 1}, std::pair{1, 2}, std::pair{3, 3}, std::pair{7, -1}}) {
+        auto arrow = launchProjectile(0, 0, dir.first, dir.second, 1000, cls, kTuning);
+        REQUIRE(arrow);
+        const std::int64_t vv = std::int64_t{arrow->vx} * arrow->vx + std::int64_t{arrow->vy} * arrow->vy;
+        const std::int64_t want = std::int64_t{kTuning.projectileSpeedMm} * kTuning.projectileSpeedMm;
+        CHECK(vv >= want * 99 / 100);
+        CHECK(vv <= want);
+    }
+}
+
+TEST_CASE("corrupt counters and degenerate classes never overflow or fire", "[bow]")
+{
+    const WeaponClass cls = bowClass();
+    for (const auto state : {BowState::Drawing, BowState::Holding, BowState::Releasing, BowState::Recovering}) {
+        BowBrain brain;
+        brain.state = static_cast<std::uint8_t>(state);
+        brain.stateTicks = INT_MAX;
+        bowStep(brain, false, cls, kTuning);
+        CHECK(brain.bowState() != state);
+        brain.state = static_cast<std::uint8_t>(state);
+        brain.stateTicks = INT_MIN;
+        bowStep(brain, false, cls, kTuning);
+        CHECK(brain.stateTicks >= 0);
+    }
+    BowTuning extreme = kTuning;
+    extreme.minDrawTicks = INT_MIN;
+    CHECK(drawPermille(5, cls, extreme) <= 1000);
+
+    WeaponClass degenerate;
+    BowBrain brain;
+    CHECK_FALSE(run(brain, true, 5, degenerate).fired);
+    CHECK_FALSE(bowStep(brain, false, degenerate, kTuning).fired);
+    WeaponClass melee = cls;
+    melee.ranged = false;
+    BowBrain meleeBrain;
+    run(meleeBrain, true, 50, melee);
+    CHECK_FALSE(bowStep(meleeBrain, false, melee, kTuning).fired);
+    WeaponClass refund = cls;
+    refund.staminaCost = -5;
+    BowBrain refundBrain;
+    run(refundBrain, true, 50, refund);
+    CHECK(bowStep(refundBrain, false, refund, kTuning).staminaSpent == 0);
+}
+
+TEST_CASE("an invalid hit does not spend the opener", "[bow][opening]")
+{
+    RangedOpening opening;
+    CHECK(openingNoteHit(opening, 5000, true, kTuning) == 0);
+    CHECK(opening.hits == 0);
+    CHECK(opening.openingPhase() == OpeningPhase::Approach);
+    CHECK(openingNoteHit(opening, 1000, true, kTuning) > arrowDamage(1000, false, kTuning));
+}
