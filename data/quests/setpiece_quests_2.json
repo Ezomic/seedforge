@@ -1,0 +1,152 @@
+[
+ {
+  "id": "setpiece.last_performance",
+  "archetype": "sunken_amphitheatre",
+  "title": "The Last Performance",
+  "summary": "The chorus master will play to an empty bowl until someone clears the rim. The archaists want the old script kept, the isonomoi want it opened to all.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|sunken_amphitheatre|3|0||sunken_amphitheatre:state:buried",
+   "b|npc.chorus_master|4|0|a|",
+   "c|archaists|5|1|b|archaists:stance:keeping_script",
+   "d|npc.rope_climber|4|1|b|",
+   "e|route.amphitheatre_rim|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:last_performance",
+   "2|archaists|Accept>3>;WalkAway>0>abandoned:last_performance_rim;TellOtherSide>3>told:archaists_of_isonomoi",
+   "3|isonomoi|Accept>0>;WalkAway>0>abandoned:last_performance_script;TellOtherSide>0>told:isonomoi_of_archaists"
+  ],
+  "effects": [
+   "Route|route.amphitheatre_rim|1",
+   "FactionStrength|archaists|-3",
+   "FactionStrength|isonomoi|3"
+  ]
+ },
+ {
+  "id": "setpiece.glaze_that_wept",
+  "archetype": "weeping_kiln",
+  "title": "The Glaze That Wept",
+  "summary": "The kiln has burned unattended since the founding. The telestai want its fire for their rites, the metallarchs want it quenched and the clay mined.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|weeping_kiln|3|0||weeping_kiln:state:burning",
+   "b|npc.glaze_warden|4|0|a|",
+   "c|telestai|5|1|b|telestai:stance:claiming_fire",
+   "d|npc.ash_carter|4|1|b|",
+   "e|route.kiln_track|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:glaze_that_wept",
+   "2|telestai|Accept>3>;WalkAway>0>abandoned:glaze_that_wept_fire;TellOtherSide>3>told:telestai_of_metallarchs",
+   "3|metallarchs|Accept>0>;WalkAway>0>abandoned:glaze_that_wept_clay;TellOtherSide>0>told:metallarchs_of_telestai"
+  ],
+  "effects": [
+   "Route|route.kiln_track|1",
+   "FactionStrength|metallarchs|2",
+   "FactionStrength|telestai|-3"
+  ]
+ },
+ {
+  "id": "setpiece.thousand_jars",
+  "archetype": "amphora_hill",
+  "title": "A Thousand Jars",
+  "summary": "Each seal is a debt. The hekatombaia would break them for the feast, the thesauroi would count and keep them.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|amphora_hill|3|0||amphora_hill:state:sealed",
+   "b|npc.jar_counter|4|0|a|",
+   "c|hekatombaia|5|1|b|hekatombaia:stance:breaking_seals",
+   "d|npc.wax_sealer|4|1|b|",
+   "e|route.jar_stair|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:thousand_jars",
+   "2|hekatombaia|Accept>3>;WalkAway>0>abandoned:thousand_jars_seals;TellOtherSide>3>told:hekatombaia_of_thesauroi",
+   "3|thesauroi|Accept>0>;WalkAway>0>abandoned:thousand_jars_ledger;TellOtherSide>0>told:thesauroi_of_hekatombaia"
+  ],
+  "effects": [
+   "Route|route.jar_stair|1",
+   "SupplyStatus|hekatombaia|8",
+   "SupplyStatus|thesauroi|-4"
+  ]
+ },
+ {
+  "id": "setpiece.ring_of_borders",
+  "archetype": "boundary_ring",
+  "title": "The Ring of Borders",
+  "summary": "Every stone names a border that no longer exists. The horistai want them reset, the xenoi want the ring left without a master.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|boundary_ring|3|0||boundary_ring:state:disputed",
+   "b|npc.stone_walker|4|0|a|",
+   "c|horistai|5|1|b|horistai:stance:resetting_stones",
+   "d|npc.dispute_witness|4|1|b|",
+   "e|route.march_path|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:ring_of_borders",
+   "2|horistai|Accept>3>;WalkAway>0>abandoned:ring_of_borders_stones;TellOtherSide>3>told:horistai_of_xenoi",
+   "3|xenoi|Accept>0>;WalkAway>0>abandoned:ring_of_borders_gap;TellOtherSide>0>told:xenoi_of_horistai"
+  ],
+  "effects": [
+   "Route|route.march_path|1",
+   "Territory|horistai|2",
+   "FactionStrength|xenoi|2"
+  ]
+ },
+ {
+  "id": "setpiece.the_still_pit",
+  "archetype": "mirror_quarry",
+  "title": "The Still Pit",
+  "summary": "The quarry gives back no reflection of anyone who enters. The asebeis want it broken, the archaists want its stone for the old halls.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|mirror_quarry|3|0||mirror_quarry:state:still",
+   "b|npc.quarry_reader|4|0|a|",
+   "c|asebeis|5|1|b|asebeis:stance:breaking_glass",
+   "d|npc.glass_hauler|4|1|b|",
+   "e|route.quarry_ramp|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:the_still_pit",
+   "2|asebeis|Accept>3>;WalkAway>0>abandoned:the_still_pit_glass;TellOtherSide>3>told:asebeis_of_archaists",
+   "3|archaists|Accept>0>;WalkAway>0>abandoned:the_still_pit_halls;TellOtherSide>0>told:archaists_of_asebeis"
+  ],
+  "effects": [
+   "Route|route.quarry_ramp|1",
+   "FactionStrength|asebeis|3",
+   "FactionStrength|archaists|-2"
+  ]
+ },
+ {
+  "id": "setpiece.the_shut_leaf",
+  "archetype": "tide_gate",
+  "title": "The Shut Leaf",
+  "summary": "The keeper will not open the last leaf without a map of what the water left. The periegetes want the estuary charted, the diadochoi want it held.",
+  "budget": 20,
+  "start": 1,
+  "nodes": [
+   "a|tide_gate|3|0||tide_gate:state:shut",
+   "b|npc.gate_keeper|4|0|a|",
+   "c|periegetes|5|1|b|periegetes:stance:charting_silt",
+   "d|npc.silt_surveyor|4|1|b|",
+   "e|route.estuary_cut|3|0|c,d|"
+  ],
+  "steps": [
+   "1||Accept>2>;Decline>0>declined:the_shut_leaf",
+   "2|periegetes|Accept>3>;WalkAway>0>abandoned:the_shut_leaf_silt;TellOtherSide>3>told:periegetes_of_diadochoi",
+   "3|diadochoi|Accept>0>;WalkAway>0>abandoned:the_shut_leaf_gate;TellOtherSide>0>told:diadochoi_of_periegetes"
+  ],
+  "effects": [
+   "Route|route.estuary_cut|1",
+   "FactionStrength|periegetes|2",
+   "Territory|diadochoi|-2"
+  ]
+ }
+]
