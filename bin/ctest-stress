@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Stress the ctest suite for races: every Catch2 case is its own process, so shared scratch files, fixed paths and order dependence show up
+# as tests that pass alone but fail in some runs. Runs the suite several times in random order with more parallel jobs than cores.
+#
+#   bin/ctest-stress [-p preset] [-c config] [-n rounds] [-j jobs] [-R regex] [-- extra ctest args]
+#
+# Defaults: preset windows-ci, 5 rounds, jobs = 2 x cores. Build first with bin/build (this script never builds).
+# Each round clears <build>/test-output so stale scratch from an earlier round cannot hide or cause a failure.
+# Exit: 0 every round clean, 1 some test failed in at least one round (flaky ones are listed with their failure count), 2 usage/setup error.
+set -u
+
+preset=windows-ci
+config=
+rounds=5
+cores=$(nproc 2>/dev/null || echo 4)
+jobs=$((cores * 2))
+regex=
+extra=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p|-c|-n|-j|-R)
+      [ $# -ge 2 ] || { echo "ctest-stress: $1 needs a value" >&2; exit 2; }
+      case "$1" in -p) preset=$2 ;; -c) config=$2 ;; -n) rounds=$2 ;; -j) jobs=$2 ;; *) regex=$2 ;; esac
+      shift 2 ;;
+    --) shift; extra+=("$@"); break ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "ctest-stress: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+for v in "$rounds" "$jobs"; do
+  case "$v" in ''|*[!0-9]*|0) echo "ctest-stress: rounds and jobs must be integers >= 1" >&2; exit 2 ;; esac
+done
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+bdir=$repo/engine/build/$preset
+[ -f "$bdir/CTestTestfile.cmake" ] || { echo "ctest-stress: $bdir is not configured, run bin/build first" >&2; exit 2; }
+
+ctest_bin=$(command -v ctest || true)
+if [ -z "$ctest_bin" ]; then
+  for d in /e/VS2022 "/c/Program Files/Microsoft Visual Studio/2022/"*; do
+    c=$d/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/ctest.exe
+    [ -x "$c" ] && ctest_bin=$c && break
+  done
+fi
+[ -n "$ctest_bin" ] || { echo "ctest-stress: ctest not found on PATH" >&2; exit 2; }
+
+cfg=()
+[ -n "$config" ] && cfg=(-C "$config")
+sel=()
+[ -n "$regex" ] && sel=(-R "$regex")
+
+tally=$(mktemp)
+trap 'rm -f "$tally"' EXIT
+failed_rounds=0
+for round in $(seq 1 "$rounds"); do
+  rm -rf "$bdir/test-output"
+  echo "ctest-stress: round $round/$rounds (-j $jobs, random order)"
+  (cd "$bdir" && "$ctest_bin" "${cfg[@]}" "${sel[@]}" -j "$jobs" --schedule-random --no-tests=error --output-on-failure "${extra[@]}") > "$bdir/ctest-stress-round.log" 2>&1
+  status=$?
+  tail -n 3 "$bdir/ctest-stress-round.log"
+  if [ "$status" -ne 0 ]; then
+    failed_rounds=$((failed_rounds + 1))
+    cp "$bdir/ctest-stress-round.log" "$bdir/ctest-stress-fail-$round.log"
+    log=$bdir/Testing/Temporary/LastTestsFailed.log
+    if [ -f "$log" ]; then sed 's/^[0-9]*://' "$log" | tr -d '\r' >> "$tally"; else echo "(ctest exited $status without a failure list)" >> "$tally"; fi
+  fi
+done
+
+if [ "$failed_rounds" -eq 0 ]; then
+  echo "ctest-stress: $rounds/$rounds rounds clean"
+  exit 0
+fi
+echo "ctest-stress: $failed_rounds/$rounds rounds had failures; failures per test:"
+sort "$tally" | uniq -c | sort -rn | sed 's/^/  /'
+echo "ctest-stress: full output of failing rounds in $bdir/ctest-stress-fail-<round>.log"
+exit 1

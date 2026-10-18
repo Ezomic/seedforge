@@ -1,3 +1,4 @@
+#include "test_temp.h"
 #include "codec_fuzz.h"
 
 #include "ichor/graph/dungeon_forge.h"
@@ -389,7 +390,7 @@ TEST_CASE("fuzz: codex", "[fuzz][codex]")
 TEST_CASE("fuzz: campaign manifest through Campaign::open", "[fuzz][campaign]")
 {
     namespace fs = std::filesystem;
-    const fs::path root = fs::path(ICHOR_TEST_OUTPUT) / "codec_fuzz_campaign";
+    const fs::path root = ichor::test::outputPath(ICHOR_TEST_OUTPUT, "codec_fuzz_campaign");
     std::error_code ec;
     fs::remove_all(root, ec);
     fs::create_directories(root);
