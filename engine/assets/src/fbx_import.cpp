@@ -25,7 +25,6 @@
 #include <functional>
 #include <map>
 #include <optional>
-#include <unordered_map>
 
 namespace ichor {
 
@@ -145,7 +144,7 @@ struct FbxMaterial {
 
 struct Scene {
     std::vector<Model> models;
-    std::unordered_map<std::int64_t, std::size_t> modelIndex;
+    std::map<std::int64_t, std::size_t> modelIndex;
     double metresPerUnit = 0.01;
     std::int64_t meshModel = 0;
     Geometry geometry;
@@ -277,11 +276,11 @@ bool loadScene(const std::filesystem::path& file, Scene& scene)
         std::int64_t model = 0;
         int channel = -1;
     };
-    std::unordered_map<std::int64_t, CurveNode> curveNodes;
-    std::unordered_map<std::int64_t, const fbx::Node*> curveObjects;
-    std::unordered_map<std::int64_t, const fbx::Node*> geometries;
-    std::unordered_map<std::int64_t, const fbx::Node*> deformers;
-    std::unordered_map<std::int64_t, const fbx::Node*> materialObjects;
+    std::map<std::int64_t, CurveNode> curveNodes;
+    std::map<std::int64_t, const fbx::Node*> curveObjects;
+    std::map<std::int64_t, const fbx::Node*> geometries;
+    std::map<std::int64_t, const fbx::Node*> deformers;
+    std::map<std::int64_t, const fbx::Node*> materialObjects;
 
     for (const fbx::Node& object : objects->children) {
         if (object.props.empty() || object.props[0].type != 'L') continue;
@@ -320,9 +319,9 @@ bool loadScene(const std::filesystem::path& file, Scene& scene)
         }
     }
 
-    std::unordered_map<std::int64_t, std::int64_t> skinOfGeometry;
-    std::unordered_map<std::int64_t, std::int64_t> skinOfCluster;
-    std::unordered_map<std::int64_t, std::int64_t> boneOfCluster;
+    std::map<std::int64_t, std::int64_t> skinOfGeometry;
+    std::map<std::int64_t, std::int64_t> skinOfCluster;
+    std::map<std::int64_t, std::int64_t> boneOfCluster;
     std::int64_t geometryOfMesh = 0;
     std::vector<std::int64_t> materialIds;
     for (const fbx::Node& c : connections->children) {
@@ -794,9 +793,9 @@ bool importFbxCharacter(const std::filesystem::path& file, const FbxImportOption
         logf(LogLevel::Error, "{}: {} bones is more than a skeleton can hold", file.string(), joints.size());
         return false;
     }
-    std::unordered_map<std::int64_t, const Cluster*> clusterOf;
+    std::map<std::int64_t, const Cluster*> clusterOf;
     for (const Cluster& c : scene.clusters) clusterOf[c.bone] = &c;
-    std::unordered_map<std::int64_t, glm::dmat4> bindOf;
+    std::map<std::int64_t, glm::dmat4> bindOf;
     for (const Model* j : joints) {
         const auto it = clusterOf.find(j->id);
         bindOf[j->id] = modelFromFile * (it != clusterOf.end() ? it->second->transformLink : restWorld(scene, *j));
@@ -821,7 +820,7 @@ bool importFbxCharacter(const std::filesystem::path& file, const FbxImportOption
     raw.roots.emplace_back();
     raw.roots.back().name = kRootJoint;
     raw.roots.back().transform = toOzz(Trs{});
-    std::unordered_map<std::int64_t, std::vector<const Model*>> childrenOf;
+    std::map<std::int64_t, std::vector<const Model*>> childrenOf;
     for (const Model* j : joints) childrenOf[j->parent].push_back(j);
     bool usableBinds = true;
     std::function<void(const Model*, const glm::dmat4&, ozz::animation::offline::RawSkeleton::Joint&)> build;
@@ -855,7 +854,7 @@ bool importFbxCharacter(const std::filesystem::path& file, const FbxImportOption
 
     Skeleton cooked;
     cooked.name = std::filesystem::path(file).stem().string();
-    std::unordered_map<std::string, std::uint16_t> indexOfName;
+    std::map<std::string, std::uint16_t> indexOfName;
     const auto names = skeleton->joint_names();
     for (int i = 0; i < skeleton->num_joints(); ++i) {
         cooked.jointNames.emplace_back(names[i]);
@@ -1068,7 +1067,7 @@ bool importFbxClipFirstPose(const std::filesystem::path& file, const FbxRig& rig
         }
     }
     if (!any || skeleton.jointNames.size() < 2) return false;
-    std::unordered_map<std::string, std::size_t> indexOfName;
+    std::map<std::string, std::size_t> indexOfName;
     for (std::size_t j = 0; j < skeleton.jointNames.size(); ++j) indexOfName[skeleton.jointNames[j]] = j;
     worlds.assign(skeleton.jointNames.size(), glm::mat4(1.0f));
     std::vector<glm::dmat4> placed(skeleton.jointNames.size(), glm::dmat4(1.0));
