@@ -20,6 +20,7 @@ using Json = nlohmann::json;
 constexpr std::size_t kMaxRules = 256;
 constexpr std::uintmax_t kMaxFileBytes = 1u << 20;
 constexpr std::uint32_t kMaxExpansionSteps = 512;
+constexpr int kMaxJsonDepth = 32;
 
 Ruleset failed(std::string message)
 {
@@ -71,11 +72,22 @@ std::string runPhase(Graph& graph, const RuleSet& rules, std::uint64_t seed, con
     return {};
 }
 
+// Records are re-serialised below, and the serialiser recurses, so a hostile nesting depth is refused up front.
+Json parseShallow(std::string_view json)
+{
+    bool tooDeep = false;
+    Json document = Json::parse(json.begin(), json.end(), [&tooDeep](int depth, Json::parse_event_t, Json&) {
+        if (depth > kMaxJsonDepth) tooDeep = true;
+        return !tooDeep;
+    }, false);
+    return tooDeep ? Json(Json::value_t::discarded) : document;
+}
+
 }
 
 Ruleset parseRuleset(std::string_view json)
 {
-    const Json document = Json::parse(json.begin(), json.end(), nullptr, false);
+    const Json document = parseShallow(json);
     if (document.is_discarded() || !document.is_array()) {
         return failed("quest rules must be a JSON array of records");
     }
