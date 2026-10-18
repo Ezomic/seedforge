@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <limits>
 
 using namespace ichor;
@@ -169,4 +170,87 @@ TEST_CASE("overlay survives a missing foe and non-finite numbers", "[knobs][over
         CHECK(l.value.find("nan") == std::string::npos);
         CHECK(l.value.find("inf") == std::string::npos);
     }
+}
+
+namespace {
+
+std::filesystem::path scratchDir(const char* name)
+{
+    const auto dir = std::filesystem::temp_directory_path() / "ichor_stage0_knobs" / name;
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "ai_knobs");
+    return dir;
+}
+
+void writeKnobs(const std::filesystem::path& root, const std::string& body)
+{
+    std::ofstream(root / "ai_knobs" / "skirmisher.json") << body;
+}
+
+}
+
+TEST_CASE("--knobs directory values reach the tuning", "[knobs][startup]")
+{
+    const auto root = scratchDir("applied");
+    writeKnobs(root, R"([{"id":"skirmisher","windup_scale":2.0,"preferred_spacing":4.0,"rest_duration":3.0}])");
+    const auto load = loadKnobsFromDirectory(root);
+    REQUIRE(load.problems.empty());
+    const Tuning base;
+    const Tuning t = applyKnobs(base, load.knobs);
+    CHECK(t.lightWindup == Approx(base.lightWindup * 2.0f));
+    CHECK(t.heavyWindup == Approx(base.heavyWindup * 2.0f));
+    CHECK(t.preferredSpacing == Approx(4.0f));
+    CHECK(t.restDuration == Approx(3.0f));
+    CHECK(t.desireGainRate == base.desireGainRate);
+}
+
+TEST_CASE("a directory that fails to load gives defaults and a problem", "[knobs][startup]")
+{
+    const auto missing = std::filesystem::temp_directory_path() / "ichor_stage0_knobs" / "does_not_exist";
+    const auto load = loadKnobsFromDirectory(missing);
+    CHECK(load.problems.size() == 1);
+    CHECK(load.knobs.windupScale == 1.0f);
+
+    const auto bad = scratchDir("bad");
+    writeKnobs(bad, "{ not json");
+    const auto badLoad = loadKnobsFromDirectory(bad);
+    CHECK(badLoad.problems.size() == 1);
+    CHECK(badLoad.knobs.windupScale == 1.0f);
+}
+
+TEST_CASE("the stamp line carries every applied knob and differs per knob set", "[knobs][startup]")
+{
+    AiKnobs a;
+    AiKnobs b;
+    b.windupScale = 1.5f;
+    const std::string lineA = knobStampLine(a, "defaults", 7);
+    const std::string lineB = knobStampLine(b, "defaults", 7);
+    CHECK(lineA != lineB);
+    CHECK(lineB.find("windup_scale=1.5") != std::string::npos);
+    CHECK(lineA.find("first_fight=7") == 0);
+    for (const auto& spec : kKnobSpecs) {
+        CHECK(lineA.find(std::string(spec.key) + "=") != std::string::npos);
+    }
+    CHECK(knobStampLine(a, "x\ny", 1).find('\n') == std::string::npos);
+}
+
+TEST_CASE("stamps append one line per session beside the log and leave the log alone", "[knobs][startup]")
+{
+    const auto dir = scratchDir("stamp");
+    const auto csv = dir / "fights.csv";
+    std::ofstream(csv) << "fight,seconds\n";
+    REQUIRE(appendKnobStamp(csv, knobStampLine(AiKnobs{}, "defaults", 1)));
+    REQUIRE(appendKnobStamp(csv, knobStampLine(AiKnobs{}, "data", 3)));
+    std::ifstream in(knobStampPath(csv));
+    std::string first, second, third;
+    std::getline(in, first);
+    std::getline(in, second);
+    CHECK(!std::getline(in, third));
+    CHECK(first.find("first_fight=1") == 0);
+    CHECK(second.find("first_fight=3") == 0);
+    std::ifstream log(csv);
+    std::string header;
+    std::getline(log, header);
+    CHECK(header == "fight,seconds");
+    CHECK(!appendKnobStamp({}, "x"));
 }

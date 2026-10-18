@@ -4,7 +4,9 @@
 #include "ichor/stage0/combat.h"
 
 #include <array>
+#include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ichor::stage0 {
@@ -48,6 +50,20 @@ KnobLoad knobsFromRecord(const DataRecord& record);
 KnobLoad loadKnobs(const DataSet& data);
 
 float clampKnob(const KnobSpec& spec, float value);
+
+// Loads the data root (the directory holding ai_knobs/) and reads the skirmisher record. A root that fails to
+// load gives defaults and a problem line carrying the loader's error.
+KnobLoad loadKnobsFromDirectory(const std::filesystem::path& root);
+
+// One line per session for the sidecar next to the fight log: the first fight number the session will write,
+// every knob value, and where they came from. The fight CSV keeps its header; this line says which knobs
+// produced the rows from firstFight on.
+std::string knobStampLine(const AiKnobs& knobs, std::string_view source, int firstFight);
+
+// The sidecar of a fight log: "<csv>.knobs.txt".
+std::filesystem::path knobStampPath(const std::filesystem::path& csv);
+
+bool appendKnobStamp(const std::filesystem::path& csv, const std::string& line);
 
 // The tuning with the knobs laid over it. Windups are scaled, not replaced, so the light/heavy ratio holds.
 Tuning applyKnobs(Tuning base, const AiKnobs& knobs);
