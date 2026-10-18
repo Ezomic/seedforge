@@ -22,4 +22,14 @@ inline std::filesystem::path tempPath(const std::filesystem::path& name)
     return std::filesystem::temp_directory_path() / (name.stem().string() + "_" + std::to_string(pid) + name.extension().string());
 }
 
+inline std::filesystem::path outputPath(const std::filesystem::path& base, const std::filesystem::path& name)
+{
+#ifdef _WIN32
+    const auto pid = static_cast<unsigned long>(_getpid());
+#else
+    const auto pid = static_cast<unsigned long>(getpid());
+#endif
+    return base / (name.string() + "_" + std::to_string(pid));
+}
+
 } // namespace ichor::test
