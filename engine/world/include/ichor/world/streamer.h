@@ -5,6 +5,7 @@
 #include "ichor/world/hydrology.h"
 #include "ichor/world/water_mesh.h"
 #include "ichor/world/navmesh.h"
+#include "ichor/world/placed_pois.h"
 #include "ichor/world/vegetation.h"
 
 #include <glm/vec3.hpp>
@@ -30,6 +31,7 @@ struct CellPayload {
     NavTile nav;            // empty when navmeshes are off or the cell has nothing to walk on
     std::vector<VegetationInstance> plants; // empty when vegetation is off
     Mesh water;             // the cell's rivers and lakes; no vertices when water is off or the cell is dry
+    std::vector<PlacedPoi> pois; // the forged settlements, dungeons and landmarks standing in the cell; empty without a PlacedPoiSet
 };
 
 struct StreamerConfig {
@@ -49,6 +51,9 @@ struct StreamerConfig {
     // The world's hydrology, when the caller has worked it out already (for a WaterField, say), so it
     // is not worked out twice. Without it the streamer works it out itself.
     std::shared_ptr<const Hydrology> hydrology;
+    // The forged points of interest (placeForgedPois). Each cell's payload carries the ones inside it;
+    // without a set the payloads carry none and the stand-in world is unchanged.
+    std::shared_ptr<const PlacedPoiSet> pois;
 };
 
 // Keeps the cells around the player resident, building them on a worker
