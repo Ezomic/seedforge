@@ -15,7 +15,7 @@ Rml::CompiledGeometryHandle RecordingUiRenderer::CompileGeometry(Rml::Span<const
     return handle;
 }
 
-void RecordingUiRenderer::RenderGeometry(Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation, Rml::TextureHandle)
+void RecordingUiRenderer::RenderGeometry(Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation, Rml::TextureHandle texture)
 {
     const auto found = geometry_.find(geometry);
     if (found == geometry_.end()) {
@@ -28,6 +28,9 @@ void RecordingUiRenderer::RenderGeometry(Rml::CompiledGeometryHandle geometry, R
     draw.scissored = scissorOn_;
     draw.scissor = scissor_;
     draw.firstColour = found->second.firstColour;
+    if (const auto hash = textureHashes_.find(texture); hash != textureHashes_.end()) {
+        draw.textureHash = hash->second;
+    }
     draws_.push_back(draw);
 }
 
@@ -42,13 +45,20 @@ Rml::TextureHandle RecordingUiRenderer::LoadTexture(Rml::Vector2i& dimensions, c
     return nextTexture_++;
 }
 
-Rml::TextureHandle RecordingUiRenderer::GenerateTexture(Rml::Span<const Rml::byte>, Rml::Vector2i)
+Rml::TextureHandle RecordingUiRenderer::GenerateTexture(Rml::Span<const Rml::byte> source, Rml::Vector2i)
 {
-    return nextTexture_++;
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const Rml::byte b : source) {
+        hash = (hash ^ b) * 1099511628211ull;
+    }
+    const Rml::TextureHandle handle = nextTexture_++;
+    textureHashes_[handle] = hash;
+    return handle;
 }
 
-void RecordingUiRenderer::ReleaseTexture(Rml::TextureHandle)
+void RecordingUiRenderer::ReleaseTexture(Rml::TextureHandle texture)
 {
+    textureHashes_.erase(texture);
 }
 
 void RecordingUiRenderer::EnableScissorRegion(bool enable)
