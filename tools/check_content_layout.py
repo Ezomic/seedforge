@@ -64,7 +64,8 @@ def check_file(parts):
             return []
         if len(parts) == 2:
             return [("data-root", "data/ holds only feature folders (and README.md), not content files")]
-        if ext != ".json" or not re.fullmatch(SNAKE, stem):
+        game_ui = parts[1] == "ui" and ext in (".rml", ".rcss")
+        if (ext != ".json" and not game_ui) or not re.fullmatch(SNAKE, stem):
             return [("data-file", "data files are snake_case.json")]
         return []
     if ext == ".blend1":
@@ -199,6 +200,7 @@ def self_test():
         ("data file in CamelCase", "data-file", add("data/axioms/LastFavour.json")),
         ("data file with a dash", "data-file", add("data/axioms/last-favour.json")),
         ("data file that is not json", "data-file", add("data/axioms/notes.txt")),
+        ("rml outside data/ui", "data-file", add("data/axioms/screen.rml")),
         ("texture without prefix", "art-file", add("art/hoplite/Bronze.png")),
         ("texture in snake_case", "art-file", add("art/hoplite/t_bronze.png")),
         ("mesh with the texture prefix", "art-file", add("art/hoplite/T_Aspis.fbx")),
