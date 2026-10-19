@@ -48,3 +48,5 @@ Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/
 On failure the job summary lists the flaky tests with their failure count per test, and for the world report each failing seed with the design check and cause (`FAIL seed 3: rejected by validation`, then `design check failed: <gate id>: <cause>`). The logs, `manifest.json` and `validation.json` are uploaded as the `nightly-logs` artifact.
 
 Run the same commands locally: `bin/build`, then `bin/ctest-stress -n 2` and `python tools/world_sanity.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe`. The seeds are fixed on purpose so a red night means a code change, not luck; change the range in the workflow when the world generator is retuned and the set should widen. `nightly.yml` is in the path filter of `engine.yml`, so editing it runs both required checks.
+
+Why seeds 1-8 at size 128: with the SEED-416 defaults, seeds 3, 4 and 5 forge nothing usable at size 64 (`roads: no settlement sites to connect`, tracked by SEED-497), so the report would be red from day one. At sizes 128 and 256 all eight seeds are accepted, and 128 is the cheaper. Revisit the size when SEED-497 lands.
