@@ -54,6 +54,8 @@
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_game.h"
+#include "ichor/npc/schedule.h"
+#include "ichor/ui/journal_screen_model.h"
 #include "ichor/world/hydrology_cache.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
@@ -73,6 +75,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -278,7 +281,16 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
 {
     ichor::WorldDesc desc;
     desc.seed = options.seed;
-    ichor::NewGameFlow flow(true, options.forgedGrid);
+    // The manifest names the items, cast and dungeon themes the data layer has, so the forge is given them.
+    ichor::DataSet contentData;
+    if (!contentData.loadDirectory(options.data)) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", contentData.lastError());
+    }
+    ichor::ForgedContentSetup content = ichor::loadForgedContentSetup(contentData, options.data);
+    for (const std::string& problem : content.problems) {
+        ichor::logf(ichor::LogLevel::Warn, "forged content: {}", problem);
+    }
+    ichor::NewGameFlow flow(true, options.forgedGrid, content.config);
     flow.begin(desc);
 
     std::unique_ptr<ichor::UiContext> ui;
@@ -343,11 +355,16 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
         ichor::log(ichor::LogLevel::Error, "the forge finished with no world");
         return ForgeOutcome::Failed;
     }
-    out = ichor::buildForgedGame(*job->result(), desc);
+    out = ichor::buildForgedGame(*job->result(), desc, content.inputs);
     if (!out->ok()) {
         ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", out->error);
         return ForgeOutcome::Failed;
     }
+    for (const std::string& problem : out->contentProblems) {
+        ichor::logf(ichor::LogLevel::Warn, "forged content left out: {}", problem);
+    }
+    ichor::logf(ichor::LogLevel::Info, "forged content: {} items, {} cast, {} quests ({} refused), {} dungeon slots", out->loot ? out->loot->all().size() : 0, out->cast ? out->cast->all().size() : 0,
+        out->quests ? out->quests->all().size() : 0, out->quests ? out->quests->refused().size() : 0, out->dungeons ? out->dungeons->poiIds().size() : 0);
     ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", out->stateHash(), out->spawn.x, out->spawn.z, out->spawn.groundY, out->spawn.found ? "" : " (no gentle dry ground found)");
     return ForgeOutcome::Built;
 }
@@ -459,6 +476,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const ichor::Heightfield& heightfield = forged ? forged->heightfield : standInHeightfield;
     // The roads, points of interest and buildings are grey-box meshes uploaded once; the view draws the ones in resident cells.
     ichor::ForgedScenery scenery;
+    std::set<std::string> bakedDungeons;
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
     if (forged) {
@@ -488,6 +506,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
+        streaming.loot = forged->loot;
+        streaming.cast = forged->cast;
         waterField = forged->waterField.get();
     } else if (!heightfield.empty()) {
         hydrology = std::make_shared<const ichor::Hydrology>(ichor::loadOrComputeHydrology(options.world, heightfield));
@@ -632,6 +652,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         glm::dvec3 origin{0.0};
         std::vector<ichor::PlacedPoi> pois;
         std::vector<ichor::PlacedBuilding> buildings;
+        std::vector<ichor::PlacedLoot> loot;
+        std::vector<ichor::NpcSpawn> cast;
     };
     std::map<ichor::CellId, ResidentCell> cells;
     streamer.onLoaded([&](const ichor::CellPayload& payload) {
@@ -644,6 +666,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         cell.water = renderer.uploadWaterCell(payload.water);
         cell.pois = payload.pois;
         cell.buildings = payload.buildings;
+        cell.loot = payload.loot;
+        cell.cast = payload.cast;
         engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
@@ -693,6 +717,28 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (forged) {
                 const glm::dvec3 feet = playerPosition(scene);
                 lines.push_back(std::format("region tier {} of {}", forged->tiers.tierAt(feet.x, feet.z), forged->tiers.tierCount));
+                // A dungeon bakes its layout when the player comes within reach, once; the result is cached.
+                constexpr double kApproachM = 80.0;
+                if (forged->dungeons && forged->pois) {
+                    for (const ichor::PlacedPoi& poi : forged->pois->all()) {
+                        if (poi.kind != ichor::PlacedPoiKind::Dungeon || std::hypot(poi.x - feet.x, poi.z - feet.z) > kApproachM) continue;
+                        const ichor::DungeonLayoutResult layout = forged->dungeons->layout(poi.id);
+                        if (bakedDungeons.insert(poi.id).second) {
+                            if (layout.ok()) {
+                                ichor::logf(ichor::LogLevel::Info, "dungeon {} ({}) baked: skeleton {}, {} rooms", poi.id, poi.archetype, layout.dungeon->skeletonId, layout.dungeon->cells.size());
+                            } else {
+                                ichor::logf(ichor::LogLevel::Warn, "dungeon {} could not be baked: {}", poi.id, layout.error);
+                            }
+                        }
+                        if (layout.ok()) {
+                            lines.push_back(std::format("dungeon {}: {}, {} rooms", poi.id, layout.dungeon->skeletonId, layout.dungeon->cells.size()));
+                        }
+                        break;
+                    }
+                }
+                if (forged->quests && !forged->quests->all().empty()) {
+                    lines.push_back(std::format("tracking {} ({} quests; J lists them)", forged->quests->all().front().id, forged->quests->all().size()));
+                }
             }
             const float hour = ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
             lines.push_back(std::format("time {:02}:{:02}", static_cast<int>(hour), static_cast<int>((hour - std::floor(hour)) * 60.0f)));
@@ -891,7 +937,16 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     ledger->setRows(rows);
                 }
                 if (journalScreen->visible()) {
-                    ichor::bindJournalModel(*journalScreen, ichor::journalEntries(chronicle.entries(), config.fixedDt));
+                    std::vector<ichor::JournalModelEntry> entries = ichor::journalEntries(chronicle.entries(), config.fixedDt);
+                    if (forged && forged->quests) {
+                        // The forged world's quests, as prose lines the journal lists; the first is the one tracked.
+                        for (const ichor::QuestInstance& quest : forged->quests->all()) {
+                            entries.push_back({0, "quest", std::string(ichor::kJournalCategory),
+                                std::format("{} ({}): {} between {} and {}, {} beats.", quest.id, quest.id == forged->quests->all().front().id ? "tracked" : "open", quest.tensionKind, quest.poiA, quest.poiB, quest.beats.size()),
+                                static_cast<std::uint8_t>(quest.intensity)});
+                        }
+                    }
+                    ichor::bindJournalModel(*journalScreen, entries);
                 }
                 mapBinding->setVisible(mapScreen->visible());
                 if (characterScreen->visible()) {
@@ -981,6 +1036,23 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 if (const auto mesh = scenery.poiMesh.find(poi.id); mesh != scenery.poiMesh.end()) {
                     view.instances.push_back({sceneryBase + mesh->second, {poi.x, static_cast<double>(poi.groundY), poi.z}});
                 }
+            }
+            for (const ichor::PlacedLoot& item : cell.loot) {
+                ichor::RenderInstance instance;
+                instance.mesh = sceneryBase + scenery.lootMesh;
+                instance.position = {item.x, static_cast<double>(item.groundY), item.z};
+                instance.basis = glm::mat3(glm::vec3(0.5f, 0.0f, 0.0f), glm::vec3(0.0f, 0.4f, 0.0f), glm::vec3(0.0f, 0.0f, 0.5f));
+                view.instances.push_back(instance);
+            }
+            for (const ichor::NpcSpawn& npc : cell.cast) {
+                // Whoever is asleep by their schedule is indoors and not drawn.
+                const auto state = ichor::stateAt(npc.schedule, hour);
+                if (state && *state == ichor::ScheduleState::Sleep) continue;
+                ichor::RenderInstance instance;
+                instance.mesh = sceneryBase + scenery.castMesh;
+                instance.position = {npc.x, static_cast<double>(npc.groundY), npc.z};
+                instance.basis = glm::mat3(glm::vec3(0.6f, 0.0f, 0.0f), glm::vec3(0.0f, 1.8f, 0.0f), glm::vec3(0.0f, 0.0f, 0.6f));
+                view.instances.push_back(instance);
             }
             for (const ichor::PlacedBuilding& building : cell.buildings) {
                 // The box is 1 m cubed from its base up; it sinks half a metre so a foundation never floats on a rise.

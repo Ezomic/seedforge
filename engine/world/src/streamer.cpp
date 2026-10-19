@@ -136,6 +136,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     out.water = Mesh{};
     out.pois = config.pois ? config.pois->inCell(id) : std::vector<PlacedPoi>{};
     out.buildings = config.buildings ? config.buildings->inCell(id) : std::vector<PlacedBuilding>{};
+    out.cast = config.cast ? config.cast->inCell(id) : std::vector<NpcSpawn>{};
     out.loot = config.loot ? config.loot->inCell(id) : std::vector<PlacedLoot>{};
     if (lodCount > 0) {
         out.lods.push_back(buildLod(heightfield, out.cell, 1, config.biomes.get()));
