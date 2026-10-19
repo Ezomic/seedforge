@@ -34,27 +34,32 @@ bool SdlPlatform::init(const WindowDesc& desc)
 void SdlPlatform::enableLook(bool enabled)
 {
     lookEnabled_ = enabled;
-    mouseSpeedX_ = 0.0f;
+    mouseLook_.setHeld(false);
     if (window_ != nullptr) {
-        SDL_SetWindowRelativeMouseMode(window_, enabled);
+        SDL_SetWindowRelativeMouseMode(window_, false);
     }
 }
 
 void SdlPlatform::pumpEvents()
 {
-    // Mouse speed that counts as a full-rate turn, in window units per second.
-    constexpr float kFullTurnMouseSpeed = 1500.0f;
     const double pumpedAt = now();
     const double elapsed = pumpedAt - lastPump_;
     lastPump_ = pumpedAt;
-    float mouseDeltaX = 0.0f;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (hook_) {
             hook_(event);
         }
+        if (lookEnabled_ && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
+            mouseLook_.setHeld(true);
+            SDL_SetWindowRelativeMouseMode(window_, true);
+        }
+        if (lookEnabled_ && event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_RIGHT) {
+            mouseLook_.setHeld(false);
+            SDL_SetWindowRelativeMouseMode(window_, false);
+        }
         if (lookEnabled_ && event.type == SDL_EVENT_MOUSE_MOTION) {
-            mouseDeltaX += event.motion.xrel;
+            mouseLook_.addMotion(event.motion.xrel);
         }
         if (event.type == SDL_EVENT_QUIT) {
             quit_ = true;
@@ -87,16 +92,8 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_C]) frame.buttons |= InputFrame::Character;
     if (lookEnabled_) {
         if (keys[SDL_SCANCODE_E]) frame.buttons |= InputFrame::LockOn;
-        // The mouse reads as a turn speed, so the turn per frame does not depend on the frame or tick rate.
-        constexpr float kSmoothingSeconds = 0.05f;
-        if (elapsed > 1e-4 && elapsed < 0.5) {
-            const float blend = 1.0f - std::exp(-static_cast<float>(elapsed) / kSmoothingSeconds);
-            mouseSpeedX_ += (mouseDeltaX / static_cast<float>(elapsed) - mouseSpeedX_) * blend;
-        } else {
-            mouseSpeedX_ = 0.0f;
-        }
-        const float mouse = mouseSpeedX_ / kFullTurnMouseSpeed;
-        const float arrows = (keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
+        const float mouse = mouseLook_.step(elapsed);
+        const float arrows = arrowsReserved_ ? 0.0f : (keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
         frame.lookX = std::clamp(mouse + arrows, -1.0f, 1.0f);
     }
 
