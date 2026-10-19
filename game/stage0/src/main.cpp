@@ -13,6 +13,7 @@
 #include "ichor/stage0/ai_knobs.h"
 #include "ichor/stage0/character_visuals.h"
 #include "ichor/stage0/combat.h"
+#include "ichor/stage0/exile_player.h"
 #include "ichor/stage0/fight_review.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -30,6 +31,7 @@ struct Options {
     bool headless = false;
     bool lockOn = false;
     bool bullWarden = false;
+    bool exilePlayer = false;
     std::uint64_t frames = 0;
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
@@ -58,6 +60,7 @@ bool parse(int argc, char** argv, Options& options)
         if (arg == "--headless") options.headless = true;
         else if (arg == "--lock-on") options.lockOn = true;
         else if (arg == "--bull-warden") options.bullWarden = true;
+        else if (arg == "--exile-player") options.exilePlayer = true;
         else if (arg == "--frames" && hasValue) { if (!parseNumber(argv[++i], options.frames)) return false; }
         else if (arg == "--seed" && hasValue) { if (!parseNumber(argv[++i], options.seed)) return false; }
         else if (arg == "--scene" && hasValue) options.scene = argv[++i];
@@ -91,6 +94,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     const ichor::stage0::GreyBoxMeshes greyBox = ichor::stage0::appendGreyBoxMeshes(bundle);
     if (!renderer.uploadBundle(bundle)) {
+        return 1;
+    }
+    ichor::stage0::ExilePlayer exilePlayer;
+    if (options.exilePlayer && !exilePlayer.load(std::filesystem::path(ICHOR_ART_DIR) / "exile", renderer)) {
+        ichor::log(ichor::LogLevel::Error, "--exile-player: art/exile did not load (git lfs pull --include=\"art/exile/*\")");
         return 1;
     }
     audio.addBundle(bundle);
@@ -155,6 +163,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     cameraTuning.framing = lockedFraming;
     ichor::stage0::CameraRig cameraRig(cameraTuning);
     double cameraClock = platform.now();
+    double exileClock = cameraClock;
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
@@ -183,8 +192,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         std::vector<ichor::LineSegment> lines;
         scene.physics().debugLines(lines);
         stage.debugLines(scene, lines);
-        ichor::stage0::appendCharacterInstances(scene, alpha, tuning, greyBox, view.instances, bullWarden ? foe : entt::null);
+        ichor::stage0::appendCharacterInstances(scene, alpha, tuning, greyBox, view.instances, exilePlayer.loaded(), bullWarden ? foe : entt::null);
         if (bullWarden) ichor::stage0::appendBullWarden(scene, stage.foeId(), alpha, tuning, *bullWarden, view);
+        if (exilePlayer.loaded()) {
+            const double renderNow = platform.now();
+            exilePlayer.append(scene, alpha, renderNow - exileClock, static_cast<float>(config.fixedDt), tuning, view);
+            exileClock = renderNow;
+        }
         for (const ichor::LineSegment& line : lines) {
             view.lines.push_back({line.a, line.b, line.color});
         }
@@ -216,7 +230,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--bull-warden] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--exile-player] [--bull-warden] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
         return 2;
     }
     if (!options.review.empty()) {
