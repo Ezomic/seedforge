@@ -259,6 +259,19 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     }
     game->buildings = std::make_shared<const PlacedBuildingSet>(std::move(settlements.set));
 
+    std::vector<SettlementSite> sites;
+    std::string siteError;
+    if (!forgedSettlementSites(world, game->heightfield, sites, siteError)) {
+        game->error = "settlements: " + siteError;
+        return game;
+    }
+    PlacedKit kit = placeSettlementKit(sites, *game->buildings, game->heightfield, game->roads.get(), game->waterField.get());
+    if (!kit.ok()) {
+        game->error = "settlement kit: " + kit.error;
+        return game;
+    }
+    game->kit = std::make_shared<const SettlementKitSet>(std::move(kit.set));
+
     game->tiers = forgedRegionTiers(world, game->desc);
     if (!game->tiers.ok()) {
         game->error = "region tiers: " + game->tiers.error;
@@ -335,6 +348,18 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
     }
     scenery.buildingMesh = push(placedBuildingMesh(0.5f, 0.5f, 1.0f, 0.0f), 4);
     return scenery;
+}
+
+bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder)
+{
+    if (!game.kit || game.kit->empty()) return false;
+    SceneBundle staged = scenery.bundle;
+    KitMeshes meshes;
+    if (!cookSettlementKit(folder, kitPiecesUsed(*game.kit), staged, meshes)) return false;
+    scenery.bundle = std::move(staged);
+    scenery.kitMesh = meshes;
+    scenery.kitLoaded = true;
+    return true;
 }
 
 }

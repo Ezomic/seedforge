@@ -92,6 +92,7 @@ struct Options {
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
+    std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
@@ -141,6 +142,8 @@ bool parse(int argc, char** argv, Options& options)
             options.actor = argv[++i];
         } else if (arg == "--exile" && hasValue) {
             options.exile = argv[++i];
+        } else if (arg == "--kit" && hasValue) {
+            options.kit = argv[++i];
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
@@ -455,6 +458,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool sceneryDrawn = false;
     if (forged) {
         scenery = ichor::buildForgedScenery(*forged);
+        if (!ichor::addSettlementKit(scenery, *forged, options.kit)) {
+            ichor::logf(ichor::LogLevel::Warn, "the settlement kit could not be loaded from {}; the buildings are drawn as boxes", options.kit.string());
+        }
         sceneryBase = renderer.meshCount();
         sceneryDrawn = renderer.uploadBundle(scenery.bundle);
         if (!sceneryDrawn) {
@@ -975,7 +981,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     view.instances.push_back({sceneryBase + mesh->second, {poi.x, static_cast<double>(poi.groundY), poi.z}});
                 }
             }
+            if (scenery.kitLoaded) {
+                for (const ichor::KitInstance& piece : forged->kit->inCell(id)) {
+                    ichor::RenderInstance instance;
+                    instance.mesh = sceneryBase + scenery.kitMesh.mesh[static_cast<std::size_t>(piece.piece)];
+                    instance.position = {piece.x, static_cast<double>(piece.groundY), piece.z};
+                    instance.basis = ichor::kitBasis(piece.quarterTurns);
+                    view.instances.push_back(instance);
+                }
+            }
             for (const ichor::PlacedBuilding& building : cell.buildings) {
+                if (scenery.kitLoaded) break; // the kit pieces above stand in for the boxes
                 // The box is 1 m cubed from its base up; it sinks half a metre so a foundation never floats on a rise.
                 constexpr float kSink = 0.5f;
                 ichor::RenderInstance instance;
@@ -1278,7 +1294,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
         return 2;
     }
 
