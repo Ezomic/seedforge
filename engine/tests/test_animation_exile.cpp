@@ -189,7 +189,11 @@ TEST_CASE("walk travels about 1.05 m/s and run about 5.2 m/s along the way the b
 
     float runSeconds = 0.0f;
     const glm::vec3 run = travel("run", runSeconds);
-    REQUIRE(glm::dot(glm::vec2(run.x, run.z), forward) / runSeconds == Catch::Approx(5.2f).margin(0.5f));
+    // The run is turned about 10 degrees so its legs sweep along the travel, so the speed is the length of the
+    // travel and the direction is only checked to be roughly the way the body faces.
+    const glm::vec2 runTravel(run.x, run.z);
+    REQUIRE(glm::length(runTravel) / runSeconds == Catch::Approx(5.2f).margin(0.5f));
+    REQUIRE(glm::dot(glm::normalize(runTravel), forward) > 0.8f);
     REQUIRE(std::abs(run.y) < 0.05f);
 }
 
