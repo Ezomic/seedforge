@@ -137,6 +137,7 @@ void JournalScreen::setRows(const std::vector<JournalRow>& rows)
     for (const JournalRow& row : shown_) {
         markup += "<div class=\"entry\"><span class=\"when\">" + escapeRml(row.time) + "</span>" + escapeRml(row.text) + "</div>";
     }
+    list_->SetProperty("top", "78px");
     list_->SetInnerRML(markup);
 }
 
@@ -152,6 +153,7 @@ void JournalScreen::setTabs(const std::vector<JournalModelTab>& tabs)
     shownTab_ = active_;
     tabsWritten_ = true;
     tabs_->SetInnerRML(journalTabBarMarkup(shownTabs_, active_));
+    list_->SetProperty("top", "135px");
     list_->SetInnerRML(journalTabBodyMarkup(shownTabs_, active_));
 }
 
