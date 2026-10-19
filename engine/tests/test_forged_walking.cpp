@@ -367,3 +367,37 @@ TEST_CASE("the scene's velocity filter keeps the player off ground that cannot b
     REQUIRE(runInto(false) > 30.0);
     REQUIRE(runInto(true) < 20.5);
 }
+
+TEST_CASE("strafing back and forth in place is not stuck, and the slowest legitimate pace clears the threshold", "[walking][stuck]")
+{
+    const WalkAssessment fine;
+    StuckDetector strafing;
+    glm::dvec3 position{10.0, 0.0, 10.0};
+    for (int i = 0; i < 600; ++i) {
+        position.x += (i / 10) % 2 == 0 ? 0.3 : -0.3; // 3 m/s, turning every second
+        REQUIRE_FALSE(strafing.step(position, true, fine, WalkBlock::None, 0.1).stuck);
+    }
+
+    // Wading at its slowest on a steep rise: walking pace 3 m/s, wading 0.35, rise 0.3.
+    const double slowest = 3.0 * 0.35 * 0.3;
+    StuckDetector crawling;
+    glm::dvec3 where{0.0};
+    for (int i = 0; i < 1000; ++i) {
+        where.x += slowest * 0.1;
+        REQUIRE_FALSE(crawling.step(where, true, fine, WalkBlock::None, 0.1).stuck);
+    }
+}
+
+TEST_CASE("a walker on a barely moving stick, or asking for a huge radius, is handled", "[walking]")
+{
+    const Heightfield field = wallOf(0);
+    const ForgedWalking walking(field, nullptr, CapabilitySet{});
+    const glm::dvec3 tiny = walking.filterVelocity({5.0, 0.0, 5.0}, {1.0e-300, 0.0, 0.0});
+    REQUIRE(std::isfinite(tiny.x));
+    REQUIRE(std::isfinite(tiny.z));
+    glm::dvec3 spawn;
+    REQUIRE(findWalkableSpawn(walking, 5.0, 5.0, 1.0e12, spawn));
+    const Lake deep(9950);
+    const ForgedWalking drowned(deep.field, deep.water.get(), CapabilitySet{});
+    REQUIRE(findWalkableSpawn(drowned, 16.0, 16.0, 1.0e12, spawn));
+}

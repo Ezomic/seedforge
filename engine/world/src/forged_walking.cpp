@@ -13,10 +13,16 @@ namespace {
 
 constexpr double kDegreesToRadians = 0.017453292519943295;
 constexpr float kHazardFloor = 0.001f;
+constexpr double kMinSpeed = 1.0e-9;
 
 double cosOfDegrees(float degrees)
 {
     return static_cast<double>(dmath::cos(static_cast<float>(degrees * kDegreesToRadians)));
+}
+
+double flatLength(double x, double z)
+{
+    return std::sqrt(x * x + z * z);
 }
 
 bool finite(const glm::dvec3& v)
@@ -86,7 +92,7 @@ WalkAssessment ForgedWalking::assess(double x, double z) const
     }
 
     const double ny = static_cast<double>(heightfield_.normalAt(x, z).y);
-    if (ny < cosMax_) {
+    if (!(ny >= cosMax_)) {
         out.block = WalkBlock::TooSteep;
         out.hazard = static_cast<float>(cosMax_ - ny) + kHazardFloor;
         out.slopeFactor = 0.0f;
@@ -113,18 +119,21 @@ glm::dvec3 ForgedWalking::filterVelocity(const glm::dvec3& position, const glm::
     if (!finite(position) || !finite(velocity)) {
         return glm::dvec3(0.0);
     }
-    const double speed = std::hypot(velocity.x, velocity.z);
-    if (!(speed > 0.0)) {
+    const double speed = flatLength(velocity.x, velocity.z);
+    if (!(speed >= kMinSpeed)) {
         return velocity;
     }
     const WalkAssessment here = assess(position.x, position.z);
-    const double reach = params_.probeMetres / speed;
     const auto admit = [&](const glm::dvec3& v, WalkAssessment& at) {
-        at = assess(position.x + v.x * reach, position.z + v.z * reach);
+        const double s = flatLength(v.x, v.z);
+        if (!(s >= kMinSpeed)) {
+            return false;
+        }
+        at = assess(position.x + v.x / s * params_.probeMetres, position.z + v.z / s * params_.probeMetres);
         return at.walkable() || (!here.walkable() && at.hazard <= here.hazard && at.block == here.block);
     };
-
     const auto crawl = [&](const WalkAssessment& at) { return at.walkable() ? static_cast<double>(at.slopeFactor) : static_cast<double>(params_.minSlopeFactor); };
+
     WalkAssessment ahead;
     if (admit(velocity, ahead)) {
         const double pace = crawl(ahead);
@@ -162,7 +171,7 @@ bool findWalkableSpawn(const ForgedWalking& walking, double aroundX, double arou
         return accept(aroundX, aroundZ);
     }
     constexpr double kStep = 8.0;
-    const int rings = static_cast<int>(std::min(maxRadius / kStep, 4096.0));
+    const int rings = static_cast<int>(std::min({maxRadius / kStep, walking.sizeMetres() / kStep + 1.0, 4096.0}));
     for (int ring = 1; ring <= rings; ++ring) {
         const double r = ring * kStep;
         for (int i = -ring; i <= ring; ++i) {
@@ -197,7 +206,9 @@ StuckDetector::StuckDetector(const StuckParams& params)
 void StuckDetector::reset(const glm::dvec3& position)
 {
     windowStart_ = position;
+    lastPosition_ = position;
     tryingSeconds_ = 0.0;
+    pathMetres_ = 0.0;
     windowOpen_ = false;
     safe_.clear();
 }
@@ -211,8 +222,11 @@ StuckReport StuckDetector::step(const glm::dvec3& position, bool wantsToMove, co
         return report;
     }
 
-    if (here.walkable()) {
-        const bool far = safe_.empty() || std::hypot(position.x - safe_.back().x, position.z - safe_.back().z) >= params_.safeSpacingMetres;
+    const double stepped = windowOpen_ ? flatLength(position.x - lastPosition_.x, position.z - lastPosition_.z) : 0.0;
+    lastPosition_ = position;
+
+    if (here.walkable() && here.slopeFactor >= 1.0f && here.waterDepth <= kWadeStart) {
+        const bool far = safe_.empty() || flatLength(position.x - safe_.back().x, position.z - safe_.back().z) >= params_.safeSpacingMetres;
         if (far) {
             safe_.push_back(position);
             if (safe_.size() > params_.safeHistory) safe_.pop_front();
@@ -222,22 +236,25 @@ StuckReport StuckDetector::step(const glm::dvec3& position, bool wantsToMove, co
     if (!wantsToMove) {
         windowOpen_ = false;
         tryingSeconds_ = 0.0;
+        pathMetres_ = 0.0;
         return report;
     }
     if (!windowOpen_) {
         windowOpen_ = true;
         windowStart_ = position;
         tryingSeconds_ = 0.0;
+        pathMetres_ = 0.0;
     }
     tryingSeconds_ += dt;
+    pathMetres_ += stepped;
     if (tryingSeconds_ < params_.windowSeconds) {
         return report;
     }
 
-    const double moved = std::hypot(position.x - windowStart_.x, position.z - windowStart_.z);
-    if (moved >= params_.minProgressMetres) {
+    if (pathMetres_ >= params_.minProgressMetres) {
         windowStart_ = position;
         tryingSeconds_ = 0.0;
+        pathMetres_ = 0.0;
         return report;
     }
 
@@ -251,6 +268,7 @@ StuckReport StuckDetector::step(const glm::dvec3& position, bool wantsToMove, co
     }
     windowStart_ = position;
     tryingSeconds_ = 0.0;
+    pathMetres_ = 0.0;
     return report;
 }
 

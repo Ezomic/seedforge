@@ -69,6 +69,8 @@ public:
     // The pace a walker keeps on blocked ground it is walking out of, where the assessment's own factors are zero.
     float crawlFactor() const { return params_.minSlopeFactor; }
 
+    double sizeMetres() const { return heightfield_.desc().sizeMetres; }
+
 private:
     const Heightfield& heightfield_;
     const WaterField* water_;
@@ -84,7 +86,7 @@ bool findWalkableSpawn(const ForgedWalking& walking, double aroundX, double arou
 
 struct StuckParams {
     double windowSeconds = 3.0;       // trying to move for this long...
-    double minProgressMetres = 0.75;  // ...without getting this far is stuck
+    double minProgressMetres = 0.75;  // ...without covering this much ground is stuck
     double safeSpacingMetres = 4.0;   // safe footing is remembered this far apart
     std::size_t safeHistory = 8;
     std::size_t recoverBack = 3;      // recover to the safe point this many remembered ones back
@@ -117,7 +119,9 @@ public:
 private:
     StuckParams params_;
     glm::dvec3 windowStart_{0.0};
+    glm::dvec3 lastPosition_{0.0};
     double tryingSeconds_ = 0.0;
+    double pathMetres_ = 0.0; // ground covered since the window opened: strafing in place is not stuck
     bool windowOpen_ = false;
     std::deque<glm::dvec3> safe_;
 };

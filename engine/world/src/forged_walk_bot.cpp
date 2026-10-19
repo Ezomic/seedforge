@@ -9,7 +9,9 @@ namespace {
 
 double flatDistance(const glm::dvec3& a, const glm::dvec3& b)
 {
-    return std::hypot(a.x - b.x, a.z - b.z);
+    const double dx = a.x - b.x;
+    const double dz = a.z - b.z;
+    return std::sqrt(dx * dx + dz * dz);
 }
 
 bool finite(const glm::dvec3& v)
