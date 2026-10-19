@@ -92,6 +92,7 @@ struct Options {
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
+    float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
     int settlement = -1; // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
@@ -143,6 +144,8 @@ bool parse(int argc, char** argv, Options& options)
             options.actor = argv[++i];
         } else if (arg == "--exile" && hasValue) {
             options.exile = argv[++i];
+        } else if (arg == "--overlook" && hasValue) {
+            if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
         } else if (arg == "--settlement" && hasValue) {
             if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
         } else if (arg == "--kit" && hasValue) {
@@ -964,6 +967,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+            if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
+                const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
+                const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
+                view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 1.2);
+                view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
         }
         const double cellMetres = heightfield.desc().cellMetres;
         for (const auto& [id, cell] : cells) {
@@ -1300,7 +1309,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
         return 2;
     }
 
