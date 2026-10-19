@@ -909,7 +909,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::PickCamera pickCamera;
     ichor::SurfaceWetness surfaceWetness;
-    float viewYaw = 0.0f;
+    // A forged world starts facing the place the spawn was searched around.
+    float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
     engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
         viewYaw = ichor::nextWalkYaw(viewYaw, input.lookX, dt);
         for (auto [entity, player, body] : scene.registry().view<const ichor::Player, ichor::CharacterBody>().each()) {
