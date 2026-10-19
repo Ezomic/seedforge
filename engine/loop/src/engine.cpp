@@ -78,7 +78,7 @@ bool Engine::frame(double frameSeconds)
         viewBuilder_(scene_, step_.alpha(), view_);
         renderer_.submit(view_);
     }
-    renderer_.debugText(std::format("frame {}  {:.1f} ms  tick {}  sim {:.2f} s{}{}", frameCount_, frameMillis_, scene_.tickCount(), scene_.time(),
+    renderer_.debugText(std::format("frame {}  {:.0f} fps  {:.1f} ms  tick {}  sim {:.2f} s{}{}", frameCount_, frameMillis_ > 0.0 ? 1000.0 / frameMillis_ : 0.0, frameMillis_, scene_.tickCount(), scene_.time(),
         replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
     renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
     if (overlayBuilder_) {
