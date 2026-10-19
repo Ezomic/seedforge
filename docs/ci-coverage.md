@@ -35,3 +35,16 @@ Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/
 2. **Closed by SEED-410:** `engine/tests/test_forge_determinism.cpp` pins the chained world hash and every phase hash of `forgeWorld` for 52 (size, seed) pairs against `engine/tests/data/forge_world_digests.json`, on both OSes. After an intended phase change, regenerate with `ICHOR_UPDATE_FORGE_DIGESTS=1 bin/build -t "forge world digests"` and commit the file.
 3. **The headless smoke run's hash is compared** (SEED-472). `tools/check_smoke_hash.py` checks the shipped executable's end-of-run state against `engine/tests/data/app_smoke_hash.txt`. The app populates its own scene, so this value differs from `determinism.json`'s `engine` entry on purpose. After an intended sim change, build `windows-ci` and run `python tools/check_smoke_hash.py engine/build/windows-ci/app/ichor.exe --update`.
 4. **A save of a fully forged world (not just the hydrology) is not round-tripped**, because the world is not yet baked to disk as in `docs/14-save-system.md`. Revisit when the campaign `world/` folder is written for real.
+
+## Nightly run (SEED-494)
+
+`.github/workflows/nightly.yml` runs every night at 02:17 UTC (and on demand: Actions, nightly, Run workflow, with optional `rounds` and `size` inputs). It is not a required check and is not path filtered; it runs against the default branch. One Linux job (`linux-headless-asan` preset, 30 minute timeout) builds once, then runs two steps, and the second runs even when the first fails so one night reports both problems:
+
+| Step | Command | Catches |
+|---|---|---|
+| ctest-stress | `bin/ctest-stress -p linux-headless-asan -n 3` (SEED-462) | Tests that pass alone but fail under parallel, random-order execution: shared scratch files, fixed paths, order dependence |
+| World sanity report | `python3 tools/world_sanity.py <ichor_forge_cli> --seeds 1-8 --size 128` (SEED-413) | World generator changes that push a fixed seed over a design check (`forge-cli --validate`, gates from `world_validation.h`) |
+
+On failure the job summary lists the flaky tests with their failure count per test, and for the world report each failing seed with the design check and cause (`FAIL seed 3: rejected by validation`, then `design check failed: <gate id>: <cause>`). The logs, `manifest.json` and `validation.json` are uploaded as the `nightly-logs` artifact.
+
+Run the same commands locally: `bin/build`, then `bin/ctest-stress -n 2` and `python tools/world_sanity.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe`. The seeds are fixed on purpose so a red night means a code change, not luck; change the range in the workflow when the world generator is retuned and the set should widen. `nightly.yml` is in the path filter of `engine.yml`, so editing it runs both required checks.
