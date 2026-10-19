@@ -5,6 +5,7 @@
 #include "ichor/world/hydrology.h"
 #include "ichor/world/water_mesh.h"
 #include "ichor/world/navmesh.h"
+#include "ichor/world/placed_loot.h"
 #include "ichor/world/placed_pois.h"
 #include "ichor/world/placed_settlements.h"
 #include "ichor/world/vegetation.h"
@@ -34,6 +35,7 @@ struct CellPayload {
     Mesh water;             // the cell's rivers and lakes; no vertices when water is off or the cell is dry
     std::vector<PlacedPoi> pois; // the forged settlements, dungeons and landmarks standing in the cell; empty without a PlacedPoiSet
     std::vector<PlacedBuilding> buildings; // the settlements' building clusters standing in the cell; empty without a PlacedBuildingSet
+    std::vector<PlacedLoot> loot; // the manifest items lying in the cell; empty without a PlacedLootSet
 };
 
 struct StreamerConfig {
@@ -58,6 +60,8 @@ struct StreamerConfig {
     std::shared_ptr<const PlacedPoiSet> pois;
     // The forged settlements' placeholder buildings (placeForgedSettlements). Without a set the payloads carry none.
     std::shared_ptr<const PlacedBuildingSet> buildings;
+    // The manifest's items (placeForgedLoot). Without a set the payloads carry none.
+    std::shared_ptr<const PlacedLootSet> loot;
 };
 
 // Keeps the cells around the player resident, building them on a worker
