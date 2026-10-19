@@ -138,7 +138,7 @@ TEST_CASE("the sanity row counts evaluated gates and numbers the failed ones", "
 
 TEST_CASE("the gallery caption changes when a check fails", "[forge_cli][gallery][sanity]")
 {
-    auto good = options(1, 3);
+    auto good = options(6, 8);
     good.thresholds = permissive();
     auto broken = good;
     broken.thresholds->minLandmarkCoveragePermille = 1000;
