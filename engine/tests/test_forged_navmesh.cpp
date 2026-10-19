@@ -15,8 +15,15 @@ using namespace ichor;
 
 namespace {
 
-constexpr int kGrid = 129;
-constexpr std::uint64_t kSeed = 26;
+worldforge::ForgeConfig lowRiverThreshold()
+{
+    worldforge::ForgeConfig config;
+    config.hydrology.riverThreshold = 48;
+    return config;
+}
+
+constexpr int kGrid = 257;
+constexpr std::uint64_t kSeed = 13;
 constexpr float kFord = 0.5f;
 
 struct Crossing {
@@ -65,7 +72,7 @@ std::unique_ptr<Fixture> makeFixtureOwned(std::uint64_t seed)
     base.metresPerSample = 8;
     base.cellMetres = 512;
     const WorldDesc desc = forgedWorldDesc(base);
-    auto owned = std::make_unique<Fixture>(desc, worldforge::forgeWorld(desc.seed, kGrid, {}, worldforge::ForgePhase::Hydrology));
+    auto owned = std::make_unique<Fixture>(desc, worldforge::forgeWorld(desc.seed, kGrid, lowRiverThreshold(), worldforge::ForgePhase::Hydrology));
     Fixture& f = *owned;
     REQUIRE(f.world.ok());
     ForgedHeightfield forged = heightfieldFromForgedWorld(f.world, f.desc);

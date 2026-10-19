@@ -1,4 +1,5 @@
 #include <forgecli/forge.h>
+#include <forgecli/overlay.h>
 #include <forgecli/png.h>
 
 #include <worldforge/world_validation.h>
@@ -69,13 +70,9 @@ bool writeFile(const std::filesystem::path& path, const std::vector<std::uint8_t
     return static_cast<bool>(f);
 }
 
-// Without --data no item or NPC ids are bound, so the quest gates stay open; the thresholds are otherwise the defaults.
 void validateSeed(const RunOptions& options, const worldforge::ForgeConfig& config, SeedRecord& record, RunResult& result)
 {
-    worldforge::GateThresholds thresholds;
-    thresholds.minQuestItems = 0;
-    thresholds.minQuestCast = 0;
-    const worldforge::ValidatedForge v = worldforge::forgeValidated(record.seed, options.size, config, thresholds);
+    const worldforge::ValidatedForge v = worldforge::forgeValidated(record.seed, options.size, config, sanityThresholds());
     record.validated = true;
     record.rejected = !v.accepted;
     const worldforge::ValidationReport& last = v.attempts.back().report;
@@ -89,6 +86,14 @@ void validateSeed(const RunOptions& options, const worldforge::ForgeConfig& conf
     result.validation += (result.validation.empty() ? "" : ",") + ("\n" + json);
 }
 
+}
+
+worldforge::GateThresholds sanityThresholds()
+{
+    worldforge::GateThresholds thresholds;
+    thresholds.minQuestItems = 0;
+    thresholds.minQuestCast = 0;
+    return thresholds;
 }
 
 std::string manifestJson(const RunOptions& options, const std::vector<SeedRecord>& seeds)
@@ -105,6 +110,7 @@ std::string manifestJson(const RunOptions& options, const std::vector<SeedRecord
             for (std::size_t c = 0; c < s.causes.size(); ++c) out += (c ? ", " : "") + jsonString(s.causes[c]);
             out += "]}";
         }
+        if (!s.overlay.empty()) out += ", \"overlay\": " + jsonString(s.overlay);
         out += ", \"layers\": [";
         for (std::size_t j = 0; j < s.layers.size(); ++j) {
             const LayerRecord& l = s.layers[j];
@@ -231,6 +237,19 @@ RunResult runForge(const RunOptions& in)
                 record.layers.push_back(std::move(lr));
             }
             if (!record.error.empty() || failedWrite) break;
+        }
+        if (!options.outDir.empty() && world && record.error.empty() && !failedWrite) {
+            const std::string overlay = overlayJson(*world);
+            if (!overlay.empty()) {
+                std::filesystem::create_directories(outDir / dirName, ec);
+                const std::vector<std::uint8_t> bytes(overlay.begin(), overlay.end());
+                if (ec || !writeFile(outDir / dirName / "overlay.json", bytes)) {
+                    result.error = "cannot write " + dirName + "/overlay.json";
+                    failedWrite = true;
+                } else {
+                    record.overlay = dirName + "/overlay.json";
+                }
+            }
         }
         if (options.validate && record.error.empty()) validateSeed(options, config, record, result);
         result.seeds.push_back(std::move(record));
