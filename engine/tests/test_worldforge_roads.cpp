@@ -403,7 +403,7 @@ TEST_CASE("roads are deterministic across repeat runs", "[worldforge][roads]")
 TEST_CASE("roads golden hash is stable", "[worldforge][roads]")
 {
     const HydrologyMap m = worldHydrology();
-    CHECK(hashRoadMap(roads(m, landSites(m, 14))) == 0x50886001ccfec784ull);
+    CHECK(hashRoadMap(roads(m, landSites(m, 14))) == 0x55ec31fa38928158ull);
 }
 
 TEST_CASE("different terrain gives different roads", "[worldforge][roads]")

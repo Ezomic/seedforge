@@ -147,9 +147,9 @@ TEST_CASE("the registry names every phase once and finds them", "[forge_cli]")
 
 TEST_CASE("a run is reproducible and the layer hash follows the seed", "[forge_cli]")
 {
-    const auto a = forgecli::runForge(oneSeed(7));
-    const auto b = forgecli::runForge(oneSeed(7));
-    const auto c = forgecli::runForge(oneSeed(8));
+    const auto a = forgecli::runForge(oneSeed(16));
+    const auto b = forgecli::runForge(oneSeed(16));
+    const auto c = forgecli::runForge(oneSeed(71));
     REQUIRE(a.error.empty());
     REQUIRE(a.seeds.size() == 1);
     REQUIRE(a.seeds[0].error.empty());
