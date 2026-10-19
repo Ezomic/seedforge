@@ -6,7 +6,7 @@ data/json/trainers.json. Fails when, under data/ or art/:
   1. a folder is named after an asset type (textures, audio, meshes, ...).
   2. a folder name is not lower snake_case, or the tree is nested deeper than MAX_DEPTH.
   3. a data/ file is not a snake_case .json (plus .gitkeep, and README.md at the data/ root).
-  4. an art/ file breaks its naming rule: textures T_PascalCase.png, meshes SM_/SK_PascalCase.fbx,
+  4. an art/ file breaks its naming rule: textures T_PascalCase.png, meshes SM_/SK_PascalCase.fbx or .glb,
      audio A_PascalCase.wav/.ogg, fonts Family-Style.ttf/.otf with a Family-OFL.txt licence,
      Blender sources and scripts snake_case. Backups (.blend1) and unknown extensions are rejected.
   5. two paths differ only by case (they collide on Windows and macOS).
@@ -39,6 +39,7 @@ SKIP_DIRS = {".git", "node_modules", "build", "__pycache__"}
 ART_RULES = {
     ".png": (rf"T_{PASCAL_NAME}(?:_view)?", "textures are T_PascalCase.png (or T_PascalCase_view.png for a preview render)"),
     ".fbx": (rf"S[MK]_{PASCAL_NAME}", "meshes are SM_ (static) or SK_ (skeletal) PascalCase.fbx"),
+    ".glb": (rf"S[MK]_{PASCAL_NAME}", "engine-ready meshes are SM_ (static) or SK_ (skeletal) PascalCase.glb"),
     ".wav": (rf"A_{PASCAL_NAME}", "audio is A_PascalCase.wav"),
     ".ogg": (rf"A_{PASCAL_NAME}", "audio is A_PascalCase.ogg"),
     ".ttf": (rf"{PASCAL}(?:-{PASCAL})?", "fonts are Family-Style.ttf"),
@@ -169,6 +170,8 @@ CLEAN = [
     "art/hoplite/T_Helmet_AO.png",
     "art/hoplite/SM_Aspis.fbx",
     "art/hoplite/SK_Hoplite.fbx",
+    "art/hoplite/SK_Hoplite.glb",
+    "art/hoplite/SM_Aspis.glb",
     "art/combat/A_WindupHeavy.wav",
     "art/combat/A_Hit.ogg",
     "art/ui/Cinzel.ttf",
@@ -202,6 +205,9 @@ def self_test():
         ("texture without prefix", "art-file", add("art/hoplite/Bronze.png")),
         ("texture in snake_case", "art-file", add("art/hoplite/t_bronze.png")),
         ("mesh with the texture prefix", "art-file", add("art/hoplite/T_Aspis.fbx")),
+        ("glb mesh without prefix", "art-file", add("art/hoplite/Aspis.glb")),
+        ("glb mesh with the texture prefix", "art-file", add("art/hoplite/T_Aspis.glb")),
+        ("glb mesh in snake_case", "art-file", add("art/hoplite/sm_aspis.glb")),
         ("audio without prefix", "art-file", add("art/combat/windup.wav")),
         ("blend in PascalCase", "art-file", add("art/hoplite/IchorKit.blend")),
         ("stray licence text", "art-file", add("art/ui/notes.txt")),

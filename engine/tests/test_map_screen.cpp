@@ -1,11 +1,13 @@
 #include "ichor/ui/map_screen.h"
 #include "ichor/ui/recording_renderer.h"
 #include "ichor/ui/ui_context.h"
+#include "ichor/world/map_layers.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <limits>
 
@@ -29,6 +31,17 @@ bool drewWhite(const RecordingUiRenderer& renderer)
     });
 }
 
+// The hash of the picture's texture in the last frame: the one draw bound to a texture.
+std::uint64_t pictureHash(const RecordingUiRenderer& renderer)
+{
+    for (const auto& draw : renderer.draws()) {
+        if (draw.textureHash != 0 && draw.firstColour.red == 255 && draw.firstColour.green == 255 && draw.firstColour.blue == 255) {
+            return draw.textureHash;
+        }
+    }
+    return 0;
+}
+
 MapImage sampleImage(std::uint32_t side)
 {
     MapImage image;
@@ -37,6 +50,29 @@ MapImage sampleImage(std::uint32_t side)
     image.rgba.assign(static_cast<std::size_t>(side) * side * 4, 255);
     return image;
 }
+
+const worldforge::ForgedWorld& layerWorld()
+{
+    worldforge::FactionSpec a;
+    worldforge::FactionSpec b;
+    b.strategy = worldforge::ClaimStrategy::ResourceFollowing;
+    b.oreWeight = 200;
+    worldforge::ForgeConfig config;
+    config.factions = {a, b};
+    static const worldforge::ForgedWorld world = [&] {
+        for (std::uint64_t seed = 1; seed < 40; ++seed) {
+            worldforge::ForgedWorld candidate = worldforge::forgeWorld(seed, 129, config, worldforge::ForgePhase::Politics);
+            const MapLayerStack stack(sampleImage(128), candidate);
+            if (stack.hasLayer(MapLayer::Biomes) && stack.hasLayer(MapLayer::Roads) && stack.hasLayer(MapLayer::Territories) && stack.hasLayer(MapLayer::Rivers)) {
+                return candidate;
+            }
+        }
+        FAIL("no seed forged a world with every layer");
+        return worldforge::forgeWorld(1, 129, config, worldforge::ForgePhase::Politics);
+    }();
+    return world;
+}
+
 
 struct Fixture {
     RecordingUiRenderer renderer;
@@ -197,4 +233,88 @@ TEST_CASE("a map screen can go while the context still lives, and another can ta
     again.setVisible(true);
     frame(f.ui, f.renderer, 0.2);
     REQUIRE(drewWhite(f.renderer));
+}
+
+TEST_CASE("toggling a map layer changes the picture that is drawn, and toggling it back restores it")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setLayerStack(MapLayerStack(sampleImage(128), layerWorld()));
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.0);
+    const std::uint64_t plain = pictureHash(f.renderer);
+    REQUIRE(plain != 0);
+
+    for (const MapLayer layer : {MapLayer::Biomes, MapLayer::Roads, MapLayer::Territories, MapLayer::Rivers}) {
+        INFO(mapLayerName(layer));
+        map.toggleLayer(layer);
+        REQUIRE(map.layers().on(layer));
+        frame(f.ui, f.renderer, 0.1);
+        REQUIRE(pictureHash(f.renderer) != plain);
+        map.toggleLayer(layer);
+        frame(f.ui, f.renderer, 0.2);
+        REQUIRE(pictureHash(f.renderer) == plain);
+    }
+}
+
+TEST_CASE("a map without a layer stack draws as it did and shows no layer buttons")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setImage(sampleImage(16));
+    map.setVisible(true);
+    map.setLayer(MapLayer::Biomes, true);
+    frame(f.ui, f.renderer, 0.0);
+    const std::uint64_t plain = pictureHash(f.renderer);
+    REQUIRE(plain != 0);
+    REQUIRE_FALSE(map.layerButtonCentre(MapLayer::Biomes).has_value());
+
+    map.setLayerStack(MapLayerStack(sampleImage(16), layerWorld()));
+    frame(f.ui, f.renderer, 0.1);
+    REQUIRE(pictureHash(f.renderer) != plain); // the layer set before the stack came is already on
+    map.setLayerStack(MapLayerStack{});
+    frame(f.ui, f.renderer, 0.2);
+    REQUIRE(pictureHash(f.renderer) == plain);
+}
+
+TEST_CASE("clicking a layer's button toggles that layer")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setLayerStack(MapLayerStack(sampleImage(128), layerWorld()));
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.0);
+    const std::uint64_t plain = pictureHash(f.renderer);
+    const auto centre = map.layerButtonCentre(MapLayer::Rivers);
+    REQUIRE(centre.has_value());
+
+    f.ui.mouseMove(static_cast<int>(centre->first), static_cast<int>(centre->second));
+    frame(f.ui, f.renderer, 0.1);
+    f.ui.mouseButton(0, true);
+    frame(f.ui, f.renderer, 0.2);
+    f.ui.mouseButton(0, false);
+    frame(f.ui, f.renderer, 0.3);
+    REQUIRE(map.layers().on(MapLayer::Rivers));
+    REQUIRE_FALSE(map.layers().on(MapLayer::Roads));
+    REQUIRE(pictureHash(f.renderer) != plain);
+}
+
+TEST_CASE("a new picture drops the old layers, and the layers survive a hidden map")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setLayerStack(MapLayerStack(sampleImage(64), layerWorld()));
+    map.toggleLayer(MapLayer::Biomes);
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.0);
+    const std::uint64_t layered = pictureHash(f.renderer);
+    map.setVisible(false);
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.1);
+    REQUIRE(pictureHash(f.renderer) == layered);
+
+    map.setImage(sampleImage(64));
+    frame(f.ui, f.renderer, 0.2);
+    REQUIRE(pictureHash(f.renderer) != layered);
+    REQUIRE_FALSE(map.layerButtonCentre(MapLayer::Biomes).has_value());
 }

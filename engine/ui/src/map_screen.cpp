@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <utility>
 #include <vector>
 
 namespace ichor {
@@ -30,11 +31,16 @@ constexpr const char* kMapDocument = R"(<rml><head><style>
     #picture { width: 100%; height: 100%; }
     #marker { position: absolute; left: 50%; top: 50%; width: 0px; height: 0px; }
     #dot { position: absolute; left: -6px; top: -6px; width: 8px; height: 8px; border-radius: 6px; background-color: #f0b040; border: 2px #10141a; }
+    #layers { text-align: center; padding-top: 12px; }
+    .layer { display: inline-block; font-family: Alegreya Sans; font-size: 19px; color: #8890a0; padding: 3px 12px 3px 12px; margin: 0px 4px 0px 4px; border: 2px #4a4430; }
+    .layer:hover { color: #e8d8a8; background-color: #2c3340; }
+    .layer.on { color: #10141a; background-color: #a08850; border-color: #e8d8a8; }
     #empty { font-family: Alegreya Sans; font-size: 19px; color: #8890a0; text-align: center; padding: 18px 0px 18px 0px; }
 </style></head><body>
     <div id="card"><div id="close">&#215;</div><div id="title">THE MAP</div>
         <div id="empty">The world is not drawn yet.</div>
         <div id="frame"><mappicture id="picture"></mappicture><mapmarker id="marker"><div id="dot"></div></mapmarker></div>
+        <div id="layers"><div class="layer" id="layer0">Biomes</div><div class="layer" id="layer1">Roads</div><div class="layer" id="layer2">Territories</div><div class="layer" id="layer3">Rivers</div></div>
     </div>
 </body></rml>)";
 
@@ -158,14 +164,31 @@ MapScreen::MapScreen(UiContext& ui)
     picture_ = document_->GetElementById("picture");
     marker_ = document_->GetElementById("marker");
     empty_ = document_->GetElementById("empty");
-    if (close_ == nullptr || frame_ == nullptr || picture_ == nullptr || marker_ == nullptr || empty_ == nullptr || dynamic_cast<MapPicture*>(picture_) == nullptr
+    layersRow_ = document_->GetElementById("layers");
+    if (layersRow_ == nullptr || close_ == nullptr || frame_ == nullptr || picture_ == nullptr || marker_ == nullptr || empty_ == nullptr || dynamic_cast<MapPicture*>(picture_) == nullptr
         || dynamic_cast<MapMarker*>(marker_) == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
-        close_ = frame_ = picture_ = marker_ = empty_ = nullptr;
+        close_ = frame_ = picture_ = marker_ = empty_ = layersRow_ = nullptr;
         return;
     }
     close_->AddEventListener("click", &click_);
+    for (std::size_t i = 0; i < kMapLayerCount; ++i) {
+        layerButtons_[i] = document_->GetElementById(std::format("layer{}", i));
+        if (layerButtons_[i] == nullptr) {
+            close_->RemoveEventListener("click", &click_);
+            ui_.unloadDocument(document_);
+            document_ = nullptr;
+            close_ = frame_ = picture_ = marker_ = empty_ = layersRow_ = nullptr;
+            layerButtons_ = {};
+            return;
+        }
+    }
+    for (std::size_t i = 0; i < kMapLayerCount; ++i) {
+        layerClicks_[i].screen = this;
+        layerClicks_[i].layer = static_cast<MapLayer>(i);
+        layerButtons_[i]->AddEventListener("click", &layerClicks_[i]);
+    }
     setImage(MapImage{});
 }
 
@@ -174,6 +197,11 @@ MapScreen::~MapScreen()
     if (close_ != nullptr) {
         // The element may live on until the context next updates, and the listener goes first.
         close_->RemoveEventListener("click", &click_);
+    }
+    for (std::size_t i = 0; i < kMapLayerCount; ++i) {
+        if (layerButtons_[i] != nullptr) {
+            layerButtons_[i]->RemoveEventListener("click", &layerClicks_[i]);
+        }
     }
     if (document_ != nullptr) {
         ui_.unloadDocument(document_);
@@ -197,6 +225,17 @@ std::optional<std::pair<float, float>> MapScreen::closeButtonCentre() const
     return std::pair{offset.x + size.x * 0.5f, offset.y + size.y * 0.5f};
 }
 
+std::optional<std::pair<float, float>> MapScreen::layerButtonCentre(MapLayer layer) const
+{
+    Rml::Element* button = layerButtons_[static_cast<std::size_t>(layer)];
+    if (button == nullptr || !visible_ || !stack_.hasLayer(layer)) {
+        return std::nullopt;
+    }
+    const Rml::Vector2f offset = button->GetAbsoluteOffset(Rml::BoxArea::Border);
+    const Rml::Vector2f size = button->GetBox().GetSize(Rml::BoxArea::Border);
+    return std::pair{offset.x + size.x * 0.5f, offset.y + size.y * 0.5f};
+}
+
 void MapScreen::setVisible(bool visible)
 {
     if (document_ == nullptr || visible == visible_) {
@@ -215,10 +254,44 @@ void MapScreen::setImage(const MapImage& image)
     if (document_ == nullptr) {
         return;
     }
-    const bool drawn = !image.empty();
-    static_cast<MapPicture*>(picture_)->setImage(drawn ? image : MapImage{});
+    plain_ = image.empty() ? MapImage{} : image;
+    stack_ = MapLayerStack{};
+    redraw();
+}
+
+void MapScreen::setLayerStack(MapLayerStack stack)
+{
+    if (document_ == nullptr) {
+        return;
+    }
+    stack_ = std::move(stack);
+    redraw();
+}
+
+void MapScreen::setLayer(MapLayer layer, bool on)
+{
+    if (document_ == nullptr || layers_.on(layer) == on) {
+        return;
+    }
+    layers_.set(layer, on);
+    redraw();
+}
+
+void MapScreen::redraw()
+{
+    const MapImage drawing = stack_.empty() ? plain_ : stack_.composite(layers_);
+    const bool drawn = !drawing.empty();
+    static_cast<MapPicture*>(picture_)->setImage(drawing);
     frame_->SetProperty("display", drawn ? "block" : "none");
     empty_->SetProperty("display", drawn ? "none" : "block");
+    bool anyLayer = false;
+    for (std::size_t i = 0; i < kMapLayerCount; ++i) {
+        const MapLayer layer = static_cast<MapLayer>(i);
+        anyLayer = anyLayer || stack_.hasLayer(layer);
+        layerButtons_[i]->SetProperty("display", stack_.hasLayer(layer) ? "inline-block" : "none");
+        layerButtons_[i]->SetClass("on", layers_.on(layer));
+    }
+    layersRow_->SetProperty("display", anyLayer ? "block" : "none");
 }
 
 void MapScreen::setPlayer(MapPoint where, float headingRadians)

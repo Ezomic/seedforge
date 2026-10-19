@@ -19,6 +19,8 @@ public:
         bool scissored = false;
         Rml::Rectanglei scissor;
         Rml::ColourbPremultiplied firstColour;
+        // A hash of the pixels of the texture the draw was bound to, 0 when it had none or it came from LoadTexture.
+        std::uint64_t textureHash = 0;
     };
 
     Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override;
@@ -43,6 +45,7 @@ private:
         Rml::ColourbPremultiplied firstColour;
     };
     std::map<Rml::CompiledGeometryHandle, Geometry> geometry_;
+    std::map<Rml::TextureHandle, std::uint64_t> textureHashes_;
     Rml::CompiledGeometryHandle next_ = 1;
     Rml::TextureHandle nextTexture_ = 1;
     std::vector<Draw> draws_;
