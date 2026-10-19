@@ -20,7 +20,7 @@ std::int32_t chebyshev(CellId a, CellId b)
 
 // One grid at a given sample stride, with a skirt dropped around the edge so
 // a coarser neighbour never shows a crack.
-Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std::uint32_t stride)
+Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std::uint32_t stride, const ForgedBiomeField* biomes)
 {
     const WorldDesc& desc = heightfield.desc();
     const std::uint32_t side = cell.samplesPerSide;
@@ -43,6 +43,10 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
         v.position = {static_cast<float>(vx) * spacing, h - drop, static_cast<float>(vz) * spacing};
         v.normal = heightfield.normalAt(originX + v.position.x, originZ + v.position.z);
         v.tangent = {1.0f, 0.0f, 0.0f, 1.0f};
+        if (biomes != nullptr) {
+            const glm::vec3 splat = biomes->splatAt(originX + v.position.x, originZ + v.position.z);
+            v.tangent = {splat, -1.0f};
+        }
         v.uv = {static_cast<float>(originX + v.position.x) / 8.0f, static_cast<float>(originZ + v.position.z) / 8.0f};
         v.weights[0] = 65535;
         mesh.boundsMin = glm::min(mesh.boundsMin, v.position);
@@ -134,7 +138,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     out.buildings = config.buildings ? config.buildings->inCell(id) : std::vector<PlacedBuilding>{};
     out.loot = config.loot ? config.loot->inCell(id) : std::vector<PlacedLoot>{};
     if (lodCount > 0) {
-        out.lods.push_back(buildLod(heightfield, out.cell, 1));
+        out.lods.push_back(buildLod(heightfield, out.cell, 1, config.biomes.get()));
     }
     std::size_t reduction = 1;
     for (std::uint32_t lod = 1; lod < lodCount; ++lod) {
@@ -142,12 +146,16 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
         out.lods.push_back(simplifyLod(out.lods[0], static_cast<float>(heightfield.desc().metresPerSample), reduction));
     }
     if (config.vegetation) {
-        scatterVegetation(heightfield, id, config.plants, out.plants);
+        if (config.biomes && !config.biomes->empty()) {
+            scatterBiomeVegetation(heightfield, *config.biomes, id, config.plants, out.plants);
+        } else {
+            scatterVegetation(heightfield, id, config.plants, out.plants);
+        }
     }
     if (config.water && hydrology != nullptr) {
         out.water = buildWaterMesh(heightfield, *hydrology, config.rivers, id, config.waterMesh);
     }
-    if (config.navmesh && !buildNavTile(heightfield, id, config.nav, out.nav)) {
+    if (config.navmesh && !buildNavTile(heightfield, id, config.nav, out.nav, config.navSurface.get())) {
         logf(LogLevel::Warn, "navmesh: cell {},{} failed to build", id.x, id.z);
         out.nav.data.clear();
     }
