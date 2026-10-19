@@ -200,6 +200,26 @@ std::uint64_t ForgedGame::stateHash() const
             h = hashCombine(h, std::bit_cast<std::uint64_t>(building.z));
         }
     }
+    if (loot) {
+        for (const PlacedLoot& item : loot->all()) {
+            h = hashCombine(h, hash64(item.itemId));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(item.x));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(item.z));
+        }
+    }
+    if (cast) {
+        for (const NpcSpawn& npc : cast->all()) {
+            h = hashCombine(h, hash64(npc.npcId));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(npc.x));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(npc.z));
+            h = hashCombine(h, scheduleDigest(npc.schedule));
+        }
+    }
+    if (quests) {
+        for (const QuestInstance& quest : quests->all()) {
+            h = hashCombine(h, quest.graphDigest);
+        }
+    }
     for (const std::uint8_t tier : tiers.tiers) {
         h = hashCombine(h, tier);
     }
@@ -210,7 +230,7 @@ std::uint64_t ForgedGame::stateHash() const
     return h;
 }
 
-std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const WorldDesc& requested)
+std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const WorldDesc& requested, const ForgedContentInputs& content)
 {
     auto game = std::make_unique<ForgedGame>();
     if (!result.world) {
@@ -276,6 +296,35 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
         game->error = "region tiers: " + game->tiers.error;
         return game;
     }
+    if (!content.lootCatalogue.empty() && world.manifest()) {
+        // Content is optional: one that cannot be placed is left out and named, the terrain and the rest still play.
+        PlacedLootResult loot = placeForgedLoot(world, *game->pois, content.lootCatalogue, game->heightfield);
+        if (loot.ok()) {
+            game->loot = std::make_shared<const PlacedLootSet>(std::move(loot.set));
+        } else {
+            game->contentProblems.push_back("loot: " + loot.error);
+        }
+    }
+    if (world.manifest() && !world.manifest()->cast.empty()) {
+        PlacedCast cast = placeForgedCast(world, *game->pois, game->heightfield, content.cast);
+        if (cast.ok()) {
+            game->cast = std::make_shared<const PlacedCastSet>(std::move(cast.set));
+        } else {
+            game->contentProblems.push_back("cast: " + cast.error);
+        }
+    }
+    if (content.questRules && world.manifest()) {
+        PlacedQuests quests = placeManifestQuests(*world.manifest(), *content.questRules);
+        if (quests.ok()) {
+            game->quests = std::make_shared<const PlacedQuestSet>(std::move(quests.set));
+        } else {
+            game->contentProblems.push_back("quests: " + quests.error);
+        }
+    }
+    if (content.skeletons && world.manifest()) {
+        game->skeletons = content.skeletons;
+        game->dungeons = std::make_unique<DungeonLayouts>(*world.manifest(), *game->skeletons);
+    }
     game->mapLayers = MapLayerStack(renderMapImage(game->heightfield), world);
 
     std::vector<std::pair<double, double>> towns;
@@ -304,6 +353,51 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     return game;
 }
 
+ForgedContentSetup loadForgedContentSetup(const DataSet& data, const std::filesystem::path& dataDir)
+{
+    ForgedContentSetup setup;
+    for (const char* tableName : {"notable_items", "catalogue"}) {
+        const DataTable* table = data.table(tableName);
+        if (table == nullptr) {
+            setup.problems.push_back(std::string("there is no ") + tableName + " table, so those items are not placed");
+            continue;
+        }
+        for (const auto& [id, record] : table->records) {
+            if (std::find(setup.config.itemIds.begin(), setup.config.itemIds.end(), id) != setup.config.itemIds.end()) {
+                setup.problems.push_back("item " + id + " is in two tables; the second is not placed");
+                continue;
+            }
+            const auto text = [&](const char* key) {
+                const auto it = record.fields.find(key);
+                return it != record.fields.end() && std::holds_alternative<std::string>(it->second) ? std::get<std::string>(it->second) : std::string{};
+            };
+            setup.inputs.lootCatalogue.push_back({id, text("tier"), text("class")});
+            setup.config.itemIds.push_back(id);
+        }
+    }
+    setup.config.npcArchetypes = {"smith", "priest", "merchant", "ferryman", "healer", "guard"};
+
+    auto skeletons = std::make_shared<DungeonSkeletonCatalog>(DungeonSkeletonCatalog::loadDirectory(dataDir / "dungeon_skeletons"));
+    for (const std::string& error : skeletons->errors()) {
+        setup.problems.push_back("dungeon skeleton: " + error);
+    }
+    for (const DungeonSkeleton& skeleton : skeletons->all()) {
+        auto& themes = setup.config.dungeonArchetypes;
+        if (std::find(themes.begin(), themes.end(), skeleton.theme) == themes.end()) {
+            themes.push_back(skeleton.theme);
+        }
+    }
+    setup.inputs.skeletons = std::move(skeletons);
+
+    graph::quest::Ruleset rules = graph::quest::loadRuleset(dataDir / "quests" / "expansion_rules.json");
+    if (rules.error.empty()) {
+        setup.inputs.questRules = std::make_shared<const graph::quest::Ruleset>(std::move(rules));
+    } else {
+        setup.problems.push_back("quest rules: " + rules.error);
+    }
+    return setup;
+}
+
 ForgedScenery buildForgedScenery(const ForgedGame& game)
 {
     ForgedScenery scenery;
@@ -321,6 +415,8 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
     material("dungeon", {0.30f, 0.20f, 0.36f}, 0.8f);
     material("landmark", {0.62f, 0.60f, 0.54f}, 0.85f);
     material("building", {0.55f, 0.52f, 0.48f}, 0.9f);
+    material("loot", {0.85f, 0.70f, 0.20f}, 0.6f);
+    material("npc", {0.30f, 0.42f, 0.62f}, 0.8f);
 
     const auto push = [&](Mesh mesh, std::uint32_t materialIndex) {
         for (Submesh& submesh : mesh.submeshes) {
@@ -352,6 +448,8 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
         }
     }
     scenery.buildingMesh = push(placedBuildingMesh(0.5f, 0.5f, 1.0f, 0.0f), 4);
+    scenery.lootMesh = push(placedBuildingMesh(0.5f, 0.5f, 1.0f, 0.0f), 5);
+    scenery.castMesh = push(placedBuildingMesh(0.5f, 0.5f, 1.0f, 0.0f), 6);
     return scenery;
 }
 

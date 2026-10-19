@@ -17,6 +17,9 @@ if(ENGINE_RUNTIME)
     )
     target_compile_definitions(stage0 PRIVATE ICHOR_CONTENT_DIR="${ICHOR_CONTENT_DIR}" ICHOR_SHADER_DIR="${ICHOR_SHADER_DIR}" ICHOR_ART_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../art")
     add_dependencies(stage0 ichor_content)
+    add_executable(stage0_bull_shot tools/bull_shot_main.cpp)
+    target_link_libraries(stage0_bull_shot PRIVATE ichor_stage0 ichor_assets ichor_gfx_vulkan)
+    target_compile_definitions(stage0_bull_shot PRIVATE ICHOR_ART_DIR="${ICHOR_ART_DIR}")
     if(WIN32)
         add_custom_command(TARGET stage0 POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:stage0> $<TARGET_FILE_DIR:stage0>

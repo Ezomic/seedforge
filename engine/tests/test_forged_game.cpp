@@ -1,3 +1,4 @@
+#include "ichor/data/data_set.h"
 #include "ichor/world/forge_job.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/world/streamer.h"
@@ -283,4 +284,123 @@ TEST_CASE("a navmesh built over a forged cell leaves the water out", "[forged_ga
     if (wetCell) {
         CHECK(walledBytes < openBytes);
     }
+}
+
+namespace {
+
+constexpr int kContentGrid = 128;
+
+struct Content {
+    ForgedContentSetup setup;
+    std::unique_ptr<ForgedGame> game;
+};
+
+Content contentFor(std::uint64_t seed)
+{
+    DataSet data;
+    REQUIRE(data.loadDirectory(ICHOR_GAME_DATA_DIR));
+    Content out;
+    out.setup = loadForgedContentSetup(data, ICHOR_GAME_DATA_DIR);
+    ForgeJob job(descFor(seed), kContentGrid, {}, out.setup.config);
+    REQUIRE(job.start());
+    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    INFO(job.error());
+    REQUIRE(job.state() == ForgeJobState::Done);
+    out.game = buildForgedGame(*job.result(), descFor(seed), out.setup.inputs);
+    INFO(out.game->error);
+    REQUIRE(out.game->ok());
+    return out;
+}
+
+}
+
+TEST_CASE("the shipped data gives the forge items, cast and dungeon themes", "[forged_game][content]")
+{
+    DataSet data;
+    REQUIRE(data.loadDirectory(ICHOR_GAME_DATA_DIR));
+    const ForgedContentSetup setup = loadForgedContentSetup(data, ICHOR_GAME_DATA_DIR);
+    CHECK(setup.problems.empty());
+    CHECK_FALSE(setup.config.itemIds.empty());
+    CHECK_FALSE(setup.config.npcArchetypes.empty());
+    CHECK_FALSE(setup.config.dungeonArchetypes.empty());
+    CHECK(setup.inputs.questRules);
+    CHECK(setup.inputs.skeletons);
+}
+
+TEST_CASE("a forged game with content places loot, cast, quests and dungeons deterministically", "[forged_game][content]")
+{
+    const Content a = contentFor(1);
+    const Content b = contentFor(1);
+    const Content c = contentFor(2);
+    REQUIRE(a.game->loot);
+    REQUIRE(a.game->cast);
+    REQUIRE(a.game->quests);
+    REQUIRE(a.game->dungeons);
+    CHECK_FALSE(a.game->loot->empty());
+    CHECK_FALSE(a.game->cast->empty());
+    CHECK_FALSE(a.game->quests->all().empty());
+    CHECK_FALSE(a.game->dungeons->poiIds().empty());
+    CHECK(a.game->stateHash() == b.game->stateHash());
+    CHECK(a.game->stateHash() != c.game->stateHash());
+    // The content is part of the hash: the same world without it hashes differently.
+    CHECK(a.game->stateHash() != gameFor(1)->stateHash());
+}
+
+TEST_CASE("the streamer hands every loot item and cast member out once, in the cell it lies in", "[forged_game][content]")
+{
+    const Content content = contentFor(1);
+    const ForgedGame& game = *content.game;
+    StreamerConfig config;
+    config.loot = game.loot;
+    config.cast = game.cast;
+    config.lodCount = 0;
+    std::size_t loot = 0;
+    std::size_t cast = 0;
+    for (std::uint32_t z = 0; z < game.desc.cellsPerSide(); ++z) {
+        for (std::uint32_t x = 0; x < game.desc.cellsPerSide(); ++x) {
+            CellPayload payload;
+            WorldStreamer::buildPayload(game.heightfield, {static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)}, config, payload);
+            loot += payload.loot.size();
+            cast += payload.cast.size();
+            for (const NpcSpawn& npc : payload.cast) {
+                CHECK(game.heightfield.cellAt(npc.x, npc.z) == CellId{static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)});
+            }
+        }
+    }
+    CHECK(loot == game.loot->all().size());
+    CHECK(cast == game.cast->all().size());
+}
+
+TEST_CASE("a dungeon layout bakes once and every manifest slot has a usable skeleton or is named", "[forged_game][content]")
+{
+    const Content content = contentFor(1);
+    DungeonLayouts& dungeons = *content.game->dungeons;
+    const std::vector<std::string> ids = dungeons.poiIds();
+    REQUIRE_FALSE(ids.empty());
+    const DungeonLayoutResult first = dungeons.layout(ids.front());
+    REQUIRE(first.ok());
+    CHECK(dungeons.layout(ids.front()).dungeon == first.dungeon);
+    CHECK(dungeons.bakedCount() == 1);
+    CHECK(dungeons.unknownArchetypes().empty());
+}
+
+TEST_CASE("content that cannot be placed is left out and named, and the game still builds", "[forged_game][content]")
+{
+    Content content = contentFor(1);
+    ForgedContentInputs broken = content.setup.inputs;
+    broken.lootCatalogue.push_back(broken.lootCatalogue.front()); // one id twice: the loot is refused whole
+    ForgeJob job(descFor(1), kContentGrid, {}, content.setup.config);
+    REQUIRE(job.start());
+    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    REQUIRE(job.state() == ForgeJobState::Done);
+    const auto game = buildForgedGame(*job.result(), descFor(1), broken);
+    REQUIRE(game->ok());
+    CHECK_FALSE(game->loot);
+    CHECK(game->contentProblems.size() == 1);
+    CHECK(game->cast);
+    CHECK(game->quests);
 }

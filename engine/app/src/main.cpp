@@ -36,6 +36,7 @@
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
+#include "ichor/gfx/walk_camera.h"
 #include "ichor/gfx/vulkan_renderer.h"
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
@@ -53,6 +54,8 @@
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_game.h"
+#include "ichor/npc/schedule.h"
+#include "ichor/ui/journal_screen_model.h"
 #include "ichor/world/hydrology_cache.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
@@ -72,6 +75,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -106,7 +110,8 @@ struct Options {
     bool showNewGame = false;
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
-    std::string screenshot; // where to save the last frame of a windowed run; empty is none
+    std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
+    bool showWindow = false; // with --screenshot: a visible window, only to compare it with the hidden render
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
@@ -176,6 +181,8 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
+        } else if (arg == "--show-window") {
+            options.showWindow = true;
         } else if (arg == "--screenshot" && hasValue) {
             options.screenshot = argv[++i];
         } else if (arg == "--editor") {
@@ -283,7 +290,16 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
 {
     ichor::WorldDesc desc;
     desc.seed = options.seed;
-    ichor::NewGameFlow flow(true, options.forgedGrid);
+    // The manifest names the items, cast and dungeon themes the data layer has, so the forge is given them.
+    ichor::DataSet contentData;
+    if (!contentData.loadDirectory(options.data)) {
+        ichor::logf(ichor::LogLevel::Warn, "data: {}", contentData.lastError());
+    }
+    ichor::ForgedContentSetup content = ichor::loadForgedContentSetup(contentData, options.data);
+    for (const std::string& problem : content.problems) {
+        ichor::logf(ichor::LogLevel::Warn, "forged content: {}", problem);
+    }
+    ichor::NewGameFlow flow(true, options.forgedGrid, content.config);
     flow.begin(desc);
 
     std::unique_ptr<ichor::UiContext> ui;
@@ -348,19 +364,28 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
         ichor::log(ichor::LogLevel::Error, "the forge finished with no world");
         return ForgeOutcome::Failed;
     }
-    out = ichor::buildForgedGame(*job->result(), desc);
+    out = ichor::buildForgedGame(*job->result(), desc, content.inputs);
     if (!out->ok()) {
         ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", out->error);
         return ForgeOutcome::Failed;
     }
+    for (const std::string& problem : out->contentProblems) {
+        ichor::logf(ichor::LogLevel::Warn, "forged content left out: {}", problem);
+    }
+    ichor::logf(ichor::LogLevel::Info, "forged content: {} items, {} cast, {} quests ({} refused), {} dungeon slots", out->loot ? out->loot->all().size() : 0, out->cast ? out->cast->all().size() : 0,
+        out->quests ? out->quests->all().size() : 0, out->quests ? out->quests->refused().size() : 0, out->dungeons ? out->dungeons->poiIds().size() : 0);
     ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", out->stateHash(), out->spawn.x, out->spawn.z, out->spawn.groundY, out->spawn.found ? "" : " (no gentle dry ground found)");
     return ForgeOutcome::Built;
 }
 
 int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
-    if (!platform.init({}) || !renderer.init()) {
+    const bool hidden = !options.screenshot.empty() && !options.showWindow;
+    if (!platform.init({.hidden = hidden}) || !renderer.init()) {
         return 1;
+    }
+    if (!options.screenshot.empty()) {
+        ichor::log(ichor::LogLevel::Info, hidden ? "screenshot: hidden window, fixed frame step, no pacing" : "screenshot: visible window, fixed frame step");
     }
     // No playback device is not a reason not to run; cues then go to the null host.
     ichor::NullAudio silent;
@@ -463,6 +488,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const ichor::Heightfield& heightfield = forged ? forged->heightfield : standInHeightfield;
     // The roads, points of interest and buildings are grey-box meshes uploaded once; the view draws the ones in resident cells.
     ichor::ForgedScenery scenery;
+    std::set<std::string> bakedDungeons;
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
     if (forged) {
@@ -477,7 +503,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
     }
     ichor::StreamerConfig streaming;
-    streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
+    streaming.synchronous = options.headless || !options.screenshot.empty(); // a replay or an unthrottled screenshot must see the same cells on the same frames
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
     streaming.vegetation = !options.headless;
     streaming.water = !options.headless;
@@ -495,6 +521,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
+        streaming.loot = forged->loot;
+        streaming.cast = forged->cast;
         waterField = forged->waterField.get();
     } else if (!heightfield.empty()) {
         hydrology = std::make_shared<const ichor::Hydrology>(ichor::loadOrComputeHydrology(options.world, heightfield));
@@ -639,6 +667,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         glm::dvec3 origin{0.0};
         std::vector<ichor::PlacedPoi> pois;
         std::vector<ichor::PlacedBuilding> buildings;
+        std::vector<ichor::PlacedLoot> loot;
+        std::vector<ichor::NpcSpawn> cast;
     };
     std::map<ichor::CellId, ResidentCell> cells;
     streamer.onLoaded([&](const ichor::CellPayload& payload) {
@@ -651,6 +681,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         cell.water = renderer.uploadWaterCell(payload.water);
         cell.pois = payload.pois;
         cell.buildings = payload.buildings;
+        cell.loot = payload.loot;
+        cell.cast = payload.cast;
         engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
             static_cast<float>(heightfield.desc().metresPerSample));
         cells[payload.cell.id] = cell;
@@ -700,6 +732,28 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (forged) {
                 const glm::dvec3 feet = playerPosition(scene);
                 lines.push_back(std::format("region tier {} of {}", forged->tiers.tierAt(feet.x, feet.z), forged->tiers.tierCount));
+                // A dungeon bakes its layout when the player comes within reach, once; the result is cached.
+                constexpr double kApproachM = 80.0;
+                if (forged->dungeons && forged->pois) {
+                    for (const ichor::PlacedPoi& poi : forged->pois->all()) {
+                        if (poi.kind != ichor::PlacedPoiKind::Dungeon || std::hypot(poi.x - feet.x, poi.z - feet.z) > kApproachM) continue;
+                        const ichor::DungeonLayoutResult layout = forged->dungeons->layout(poi.id);
+                        if (bakedDungeons.insert(poi.id).second) {
+                            if (layout.ok()) {
+                                ichor::logf(ichor::LogLevel::Info, "dungeon {} ({}) baked: skeleton {}, {} rooms", poi.id, poi.archetype, layout.dungeon->skeletonId, layout.dungeon->cells.size());
+                            } else {
+                                ichor::logf(ichor::LogLevel::Warn, "dungeon {} could not be baked: {}", poi.id, layout.error);
+                            }
+                        }
+                        if (layout.ok()) {
+                            lines.push_back(std::format("dungeon {}: {}, {} rooms", poi.id, layout.dungeon->skeletonId, layout.dungeon->cells.size()));
+                        }
+                        break;
+                    }
+                }
+                if (forged->quests && !forged->quests->all().empty()) {
+                    lines.push_back(std::format("tracking {} ({} quests; J lists them)", forged->quests->all().front().id, forged->quests->all().size()));
+                }
             }
             const float hour = ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
             lines.push_back(std::format("time {:02}:{:02}", static_cast<int>(hour), static_cast<int>((hour - std::floor(hour)) * 60.0f)));
@@ -898,7 +952,16 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                     ledger->setRows(rows);
                 }
                 if (journalScreen->visible()) {
-                    ichor::bindJournalModel(*journalScreen, ichor::journalEntries(chronicle.entries(), config.fixedDt));
+                    std::vector<ichor::JournalModelEntry> entries = ichor::journalEntries(chronicle.entries(), config.fixedDt);
+                    if (forged && forged->quests) {
+                        // The forged world's quests, as prose lines the journal lists; the first is the one tracked.
+                        for (const ichor::QuestInstance& quest : forged->quests->all()) {
+                            entries.push_back({0, "quest", std::string(ichor::kJournalCategory),
+                                std::format("{} ({}): {} between {} and {}, {} beats.", quest.id, quest.id == forged->quests->all().front().id ? "tracked" : "open", quest.tensionKind, quest.poiA, quest.poiB, quest.beats.size()),
+                                static_cast<std::uint8_t>(quest.intensity)});
+                        }
+                    }
+                    ichor::bindJournalModel(*journalScreen, entries);
                 }
                 mapBinding->setVisible(mapScreen->visible());
                 if (characterScreen->visible()) {
@@ -958,7 +1021,6 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
-            const glm::dvec3 target = forged ? anchor + glm::dvec3(forgedLook.x, 1.1, forgedLook.y) : anchor + glm::dvec3(0.0, 0.55, 0.0);
             const glm::dvec3 feet = blend(previous, transform).first;
             const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
@@ -966,7 +1028,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (options.compassTarget) {
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
-            view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+            view.camera.rotation = ichor::walkCameraRotation();
             if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
                 const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
                 const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
@@ -995,6 +1057,23 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 if (const auto mesh = scenery.poiMesh.find(poi.id); mesh != scenery.poiMesh.end()) {
                     view.instances.push_back({sceneryBase + mesh->second, {poi.x, static_cast<double>(poi.groundY), poi.z}});
                 }
+            }
+            for (const ichor::PlacedLoot& item : cell.loot) {
+                ichor::RenderInstance instance;
+                instance.mesh = sceneryBase + scenery.lootMesh;
+                instance.position = {item.x, static_cast<double>(item.groundY), item.z};
+                instance.basis = glm::mat3(glm::vec3(0.5f, 0.0f, 0.0f), glm::vec3(0.0f, 0.4f, 0.0f), glm::vec3(0.0f, 0.0f, 0.5f));
+                view.instances.push_back(instance);
+            }
+            for (const ichor::NpcSpawn& npc : cell.cast) {
+                // Whoever is asleep by their schedule is indoors and not drawn.
+                const auto state = ichor::stateAt(npc.schedule, hour);
+                if (state && *state == ichor::ScheduleState::Sleep) continue;
+                ichor::RenderInstance instance;
+                instance.mesh = sceneryBase + scenery.castMesh;
+                instance.position = {npc.x, static_cast<double>(npc.groundY), npc.z};
+                instance.basis = glm::mat3(glm::vec3(0.6f, 0.0f, 0.0f), glm::vec3(0.0f, 1.8f, 0.0f), glm::vec3(0.0f, 0.0f, 0.6f));
+                view.instances.push_back(instance);
             }
             if (scenery.kitLoaded) {
                 for (const ichor::KitInstance& piece : forged->kit->inCell(id)) {
@@ -1209,7 +1288,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
-        const double dt = options.headless ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
+        const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
@@ -1309,7 +1388,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
@@ -1333,6 +1412,10 @@ int main(int argc, char** argv)
 
     ichor::SdlPlatform platform;
     ichor::VulkanRenderer renderer(platform);
+    if (!options.screenshot.empty()) {
+        ichor::NullAudio audio; // a screenshot run plays nothing on the owner's speakers
+        return run(platform, renderer, audio, options);
+    }
     ichor::MiniaudioDevice audio;
     return run(platform, renderer, audio, options);
 }
