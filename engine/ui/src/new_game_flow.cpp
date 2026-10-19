@@ -6,9 +6,10 @@
 
 namespace ichor {
 
-NewGameFlow::NewGameFlow(bool forged, int gridSize)
+NewGameFlow::NewGameFlow(bool forged, int gridSize, worldforge::ForgeConfig config)
     : forged_(forged)
     , gridSize_(gridSize)
+    , config_(std::move(config))
 {
 }
 
@@ -28,7 +29,7 @@ void NewGameFlow::begin(const WorldDesc& desc)
         stage_ = NewGameStage::Ready;
         return;
     }
-    job_ = std::make_unique<ForgeJob>(desc, gridSize_);
+    job_ = std::make_unique<ForgeJob>(desc, gridSize_, PhaseObserver{}, config_);
     job_->start();
     stage_ = NewGameStage::Forging;
 }

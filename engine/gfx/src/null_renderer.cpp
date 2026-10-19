@@ -61,6 +61,8 @@ void NullRenderer::submit(const RenderView& view)
     }
     terrainDraws_ += view.terrain.size();
     vegetationDraws_ += view.vegetation.size();
+    waterDraws_ += view.waterCells.size();
+    lastDraws_ = view.terrain.size() + view.vegetation.size() + view.waterCells.size() + view.instances.size();
 }
 
 void NullRenderer::endFrame()

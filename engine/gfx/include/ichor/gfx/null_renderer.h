@@ -3,6 +3,7 @@
 #include "ichor/gfx/renderer.h"
 
 #include <cstdint>
+#include <cstddef>
 #include <set>
 
 namespace ichor {
@@ -33,6 +34,8 @@ public:
     std::size_t terrainCellsHeld() const { return cells_.size(); }
     std::size_t vegetationCellsHeld() const { return plantCells_.size(); }
     std::uint64_t vegetationDrawsSubmitted() const { return vegetationDraws_; }
+    std::uint64_t waterDrawsSubmitted() const { return waterDraws_; }
+    std::size_t lastDrawCount() const { return lastDraws_; } // terrain, vegetation, water and instance draws in the latest view
 
 private:
     std::uint64_t begun_ = 0;
@@ -47,6 +50,8 @@ private:
     std::set<std::uint32_t> plantCells_;
     std::uint32_t nextPlantCell_ = 0;
     std::uint64_t vegetationDraws_ = 0;
+    std::uint64_t waterDraws_ = 0;
+    std::size_t lastDraws_ = 0;
 };
 
 }
