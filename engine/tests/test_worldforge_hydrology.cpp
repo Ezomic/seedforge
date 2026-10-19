@@ -98,7 +98,7 @@ TEST_CASE("hydrology is deterministic across repeat runs", "[worldforge][hydrolo
 
 TEST_CASE("hydrology golden hash is stable", "[worldforge][hydrology]")
 {
-    CHECK(hashHydrologyMap(hydrology(makeEroded(kSeed, 128, 96, 12))) == 0x3f7c8bac3bfe7690ull);
+    CHECK(hashHydrologyMap(hydrology(makeEroded(kSeed, 128, 96, 12))) == 0xc7281ce62503dcf0ull);
 }
 
 TEST_CASE("hydrology does not mutate the input and keeps the grid", "[worldforge][hydrology]")

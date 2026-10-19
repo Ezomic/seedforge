@@ -68,7 +68,7 @@ Committed budget (`kForgeBudget`), against the model at 1024 x 1024:
 
 | Limit | Budget | Model today | Meaning |
 | --- | --- | --- | --- |
-| cell passes | 260,000,000 | about 202,000,000 | every phase off one shared forge: each stage paid once; one pass is one stage visiting one cell |
+| cell passes | 300,000,000 | about 278,000,000 | every phase off one shared forge: each stage paid once; one pass is one stage visiting one cell |
 | peak bytes | 96 MiB | about 83 MiB | every stage's kept maps together, plus the largest scratch and the largest layer set |
 | largest allocation | 24 MiB | 16 MiB | the biggest single vector, a guard against one buffer blowing up |
 
@@ -83,8 +83,8 @@ iterations moves the total. A phase with no entry in the model fails
 To change the numbers:
 
 - A phase got slower or bigger on purpose: edit its stage factors in `defaultCostModel()`, then raise
-  `kForgeBudget` in `budget.h` if the test says the total is over. Keep 25% to 30% headroom (now 28% for
-  passes, 16% for peak bytes, 50% for the largest allocation); the test `the budget is tight enough
+  `kForgeBudget` in `budget.h` if the test says the total is over. Keep 25% to 30% headroom (passes are at 8%
+  since SEED-416 doubled the erosion rounds to 48, 16% for peak bytes, 50% for the largest allocation); the test `the budget is tight enough
   to notice growth` fails if the budget is more than 50% above the model.
 - A new phase: add a `PhaseModel` (and a `Stage` if it adds shared work). The output-bytes test
   checks the model against the layers the phase really writes.

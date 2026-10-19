@@ -76,7 +76,7 @@ into the heightfield.
 > the most immersion-breaking thing a generated world can do, and everyone notices.
 
 > **Tuned defaults (SEED-416).** Chosen by eye in the map viewer at the 1024 grid (4 m per cell), checked
-> at 256, over eight fixed seeds. `ErosionParams`: 24 rounds, 2 thermal passes, strength 128, erode 160,
+> at 256, over eight fixed seeds. `ErosionParams`: 48 rounds, 2 thermal passes, strength 128, erode 160,
 > deposit 128, thermal 128, talus 5 m. `HydrologyParams`: river threshold 700 cells, carve 128 per sqrt(flow),
 > deepest channel 60 m. A softer set left the terrain close to the raw tectonics; a heavier set (160 rounds,
 > threshold 250) turned plains into dense comb-like river networks. Changing any of these changes every

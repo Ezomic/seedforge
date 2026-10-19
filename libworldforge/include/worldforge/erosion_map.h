@@ -40,7 +40,7 @@ constexpr int kErosionMaxTalusM = 1000;
 constexpr std::int64_t kErosionMaxCellPasses = 1'000'000'000;
 
 struct ErosionParams {
-    int iterations = 24;       // rounds of hydraulic then thermal, in [0, kErosionMaxIterations]
+    int iterations = 48;       // rounds of hydraulic then thermal, in [0, kErosionMaxIterations]
     int thermalPasses = 2;     // thermal passes per round, in [0, kErosionMaxIterations]
     int strength = 128;        // sediment capacity scale per unit of flux times drop, in [0, 256]
     int erodeRate = 160;       // share (of 256) of spare capacity converted to erosion per pass

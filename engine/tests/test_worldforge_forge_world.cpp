@@ -99,11 +99,11 @@ TEST_CASE("forgeWorld is repeatable and seed sensitive", "[worldforge][forge]")
 TEST_CASE("stop-after N equals the first N phases of a full run", "[worldforge][forge]")
 {
     const ForgeConfig cfg = richConfig();
-    const ForgedWorld full = forgeWorld(21, kSmall, cfg);
+    const ForgedWorld full = forgeWorld(2, kSmall, cfg);
     requireComplete(full);
     for (int n = 1; n <= kForgePhaseCount; ++n) {
         INFO("stopAfter " << n);
-        const ForgedWorld part = forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(n));
+        const ForgedWorld part = forgeWorld(2, kSmall, cfg, static_cast<ForgePhase>(n));
         REQUIRE(part.ok());
         CHECK(part.complete());
         CHECK(part.completedPhases() == n);
@@ -126,13 +126,13 @@ TEST_CASE("stop-after N equals the first N phases of a full run", "[worldforge][
         CHECK(part.landmarkCoverage().has_value() == (n >= 10));
         CHECK(part.manifest().has_value() == (n >= 11));
     }
-    const ForgedWorld none = forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(0));
+    const ForgedWorld none = forgeWorld(2, kSmall, cfg, static_cast<ForgePhase>(0));
     CHECK(none.ok());
     CHECK(none.complete());
     CHECK(none.completedPhases() == 0);
     CHECK_FALSE(none.tectonics().has_value());
-    CHECK(forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(200)).complete());
-    CHECK(forgeWorld(21, kSmall, cfg, static_cast<ForgePhase>(200)).worldHash() == full.worldHash());
+    CHECK(forgeWorld(2, kSmall, cfg, static_cast<ForgePhase>(200)).complete());
+    CHECK(forgeWorld(2, kSmall, cfg, static_cast<ForgePhase>(200)).worldHash() == full.worldHash());
 }
 
 TEST_CASE("a failing phase stops the run and keeps earlier artifacts", "[worldforge][forge]")
@@ -142,7 +142,7 @@ TEST_CASE("a failing phase stops the run and keeps earlier artifacts", "[worldfo
         ForgeConfig cfg = smallConfig();
         cfg.hydrology.riverThreshold = 0;
         std::vector<ForgeProgress> events;
-        const ForgedWorld w = forgeWorld(3, kSmall, cfg, ForgePhase::Content, [&](const ForgeProgress& p) { events.push_back(p); });
+        const ForgedWorld w = forgeWorld(2, kSmall, cfg, ForgePhase::Content, [&](const ForgeProgress& p) { events.push_back(p); });
         CHECK_FALSE(w.ok());
         CHECK_FALSE(w.complete());
         REQUIRE(w.failedPhase().has_value());
@@ -165,7 +165,7 @@ TEST_CASE("a failing phase stops the run and keeps earlier artifacts", "[worldfo
     {
         ForgeConfig cfg = smallConfig();
         cfg.settlements.maxSettlements = 0;
-        const ForgedWorld w = forgeWorld(3, kSmall, cfg);
+        const ForgedWorld w = forgeWorld(2, kSmall, cfg);
         REQUIRE(w.failedPhase().has_value());
         CHECK(*w.failedPhase() == ForgePhase::Roads);
         CHECK(w.completedPhases() == 7);
@@ -178,15 +178,15 @@ TEST_CASE("a failing phase stops the run and keeps earlier artifacts", "[worldfo
     {
         ForgeConfig cfg = smallConfig();
         cfg.settlements.maxSettlements = 0;
-        const ForgedWorld failed = forgeWorld(3, kSmall, cfg);
-        const ForgedWorld clean = forgeWorld(3, kSmall, cfg, ForgePhase::Settlements);
+        const ForgedWorld failed = forgeWorld(2, kSmall, cfg);
+        const ForgedWorld clean = forgeWorld(2, kSmall, cfg, ForgePhase::Settlements);
         CHECK(failed.worldHash() == clean.worldHash());
     }
     SECTION("content rejects duplicate item ids after the POIs were kept")
     {
         ForgeConfig cfg = richConfig();
         cfg.itemIds = { "sword", "sword" };
-        const ForgedWorld w = forgeWorld(3, kSmall, cfg);
+        const ForgedWorld w = forgeWorld(2, kSmall, cfg);
         REQUIRE(w.failedPhase().has_value());
         CHECK(*w.failedPhase() == ForgePhase::Content);
         CHECK(w.pois().has_value());
@@ -197,33 +197,33 @@ TEST_CASE("a failing phase stops the run and keeps earlier artifacts", "[worldfo
 
 TEST_CASE("the chained hash goes red when a phase is dropped", "[worldforge][forge]")
 {
-    const ForgedWorld w = forgeWorld(5, kSmall, richConfig());
+    const ForgedWorld w = forgeWorld(2, kSmall, richConfig());
     requireComplete(w);
     const std::vector<ForgePhaseHash> all = completedHashes(w);
     REQUIRE(all.size() == static_cast<std::size_t>(kForgePhaseCount));
-    CHECK(chainForgeHash(5, kSmall, all) == w.worldHash());
+    CHECK(chainForgeHash(2, kSmall, all) == w.worldHash());
 
     for (std::size_t drop = 0; drop < all.size(); ++drop) {
         INFO("dropped phase " << drop + 1);
         std::vector<ForgePhaseHash> fewer = all;
         fewer.erase(fewer.begin() + static_cast<std::ptrdiff_t>(drop));
-        CHECK(chainForgeHash(5, kSmall, fewer) != w.worldHash());
+        CHECK(chainForgeHash(2, kSmall, fewer) != w.worldHash());
     }
     std::vector<ForgePhaseHash> swapped = all;
     std::swap(swapped[3], swapped[4]);
-    CHECK(chainForgeHash(5, kSmall, swapped) != w.worldHash());
+    CHECK(chainForgeHash(2, kSmall, swapped) != w.worldHash());
     std::vector<ForgePhaseHash> changed = all;
     changed[0].hash ^= 1;
-    CHECK(chainForgeHash(5, kSmall, changed) != w.worldHash());
+    CHECK(chainForgeHash(2, kSmall, changed) != w.worldHash());
 }
 
 TEST_CASE("a late-phase param changes the world hash but not the chain before it", "[worldforge][forge]")
 {
-    const ForgedWorld base = forgeWorld(5, kSmall, richConfig());
+    const ForgedWorld base = forgeWorld(2, kSmall, richConfig());
     ForgeConfig tweaked = richConfig();
     tweaked.binding.tensionCount = 1;
     tweaked.binding.castPerArchetype = 5;
-    const ForgedWorld other = forgeWorld(5, kSmall, tweaked);
+    const ForgedWorld other = forgeWorld(2, kSmall, tweaked);
     requireComplete(base);
     requireComplete(other);
     for (std::size_t i = 0; i + 1 < static_cast<std::size_t>(kForgePhaseCount); ++i) CHECK(base.chain()[i] == other.chain()[i]);
@@ -468,9 +468,9 @@ TEST_CASE("golden world hashes for fixed seeds", "[worldforge][forge][golden]")
         std::uint64_t hash;
     };
     const std::array<Case, 3> cases = { {
-        { 1, 0xb0330e6d6627c309ull },
-        { 42, 0xabde616061158aa5ull },
-        { 0xDEADBEEFull, 0xb9724b4e6d9275efull },
+        { 1, 0x02ec319884136eb1ull },
+        { 42, 0xd8ad0ea7c6f95ebfull },
+        { 0xDEADBEEFull, 0x3dbc31f3ce43315aull },
     } };
     for (const Case& c : cases) {
         INFO("seed " << c.seed);

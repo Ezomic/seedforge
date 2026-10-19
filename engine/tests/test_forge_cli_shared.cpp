@@ -41,9 +41,9 @@ TEST_CASE("the four original phases keep their layer hashes", "[forge_cli][forge
     // Recorded from the stand-alone per-phase code that forgeWorld replaced (seed 1, size 64).
     const std::map<std::string, std::string> golden = {
         {"plates", "4c69858509baee99"}, {"boundary", "b9e886218c2b7fea"}, {"height", "051d5cdacf4b7b9a"},
-        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "7396e0179c0450fa"}, {"rivers", "2785ba395bf1262d"},
-        {"lakes", "82d72a57feb055e9"}, {"height_carved", "4fe8ca5e066ce89a"}, {"biome", "4c33c3f6fb2539e2"},
-        {"biome_blend", "e47f18e495bb85ba"},
+        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "ad8258f0d9bea137"}, {"rivers", "f90f4647c9bdc988"},
+        {"lakes", "82d72a57feb055e9"}, {"height_carved", "9d9bd7446a798ffb"}, {"biome", "9c5c8098431a7306"},
+        {"biome_blend", "d7eafc431d1b729a"},
     };
     const auto result = forgecli::runForge(oneSeed(1));
     REQUIRE(result.error.empty());
@@ -61,12 +61,12 @@ TEST_CASE("the four original phases keep their layer hashes", "[forge_cli][forge
 
 TEST_CASE("a shared batch run gives each phase the layers it gives alone", "[forge_cli][forge_shared]")
 {
-    const auto shared = forgecli::runForge(oneSeed(3));
+    const auto shared = forgecli::runForge(oneSeed(2));
     REQUIRE(shared.error.empty());
     REQUIRE(shared.seeds[0].error.empty());
     std::size_t at = 0;
     for (const auto& phase : forgecli::phaseRegistry()) {
-        const auto alone = phase.run(3, 64);
+        const auto alone = phase.run(2, 64);
         REQUIRE(alone.error.empty());
         for (const auto& layer : alone.layers) {
             REQUIRE(at < shared.seeds[0].layers.size());

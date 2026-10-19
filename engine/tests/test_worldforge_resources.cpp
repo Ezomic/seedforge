@@ -56,7 +56,7 @@ TEST_CASE("resources are deterministic and match the golden hash", "[worldforge]
     const ResourceMap b = resources(w, params);
     CHECK(hashResourceMap(a) == hashResourceMap(b));
     CHECK(a.oreGrade == b.oreGrade);
-    CHECK(hashResourceMap(a) == 0x39d63064b8e67200ull);
+    CHECK(hashResourceMap(a) == 0xfbf03f9206041799ull);
 }
 
 TEST_CASE("different seeds give different resources", "[worldforge][resources]")

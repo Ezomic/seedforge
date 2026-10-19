@@ -71,7 +71,7 @@ TEST_CASE("erosion is deterministic across repeat runs", "[worldforge][erosion]"
 TEST_CASE("erosion golden hash is stable", "[worldforge][erosion]")
 {
     const auto eroded = erode(makeBase(kSeed, 128, 96, 12));
-    CHECK(hashErodedMap(eroded) == 0xb20f0b2892655b56ull);
+    CHECK(hashErodedMap(eroded) == 0x6eb9db755b7c583full);
 }
 
 TEST_CASE("erosion does not mutate the input and keeps the grid", "[worldforge][erosion]")
