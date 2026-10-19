@@ -31,12 +31,12 @@ namespace ichor {
 //
 // Schedule: the archetype's entry in PlacedCastParams::archetypeSchedules, else one of the default
 // templates picked by the NPC's id. Every template is parsed with parseSchedule, so a schedule that
-// leaves here is legal (ascending, no duplicate start, known states).
+// leaves here is legal (ascending, no duplicate start, known states, at most kMaxScheduleEntries).
 //
 // Relationships: every cast member is taken as a Regular and generateRelationships links them
 // (family, rival, creditor, lover, grudge, three to five each). Each spawn carries the edges that
-// touch it. That generator scans every pair, so only the first kMaxRelatedCast members by id take
-// part; the rest have none.
+// touch it. That generator scans every pair, so only kMaxRelatedCast members take part, chosen by a
+// seeded hash of their id (so no archetype or settlement is cut as a block); the rest have none.
 //
 // Deferred: generateRegulars (names, traits, wants, fears, economic roles) needs name, desire and
 // trait pools the manifest does not carry, and succession needs a live ledger. Both hang off npcId.
@@ -45,6 +45,7 @@ namespace ichor {
 
 constexpr std::size_t kMaxCastSpawns = 65536;
 constexpr std::size_t kMaxRelatedCast = 512;
+constexpr std::size_t kMaxScheduleEntries = 32;
 constexpr float kMaxSpawnRadiusM = 200.0f;
 
 struct NpcSpawn {

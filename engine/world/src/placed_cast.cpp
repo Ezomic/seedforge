@@ -35,6 +35,7 @@ namespace {
 constexpr std::uint64_t kCastSpawnDomain = 0x636173747370776eull;
 constexpr std::uint64_t kCastScheduleSalt = 1;
 constexpr std::uint64_t kCastOffsetSalt = 2;
+constexpr std::uint64_t kCastRelatedSalt = 3;
 constexpr std::size_t kMaxTemplates = 64;
 
 PlacedCast failure(std::string message)
@@ -68,12 +69,20 @@ bool parseTemplates(const PlacedCastParams& p, Templates& out, std::string& erro
             error = "a default schedule is not legal: " + parsed.error;
             return false;
         }
+        if (parsed.schedule->entries.size() > kMaxScheduleEntries) {
+            error = "a default schedule has too many entries";
+            return false;
+        }
         out.defaults.push_back(std::move(*parsed.schedule));
     }
     for (const ArchetypeSchedule& a : p.archetypeSchedules) {
         ScheduleParse parsed = parseSchedule(a.entries);
         if (!parsed.schedule) {
             error = std::format("the schedule for archetype '{}' is not legal: {}", a.archetype, parsed.error);
+            return false;
+        }
+        if (parsed.schedule->entries.size() > kMaxScheduleEntries) {
+            error = std::format("the schedule for archetype '{}' has too many entries", a.archetype);
             return false;
         }
         if (!out.byArchetype.emplace(a.archetype, std::move(*parsed.schedule)).second) {
@@ -156,9 +165,13 @@ PlacedCast placeCast(const worldforge::ContentManifest& manifest, const PlacedPo
     }
     PlacedCastBuilder::index(out.set, heightfield);
 
+    std::vector<std::pair<std::uint64_t, std::size_t>> ranked;
+    ranked.reserve(spawns.size());
+    for (std::size_t i = 0; i < spawns.size(); ++i) ranked.emplace_back(castHash(seed, kCastRelatedSalt, spawns[i].npcId), i);
+    std::sort(ranked.begin(), ranked.end());
+    ranked.resize(std::min(ranked.size(), kMaxRelatedCast));
     std::vector<RelationshipNpc> related;
-    const std::size_t relatedCount = std::min(spawns.size(), kMaxRelatedCast);
-    for (std::size_t i = 0; i < relatedCount; ++i) related.push_back({spawns[i].npcId, NpcTier::Regular, spawns[i].homePoiId});
+    for (const auto& [rank, i] : ranked) related.push_back({spawns[i].npcId, NpcTier::Regular, spawns[i].homePoiId});
     for (const RelationshipEdge& edge : generateRelationships(seed, related)) {
         for (const std::string* end : {&edge.a, &edge.b}) {
             const auto it = std::lower_bound(spawns.begin(), spawns.end(), *end, [](const NpcSpawn& s, const std::string& id) { return s.npcId < id; });

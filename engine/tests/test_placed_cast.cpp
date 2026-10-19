@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <map>
 #include <set>
@@ -232,22 +233,53 @@ TEST_CASE("relationships follow the generator and each spawn carries its own edg
     REQUIRE(carried == expected.size() * 2);
 }
 
-TEST_CASE("a cast beyond the relationship cap still spawns, the overflow without edges", "[bake][cast][relationships]")
+TEST_CASE("a cast beyond the relationship cap still spawns and the cap does not cut whole archetypes", "[bake][cast][relationships]")
 {
     const Fixture& f = fixture();
     worldforge::ContentManifest big = manifest();
     const worldforge::CastMember seedMember = big.cast.front();
     big.cast.clear();
+    const std::vector<std::string> archetypes = {"a", "b", "c", "d"};
     for (std::size_t i = 0; i < kMaxRelatedCast + 40; ++i) {
         worldforge::CastMember member = seedMember;
-        member.npcId = "extra#" + std::to_string(100000 + i);
+        member.archetype = archetypes[i % archetypes.size()];
+        member.npcId = member.archetype + "#" + std::to_string(i);
         big.cast.push_back(member);
     }
     const PlacedCast cast = placeCast(big, f.pois.set, f.field);
     REQUIRE(cast.ok());
     REQUIRE(cast.set.all().size() == big.cast.size());
-    REQUIRE_FALSE(cast.set.all().front().relationships.empty());
-    REQUIRE(cast.set.all().back().relationships.empty());
+    std::map<std::string, std::size_t> related;
+    std::size_t withEdges = 0;
+    for (const NpcSpawn& spawn : cast.set.all()) {
+        if (!spawn.relationships.empty()) {
+            ++related[spawn.archetype];
+            ++withEdges;
+        }
+    }
+    REQUIRE(withEdges == kMaxRelatedCast);
+    for (const std::string& archetype : archetypes) REQUIRE(related[archetype] > 0);
+}
+
+TEST_CASE("spawns at the world edge stay inside it", "[bake][cast]")
+{
+    const Fixture& f = fixture();
+    PlacedCastParams params;
+    params.spawnRadiusM = kMaxSpawnRadiusM;
+    const double extent = f.field.desc().sizeMetres;
+    const auto last = static_cast<std::int32_t>(f.field.desc().cellsPerSide()) - 1;
+    const PlacedCast cast = placeCast(manifest(), f.pois.set, f.field, params);
+    REQUIRE(cast.ok());
+    for (const NpcSpawn& spawn : cast.set.all()) {
+        REQUIRE(spawn.x >= 0.0);
+        REQUIRE(spawn.x <= extent);
+        REQUIRE(spawn.z >= 0.0);
+        REQUIRE(spawn.z <= extent);
+        REQUIRE(spawn.cell.x >= 0);
+        REQUIRE(spawn.cell.x <= last);
+        REQUIRE(spawn.cell.z >= 0);
+        REQUIRE(spawn.cell.z <= last);
+    }
 }
 
 TEST_CASE("find and ofSettlement agree with the set", "[bake][cast]")
@@ -267,7 +299,9 @@ TEST_CASE("hostile manifests fail with a message and never half-place", "[bake][
 
     worldforge::ContentManifest unknownHome = manifest();
     unknownHome.cast.front().homePoiId = "settlement_9999";
-    CHECK_FALSE(placeCast(unknownHome, f.pois.set, f.field).ok());
+    const PlacedCast failed = placeCast(unknownHome, f.pois.set, f.field);
+    CHECK_FALSE(failed.ok());
+    CHECK(failed.set.empty());
 
     worldforge::ContentManifest dungeonHome = manifest();
     REQUIRE_FALSE(dungeonHome.dungeons.empty());
@@ -319,6 +353,12 @@ TEST_CASE("bad params and schedules are rejected", "[bake][cast][hostile]")
     twice.archetypeSchedules.push_back({"smith", {"06:00 work"}});
     twice.archetypeSchedules.push_back({"smith", {"07:00 work"}});
     CHECK_FALSE(placeCast(manifest(), f.pois.set, f.field, twice).ok());
+
+    PlacedCastParams tooLong;
+    std::vector<std::string> entries;
+    for (int minute = 0; minute <= static_cast<int>(kMaxScheduleEntries); ++minute) entries.push_back(std::format("{:02}:{:02} work", minute / 60, minute % 60));
+    tooLong.archetypeSchedules.push_back({"smith", entries});
+    CHECK_FALSE(placeCast(manifest(), f.pois.set, f.field, tooLong).ok());
 }
 
 TEST_CASE("a world that stopped before the content phase has no cast", "[bake][cast]")
