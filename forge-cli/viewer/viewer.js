@@ -3,7 +3,13 @@
     const core = window.ViewerCore;
     const $ = (id) => document.getElementById(id);
 
-    const state = { files: new Map(), manifest: null, run: null, layers: [], selected: -1, token: 0 };
+    const KIND_STYLE = {
+        settlement: { color: '#ffd23f', label: 'Settlements' },
+        dungeon: { color: '#ff4d4d', label: 'Dungeons' },
+        ruin: { color: '#c77dff', label: 'Ruins' },
+        landmark: { color: '#3fe0e0', label: 'Landmarks' },
+    };
+    const state = { files: new Map(), manifest: null, run: null, layers: [], selected: -1, token: 0, overlay: null, kindOn: { settlement: true, dungeon: true, ruin: true, landmark: true }, hover: null };
 
     function showError(msg) {
         $('error').textContent = msg;
@@ -86,6 +92,10 @@
             if (token !== state.token) return;
         }
         state.layers = loaded;
+        const overlay = await loadOverlay(run);
+        if (token !== state.token) return;
+        state.overlay = overlay;
+        buildOverlayBox();
         const first = loaded.findIndex((l) => l.canvas);
         if (first >= 0) loaded[first].on = true;
         state.selected = first;
@@ -95,6 +105,115 @@
         resize();
         draw();
         showHash();
+    }
+
+    async function loadOverlay(run) {
+        if (!run.overlay) return null;
+        const file = state.files.get(run.overlay);
+        if (!file) return fail('missing file ' + run.overlay);
+        try {
+            const overlay = core.parseOverlay(await file.text());
+            const ref = run.layers[0];
+            if (ref && overlay.size !== ref.width) return fail('overlay.json size ' + overlay.size + ' differs from the layers (' + ref.width + ')');
+            return overlay;
+        } catch (e) {
+            return fail(e.message);
+        }
+    }
+
+    function fail(msg) {
+        showError(msg);
+        return null;
+    }
+
+    function siteLabel(s) {
+        const lines = [s.id + ' (' + s.kind + ') at ' + s.x + ', ' + s.y];
+        if (s.dungeon) lines.push('dungeon ' + s.dungeon.archetype + ', seed ' + s.dungeon.seed);
+        if (s.items.length) lines.push('items: ' + s.items.slice(0, 6).join(', ') + (s.items.length > 6 ? ' +' + (s.items.length - 6) : ''));
+        if (s.cast.length) lines.push('cast: ' + s.cast.slice(0, 6).map((c) => c.id).join(', ') + (s.cast.length > 6 ? ' +' + (s.cast.length - 6) : ''));
+        return lines.join('\n');
+    }
+
+    function buildOverlayBox() {
+        const box = $('overlayKinds');
+        box.textContent = '';
+        $('overlayNote').textContent = '';
+        setHidden(['overlayBox'], !state.overlay);
+        if (!state.overlay) return;
+        for (const kind of core.KINDS) {
+            const sites = state.overlay.sites.filter((s) => s.kind === kind);
+            const label = document.createElement('label');
+            label.className = 'row';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = state.kindOn[kind];
+            cb.addEventListener('change', () => {
+                state.kindOn[kind] = cb.checked;
+                drawMarks();
+            });
+            const sw = document.createElement('span');
+            sw.className = 'swatch';
+            sw.style.background = KIND_STYLE[kind].color;
+            label.append(cb, sw, document.createTextNode(KIND_STYLE[kind].label + ' (' + sites.length + ')'));
+            box.appendChild(label);
+        }
+        const all = state.overlay.sites;
+        $('overlayNote').textContent = all.reduce((n, s) => n + s.items.length, 0) + ' items, ' + all.reduce((n, s) => n + s.cast.length, 0) + ' cast, ' + all.filter((s) => s.dungeon).length + ' dungeon slots.' + (all.some((s) => s.items.length || s.cast.length) ? '' : ' Items and cast need --data.');
+    }
+
+    function drawMarks() {
+        const marks = $('marks');
+        const [w, h] = mapSize();
+        const zoom = Number($('zoom').value);
+        marks.width = w * zoom;
+        marks.height = h * zoom;
+        marks.style.width = w * zoom + 'px';
+        marks.style.height = h * zoom + 'px';
+        const ctx = marks.getContext('2d');
+        ctx.clearRect(0, 0, marks.width, marks.height);
+        if (!state.overlay) return;
+        const r = Math.max(4, Math.min(zoom, 10));
+        for (const s of state.overlay.sites) {
+            if (!state.kindOn[s.kind]) continue;
+            const cx = (s.x + 0.5) * zoom;
+            const cy = (s.y + 0.5) * zoom;
+            const extra = Math.min(3, Math.floor((s.items.length + s.cast.length) / 2));
+            const rr = r + extra;
+            ctx.beginPath();
+            if (s.kind === 'settlement') ctx.rect(cx - rr, cy - rr, rr * 2, rr * 2);
+            else if (s.kind === 'dungeon') {
+                ctx.moveTo(cx, cy - rr * 1.2);
+                ctx.lineTo(cx + rr * 1.1, cy + rr);
+                ctx.lineTo(cx - rr * 1.1, cy + rr);
+                ctx.closePath();
+            } else if (s.kind === 'ruin') {
+                ctx.moveTo(cx, cy - rr * 1.2);
+                ctx.lineTo(cx + rr * 1.2, cy);
+                ctx.lineTo(cx, cy + rr * 1.2);
+                ctx.lineTo(cx - rr * 1.2, cy);
+                ctx.closePath();
+            } else ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+            ctx.fillStyle = KIND_STYLE[s.kind].color;
+            ctx.globalAlpha = 0.9;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.lineWidth = s === state.hover ? 3 : 1.5;
+            ctx.strokeStyle = s === state.hover ? '#fff' : '#000';
+            ctx.stroke();
+        }
+    }
+
+    function showTip(ev, site) {
+        const tip = $('tip');
+        if (!site) {
+            tip.hidden = true;
+            return;
+        }
+        tip.textContent = siteLabel(site);
+        tip.hidden = false;
+        const stage = $('stage').getBoundingClientRect();
+        tip.style.left = ev.clientX - stage.left + 14 + 'px';
+        tip.style.top = ev.clientY - stage.top + 14 + 'px';
     }
 
     function buildLayerList() {
@@ -178,6 +297,7 @@
         canvas.style.width = w * zoom + 'px';
         canvas.style.height = h * zoom + 'px';
         $('zoomLabel').textContent = zoom + 'x';
+        drawMarks();
     }
 
     function draw() {
@@ -221,6 +341,12 @@
         const y = Math.floor(((ev.clientY - rect.top) / rect.height) * canvas.height);
         const table = $('values');
         table.textContent = '';
+        const site = state.overlay ? core.nearestSite(state.overlay.sites.filter((s) => state.kindOn[s.kind]), ev.offsetX / rect.width * canvas.width, ev.offsetY / rect.height * canvas.height, 8 / Number($('zoom').value) + 0.5) : null;
+        if (site !== state.hover) {
+            state.hover = site;
+            drawMarks();
+        }
+        showTip(ev, site);
         $('cell').textContent = '(' + x + ', ' + y + ')';
         for (const l of state.layers) {
             if (!l.on || !l.pixels) continue;
@@ -251,6 +377,7 @@
             state.files.set('manifest.json', mblob);
             const manifest = core.parseManifest(await mblob.text());
             for (const run of manifest.runs) {
+                if (run.overlay) state.files.set(run.overlay, await get(run.overlay));
                 for (const l of run.layers) if (l.file) state.files.set(l.file, await get(l.file));
             }
             await load();
@@ -261,9 +388,15 @@
 
     $('folder').addEventListener('change', onFolder);
     $('seed').addEventListener('change', () => selectRun($('seed').selectedIndex));
-    $('zoom').addEventListener('input', resize);
+    $('zoom').addEventListener('input', () => {
+        resize();
+        draw();
+    });
     $('map').addEventListener('mousemove', onMove);
     $('map').addEventListener('mouseleave', () => {
+        state.hover = null;
+        drawMarks();
+        showTip(null, null);
         $('cell').textContent = '';
         $('values').textContent = '';
     });
