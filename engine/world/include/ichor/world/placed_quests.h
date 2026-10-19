@@ -22,7 +22,7 @@ namespace ichor {
 //   Npc     : every cast member; those homed on either settlement are preferred.
 //   Faction : every cast archetype (the manifest has no factions yet), preferred when a local NPC has it.
 //   Road    : one synthetic road per tension, joining its two settlements.
-// The preference is the binder's own "appearances" tie-break, so the quest stays in its region.
+// Entities have no region; the preference is the binder's "appearances" tie-break (A 2, B 1, local cast 1, the rest 0).
 //
 // A tension that cannot become a quest is not dropped: it lands in `refused` with the reason. The
 // set is ordered by the manifest's tension order (poiA, poiB), so nothing depends on cell load order.
@@ -41,7 +41,7 @@ struct QuestBeat {
 };
 
 struct QuestInstance {
-    std::string id;          // "quest_NNNN" in tension order
+    std::string id;          // "quest_NNNNN" in tension order
     std::string tensionKind; // one of graph::quest::kTensionKinds
     std::string poiA;
     std::string poiB;
@@ -49,7 +49,7 @@ struct QuestInstance {
     std::uint64_t seed = 0;
     std::uint64_t graphDigest = 0;
     std::vector<QuestBeat> beats;        // in node id order
-    graph::questrefusal::Quest refusals; // linear steps with decline, walk away and tell options
+    graph::questrefusal::Quest refusals; // steps in story order (from the situation) with decline, walk away and tell options
 };
 
 struct RefusedQuest {

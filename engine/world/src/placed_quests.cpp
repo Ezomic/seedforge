@@ -23,6 +23,7 @@ using graph::questbind::EntityKind;
 
 constexpr std::size_t kMaxSites = 1500;
 constexpr std::size_t kMaxFactions = 500;
+constexpr std::size_t kMaxLocalNpcs = 1500; // sites + factions + local NPCs + the road stay under the binder's cap
 
 constexpr std::string_view kSite = "poi:";
 constexpr std::string_view kNpc = "npc:";
@@ -77,8 +78,11 @@ graph::questbind::World bindWorld(const worldforge::ContentManifest& m, const wo
 
     std::set<std::string> localArchetypes;
     std::vector<const worldforge::CastMember*> others;
+    std::size_t localNpcs = 0;
     for (const worldforge::CastMember& c : m.cast) {
         if (c.homePoiId == t.poiA || c.homePoiId == t.poiB) {
+            if (localNpcs >= kMaxLocalNpcs) continue;
+            ++localNpcs;
             localArchetypes.insert(c.archetype);
             world.entities.push_back({std::string(kNpc) + c.npcId, EntityKind::Npc, "", 1});
         } else {
@@ -109,13 +113,41 @@ std::string plainId(const std::string& internal, EntityKind kind, const worldfor
     return internal.substr(prefixOf(kind).size());
 }
 
-// Steps in node id order, each accepting into the next; the other side is the opposite settlement.
+// Story order: breadth first from the situation along needs and then edges, ties by node id; any
+// node the walk misses follows in id order.
+std::vector<std::uint32_t> storyOrder(const graph::Graph& graph)
+{
+    std::vector<std::uint32_t> order;
+    std::set<std::uint32_t> seen;
+    const auto visit = [&](std::uint32_t root) {
+        if (!seen.insert(root).second) return;
+        std::vector<std::uint32_t> queue{root};
+        for (std::size_t head = 0; head < queue.size(); ++head) {
+            order.push_back(queue[head]);
+            std::set<std::uint32_t> next;
+            for (const auto& [eid, edge] : graph.edges()) {
+                if (edge.from == queue[head] && edge.type != graph::quest::kRefuse && !seen.contains(edge.to)) next.insert(edge.to);
+            }
+            for (const std::uint32_t id : next) {
+                seen.insert(id);
+                queue.push_back(id);
+            }
+        }
+    };
+    for (const auto& [id, node] : graph.nodes()) {
+        if (node.type == graph::quest::kSituation) visit(id);
+    }
+    for (const auto& [id, node] : graph.nodes()) visit(id);
+    return order;
+}
+
+// Steps in story order, each accepting into the next; the other side is the opposite settlement.
 graph::questrefusal::Quest stepsOf(const graph::Graph& graph, std::uint32_t otherSide)
 {
     graph::questrefusal::Quest quest;
     std::vector<std::uint32_t> ids;
-    for (const auto& [id, node] : graph.nodes()) {
-        if (node.type != graph::quest::kWalkAway) ids.push_back(id);
+    for (const std::uint32_t id : storyOrder(graph)) {
+        if (graph.node(id)->type != graph::quest::kWalkAway) ids.push_back(id);
     }
     for (std::size_t i = 0; i < ids.size(); ++i) {
         graph::questrefusal::Step step;
@@ -199,7 +231,7 @@ PlacedQuests placeManifestQuests(const worldforge::ContentManifest& manifest, co
 
         QuestInstance quest;
         char number[16];
-        std::snprintf(number, sizeof number, "quest_%04zu", i);
+        std::snprintf(number, sizeof number, "quest_%05zu", i);
         quest.id = number;
         quest.tensionKind = params.tension;
         quest.poiA = t.poiA;

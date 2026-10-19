@@ -192,3 +192,33 @@ TEST_CASE("a forged world's manifest bakes into quests", "[bake][quests]")
     }
     FAIL("no seed under 40 forged a manifest with tensions");
 }
+
+TEST_CASE("a flood of cast homed on one settlement does not refuse its quests", "[bake][quests]")
+{
+    worldforge::ContentManifest manifest = manifestFor(6, 4, 4);
+    const std::string home = manifest.tensions.front().poiA;
+    for (int i = 0; i < 5000; ++i) manifest.cast.push_back({"zz#" + std::to_string(1000 + i), "zz", home});
+    std::sort(manifest.cast.begin(), manifest.cast.end(), [](const auto& a, const auto& b) { return a.npcId < b.npcId; });
+    const PlacedQuests placed = placeManifestQuests(manifest, rules());
+    REQUIRE(placed.ok());
+    REQUIRE(placed.set.refused().empty());
+    REQUIRE(placed.set.all().size() == manifest.tensions.size());
+}
+
+TEST_CASE("refusal steps start at the situation and cover every beat but walk away", "[bake][quests]")
+{
+    const PlacedQuests placed = placeManifestQuests(manifestFor(13, 6, 8), rules());
+    REQUIRE(placed.ok());
+    for (const QuestInstance& q : placed.set.all()) {
+        std::set<std::uint32_t> expected;
+        std::uint32_t situation = 0;
+        for (const QuestBeat& b : q.beats) {
+            if (b.type == graph::quest::kSituation) situation = b.node;
+            if (b.type != graph::quest::kWalkAway) expected.insert(b.node);
+        }
+        std::set<std::uint32_t> steps;
+        for (const auto& s : q.refusals.steps) steps.insert(s.id);
+        REQUIRE(q.refusals.start == situation);
+        REQUIRE(steps == expected);
+    }
+}
