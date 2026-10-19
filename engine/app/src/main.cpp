@@ -970,7 +970,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
                 const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
                 const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
-                view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 1.2);
+                view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 2.0);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
         }
