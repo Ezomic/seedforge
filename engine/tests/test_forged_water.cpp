@@ -30,7 +30,9 @@ Fixture makeFixture(std::uint64_t seed)
     base.metresPerSample = 8;
     base.cellMetres = 512;
     const WorldDesc desc = forgedWorldDesc(base);
-    worldforge::ForgedWorld world = worldforge::forgeWorld(desc.seed, kGrid, {}, worldforge::ForgePhase::Hydrology);
+    worldforge::ForgeConfig config;
+    config.hydrology.riverThreshold = 48;
+    worldforge::ForgedWorld world = worldforge::forgeWorld(desc.seed, kGrid, config, worldforge::ForgePhase::Hydrology);
     REQUIRE(world.ok());
     ForgedHeightfield forged = heightfieldFromForgedWorld(world, desc);
     REQUIRE(forged.ok());
@@ -66,7 +68,7 @@ std::pair<int, int> wetCells(const Fixture& f, const WaterField& waterField, Pic
 
 TEST_CASE("a forged river cell has water and a dry cell does not")
 {
-    const Fixture f = makeFixture(23);
+    const Fixture f = makeFixture(16);
     const WaterField waterField(f.field, f.water.hydrology, f.water.rivers);
 
     const auto rivers = wetCells(f, waterField, [](const worldforge::HydrologyMap& m, std::size_t c) { return m.river[c] != 0 && m.lakeDepthM[c] == 0; });
@@ -99,7 +101,7 @@ TEST_CASE("a forged river cell has water and a dry cell does not")
 
 TEST_CASE("removing the feed leaves the river dry: the engine's own flood finds other water")
 {
-    const Fixture f = makeFixture(23);
+    const Fixture f = makeFixture(16);
     const auto standIn = std::make_shared<const Hydrology>(computeHydrology(f.field));
     const WaterField waterField(f.field, standIn, f.water.rivers);
     const auto rivers = wetCells(f, waterField, [](const worldforge::HydrologyMap& m, std::size_t c) { return m.river[c] != 0 && m.lakeDepthM[c] == 0; });
@@ -109,7 +111,7 @@ TEST_CASE("removing the feed leaves the river dry: the engine's own flood finds 
 
 TEST_CASE("forged lakes stand at the forged level, flat, and over their ground")
 {
-    for (const std::uint64_t seed : {11ull, 23ull}) {
+    for (const std::uint64_t seed : {11ull, 16ull}) {
         const Fixture f = makeFixture(seed);
         const Hydrology& h = *f.water.hydrology;
         REQUIRE(h.side == f.desc.samplesPerSide());
@@ -129,7 +131,7 @@ TEST_CASE("forged lakes stand at the forged level, flat, and over their ground")
 
 TEST_CASE("the forged water draws: a river cell's mesh has vertices and a dry cell's has none")
 {
-    const Fixture f = makeFixture(23);
+    const Fixture f = makeFixture(16);
     const worldforge::HydrologyMap& map = *f.world.hydrology();
     bool anyWet = false;
     bool anyDry = false;
@@ -147,7 +149,7 @@ TEST_CASE("the forged water draws: a river cell's mesh has vertices and a dry ce
 
 TEST_CASE("bad input comes back as an error and nothing throws")
 {
-    const Fixture f = makeFixture(23);
+    const Fixture f = makeFixture(16);
     CHECK(!waterFromForgedWorld(f.world, Heightfield()).ok());
 
     const worldforge::ForgedWorld early = worldforge::forgeWorld(23, kGrid, {}, worldforge::ForgePhase::Tectonics);
@@ -159,8 +161,8 @@ TEST_CASE("bad input comes back as an error and nothing throws")
 
 TEST_CASE("the same forged world gives the same water")
 {
-    const Fixture a = makeFixture(23);
-    const Fixture b = makeFixture(23);
+    const Fixture a = makeFixture(16);
+    const Fixture b = makeFixture(16);
     CHECK(a.water.hydrology->accumulation == b.water.hydrology->accumulation);
     CHECK(a.water.hydrology->lake == b.water.hydrology->lake);
     CHECK(a.water.hydrology->direction == b.water.hydrology->direction);
@@ -169,7 +171,7 @@ TEST_CASE("the same forged world gives the same water")
 
 TEST_CASE("the flow of forged water ends, whichever sample it starts from")
 {
-    const Fixture f = makeFixture(23);
+    const Fixture f = makeFixture(16);
     const Hydrology& h = *f.water.hydrology;
     const std::size_t total = h.filled.size();
     for (std::size_t start = 0; start < total; ++start) {

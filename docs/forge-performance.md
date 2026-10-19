@@ -9,7 +9,7 @@ The vertical slice (doc 18) does not fix a world size; it only says the engine d
 | Phase | 256 | 512 | 1024 |
 | --- | --- | --- | --- |
 | tectonics | 10 | 44 | 156 |
-| erosion | 284 | 1257 | 4350 |
+| erosion | 570 | 2500 | 8700 |
 | hydrology | 7 | 35 | 150 |
 | climate | 1.5 | 7.6 | 22 |
 | biomes | 2.3 | 10 | 38 |
@@ -28,15 +28,15 @@ Peak live heap is not observable from inside the shared test binary, so the guar
 
 | Size | Bytes requested, all phases | Largest single allocation |
 | --- | --- | --- |
-| 256 | 70 MB (erosion 57 MB) | 0.5 MiB |
-| 512 | 280 MB (erosion 228 MB) | 2 MiB |
-| 1024 | 1.1 GB (erosion 912 MB) | 8 MiB |
+| 256 | 127 MB (erosion 114 MB) | 0.5 MiB |
+| 512 | 510 MB (erosion 456 MB) | 2 MiB |
+| 1024 | 2.0 GB (erosion 1.8 GB) | 8 MiB |
 
-Peak live memory is bounded by the SEED-424 model (`forge-cli/README.md`, "Forge budget"): about 69 MiB at 1024, committed budget 96 MiB. That model is a cell-pass and bytes-per-cell estimate, the measured table above is the check that the real run behaves.
+Peak live memory is bounded by the SEED-424 model (`forge-cli/README.md`, "Forge budget"): about 69 MiB at 1024, committed budget 96 MiB. The erosion rows were doubled for the SEED-416 default of 48 rounds (24 before); the 256 allocation is measured, the 512 and 1024 erosion time and allocation rows and the other phases' totals are scaled estimates, not re-measured. That model is a cell-pass and bytes-per-cell estimate, the measured table above is the check that the real run behaves.
 
 ## The CI guard
 
-`engine/tests/test_forge_perf.cpp`, tag `[forge_perf]`, runs the forge at 256 (about 1.5 s for three runs) and fails when:
+`engine/tests/test_forge_perf.cpp`, tag `[forge_perf]`, runs the forge at 256 (about 2.5 s for three runs) and fails when:
 
 - a phase takes more than 6 times its recorded cost, where cost is the phase time divided by the time of a fixed reference loop measured in the same process (so a slow or loaded runner scales both). Phases cheaper than 2% of the reference loop are compared against that 2% floor instead, because they are too short to time; a phase that small can get up to about 6 times the floor slower before it trips, and the allocation check below still covers its work;
 - a phase requests more than 1.5 times its recorded allocation bytes, or the largest single allocation exceeds 1.5 times its record.

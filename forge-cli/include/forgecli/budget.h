@@ -60,7 +60,7 @@ struct ForgeBudget {
 
 // The committed budget for the full forge at kForgeTargetSize.
 constexpr ForgeBudget kForgeBudget = {
-    260'000'000,        // cell passes, about 28% above the model at the target size
+    300'000'000,        // cell passes, about 8% above the model at the target size
     96ll * 1024 * 1024, // peak bytes of the whole shared run
     24ll * 1024 * 1024, // largest single allocation
 };

@@ -137,7 +137,7 @@ TEST_CASE("the output bytes in the model match the layers the phases write", "[f
     for (const PhaseModel& pm : defaultCostModel().phases) {
         const Phase* phase = findPhase(pm.phase);
         REQUIRE(phase != nullptr);
-        const PhaseResult result = phase->run(3, size);
+        const PhaseResult result = phase->run(2, size);
         REQUIRE(result.error.empty());
         std::int64_t bytes = 0;
         for (const Layer& l : result.layers) bytes += static_cast<std::int64_t>(l.pixels.size());

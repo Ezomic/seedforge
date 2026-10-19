@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
@@ -70,7 +71,7 @@ TEST_CASE("erosion is deterministic across repeat runs", "[worldforge][erosion]"
 TEST_CASE("erosion golden hash is stable", "[worldforge][erosion]")
 {
     const auto eroded = erode(makeBase(kSeed, 128, 96, 12));
-    CHECK(hashErodedMap(eroded) == 0x6f38e54ae2539123ull);
+    CHECK(hashErodedMap(eroded) == 0x6eb9db755b7c583full);
 }
 
 TEST_CASE("erosion does not mutate the input and keeps the grid", "[worldforge][erosion]")
@@ -224,4 +225,33 @@ TEST_CASE("erosion handles flat, minimum-size and non-square grids", "[worldforg
     const auto eroded = erode(thin);
     CHECK(eroded.heightM.size() == 16u * 200u);
     CHECK(hashErodedMap(eroded) == hashErodedMap(erode(thin)));
+}
+
+TEST_CASE("thermal erosion at the default talus levels a spike into a slope", "[worldforge][erosion][talus]")
+{
+    auto base = makeBase(kSeed, 64, 64, 8);
+    base.heightM.assign(base.heightM.size(), 100);
+    const std::size_t spike = static_cast<std::size_t>(32) * 64 + 32;
+    base.heightM[spike] = 400;
+
+    const auto maxStep = [](const std::vector<std::int16_t>& v) {
+        int worst = 0;
+        for (int y = 0; y < 64; ++y) {
+            for (int x = 0; x + 1 < 64; ++x) {
+                const std::size_t c = static_cast<std::size_t>(y) * 64 + x;
+                worst = std::max(worst, std::abs(v[c + 1] - v[c]));
+                if (y + 1 < 64) worst = std::max(worst, std::abs(v[c + 64] - v[c]));
+            }
+        }
+        return worst;
+    };
+
+    ErosionParams params;
+    params.strength = 0;
+    const auto eroded = erode(base, params);
+    ErosionParams off = params;
+    off.thermalPasses = 0;
+    CHECK(maxStep(erode(base, off).heightM) == 300);
+    CHECK(maxStep(eroded.heightM) <= params.talusM + 1);
+    CHECK(eroded.heightM[spike] < 400);
 }
