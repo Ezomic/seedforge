@@ -74,6 +74,7 @@ struct ForgedGame {
     std::shared_ptr<const ForgedRoads> roads;
     std::shared_ptr<const PlacedPoiSet> pois;
     std::shared_ptr<const PlacedBuildingSet> buildings;
+    std::vector<SettlementSite> sites; // the settlements in the forge's order, in world metres
     std::shared_ptr<const SettlementKitSet> kit; // the textured pieces that stand in for the buildings; empty when the settlements are
     std::shared_ptr<const NavSurface> navSurface; // water and roads as the navmesh sees them; reads `waterField` and `roads`
     ForgedRegionTiers tiers;
@@ -105,6 +106,10 @@ ForgedScenery buildForgedScenery(const ForgedGame& game);
 // Cooks the settlement kit (the GLBs under `folder`) into the scenery bundle, only the pieces the game uses. On a
 // failure (folder missing, a file does not cook) the scenery is left as it was and the buildings stay boxes.
 bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder);
+
+// Moves the spawn to dry, gentle ground nearest the middle of settlement `index` (in the forge's order), clear of its
+// buildings and kit pieces, and aims the view at it. Returns false, leaving the spawn alone, for an index past the end.
+bool spawnAtSettlement(ForgedGame& game, std::size_t index);
 
 // Builds the game from a finished forge. Fails, with a message, when the result is empty or a bake step
 // refuses the world. Never throws.

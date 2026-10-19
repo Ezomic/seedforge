@@ -92,6 +92,7 @@ struct Options {
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
+    int settlement = -1; // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
@@ -142,6 +143,8 @@ bool parse(int argc, char** argv, Options& options)
             options.actor = argv[++i];
         } else if (arg == "--exile" && hasValue) {
             options.exile = argv[++i];
+        } else if (arg == "--settlement" && hasValue) {
+            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
         } else if (arg == "--kit" && hasValue) {
             options.kit = argv[++i];
         } else if (arg == "--world" && hasValue) {
@@ -428,6 +431,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         if (!renderer.setVegetationMeshes(ichor::treeBundle(), ichor::vegetationUnblendedKinds())) {
             ichor::log(ichor::LogLevel::Warn, "the tree meshes could not be uploaded; the world has no trees");
+        }
+        if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
+            ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
         }
         anchor = {forged->spawn.x, forged->spawn.groundY + 0.5, forged->spawn.z};
         // The view looks 30 m toward the place the spawn was searched around, north when the spawn is on top of it.
@@ -1294,7 +1300,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
         return 2;
     }
 
