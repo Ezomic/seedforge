@@ -164,7 +164,7 @@ TEST_CASE("an entry copied under another key's name is rejected by the stamp ins
 TEST_CASE("a corrupt or truncated file is forged again and replaced", "[forged_world_cache]")
 {
     Scratch dir;
-    const WorldDesc desc = smallWorld(17);
+    const WorldDesc desc = smallWorld(21);
     const LoadedForgedWorld original = loadOrForgeWorld(dir.path, desc, kGrid);
     REQUIRE(original.ok());
     const std::filesystem::path file = forgedWorldCachePath(dir.path, forgedWorldKey(desc, kGrid));

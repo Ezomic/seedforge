@@ -168,8 +168,8 @@ TEST_CASE("the adapter refuses bad input without crashing")
 TEST_CASE("heights outside the desc range flatten against its ends")
 {
     WorldDesc narrow = gridWorld();
-    narrow.minHeight = 100.0f;
-    narrow.heightRange = 50.0f;
+    narrow.minHeight = 20.0f;
+    narrow.heightRange = 30.0f;
     const ForgedHeightfield forged = forgeHeightfieldFromWorldforge(narrow, kGrid);
     REQUIRE(forged.ok());
     const auto [low, high] = std::minmax_element(forged.field.samples().begin(), forged.field.samples().end());

@@ -1,5 +1,6 @@
 add_executable(ichor
     src/main.cpp
+    src/exile_demo.cpp
 )
 target_link_libraries(ichor PRIVATE
     ichor_loop ichor_assets ichor_audio ichor_world ichor_script ichor_data ichor_traversal ichor_save ichor_editor_ui ichor_ui ichor_platform_sdl ichor_platform_null ichor_gfx_vulkan ichor_gfx_null ichor_profile

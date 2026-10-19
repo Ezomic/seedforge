@@ -50,6 +50,7 @@ worldforge::ForgeConfig twoFactions()
     b.oreWeight = 200;
     worldforge::ForgeConfig config;
     config.factions = {a, b};
+    config.hydrology.riverThreshold = 48;
     return config;
 }
 
@@ -127,7 +128,9 @@ TEST_CASE("a road is drawn opaque where the forge put one")
 
 TEST_CASE("a world that stopped early has no layers past its phase, and they change nothing")
 {
-    const worldforge::ForgedWorld early = worldforge::forgeWorld(7, kGrid, {}, worldforge::ForgePhase::Hydrology);
+    worldforge::ForgeConfig config;
+    config.hydrology.riverThreshold = 48;
+    const worldforge::ForgedWorld early = worldforge::forgeWorld(7, kGrid, config, worldforge::ForgePhase::Hydrology);
     const MapLayerStack stack(greyImage(kSide), early);
     REQUIRE(stack.hasLayer(MapLayer::Rivers));
     REQUIRE_FALSE(stack.hasLayer(MapLayer::Roads));

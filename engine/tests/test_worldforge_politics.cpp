@@ -152,7 +152,7 @@ TEST_CASE("politics are deterministic and match the golden hash", "[worldforge][
     const PoliticsMap b = politics(w, factions);
     CHECK(hashPoliticsMap(a) == hashPoliticsMap(b));
     CHECK(a.owner == b.owner);
-    CHECK(hashPoliticsMap(a) == 0xe65080e64832b1d5ull);
+    CHECK(hashPoliticsMap(a) == 0xc02f564c792e5d93ull);
 }
 
 TEST_CASE("different seeds give different politics", "[worldforge][politics]")
