@@ -6,48 +6,48 @@
    "id": "settlement_0000",
    "items": [],
    "kind": "settlement",
-   "x": 23,
-   "y": 57
+   "x": 29,
+   "y": 37
   },
   {
    "cast": [],
    "id": "settlement_0001",
    "items": [],
    "kind": "settlement",
-   "x": 63,
-   "y": 22
+   "x": 26,
+   "y": 41
   },
   {
    "cast": [],
    "id": "settlement_0002",
    "items": [],
    "kind": "settlement",
-   "x": 63,
-   "y": 26
+   "x": 15,
+   "y": 38
   },
   {
    "cast": [],
    "id": "settlement_0003",
    "items": [],
    "kind": "settlement",
-   "x": 63,
-   "y": 16
+   "x": 23,
+   "y": 38
   },
   {
    "cast": [],
    "id": "settlement_0004",
    "items": [],
    "kind": "settlement",
-   "x": 21,
-   "y": 53
+   "x": 23,
+   "y": 44
   },
   {
    "cast": [],
    "id": "settlement_0005",
    "items": [],
    "kind": "settlement",
-   "x": 13,
-   "y": 49
+   "x": 25,
+   "y": 51
   },
   {
    "cast": [],
@@ -62,108 +62,132 @@
    "id": "settlement_0007",
    "items": [],
    "kind": "settlement",
-   "x": 17,
-   "y": 50
+   "x": 15,
+   "y": 42
   },
   {
    "cast": [],
    "id": "settlement_0008",
    "items": [],
    "kind": "settlement",
-   "x": 63,
-   "y": 9
+   "x": 15,
+   "y": 47
   },
   {
    "cast": [],
    "id": "settlement_0009",
    "items": [],
    "kind": "settlement",
-   "x": 9,
-   "y": 50
+   "x": 22,
+   "y": 48
   },
   {
    "cast": [],
    "id": "settlement_0010",
    "items": [],
    "kind": "settlement",
-   "x": 63,
-   "y": 30
+   "x": 30,
+   "y": 41
   },
   {
    "cast": [],
    "id": "settlement_0011",
    "items": [],
    "kind": "settlement",
-   "x": 22,
-   "y": 44
+   "x": 63,
+   "y": 18
   },
   {
    "cast": [],
    "id": "settlement_0012",
    "items": [],
    "kind": "settlement",
-   "x": 25,
-   "y": 52
+   "x": 23,
+   "y": 56
   },
   {
    "cast": [],
    "id": "settlement_0013",
    "items": [],
    "kind": "settlement",
-   "x": 12,
-   "y": 45
+   "x": 33,
+   "y": 36
   },
   {
    "cast": [],
    "id": "settlement_0014",
    "items": [],
    "kind": "settlement",
-   "x": 60,
-   "y": 12
+   "x": 11,
+   "y": 38
   },
   {
    "cast": [],
    "id": "settlement_0015",
    "items": [],
    "kind": "settlement",
-   "x": 21,
-   "y": 49
+   "x": 63,
+   "y": 23
   },
   {
    "cast": [],
    "id": "settlement_0016",
    "items": [],
    "kind": "settlement",
-   "x": 16,
-   "y": 46
+   "x": 63,
+   "y": 14
   },
   {
    "cast": [],
    "id": "settlement_0017",
    "items": [],
    "kind": "settlement",
-   "x": 8,
-   "y": 46
+   "x": 27,
+   "y": 45
   },
   {
    "cast": [],
    "id": "settlement_0018",
    "items": [],
    "kind": "settlement",
-   "x": 40,
-   "y": 25
+   "x": 19,
+   "y": 52
   },
   {
    "cast": [],
    "id": "settlement_0019",
    "items": [],
    "kind": "settlement",
-   "x": 63,
-   "y": 34
+   "x": 11,
+   "y": 42
   },
   {
    "cast": [],
    "id": "poi_0000",
+   "items": [],
+   "kind": "ruin",
+   "x": 15,
+   "y": 59
+  },
+  {
+   "cast": [],
+   "id": "poi_0001",
+   "items": [],
+   "kind": "landmark",
+   "x": 11,
+   "y": 55
+  },
+  {
+   "cast": [],
+   "id": "poi_0002",
+   "items": [],
+   "kind": "ruin",
+   "x": 57,
+   "y": 7
+  },
+  {
+   "cast": [],
+   "id": "poi_0003",
    "items": [],
    "kind": "ruin",
    "x": 11,
@@ -171,23 +195,47 @@
   },
   {
    "cast": [],
-   "id": "poi_0001",
+   "id": "poi_0004",
+   "items": [],
+   "kind": "landmark",
+   "x": 61,
+   "y": 7
+  },
+  {
+   "cast": [],
+   "id": "poi_0005",
+   "items": [],
+   "kind": "ruin",
+   "x": 57,
+   "y": 3
+  },
+  {
+   "cast": [],
+   "id": "poi_0006",
+   "items": [],
+   "kind": "ruin",
+   "x": 61,
+   "y": 3
+  },
+  {
+   "cast": [],
+   "id": "poi_0007",
    "items": [],
    "kind": "ruin",
    "x": 15,
-   "y": 61
+   "y": 63
   },
   {
    "cast": [],
-   "id": "poi_0002",
+   "id": "poi_0008",
    "items": [],
    "kind": "ruin",
-   "x": 29,
-   "y": 41
+   "x": 7,
+   "y": 53
   },
   {
    "cast": [],
-   "id": "poi_0003",
+   "id": "poi_0009",
    "items": [],
    "kind": "ruin",
    "x": 7,
@@ -195,63 +243,7 @@
   },
   {
    "cast": [],
-   "id": "poi_0004",
-   "items": [],
-   "kind": "ruin",
-   "x": 33,
-   "y": 43
-  },
-  {
-   "cast": [],
-   "id": "poi_0005",
-   "items": [],
-   "kind": "ruin",
-   "x": 37,
-   "y": 33
-  },
-  {
-   "cast": [],
-   "id": "poi_0006",
-   "items": [],
-   "kind": "ruin",
-   "x": 33,
-   "y": 39
-  },
-  {
-   "cast": [],
-   "id": "poi_0007",
-   "items": [],
-   "kind": "ruin",
-   "x": 37,
-   "y": 37
-  },
-  {
-   "cast": [],
-   "id": "poi_0008",
-   "items": [],
-   "kind": "landmark",
-   "x": 63,
-   "y": 1
-  },
-  {
-   "cast": [],
-   "id": "poi_0009",
-   "items": [],
-   "kind": "ruin",
-   "x": 29,
-   "y": 45
-  },
-  {
-   "cast": [],
    "id": "poi_0010",
-   "items": [],
-   "kind": "ruin",
-   "x": 59,
-   "y": 1
-  },
-  {
-   "cast": [],
-   "id": "poi_0011",
    "items": [],
    "kind": "ruin",
    "x": 11,
@@ -259,35 +251,19 @@
   },
   {
    "cast": [],
+   "id": "poi_0011",
+   "items": [],
+   "kind": "ruin",
+   "x": 3,
+   "y": 39
+  },
+  {
+   "cast": [],
    "id": "poi_0012",
    "items": [],
    "kind": "ruin",
-   "x": 53,
-   "y": 5
-  },
-  {
-   "cast": [],
-   "id": "poi_0013",
-   "items": [],
-   "kind": "landmark",
-   "x": 55,
-   "y": 1
-  },
-  {
-   "cast": [],
-   "id": "poi_0014",
-   "items": [],
-   "kind": "ruin",
-   "x": 31,
-   "y": 29
-  },
-  {
-   "cast": [],
-   "id": "poi_0015",
-   "items": [],
-   "kind": "landmark",
-   "x": 1,
-   "y": 53
+   "x": 7,
+   "y": 49
   }
  ],
  "size": 64
