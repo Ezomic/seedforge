@@ -259,14 +259,12 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     }
     game->buildings = std::make_shared<const PlacedBuildingSet>(std::move(settlements.set));
 
-    std::vector<SettlementSite> sites;
     std::string siteError;
-    if (!forgedSettlementSites(world, game->heightfield, sites, siteError)) {
+    if (!forgedSettlementSites(world, game->heightfield, game->sites, siteError)) {
         game->error = "settlements: " + siteError;
         return game;
     }
-    game->sites = sites;
-    PlacedKit kit = placeSettlementKit(sites, *game->buildings, game->heightfield, game->roads.get(), game->waterField.get());
+    PlacedKit kit = placeSettlementKit(game->sites, *game->buildings, game->heightfield, game->roads.get(), game->waterField.get());
     if (!kit.ok()) {
         game->error = "settlement kit: " + kit.error;
         return game;
@@ -304,32 +302,6 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     });
     chooseForgedView(*game);
     return game;
-}
-
-bool spawnAtSettlement(ForgedGame& game, std::size_t index)
-{
-    if (index >= game.sites.size()) return false;
-    const SettlementSite& site = game.sites[index];
-    constexpr double kClearM = 4.0;
-    const std::vector<PlacedBuilding> buildings = game.buildings ? game.buildings->ofSettlement(site.id) : std::vector<PlacedBuilding>{};
-    std::vector<KitInstance> pieces;
-    if (game.kit) {
-        for (const KitInstance& piece : game.kit->all()) {
-            if (piece.settlementId == site.id) pieces.push_back(piece);
-        }
-    }
-    game.spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
-        for (const PlacedBuilding& b : buildings) {
-            if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) return true;
-        }
-        for (const KitInstance& piece : pieces) {
-            if (std::abs(x - piece.x) < kClearM + 2.0 && std::abs(z - piece.z) < kClearM + 2.0) return true;
-        }
-        return false;
-    });
-    game.spawn.faceX = site.x;
-    game.spawn.faceZ = site.z;
-    return true;
 }
 
 ForgedScenery buildForgedScenery(const ForgedGame& game)
@@ -392,6 +364,32 @@ bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std:
     scenery.bundle = std::move(staged);
     scenery.kitMesh = meshes;
     scenery.kitLoaded = true;
+    return true;
+}
+
+bool spawnAtSettlement(ForgedGame& game, std::size_t index)
+{
+    if (index >= game.sites.size()) return false;
+    const SettlementSite& site = game.sites[index];
+    constexpr double kClearM = 4.0;
+    const std::vector<PlacedBuilding> buildings = game.buildings ? game.buildings->ofSettlement(site.id) : std::vector<PlacedBuilding>{};
+    std::vector<KitInstance> pieces;
+    if (game.kit) {
+        for (const KitInstance& piece : game.kit->all()) {
+            if (piece.settlementId == site.id) pieces.push_back(piece);
+        }
+    }
+    game.spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
+        for (const PlacedBuilding& b : buildings) {
+            if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) return true;
+        }
+        for (const KitInstance& piece : pieces) {
+            if (std::abs(x - piece.x) < kClearM + 2.0 && std::abs(z - piece.z) < kClearM + 2.0) return true;
+        }
+        return false;
+    });
+    game.spawn.faceX = site.x;
+    game.spawn.faceZ = site.z;
     return true;
 }
 

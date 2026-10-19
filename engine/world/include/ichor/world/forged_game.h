@@ -75,7 +75,7 @@ struct ForgedGame {
     std::shared_ptr<const PlacedPoiSet> pois;
     std::shared_ptr<const PlacedBuildingSet> buildings;
     std::vector<SettlementSite> sites; // the settlements in the forge's order, in world metres
-    std::shared_ptr<const SettlementKitSet> kit; // the textured pieces that stand in for the buildings; empty when the settlements are
+    std::shared_ptr<const SettlementKitSet> kit; // the textured pieces that stand in for the buildings
     std::shared_ptr<const NavSurface> navSurface; // water and roads as the navmesh sees them; reads `waterField` and `roads`
     ForgedRegionTiers tiers;
     MapLayerStack mapLayers;

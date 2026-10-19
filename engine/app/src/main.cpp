@@ -92,9 +92,9 @@ struct Options {
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
-    float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
-    int settlement = -1; // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
+    float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
+    int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
@@ -144,12 +144,12 @@ bool parse(int argc, char** argv, Options& options)
             options.actor = argv[++i];
         } else if (arg == "--exile" && hasValue) {
             options.exile = argv[++i];
+        } else if (arg == "--kit" && hasValue) {
+            options.kit = argv[++i];
         } else if (arg == "--overlook" && hasValue) {
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
         } else if (arg == "--settlement" && hasValue) {
             if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
-        } else if (arg == "--kit" && hasValue) {
-            options.kit = argv[++i];
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
