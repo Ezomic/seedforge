@@ -18,7 +18,7 @@ constexpr float kRootYawDegrees = 180.0f;
 
 float clamp01(float x)
 {
-    return std::isfinite(x) ? std::clamp(x, 0.0f, 1.0f) : 0.0f;
+    return std::isnan(x) ? 0.0f : std::clamp(x, 0.0f, 1.0f);
 }
 
 }
@@ -40,8 +40,12 @@ bool cookBullWarden(const std::filesystem::path& folder, BullWardenKit& kit)
         logf(LogLevel::Error, "{}: the Bull-Warden needs one skeleton and one mesh", folder.string());
         return false;
     }
-    AnimationSet animations;
-    if (!animations.load(bundle)) return false;
+    // The clip indices are taken from the very set that will be sampled, so they stay valid however often the kit is reused.
+    kit.animations.clear();
+    kit.bundle = std::move(bundle);
+    if (!kit.animations.load(kit.bundle)) return false;
+    const AnimationSet& animations = kit.animations;
+    const Skeleton& skeleton = kit.bundle.skeletons[0];
     BullWardenClips clips;
     clips.idle = animations.findClip("idle");
     clips.walk = animations.findClip("walk");
@@ -57,7 +61,6 @@ bool cookBullWarden(const std::filesystem::path& folder, BullWardenKit& kit)
     clips.attackDuration = animations.clipDuration(clips.attack);
     clips.staggerDuration = animations.clipDuration(clips.stagger);
     clips.deathDuration = animations.clipDuration(clips.death);
-    const Skeleton& skeleton = bundle.skeletons[0];
     const auto isProp = [](const std::string& name) {
         for (const char* prop : {"Axe", "Shield", "Hand"}) {
             if (name.find(prop) != std::string::npos) return true;
@@ -72,14 +75,15 @@ bool cookBullWarden(const std::filesystem::path& folder, BullWardenKit& kit)
         kit.groundClearance = std::min(kit.groundClearance, glm::inverse(skeleton.inverseBind[j])[3].y);
     }
     if (kit.bodyJoints.empty()) return false;
-    kit.bundle = std::move(bundle);
     kit.clips = clips;
-    return kit.animations.load(kit.bundle);
+    return true;
 }
 
 BullWardenPose bullWardenPose(const Combatant& c, const Tuning& tuning, const BullWardenClips& clips, const BullWardenSwing& swing, bool moving, double clock)
 {
-    const float t = std::isfinite(c.stateTime) ? std::max(c.stateTime, 0.0f) : 0.0f;
+    const float t = std::isnan(c.stateTime) ? 0.0f : std::max(c.stateTime, 0.0f); // +inf is a long time, not none
+    const float strikeStart = clamp01(swing.strikeStart);
+    const float strikeEnd = std::max(clamp01(swing.strikeEnd), strikeStart);
     const auto loop = [&](std::uint32_t clip, float duration) {
         const float d = std::max(duration, 1e-3f);
         return BullWardenPose{clip, static_cast<float>(std::fmod(std::isfinite(clock) ? std::max(clock, 0.0) : 0.0, static_cast<double>(d)))};
@@ -93,9 +97,9 @@ BullWardenPose bullWardenPose(const Combatant& c, const Tuning& tuning, const Bu
         const float active = std::max(heavy ? tuning.heavyActive : tuning.lightActive, 1e-3f);
         const float recovery = std::max(heavy ? tuning.heavyRecovery : tuning.lightRecovery, 1e-3f);
         float f = 0.0f;
-        if (c.combatState() == CombatState::Windup) f = swing.strikeStart * clamp01(t / windup);
-        else if (c.combatState() == CombatState::Active) f = swing.strikeStart + (swing.strikeEnd - swing.strikeStart) * clamp01(t / active);
-        else f = swing.strikeEnd + (1.0f - swing.strikeEnd) * clamp01(t / recovery);
+        if (c.combatState() == CombatState::Windup) f = strikeStart * clamp01(t / windup);
+        else if (c.combatState() == CombatState::Active) f = strikeStart + (strikeEnd - strikeStart) * clamp01(t / active);
+        else f = strikeEnd + (1.0f - strikeEnd) * clamp01(t / recovery);
         return {clips.attack, f * clips.attackDuration};
     }
     case CombatState::Staggered:
@@ -133,6 +137,7 @@ void appendBullWarden(const Scene& scene, StableId foe, double alpha, const Tuni
     const auto* combatant = scene.registry().try_get<Combatant>(entity);
     if (transform == nullptr || previous == nullptr || combatant == nullptr) return;
     const glm::dvec3 feet = glm::mix(previous->position, transform->position, alpha);
+    if (!std::isfinite(feet.x + feet.y + feet.z) || !std::isfinite(kit.scale)) return;
     const bool moving = glm::dot(transform->position - previous->position, transform->position - previous->position) > 1e-8;
     const BullWardenPose pose = bullWardenPose(*combatant, tuning, kit.clips, kit.swing, moving, scene.time());
 

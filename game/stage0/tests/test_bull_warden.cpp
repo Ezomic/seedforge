@@ -214,3 +214,31 @@ TEST_CASE("drawing the Bull-Warden does not move the simulation")
     appendBullWarden(arena.scene, arena.stage.foeId(), 0.5, Tuning{}, own, view);
     CHECK(arena.scene.stateHash() == before);
 }
+
+TEST_CASE("an endless death time ends on the last frame of the death clip, and a reversed swing window stays in order")
+{
+    CHECK(poseOf(inState(CombatState::Dead, std::numeric_limits<float>::infinity())).time == Catch::Approx(kit().clips.deathDuration));
+    CHECK(poseOf(inState(CombatState::Recovery, std::numeric_limits<float>::infinity())).time == Catch::Approx(kit().clips.attackDuration));
+    const BullWardenSwing reversed{0.8f, 0.2f};
+    for (const CombatState state : {CombatState::Windup, CombatState::Active, CombatState::Recovery}) {
+        for (const float time : {0.0f, 0.1f, 0.3f, 10.0f}) {
+            const BullWardenPose p = bullWardenPose(inState(state, time), Tuning{}, kit().clips, reversed, false, 0.0);
+            CHECK(p.time >= 0.0f);
+            CHECK(p.time <= kit().clips.attackDuration + 1e-3f);
+        }
+    }
+    CHECK(bullWardenPose(inState(CombatState::Active, 0.0f), Tuning{}, kit().clips, reversed, false, 0.0).time
+        == Catch::Approx(bullWardenPose(inState(CombatState::Active, 10.0f), Tuning{}, kit().clips, reversed, false, 0.0).time));
+}
+
+TEST_CASE("a non-finite foe position draws nothing")
+{
+    Arena arena;
+    arena.scene.registry().get<Transform>(arena.scene.find(arena.stage.foeId())).position.x = std::numeric_limits<double>::quiet_NaN();
+    BullWardenKit own;
+    REQUIRE(cookBullWarden(kBullFolder, own));
+    RenderView view;
+    appendBullWarden(arena.scene, arena.stage.foeId(), 1.0, Tuning{}, own, view);
+    CHECK(view.instances.empty());
+    CHECK(view.jointPalette.empty());
+}
