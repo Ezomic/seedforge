@@ -187,7 +187,7 @@ TEST_CASE("only the foe is replaced: its grey body is skipped and the Bull-Warde
     RenderView plain;
     appendCharacterInstances(arena.scene, 1.0, Tuning{}, grey, plain.instances);
     RenderView swapped;
-    appendCharacterInstances(arena.scene, 1.0, Tuning{}, grey, swapped.instances, arena.scene.find(arena.stage.foeId()));
+    appendCharacterInstances(arena.scene, 1.0, Tuning{}, grey, swapped.instances, false, arena.scene.find(arena.stage.foeId()));
     CHECK(plain.instances.size() == 6);
     CHECK(swapped.instances.size() == 3);
 
