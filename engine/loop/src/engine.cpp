@@ -60,27 +60,40 @@ bool Engine::frame(double frameSeconds)
         step_.reset();
     }
     const int steps = gated_ ? 0 : step_.advance(frameSeconds);
-    for (int i = 0; i < steps && !replayFinished(); ++i) {
-        scene_.tick(step_.dt(), nextInput());
-        if (audio_ != nullptr) {
-            for (const SoundEvent& event : scene_.soundEvents()) {
-                audio_->play(event.sound, event.position, true);
+    {
+        FrameStages::Scope timer(stages_, "sim");
+        for (int i = 0; i < steps && !replayFinished(); ++i) {
+            scene_.tick(step_.dt(), nextInput());
+            if (audio_ != nullptr) {
+                for (const SoundEvent& event : scene_.soundEvents()) {
+                    audio_->play(event.sound, event.position, true);
+                }
             }
         }
     }
 
-    renderer_.beginFrame();
+    {
+        FrameStages::Scope timer(stages_, "begin");
+        renderer_.beginFrame();
+    }
     if (viewBuilder_) {
         view_.instances.clear();
         view_.lines.clear();
         view_.jointPalette.clear();
         view_.terrain.clear();
-        viewBuilder_(scene_, step_.alpha(), view_);
+        view_.vegetation.clear();
+        view_.waterCells.clear();
+        {
+            FrameStages::Scope timer(stages_, "view");
+            viewBuilder_(scene_, step_.alpha(), view_);
+        }
+        FrameStages::Scope timer(stages_, "submit");
         renderer_.submit(view_);
     }
     renderer_.debugText(std::format("frame {}  {:.0f} fps  {:.1f} ms  tick {}  sim {:.2f} s{}{}", frameCount_, frameMillis_ > 0.0 ? 1000.0 / frameMillis_ : 0.0, frameMillis_, scene_.tickCount(), scene_.time(),
         replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
     renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
+    renderer_.debugText("ms (mean/peak) " + stages_.summary());
     if (overlayBuilder_) {
         overlay_.clear();
         overlayBuilder_(scene_, overlay_);
@@ -88,7 +101,14 @@ bool Engine::frame(double frameSeconds)
             renderer_.debugText(std::move(line));
         }
     }
-    renderer_.endFrame();
+    {
+        FrameStages::Scope timer(stages_, "present");
+        renderer_.endFrame();
+    }
+    for (const Renderer::GpuPassTime& pass : renderer_.gpuPasses()) {
+        stages_.record(std::string("gpu.") + pass.name, pass.ms);
+    }
+    stages_.endFrame();
 
     ++frameCount_;
     return true;

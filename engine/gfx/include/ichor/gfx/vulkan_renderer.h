@@ -29,6 +29,7 @@ public:
     std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) override;
     void removeVegetationCell(std::uint32_t cell) override;
     bool reloadShaders() override;
+    const std::vector<GpuPassTime>& gpuPasses() const override;
     void beginFrame() override;
     void submit(const RenderView& view) override;
     void endFrame() override;

@@ -309,6 +309,11 @@ void VulkanRenderer::removeVegetationCell(std::uint32_t cell)
     impl_->scene->removeVegetationCell(cell);
 }
 
+const std::vector<Renderer::GpuPassTime>& VulkanRenderer::gpuPasses() const
+{
+    return impl_->scene->gpuPasses();
+}
+
 bool VulkanRenderer::reloadShaders()
 {
     return impl_->scene->reloadPipelines();
