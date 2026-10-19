@@ -108,4 +108,8 @@ if(ENGINE_RUNTIME)
         )
     endif()
     catch_discover_tests(ichor_gfx_tests)
+
+    add_test(NAME offscreen_screenshot_matches_window
+        COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/offscreen_screenshot_check.cmake)
+    set_tests_properties(offscreen_screenshot_matches_window PROPERTIES SKIP_REGULAR_EXPRESSION "no usable Vulkan device" RUN_SERIAL TRUE)
 endif()
