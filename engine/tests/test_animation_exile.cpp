@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <memory>
 
 using namespace ichor;
 
@@ -47,33 +48,33 @@ std::uint32_t jointIndex(std::string_view name)
     return static_cast<std::uint32_t>(it - names.begin());
 }
 
-const AnimationSet& animations();
+std::unique_ptr<AnimationSet> loadAnimations();
 
 // Which way the body faces on the ground at the first frame of idle: from the left ankle to its toes.
 glm::vec2 bodyForward()
 {
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     std::vector<glm::mat4> pose;
     REQUIRE(set.samplePose(set.findClip("idle"), 0.0f, pose));
     const glm::vec3 d = glm::vec3(pose[jointIndex("mixamorig:LeftToeBase")][3]) - glm::vec3(pose[jointIndex("mixamorig:LeftFoot")][3]);
     return glm::normalize(glm::vec2(d.x, d.z));
 }
 
-const AnimationSet& animations()
+// Not a static: ozz asserts at exit that nothing it allocated is still alive.
+std::unique_ptr<AnimationSet> loadAnimations()
 {
-    static const AnimationSet* set = [] {
-        auto* s = new AnimationSet();
-        REQUIRE(s->load(character()));
-        return s;
-    }();
-    return *set;
+    auto set = std::make_unique<AnimationSet>();
+    REQUIRE(set->load(character()));
+    return set;
 }
 
 // Mean ground speed of the left ankle while it is planted, over one cycle. A foot that stays put
 // while the body travels is the whole point of the root travel matching the legs.
 float plantedFootSpeed(const char* clipName)
 {
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     const std::uint32_t clip = set.findClip(clipName);
     REQUIRE(clip != AnimationSet::kNoClip);
     const std::uint32_t foot = jointIndex("mixamorig:LeftFoot");
@@ -118,7 +119,8 @@ TEST_CASE("the Exile skeleton cooks to the root joint and 34 bones with their fi
     std::sort(sorted.begin(), sorted.end());
     REQUIRE(std::adjacent_find(sorted.begin(), sorted.end()) == sorted.end());
 
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     REQUIRE(set.jointCount(0) == 35);
     REQUIRE(set.clipCount() == 9);
     for (const char* clip : kExileClipNames) {
@@ -148,7 +150,8 @@ TEST_CASE("the Exile mesh is metric, upright, on the ground, facing -Z and fully
 
 TEST_CASE("skinning the first frame of idle leaves the Exile standing on the ground")
 {
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     std::vector<glm::mat4> skin;
     REQUIRE(set.skinningMatrices(set.findClip("idle"), 0.0f, skin));
     float lowest = 1e9f;
@@ -165,7 +168,8 @@ TEST_CASE("skinning the first frame of idle leaves the Exile standing on the gro
 
 TEST_CASE("walk travels about 4.2 m and run about 5 m/s along the way the body faces, from the root joint")
 {
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     const glm::vec2 forward = bodyForward();
     const auto travel = [&](const char* name, float& duration) {
         const std::uint32_t clip = set.findClip(name);
@@ -199,7 +203,8 @@ TEST_CASE("the feet plant while the body travels: the root travel matches the le
 
 TEST_CASE("no clip drags the hips off the ground or through it")
 {
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     std::vector<glm::mat4> pose;
     for (const char* name : kExileClipNames) {
         const std::uint32_t clip = set.findClip(name);
@@ -222,7 +227,8 @@ TEST_CASE("the spear is held in the right hand and the shield in the left, on th
     REQUIRE(character().skeletons[0].jointNames[kit.sockets[0].joint] == "mixamorig:RightHand");
     REQUIRE(character().skeletons[0].jointNames[kit.sockets[1].joint] == "mixamorig:LeftHand");
 
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     const std::uint32_t idle = set.findClip("idle");
     std::vector<glm::mat4> skin;
     std::vector<glm::mat4> pose;
@@ -277,7 +283,8 @@ TEST_CASE("the cooked Exile survives the bundle file")
 
 TEST_CASE("idle loops: its last pose meets its first, which walk and run, as authored, do not")
 {
-    const AnimationSet& set = animations();
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
     // The largest distance any joint is from where it started, with the root's travel taken out.
     const auto seam = [&](const char* name) {
         const std::uint32_t clip = set.findClip(name);
