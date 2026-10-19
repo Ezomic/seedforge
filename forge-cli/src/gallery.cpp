@@ -17,11 +17,13 @@ namespace {
 constexpr int kGutter = 2;
 constexpr int kLabelScale = 2;
 constexpr int kLabelHeight = 5 * kLabelScale + 4;
-constexpr int kGlyphAdvance = 4 * kLabelScale;
+constexpr int kCaptionHeight = 5 + 3;
 constexpr std::uint8_t kBackground[3] = {20, 20, 20};
 constexpr std::uint8_t kFailed[3] = {120, 20, 20};
 constexpr std::uint8_t kRiver[3] = {40, 110, 230};
 constexpr std::uint8_t kLabelInk[3] = {235, 235, 235};
+constexpr std::uint8_t kPassInk[3] = {110, 200, 120};
+constexpr std::uint8_t kFailInk[3] = {240, 150, 60};
 constexpr int kLitBase = 160;
 constexpr std::uint64_t kMaxCanvasBytes = 128ull << 20;
 
@@ -30,6 +32,20 @@ constexpr std::uint8_t kDigits[10][5] = {
     {7, 5, 5, 5, 7}, {2, 6, 2, 2, 7}, {7, 1, 7, 4, 7}, {7, 1, 7, 1, 7}, {5, 5, 7, 1, 1},
     {7, 4, 7, 1, 7}, {7, 4, 7, 5, 7}, {7, 1, 1, 1, 1}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 7},
 };
+
+// 3x5 glyphs for the caption: '/', '-' and 'X'.
+constexpr std::uint8_t kSlash[5] = {1, 1, 2, 4, 4};
+constexpr std::uint8_t kDash[5] = {0, 0, 7, 0, 0};
+constexpr std::uint8_t kCross[5] = {5, 5, 2, 5, 5};
+
+const std::uint8_t* glyph(char c)
+{
+    if (c >= '0' && c <= '9') return kDigits[c - '0'];
+    if (c == '/') return kSlash;
+    if (c == '-') return kDash;
+    if (c == 'X') return kCross;
+    return nullptr;
+}
 
 struct Canvas {
     int width = 0;
@@ -45,21 +61,23 @@ struct Canvas {
     }
 };
 
-void drawLabel(Canvas& canvas, int x0, int y0, int maxWidth, std::uint64_t seed)
+void drawText(Canvas& canvas, int x0, int y0, int maxWidth, const std::string& text, int scale, const std::uint8_t* ink)
 {
-    const std::string text = std::to_string(seed);
     int x = x0 + 2;
     for (const char c : text) {
-        if (x + 3 * kLabelScale > x0 + maxWidth) break;
-        for (int row = 0; row < 5; ++row) {
-            for (int col = 0; col < 3; ++col) {
-                if (!(kDigits[c - '0'][row] & (4 >> col))) continue;
-                for (int dy = 0; dy < kLabelScale; ++dy) {
-                    for (int dx = 0; dx < kLabelScale; ++dx) canvas.set(x + col * kLabelScale + dx, y0 + 2 + row * kLabelScale + dy, kLabelInk);
+        if (x + 3 * scale > x0 + maxWidth) break;
+        const std::uint8_t* rows = glyph(c);
+        if (rows) {
+            for (int row = 0; row < 5; ++row) {
+                for (int col = 0; col < 3; ++col) {
+                    if (!(rows[row] & (4 >> col))) continue;
+                    for (int dy = 0; dy < scale; ++dy) {
+                        for (int dx = 0; dx < scale; ++dx) canvas.set(x + col * scale + dx, y0 + row * scale + dy, ink);
+                    }
                 }
             }
         }
-        x += kGlyphAdvance;
+        x += 4 * scale;
     }
 }
 
@@ -105,6 +123,52 @@ bool drawWorld(Canvas& canvas, int x0, int y0, const worldforge::ForgedWorld& wo
 
 }
 
+SanityRow sanityRow(const worldforge::ValidationReport& report)
+{
+    SanityRow row;
+    row.seed = report.seed;
+    row.error = report.error;
+    for (std::size_t i = 0; i < report.gates.size(); ++i) {
+        const worldforge::GateResult& g = report.gates[i];
+        row.gateIds.push_back(g.id);
+        if (g.status == worldforge::GateStatus::Skipped) continue;
+        ++row.evaluated;
+        if (g.status == worldforge::GateStatus::Pass) {
+            ++row.passed;
+        } else {
+            row.failedGates.push_back(g.id);
+            row.failedIndexes.push_back(static_cast<int>(i) + 1);
+        }
+    }
+    return row;
+}
+
+std::string sanityCaption(const SanityRow& row)
+{
+    if (!row.error.empty()) return "X";
+    std::string text = std::to_string(row.passed) + "/" + std::to_string(row.evaluated);
+    for (const int index : row.failedIndexes) text += " " + std::to_string(index);
+    return text;
+}
+
+std::string sanitySummary(const std::vector<SanityRow>& rows)
+{
+    std::string out;
+    for (const SanityRow& row : rows) {
+        out += "seed " + std::to_string(row.seed) + " ";
+        out += row.error.empty() ? std::to_string(row.passed) + "/" + std::to_string(row.evaluated) : std::string("invalid thresholds");
+        out += row.error.empty() && row.failedGates.empty() ? " PASS" : " FAIL";
+        for (const std::string& id : row.failedGates) out += " " + id;
+        out += "\n";
+    }
+    if (!rows.empty()) {
+        out += "caption: passed/evaluated gates, then the failed gate numbers:";
+        for (std::size_t i = 0; i < rows.front().gateIds.size(); ++i) out += " " + std::to_string(i + 1) + "=" + rows.front().gateIds[i];
+        out += "\n";
+    }
+    return out;
+}
+
 GalleryResult makeGallery(const GalleryOptions& options)
 {
     GalleryResult result;
@@ -125,7 +189,7 @@ GalleryResult makeGallery(const GalleryOptions& options)
     while (columns * columns < count) ++columns;
     const int rows = (count + columns - 1) / columns;
     const int cellW = options.size;
-    const int cellH = options.size + kLabelHeight;
+    const int cellH = options.size + kLabelHeight + (options.sanity ? kCaptionHeight : 0);
 
     Canvas canvas;
     canvas.width = kGutter + columns * (cellW + kGutter);
@@ -142,16 +206,24 @@ GalleryResult makeGallery(const GalleryOptions& options)
         const int x0 = kGutter + (n % columns) * (cellW + kGutter);
         const int y0 = kGutter + (n / columns) * (cellH + kGutter);
         bool drawn = false;
+        std::optional<SanityRow> row;
         try {
-            const worldforge::ForgedWorld world = worldforge::forgeWorld(seed, options.size, options.config ? *options.config : defaultForgeConfig(options.size), worldforge::ForgePhase::Biomes);
+            const worldforge::ForgedWorld world = worldforge::forgeWorld(seed, options.size, options.config ? *options.config : defaultForgeConfig(options.size),
+                options.sanity ? worldforge::ForgePhase::Content : worldforge::ForgePhase::Biomes);
             drawn = drawWorld(canvas, x0, y0, world);
+            if (drawn && options.sanity) row = sanityRow(worldforge::validateWorld(world, options.thresholds ? *options.thresholds : sanityThresholds()));
         } catch (const std::exception&) {
         }
         if (!drawn) {
             fillRect(canvas, x0, y0, cellW, options.size, kFailed);
             result.failedSeeds.push_back(seed);
         }
-        drawLabel(canvas, x0, y0 + options.size, cellW, seed);
+        drawText(canvas, x0, y0 + options.size + 2, cellW, std::to_string(seed), kLabelScale, kLabelInk);
+        if (row) {
+            row->seed = seed;
+            drawText(canvas, x0, y0 + options.size + kLabelHeight, cellW, sanityCaption(*row), 1, row->error.empty() && row->failedGates.empty() ? kPassInk : kFailInk);
+            result.sanity.push_back(std::move(*row));
+        }
     }
 
     auto png = encodePng(canvas.width, canvas.height, 3, canvas.pixels);
@@ -224,6 +296,7 @@ int galleryMain(int argc, char** argv)
         return 1;
     }
     std::printf("%s %dx%d\n", out.c_str(), result.width, result.height);
+    std::fputs(sanitySummary(result.sanity).c_str(), stdout);
     for (const std::uint64_t seed : result.failedSeeds) std::fprintf(stderr, "seed %llu failed to forge\n", static_cast<unsigned long long>(seed));
     return result.failedSeeds.empty() ? 0 : 1;
 }
