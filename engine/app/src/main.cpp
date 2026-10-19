@@ -53,6 +53,7 @@
 #include "ichor/ui/loading_screen.h"
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/forge.h"
+#include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/npc/schedule.h"
 #include "ichor/ui/journal_screen_model.h"
@@ -105,6 +106,7 @@ struct Options {
     bool editor = false;
     bool showMap = false;
     bool showNewGame = false;
+    bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
@@ -193,6 +195,8 @@ bool parse(int argc, char** argv, Options& options)
             options.showMap = true;
         } else if (arg == "--new-game") {
             options.showNewGame = true;
+        } else if (arg == "--no-forged-atmosphere") {
+            options.standInAtmosphere = true;
         } else if (arg == "--forged") {
             options.forged = true;
         } else if (arg == "--grid" && hasValue) {
@@ -784,12 +788,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::bindData(scripts, data);
     ichor::bindChronicle(scripts, chronicle, engine.scene());
     ichor::bindJournal(scripts, chronicle, engine.scene(), journalTemplates);
+    const ichor::ForgedAtmosphereConfig forgedAtmosphere;
+    const bool forgedSky = forged && !options.standInAtmosphere;
+    const ichor::ForgedBiomeLook biomeLook = forgedSky && forged->biomes ? ichor::forgedBiomeLook(forged->biomes->biomeAt(forged->spawn.x, forged->spawn.z)) : ichor::ForgedBiomeLook{};
     const auto weatherAtTick = [&](std::uint64_t tick) {
         ichor::Weather weather = ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(tick) * config.fixedDt / options.daySeconds * 24.0);
         if (!options.rain) {
             weather.rain = 0.0f;
         }
-        return weather;
+        return forgedSky ? ichor::forgedWeather(forgedAtmosphere, weather) : weather;
     };
     const auto weatherNow = [&] { return weatherAtTick(engine.scene().tickCount()); };
     // The hour is read from the tick, as the sky is, so a script sees what the player sees.
@@ -1021,9 +1028,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // The editor can pin either one.
             ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : weatherAtTick(scene.tickCount()), atmosphere);
+            if (forgedSky) {
+                ichor::applyForgedAtmosphere(forgedAtmosphere, biomeLook, atmosphere);
+            }
             ichor::applyAtmosphere(atmosphere, view);
             view.wetness = surfaceWetness.update(atmosphere.rain, scene.tickCount(), config.fixedDt);
             ichor::applyPalette(palette, view);
+            if (forgedSky) {
+                view.groundColor = biomeLook.ground;
+            }
             view.time = static_cast<float>(std::fmod(scene.time(), 3600.0));
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
