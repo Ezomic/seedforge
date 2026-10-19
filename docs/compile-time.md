@@ -98,7 +98,7 @@ Reading this:
 Ordered by expected payoff per risk. "Done" is only what this PR changes (nothing in code).
 
 1. **Cache capacity (config, no code).** The shared sccache is at its 10 GiB cap with an 84.6% hit rate. With 15 worktrees and cold-to-warm swings of 7x per TU, evictions turn into full recompiles. Raise `SCCACHE_CACHE_SIZE` for `/e/build-queue/sccache` (disk permitting). Not done: it is machine config owned by the build queue.
-2. **Batch the test TUs (unity or grouped).** Catch2 costs about 3.1 s of the roughly 5 s front end in each of the 273 test TUs (about 900 s CPU cold). CMake `UNITY_BUILD` with `UNITY_BUILD_BATCH_SIZE` 4 on `ichor_tests` would cut that to a quarter. Risks: anonymous-namespace and `TEST_CASE` name collisions between files, and a coarser sccache key (editing one test recompiles its batch on a miss). Needs a collision audit first, so not "clearly safe and local". Not done.
+2. **Batch the test TUs (unity or grouped).** Catch2 costs about 3.1 s of the roughly 5 s front end in each of the 273 test TUs (about 900 s CPU cold). CMake `UNITY_BUILD` with `UNITY_BUILD_BATCH_SIZE` 4 on `ichor_tests` would cut that to a quarter. Risks: anonymous-namespace and `TEST_CASE` name collisions between files, and a coarser sccache key (editing one test recompiles its batch on a miss). Needs a collision audit first, so not "clearly safe and local". Measured in the SEED-468 spike below: 31 to 38% of the test files clash, and the warm loop does not improve, so not adopted.
 3. **Split `ichor_tests.exe` into 3 or 4 executables by domain.** Cuts the 15 to 28 s serial link on every test edit to the part you touched, and lets links run in parallel. A CMake change that affects test names in `ctest`; not done.
 4. **Build tests with `/O1` or `/Od`.** Measured with direct compiles, same TUs, best of 2: `/O2 /Ob2` 8.2, 10.3, 4.5, 8.3, 8.6, 7.7 s; `/O1` 6.9, 9.7, 3.9, 9.1, 6.0, 6.7 s; `/Od` 4.7, 7.9, 3.2, 6.5, 5.6, 5.4 s (test_xref, test_determinism, test_data, axiom, streamer, quest_expansion). That is about 30% off at `/Od`. It changes codegen and runtime of the determinism and fuzz tests, and CI's Linux job already covers the sanitizer side, so it needs a runtime comparison first. Not done.
 5. **Keep `<filesystem>` and `<format>` out of the next widest headers.** `<filesystem>` is in 38 headers because `path` is in their signatures; a `std::string_view` or an `ichor::Path` wrapper would remove it but changes those contracts. `<format>` is already confined to `.cpp` files through `log.h`. Not done (contract change).
@@ -115,3 +115,71 @@ Only this document. No source, CMake or workflow edits: the one candidate source
 - Header parse cost: a one-line TU (`#include <header>` plus `int x;`) compiled with the flags from `build.ninja` plus `/Zs`.
 - Front end vs back end: `cl /Bt+` with the target's `DEFINES`, `FLAGS`, `INCLUDES` from `build.ninja`.
 - Cold vs warm sccache: run the same compile through `sccache cl` with `SCCACHE_RECACHE=1`, then without; use a private `SCCACHE_DIR` and `SCCACHE_SERVER_PORT` so the shared cache is untouched.
+
+## Spike: unity batches and a Catch2 PCH for the test executables (SEED-468)
+
+Question: do CMake `UNITY_BUILD` / `UNITY_BUILD_BATCH_SIZE`, or a precompiled header for Catch2 alone, pay off on the four domain executables from SEED-467 (`ichor_tests_world` 98 files, `_sim` 100, `_ui` 67, `_core` 27; 292 test files)? Measured with throwaway CMake switches (not kept): `set_target_properties(<t> PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE <n>)`, `SKIP_UNITY_BUILD_INCLUSION` on files that clash, and `target_precompile_headers(<t> PRIVATE <catch2/catch_test_macros.hpp>)`.
+
+### Compile CPU per translation unit (the reliable number)
+
+Eight clash-free test files, `cl /Bt+` with the real flags (`/O2 /Ob2 /Z7`), best of 2, c1xx plus c2, same files in every row:
+
+| Variant | CPU (8 files) | vs separate TUs |
+| --- | --- | --- |
+| Separate TUs (today) | 40.0 s | |
+| Unity, batch 4 (2 TUs) | 16.9 s | -58% |
+| Unity, batch 8 (1 TU) | 11.7 s | -71% |
+| Catch2 PCH, each file compiled against it | 15.5 s | -61% |
+| Catch2 PCH build itself | 2.8 s, once per executable | |
+
+So both ideas remove the repeated Catch2 and standard-library parse, as predicted. The ceiling for a clean batch of 4 is roughly 2.4x less compile CPU, and the PCH reaches about the same without touching any test source.
+
+### Whole-build wall time (noisy, read with care)
+
+`core` + `ui` executables (94 files), private sccache dir per variant, `bin/build` at 3 compile jobs. The machine load swung by more than the effect: the same baseline measured 668 s, 401 s and 477 s cold. Treat these as direction only; the CPU table above is the number to trust.
+
+| Variant | Cold | Warm (all cache hits) | After editing one test |
+| --- | --- | --- | --- |
+| Baseline | 401 to 668 s | 53 to 117 s | 7 to 12 s |
+| Unity, batch 4 (21% of files excluded for clashes) | 420 to 510 s | 55 to 60 s | 12 to 15 s |
+| Unity, batch 8 (about 38% excluded) | 425 s (772 s in a loaded rerun) | 56 s | 15 s |
+| Catch2 PCH | 451 s | 118 s | 6 s |
+
+Link time did not decide anything: `ichor_tests_core` 1.9 to 4.6 s and `ichor_tests_ui` 3.5 to 8.9 s in the baseline, 2.1 to 2.5 s and 3.7 to 5.0 s with unity (fewer, larger objects), all inside the load noise.
+
+### Unity clashes
+
+Compiling all four executables with batch 4 and `-k 0`, then excluding every file the compiler named and repeating until the build was green:
+
+| Batch size | Files that had to be excluded | Share of 292 |
+| --- | --- | --- |
+| 4 | 90 | 31% |
+| 8 | 111 | 38% |
+
+The first pass at batch 4 alone reported 75 distinct clashing names across 40 files (36 of about 74 batches failed). Typical clashes:
+
+- Same helper or constant in each file's anonymous namespace: `kSeed`, `kGrid`, `kDt`, `kNaN`/`kNan`, `kInf`, `readJson`, `split`, `shipped`, `mentions`, `collectStrings`, `problems`, `text`, `Fixture`, `Loaded`, `World`, `Skeleton`, `Finding`.
+- Families written together share copied helpers: `test_worldforge_*`, `test_forged_*`, `test_notable_items_*`, `test_synergy_*`, `test_setpiece_quests_*`, `test_faction_questlines_*`, `test_dungeon_skeletons_*`.
+- Two real headers define `ichor::Capability` (`traversal/verbs.h` and `progression/capabilities.h`), so any batch that mixes a traversal test with a progression test fails even without anonymous namespaces.
+- 286 of 294 test files have a file-scope `using namespace`, and 18 define macros; these leak into every later file of a batch and are the second wave of errors once the obvious redefinitions are excluded.
+
+The excluded files still compile on their own, so the measured wall numbers above already include the loss: 21 to 38% of the files get no benefit.
+
+### Why the fix is not cheap
+
+- The mechanical fix is wrapping each file in a unique namespace (or renaming each helper). That touches roughly a third of 292 files, and every parallel session adds test files, so it would conflict constantly.
+- Clashes appear non-locally. Batches follow glob order, so adding `test_foo.cpp` can break the build of an unrelated neighbour, and only on a configuration with unity on. Without a CI job that builds unity, it regresses silently; with one, it adds a build that costs as much as the thing it saves.
+- A new or removed file shifts every later batch boundary in its executable, which changes the key of every following unity TU. A one-file change then costs a cache miss for each later batch under sccache, while today it costs one TU.
+- Editing one test rebuilds its whole batch on a miss: 12 to 15 s measured against 7 to 12 s for a separate TU, and it grows with the batch size.
+
+### Why the PCH does not help here
+
+`CMakeLists.txt` already leaves PCH off when a compiler launcher is set, because sccache cannot cache a compile that uses `/Yu`. This was checked directly: one `/Yc` and two `/Yu` compiles through a private sccache gave 0 hits, 0 misses and 3 non-cacheable calls. Under `bin/build` and CI the Catch2 PCH would therefore turn every test TU into an uncacheable compile: the warm build with PCH took 118 s, against a 53 to 117 s warm baseline whose spread is load noise, and a warm baseline is all cache hits where the PCH build recompiles everything. A one-test edit was fast (6 s), but only because it compiles one TU against an existing PCH, which a separate TU already does at 7 to 12 s. The PCH is a win only where there is no cache (the Visual Studio `windows` preset, which already includes Catch2 through `ichor_pch.h`). In the flows that matter it trades the cache for a 61% cheaper cold compile, so nothing changes.
+
+### Conclusion and recommendation
+
+- Compile CPU per TU falls by 58% (batch 4) to 71% (batch 8), but only for files that can be batched. After the clash exclusions the whole-build cold gain measured about 12 to 36% with large noise, below the 30% bar, and it depends on fixing a third of the test files.
+- The warm path, which is the daily loop, did not improve (about 55 s with unity, 53 to 117 s baseline depending on load), and a one-test edit got slower, because the cache hit rate decides it and unity coarsens the cache key.
+- Decision: do not enable unity or a test PCH. No CMake change is kept; this PR is the document only.
+- If cold CI time ever becomes the bottleneck, the order to try is: (1) item 1 above (cache capacity), since a warm cache beats every compile-time trick measured here; (2) a one-off codemod that puts each test file in its own namespace, as its own ticket, enabling unity for just the executable with the lowest clash count (`ichor_tests_core`: 4 of 27 files clash) and a CI job that fails on a new clash; (3) only then batch size above 4, which saves a further 13 points of CPU but doubles the cost of every test edit.
+- Reproduce: set the three properties above in the executable loop of `engine/tests/CMakeLists.txt`, build with `-k 0` through Ninja inside the MSVC environment to list every clash at once, and compare `cl /Bt+` on the same files against a concatenated `#include` TU.
