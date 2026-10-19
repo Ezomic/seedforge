@@ -77,6 +77,7 @@ set_tests_properties(seed_harness_cli PROPERTIES PASS_REGULAR_EXPRESSION "\"coun
 
 if(ENGINE_RUNTIME)
     add_test(NAME forged_app_determinism COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_app_check.cmake)
+    set_tests_properties(forged_app_determinism PROPERTIES TIMEOUT 300)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp
     )

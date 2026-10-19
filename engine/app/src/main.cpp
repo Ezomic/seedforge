@@ -438,12 +438,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // The roads, points of interest and buildings are grey-box meshes uploaded once; the view draws the ones in resident cells.
     ichor::ForgedScenery scenery;
     std::uint32_t sceneryBase = 0;
+    bool sceneryDrawn = false;
     if (forged) {
         scenery = ichor::buildForgedScenery(*forged);
         sceneryBase = renderer.meshCount();
-        if (!renderer.uploadBundle(scenery.bundle)) {
+        sceneryDrawn = renderer.uploadBundle(scenery.bundle);
+        if (!sceneryDrawn) {
             ichor::log(ichor::LogLevel::Warn, "the roads and placed buildings could not be uploaded; the world is drawn without them");
-            scenery = {};
         }
     }
     ichor::StreamerConfig streaming;
@@ -794,9 +795,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui);
-            mapScreen->setImage(ichor::renderMapImage(heightfield));
             if (forged) {
                 mapScreen->setLayerStack(forged->mapLayers);
+            } else {
+                mapScreen->setImage(ichor::renderMapImage(heightfield));
             }
             mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
@@ -947,7 +949,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (cell.water != ichor::Renderer::kNoHandle) {
                 view.waterCells.push_back({cell.water, cell.origin});
             }
-            if (!forged || distance >= 2.2) continue;
+            if (!sceneryDrawn || distance >= 2.2) continue;
             if (const auto road = scenery.roadMesh.find(id); road != scenery.roadMesh.end()) {
                 view.instances.push_back({sceneryBase + road->second, cell.origin});
             }
@@ -1263,6 +1265,9 @@ int main(int argc, char** argv)
         return 2;
     }
 
+    if (!options.forged && options.forgedGrid != ichor::kForgedDefaultGridSize) {
+        ichor::log(ichor::LogLevel::Warn, "--grid only applies with --forged and is ignored");
+    }
     if (options.audioProbe) {
         ichor::MiniaudioDevice device;
         if (!device.init()) {

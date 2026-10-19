@@ -232,3 +232,55 @@ TEST_CASE("a streamed cell of a forged world carries its biome splat, its placed
     }
     CHECK(standIn.pois.empty());
 }
+
+TEST_CASE("every level of detail of a forged cell keeps its splat weights", "[forged_game]")
+{
+    const auto game = gameFor(1);
+    StreamerConfig config;
+    config.biomes = game->biomes;
+    config.navmesh = true;
+    config.navSurface = game->navSurface;
+    CellPayload payload;
+    WorldStreamer::buildPayload(game->heightfield, {3, 3}, config, payload);
+    REQUIRE(payload.lods.size() == 3);
+    for (const Mesh& lod : payload.lods) {
+        REQUIRE_FALSE(lod.vertices.empty());
+        for (const Vertex& v : lod.vertices) {
+            REQUIRE(v.tangent.w == -1.0f);
+            REQUIRE(std::abs(v.tangent.x + v.tangent.y + v.tangent.z - 1.0f) < 1e-4f);
+        }
+    }
+}
+
+TEST_CASE("a navmesh built over a forged cell leaves the water out", "[forged_game]")
+{
+    const auto game = gameFor(1);
+    StreamerConfig walled;
+    walled.navmesh = true;
+    walled.navSurface = game->navSurface;
+    StreamerConfig open;
+    open.navmesh = true;
+    std::size_t walledBytes = 0;
+    std::size_t openBytes = 0;
+    bool wetCell = false;
+    for (std::uint32_t z = 0; z < game->desc.cellsPerSide(); ++z) {
+        for (std::uint32_t x = 0; x < game->desc.cellsPerSide(); ++x) {
+            const CellId id{static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)};
+            const double cx = (x + 0.5) * game->desc.cellMetres;
+            const double cz = (z + 0.5) * game->desc.cellMetres;
+            if (!game->waterField->at(cx, cz).wet()) {
+                continue;
+            }
+            wetCell = true;
+            CellPayload a;
+            CellPayload b;
+            WorldStreamer::buildPayload(game->heightfield, id, walled, a);
+            WorldStreamer::buildPayload(game->heightfield, id, open, b);
+            walledBytes += a.nav.data.size();
+            openBytes += b.nav.data.size();
+        }
+    }
+    if (wetCell) {
+        CHECK(walledBytes < openBytes);
+    }
+}

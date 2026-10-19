@@ -31,7 +31,7 @@ bool gentleAndDry(const Heightfield& heightfield, const WaterField* water, const
         if (!(px >= 0.0 && pz >= 0.0 && px <= size && pz <= size)) {
             return false;
         }
-        if (heightfield.heightAt(px, pz) < seaFloor || heightfield.normalAt(px, pz).y < params.minUpY) {
+        if (!(heightfield.heightAt(px, pz) >= seaFloor) || !(heightfield.normalAt(px, pz).y >= params.minUpY)) {
             return false;
         }
         if (water != nullptr && water->at(px, pz).wet()) {
@@ -47,7 +47,7 @@ ForgedSpawn findForgedSpawn(const Heightfield& heightfield, const WaterField* wa
     const std::function<bool(double, double)>& blocked, const ForgedSpawnParams& params)
 {
     ForgedSpawn spawn;
-    if (heightfield.empty() || !(params.searchStepMetres > 0.0f)) {
+    if (heightfield.empty() || !(params.searchStepMetres > 0.0f) || !std::isfinite(params.searchStepMetres) || !(params.edgeMarginMetres >= 0.0f)) {
         return spawn;
     }
     const double size = heightfield.desc().sizeMetres;
@@ -71,15 +71,26 @@ ForgedSpawn findForgedSpawn(const Heightfield& heightfield, const WaterField* wa
 
     const double step = params.searchStepMetres;
     const double margin = params.edgeMarginMetres;
-    const int maxRing = static_cast<int>(size / step) + 1;
+    constexpr double kMaxRings = 1.0e5;
+    const int maxRing = static_cast<int>(std::min(size / step, kMaxRings)) + 1;
+    // Only the points inside the margin are visited, so a target near an edge does not walk the empty ring beyond it.
+    const auto lowest = [&](double target) { return static_cast<int>(std::max(std::ceil((margin - target) / step), -static_cast<double>(maxRing))); };
+    const auto highest = [&](double target) { return static_cast<int>(std::min(std::floor((size - margin - target) / step), static_cast<double>(maxRing))); };
+    const int minIx = lowest(targetX);
+    const int maxIx = highest(targetX);
+    const int minIz = lowest(targetZ);
+    const int maxIz = highest(targetZ);
     for (int ring = 0; ring <= maxRing; ++ring) {
         double bestDistance = std::numeric_limits<double>::max();
         double bestX = 0.0;
         double bestZ = 0.0;
         bool any = false;
-        for (int iz = -ring; iz <= ring; ++iz) {
+        for (int iz = std::max(-ring, minIz); iz <= std::min(ring, maxIz); ++iz) {
             const int stride = std::abs(iz) == ring ? 1 : std::max(2 * ring, 1);
             for (int ix = -ring; ix <= ring; ix += stride) {
+                if (ix < minIx || ix > maxIx) {
+                    continue;
+                }
                 const double x = targetX + ix * step;
                 const double z = targetZ + iz * step;
                 if (x < margin || z < margin || x > size - margin || z > size - margin) {
@@ -115,9 +126,9 @@ std::uint64_t ForgedGame::stateHash() const
     h = hashCombine(h, spawn.found ? 1 : 0);
     h = hashCombine(h, std::bit_cast<std::uint64_t>(spawn.x));
     h = hashCombine(h, std::bit_cast<std::uint64_t>(spawn.z));
-    h = hashCombine(h, roads ? roads->segmentCount() : 0);
-    h = hashCombine(h, pois ? pois->all().size() : 0);
-    h = hashCombine(h, buildings ? buildings->all().size() : 0);
+    h = hashCombine(h, roads ? static_cast<std::uint64_t>(roads->segmentCount()) : 0);
+    h = hashCombine(h, pois ? static_cast<std::uint64_t>(pois->all().size()) : 0);
+    h = hashCombine(h, buildings ? static_cast<std::uint64_t>(buildings->all().size()) : 0);
     if (pois) {
         for (const PlacedPoi& poi : pois->all()) {
             h = hashCombine(h, hash64(poi.id));

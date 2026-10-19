@@ -53,8 +53,8 @@ struct ForgedSpawnParams {
 
 // Dry land with low slope nearest the target (the settlement closest to the world centre, else the
 // centre). `water` and `blocked` are optional: water rules out any wet ground in the footprint, and
-// blocked (world x, z) rules out a position (a building, say). Deterministic: the nearest valid point
-// by a fixed ring order, ties to the lower z then x.
+// blocked (world x, z) rules out a position (a building, say). Deterministic: the first ring, in
+// square rings around the target, that holds a valid point, and the nearest point of that ring.
 ForgedSpawn findForgedSpawn(const Heightfield& heightfield, const WaterField* water, const std::vector<std::pair<double, double>>& settlements,
     const std::function<bool(double, double)>& blocked = {}, const ForgedSpawnParams& params = {});
 
@@ -80,7 +80,8 @@ struct ForgedGame {
 
     bool ok() const { return error.empty(); }
 
-    // A digest of every piece: the same seed and grid always give the same value.
+    // A digest of the forged world's hash, the terrain, the spawn, the placed objects, the road count and the
+// region tiers: the same seed and grid always give the same value.
     std::uint64_t stateHash() const;
 };
 
