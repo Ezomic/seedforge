@@ -246,7 +246,7 @@ bool cookTexture(const cgltf_image& image, TextureFormat format, Texture& textur
 
 }
 
-bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats)
+bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats, const CookOptions& cookOptions)
 {
     const std::string file = source.string();
     cgltf_options options{};
@@ -303,7 +303,7 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
     std::vector<std::vector<std::uint16_t>> jointRemaps(data->skins_count);
     for (cgltf_size s = 0; s < data->skins_count && ok; ++s) {
         Skeleton skeleton;
-        ok = cookSkeleton(*data, data->skins[s], skeleton, jointRemaps[s]);
+        ok = cookSkeleton(*data, data->skins[s], skeleton, jointRemaps[s], cookOptions.rootYawDegrees);
         if (ok) {
             bundle.skeletons.push_back(std::move(skeleton));
         }
@@ -311,7 +311,7 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
     for (cgltf_size a = 0; a < data->animations_count && ok; ++a) {
         for (cgltf_size s = 0; s < data->skins_count; ++s) {
             AnimationClip clip;
-            if (cookClip(*data, data->animations[a], data->skins[s], bundle.skeletons[s], static_cast<std::uint32_t>(s), clip)) {
+            if (cookClip(*data, data->animations[a], data->skins[s], bundle.skeletons[s], static_cast<std::uint32_t>(s), clip, cookOptions.rootYawDegrees)) {
                 bundle.clips.push_back(std::move(clip));
                 stats.clips += 1;
             }

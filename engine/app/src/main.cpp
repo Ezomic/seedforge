@@ -1,3 +1,5 @@
+#include "exile_demo.h"
+
 #include "ichor/anim/animation.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
@@ -88,6 +90,7 @@ struct Options {
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
+    std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
@@ -136,6 +139,8 @@ bool parse(int argc, char** argv, Options& options)
             options.scene = argv[++i];
         } else if (arg == "--actor" && hasValue) {
             options.actor = argv[++i];
+        } else if (arg == "--exile" && hasValue) {
+            options.exile = argv[++i];
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
@@ -378,6 +383,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     if (!ichor::readBundle(options.actor, actor) || !renderer.uploadBundle(actor) || !animations.load(actor)) {
         return 1;
     }
+    ExileDemo exile;
+    if (!options.exile.empty() && !loadExileDemo(options.exile, renderer, animations, exile)) {
+        return 1;
+    }
     audio.addBundle(bundle);
     // Mesh indices run across the bundles in upload order, which is what a MeshRef holds.
     std::vector<ichor::PickBounds> pickBounds;
@@ -387,6 +396,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     pickBounds.resize(armMesh);
     for (const ichor::Mesh& mesh : actor.meshes) {
         pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
+    }
+    for (const ichor::SceneBundle& kit : exile.kit.bundles) {
+        for (const ichor::Mesh& mesh : kit.meshes) {
+            pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
+        }
     }
     ichor::SceneBundle splashSounds;
     splashSounds.sounds.push_back(ichor::makeSplashClip());
@@ -598,6 +612,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         populateForged(engine.scene(), anchor);
     } else {
         populate(engine.scene(), bundle, armMesh, armClip, anchor);
+        if (!options.exile.empty()) {
+            spawnExileDemo(engine.scene(), exile, anchor + glm::dvec3(0.0, -0.45, 0.0));
+        }
     }
 
     struct ResidentCell {
@@ -1261,7 +1278,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
         return 2;
     }
 

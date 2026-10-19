@@ -67,6 +67,11 @@ ozz::math::Transform toOzz(const Trs& trs)
     return t;
 }
 
+glm::quat yawQuat(float degrees)
+{
+    return glm::angleAxis(glm::radians(degrees), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
 template <class T>
 bool serialize(const T& object, std::vector<std::uint8_t>& out)
 {
@@ -125,6 +130,14 @@ void sampleChannel(const cgltf_animation_sampler& sampler, float t, float out[N]
     }
 }
 
+bool isJointOf(const cgltf_skin& skin, const cgltf_node* node)
+{
+    for (cgltf_size j = 0; j < skin.joints_count; ++j) {
+        if (skin.joints[j] == node) return true;
+    }
+    return false;
+}
+
 float lastKeyTime(const cgltf_animation_sampler& sampler)
 {
     if (sampler.input->has_max) {
@@ -139,7 +152,7 @@ float lastKeyTime(const cgltf_animation_sampler& sampler)
 
 }
 
-bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out, std::vector<std::uint16_t>& jointRemap)
+bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out, std::vector<std::uint16_t>& jointRemap, float rootYawDegrees)
 {
     out.name = skin.name != nullptr ? skin.name : "";
     std::unordered_map<const cgltf_node*, cgltf_size> slotOf;
@@ -183,6 +196,11 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
             float local[16];
             cgltf_node_transform_local(root, local);
             raw.roots.back().transform = toOzz(decomposeMatrix(glm::make_mat4(parentWorld) * glm::make_mat4(local)));
+        }
+        if (rootYawDegrees != 0.0f) {
+            auto& rotation = raw.roots.back().transform.rotation;
+            const glm::quat turned = yawQuat(rootYawDegrees) * glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
+            rotation = {turned.x, turned.y, turned.z, turned.w};
         }
     }
     if (!raw.Validate()) {
@@ -233,7 +251,7 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
 }
 
 bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cgltf_skin& skin, const Skeleton& skeleton,
-    std::uint32_t skeletonIndex, AnimationClip& out)
+    std::uint32_t skeletonIndex, AnimationClip& out, float rootYawDegrees)
 {
     (void)data;
     out.name = animation.name != nullptr ? animation.name : "clip";
@@ -292,6 +310,7 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
     const auto frames = static_cast<int>(std::ceil(duration * kSampleRate)) + 1;
     for (std::size_t j = 0; j < channels.size(); ++j) {
         const Trs rest = jointNodes[j] != nullptr ? localTransform(*jointNodes[j]) : Trs{};
+        const bool isRoot = jointNodes[j] != nullptr && (jointNodes[j]->parent == nullptr || !isJointOf(skin, jointNodes[j]->parent));
         auto& track = raw.tracks[j];
         for (int f = 0; f < frames; ++f) {
             const float t = std::min(duration, static_cast<float>(f) / kSampleRate);
@@ -303,6 +322,7 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
                 trs.rotation = glm::normalize(glm::quat(q[3], q[0], q[1], q[2]));
             }
             if (channels[j].scale) sampleChannel<3>(*channels[j].scale, t, &trs.scale.x);
+            if (isRoot && rootYawDegrees != 0.0f) trs.rotation = yawQuat(rootYawDegrees) * trs.rotation;
             track.translations.push_back({t, {trs.translation.x, trs.translation.y, trs.translation.z}});
             track.rotations.push_back({t, {trs.rotation.x, trs.rotation.y, trs.rotation.z, trs.rotation.w}});
             track.scales.push_back({t, {trs.scale.x, trs.scale.y, trs.scale.z}});
