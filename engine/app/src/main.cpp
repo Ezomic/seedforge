@@ -103,7 +103,8 @@ struct Options {
     bool showNewGame = false;
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
-    std::string screenshot; // where to save the last frame of a windowed run; empty is none
+    std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
+    bool showWindow = false; // with --screenshot: a visible window, only to compare it with the hidden render
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
@@ -167,6 +168,8 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
+        } else if (arg == "--show-window") {
+            options.showWindow = true;
         } else if (arg == "--screenshot" && hasValue) {
             options.screenshot = argv[++i];
         } else if (arg == "--editor") {
@@ -350,8 +353,12 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
 
 int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
-    if (!platform.init({}) || !renderer.init()) {
+    const bool hidden = !options.screenshot.empty() && !options.showWindow;
+    if (!platform.init({.hidden = hidden}) || !renderer.init()) {
         return 1;
+    }
+    if (!options.screenshot.empty()) {
+        ichor::log(ichor::LogLevel::Info, hidden ? "screenshot: hidden window, fixed frame step, no pacing" : "screenshot: visible window, fixed frame step");
     }
     // No playback device is not a reason not to run; cues then go to the null host.
     ichor::NullAudio silent;
@@ -462,7 +469,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
     }
     ichor::StreamerConfig streaming;
-    streaming.synchronous = options.headless; // a replay must see the same cells on the same ticks
+    streaming.synchronous = options.headless || !options.screenshot.empty(); // a replay or an unthrottled screenshot must see the same cells on the same frames
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
     streaming.vegetation = !options.headless;
     streaming.water = !options.headless;
@@ -1178,7 +1185,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
-        const double dt = options.headless ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
+        const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
@@ -1278,7 +1285,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
@@ -1302,6 +1309,10 @@ int main(int argc, char** argv)
 
     ichor::SdlPlatform platform;
     ichor::VulkanRenderer renderer(platform);
+    if (!options.screenshot.empty()) {
+        ichor::NullAudio audio; // a screenshot run plays nothing on the owner's speakers
+        return run(platform, renderer, audio, options);
+    }
     ichor::MiniaudioDevice audio;
     return run(platform, renderer, audio, options);
 }
