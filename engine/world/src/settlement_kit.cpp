@@ -146,7 +146,10 @@ void placePerimeter(const Context& c, std::uint8_t tier)
     for (const double sx : {-1.0, 1.0}) {
         for (const double sz : {-1.0, 1.0}) tryWallPiece(c, KitPiece::WallTower, cx + sx * half, cz + sz * half, 0);
     }
+    const double gateLo = -kKitGridM * 1.5;
+    const double gateHi = kKitGridM * 0.5;
     for (double along = -half + spacing; along < half; along += spacing) {
+        if (along > gateLo && along < gateHi) continue; // a tower there would stand half inside the gate bay
         for (const double side : {-1.0, 1.0}) {
             tryWallPiece(c, KitPiece::WallTower, cx + along, cz + side * half, 0);
             tryWallPiece(c, KitPiece::WallTower, cx + side * half, cz + along, 0);
@@ -199,6 +202,9 @@ PlacedKit placeSettlementKit(const std::vector<SettlementSite>& sites, const Pla
     std::vector<const SettlementSite*> ordered;
     for (const SettlementSite& site : sites) ordered.push_back(&site);
     std::sort(ordered.begin(), ordered.end(), [](const SettlementSite* a, const SettlementSite* b) { return a->id < b->id; });
+    if (std::adjacent_find(ordered.begin(), ordered.end(), [](const SettlementSite* a, const SettlementSite* b) { return a->id == b->id; }) != ordered.end()) {
+        return failure("two settlement sites share an id");
+    }
     std::map<std::string, std::vector<const PlacedBuilding*>> byId;
     for (const PlacedBuilding& b : buildings.all()) byId[b.settlementId].push_back(&b);
 

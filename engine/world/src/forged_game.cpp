@@ -308,15 +308,22 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
 
 bool spawnAtSettlement(ForgedGame& game, std::size_t index)
 {
-    if (index >= game.sites.size() || !game.buildings || !game.kit) return false;
+    if (index >= game.sites.size()) return false;
     const SettlementSite& site = game.sites[index];
     constexpr double kClearM = 4.0;
+    const std::vector<PlacedBuilding> buildings = game.buildings ? game.buildings->ofSettlement(site.id) : std::vector<PlacedBuilding>{};
+    std::vector<KitInstance> pieces;
+    if (game.kit) {
+        for (const KitInstance& piece : game.kit->all()) {
+            if (piece.settlementId == site.id) pieces.push_back(piece);
+        }
+    }
     game.spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
-        for (const PlacedBuilding& b : game.buildings->ofSettlement(site.id)) {
+        for (const PlacedBuilding& b : buildings) {
             if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) return true;
         }
-        for (const KitInstance& piece : game.kit->all()) {
-            if (piece.settlementId == site.id && std::abs(x - piece.x) < kClearM + 2.0 && std::abs(z - piece.z) < kClearM + 2.0) return true;
+        for (const KitInstance& piece : pieces) {
+            if (std::abs(x - piece.x) < kClearM + 2.0 && std::abs(z - piece.z) < kClearM + 2.0) return true;
         }
         return false;
     });

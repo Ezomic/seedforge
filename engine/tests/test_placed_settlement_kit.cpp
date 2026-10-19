@@ -180,6 +180,42 @@ TEST_CASE("kit pieces stay clear of roads and leave a gap where one crosses", "[
     }
 }
 
+TEST_CASE("no tower stands inside a gate bay", "[bake][settlements][kit]")
+{
+    const Heightfield field = flatField();
+    // A town whose wall half-extent is a multiple of the tower spacing puts a tower on the gate's line.
+    std::vector<SettlementSite> list = {{"settlement_0000", kTown, 600.0, 600.0}, {"settlement_0001", kCity, 1400.0, 1400.0}};
+    PlacedSettlementParams ground;
+    ground.tiers[kTown].radiusM = 88.0f; // 88 + 8 margin = 96, a multiple of 24
+    SettlementKitParams params;
+    params.ground = ground;
+    const PlacedSettlements buildings = placeSettlementBuildings(list, field, nullptr, nullptr, ground);
+    const PlacedKit kit = placeSettlementKit(list, buildings.set, field, nullptr, nullptr, params);
+    REQUIRE(kit.ok());
+    std::size_t gates = 0;
+    for (const KitInstance& gate : kit.set.all()) {
+        if (gate.piece != KitPiece::GateBayGrid) continue;
+        ++gates;
+        const KitPieceInfo& g = kitPieceInfo(gate.piece);
+        const double ghw = (gate.quarterTurns & 1u) ? g.halfDepthM : g.halfWidthM;
+        const double ghd = (gate.quarterTurns & 1u) ? g.halfWidthM : g.halfDepthM;
+        for (const KitInstance& tower : kit.set.all()) {
+            if (tower.piece != KitPiece::WallTower || tower.settlementId != gate.settlementId) continue;
+            const KitPieceInfo& t = kitPieceInfo(tower.piece);
+            CHECK(!(std::abs(tower.x - gate.x) < t.halfWidthM + ghw && std::abs(tower.z - gate.z) < t.halfDepthM + ghd));
+        }
+    }
+    CHECK(gates == 8);
+}
+
+TEST_CASE("two sites with one id are refused", "[bake][settlements][kit]")
+{
+    const Heightfield field = flatField();
+    const PlacedSettlements none = placeSettlementBuildings({}, field, nullptr, nullptr);
+    const std::vector<SettlementSite> twice = {{"settlement_0000", kTown, 600.0, 600.0}, {"settlement_0000", kTown, 900.0, 900.0}};
+    CHECK_FALSE(placeSettlementKit(twice, none.set, field, nullptr, nullptr).ok());
+}
+
 TEST_CASE("wall pieces never overlap a building", "[bake][settlements][kit]")
 {
     const Heightfield field = flatField();
