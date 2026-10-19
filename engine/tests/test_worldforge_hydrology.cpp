@@ -98,7 +98,7 @@ TEST_CASE("hydrology is deterministic across repeat runs", "[worldforge][hydrolo
 
 TEST_CASE("hydrology golden hash is stable", "[worldforge][hydrology]")
 {
-    CHECK(hashHydrologyMap(hydrology(makeEroded(kSeed, 128, 96, 12))) == 0x80f9c9efc083e15bull);
+    CHECK(hashHydrologyMap(hydrology(makeEroded(kSeed, 128, 96, 12))) == 0xc7281ce62503dcf0ull);
 }
 
 TEST_CASE("hydrology does not mutate the input and keeps the grid", "[worldforge][hydrology]")
@@ -190,7 +190,9 @@ TEST_CASE("a tilted plane collects flow into the downhill rows", "[worldforge][h
 TEST_CASE("rivers exist and carving lowers the mean channel height", "[worldforge][hydrology]")
 {
     const auto eroded = makeEroded(kSeed, 128, 128, 12);
-    const auto out = hydrology(eroded);
+    HydrologyParams params;
+    params.riverThreshold = 48;
+    const auto out = hydrology(eroded, params);
 
     std::int64_t riverCells = 0;
     std::int64_t carved = 0;
@@ -378,4 +380,33 @@ TEST_CASE("hydrology: tie-break depends on the seed", "[worldforge][hydrology][t
     auto b = flatMap(64, 64, 100);
     b.seed = 2;
     CHECK(hydrology(a).flowDir != hydrology(b).flowDir);
+}
+
+TEST_CASE("every river runs on to the sea or a lake", "[worldforge][hydrology][rivers]")
+{
+    HydrologyParams params;
+    params.riverThreshold = 100;
+    for (const std::uint64_t seed : { std::uint64_t{ 1 }, std::uint64_t{ 6 }, kSeed }) {
+        const auto m = hydrology(makeEroded(seed, 256, 256, 12), params);
+        const std::size_t cells = m.heightM.size();
+        std::size_t rivers = 0;
+        for (std::size_t c = 0; c < cells; ++c) {
+            if (!m.river[c]) continue;
+            ++rivers;
+            std::size_t at = c;
+            std::size_t steps = 0;
+            while (m.river[at] && !isOutlet(m, at)) {
+                at = receiver(m, at);
+                REQUIRE(++steps <= cells);
+            }
+            const int x = static_cast<int>(at % m.width);
+            const int y = static_cast<int>(at / m.width);
+            const bool sea = m.filledM[at] <= params.seaLevelM;
+            const bool lake = m.lakeDepthM[at] > 0;
+            const bool leavesMap = x == 0 || y == 0 || x + 1 == m.width || y + 1 == m.height;
+            INFO("seed " << seed << " river cell " << c << " ends at " << x << "," << y);
+            REQUIRE((sea || lake || leavesMap));
+        }
+        CHECK(rivers > 100);
+    }
 }

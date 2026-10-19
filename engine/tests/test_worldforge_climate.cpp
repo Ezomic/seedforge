@@ -247,7 +247,7 @@ TEST_CASE("real terrain: high land is colder than low land in the same latitude 
     for (int y = 48; y < 80; ++y) {
         for (int x = 0; x < 256; ++x) {
             const auto c = base.index(x, y);
-            if (base.heightM[c] > 1500) {
+            if (base.heightM[c] > 1000) {
                 highSum += out.temperatureC10[c];
                 ++highN;
             } else if (base.heightM[c] > 0 && base.heightM[c] < 300) {

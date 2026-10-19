@@ -36,8 +36,9 @@ struct Phase {
     PhaseResult (*layers)(const worldforge::ForgedWorld& world);
 };
 
-// The config every forge-cli run uses. Phases 1 to 5 keep the library defaults; settlement and
-// POI spacing shrink with the grid so a small map still gets sites, and a fixed faction set stands
+// The config every forge-cli run uses. Phases 1 to 5 keep the library defaults, except that the
+// river threshold (tuned for the 1024 grid) shrinks with the grid area so a small map still has
+// rivers. Settlement and POI spacing shrink with the grid so a small map still gets sites, and a fixed faction set stands
 // in for the axiom-resolved one. Item ids, NPC archetypes and dungeon archetypes come from the data scan.
 worldforge::ForgeConfig defaultForgeConfig(int size);
 

@@ -55,9 +55,9 @@ constexpr int kHydrologyMaxCarveM = 1000;
 
 struct HydrologyParams {
     int seaLevelM = 0;               // cells at or below this are ocean outlets, in the tectonics height range
-    std::int64_t riverThreshold = 48; // accumulation (cells) from which a land cell is a river, in [1, kHydrologyMaxRiverThreshold]
-    int carveRate = 64;              // channel depth per sqrt(accumulation), in 1/256 m, in [0, kHydrologyMaxCarveRate]
-    int maxCarveM = 40;              // deepest channel, in [0, kHydrologyMaxCarveM]
+    std::int64_t riverThreshold = 700; // accumulation (cells) from which a land cell is a river, in [1, kHydrologyMaxRiverThreshold]
+    int carveRate = 128;             // channel depth per sqrt(accumulation), in 1/256 m, in [0, kHydrologyMaxCarveRate]
+    int maxCarveM = 60;              // deepest channel, in [0, kHydrologyMaxCarveM]
 };
 
 struct HydrologyMap {
