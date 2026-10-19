@@ -102,25 +102,34 @@ bool stringField(const nlohmann::json& record, const char* key, std::string& out
 
 }
 
+void DungeonSkeletonCatalog::note(std::string message)
+{
+    if (errors_.size() < kMaxSkeletonErrors) errors_.push_back(std::move(message));
+    else if (errors_.size() == kMaxSkeletonErrors) errors_.push_back("more errors were dropped");
+}
+
 void DungeonSkeletonCatalog::add(std::string_view fileName, std::string_view document)
 {
     const std::string file(fileName);
     const nlohmann::json json = nlohmann::json::parse(document.begin(), document.end(), nullptr, false);
     if (json.is_discarded() || !json.is_array()) {
-        errors_.push_back(file + ": not a JSON array");
+        note(file + ": not a JSON array");
         return;
     }
+    if (json.size() > kMaxSkeletonRecords) note(file + ": more than " + std::to_string(kMaxSkeletonRecords) + " records, the rest are ignored");
+    std::size_t seen = 0;
     for (const auto& record : json) {
+        if (seen++ >= kMaxSkeletonRecords) break;
         DungeonSkeleton skeleton;
         if (!record.is_object() || !stringField(record, "id", skeleton.id) || !stringField(record, "theme", skeleton.theme)) {
-            errors_.push_back(file + ": a record needs a non-empty string id and theme");
+            note(file + ": a record needs a non-empty string id and theme");
             continue;
         }
         skeleton.name = record.contains("name") && record["name"].is_string() ? record["name"].get<std::string>() : skeleton.id;
         std::vector<std::string> rooms;
         std::vector<std::string> links;
         if (!stringList(record, "rooms", kMaxSkeletonRooms, rooms) || !stringList(record, "links", kMaxSkeletonLinks, links)) {
-            errors_.push_back(skeleton.id + ": rooms and links must be lists of strings within the size limits");
+            note(skeleton.id + ": rooms and links must be lists of strings within the size limits");
             continue;
         }
         bool ok = true;
@@ -129,7 +138,7 @@ void DungeonSkeletonCatalog::add(std::string_view fileName, std::string_view doc
             embedding::Cell cell;
             ok = parseRoom(rooms[i], i + 1, type, cell);
             if (!ok) {
-                errors_.push_back(skeleton.id + ": bad room '" + rooms[i] + "'");
+                note(skeleton.id + ": bad room '" + rooms[i] + "'");
                 break;
             }
             skeleton.cells[skeleton.graph.addNode(type)] = cell;
@@ -138,12 +147,12 @@ void DungeonSkeletonCatalog::add(std::string_view fileName, std::string_view doc
             if (!ok) break;
             std::tuple<NodeId, NodeId, std::string> link;
             ok = parseLink(text, link) && skeleton.graph.addEdge(std::get<0>(link), std::get<1>(link), std::get<2>(link)) != 0;
-            if (!ok) errors_.push_back(skeleton.id + ": bad link '" + text + "'");
+            if (!ok) note(skeleton.id + ": bad link '" + text + "'");
         }
         if (!ok) continue;
         const std::vector<std::string> found = problems(skeleton.graph, skeleton.cells);
         if (!found.empty()) {
-            errors_.push_back(skeleton.id + ": " + found.front());
+            note(skeleton.id + ": " + found.front());
             continue;
         }
         skeletons_.push_back(std::move(skeleton));
@@ -152,16 +161,16 @@ void DungeonSkeletonCatalog::add(std::string_view fileName, std::string_view doc
 
 void DungeonSkeletonCatalog::finish()
 {
-    std::sort(skeletons_.begin(), skeletons_.end(), [](const DungeonSkeleton& a, const DungeonSkeleton& b) { return std::tie(a.theme, a.id) < std::tie(b.theme, b.id); });
     std::set<std::string> seen;
     std::vector<DungeonSkeleton> unique;
     for (DungeonSkeleton& s : skeletons_) {
         if (!seen.insert(s.id).second) {
-            errors_.push_back(s.id + ": id is used twice, the later one is ignored");
+            note(s.id + ": id is used twice, the later one is ignored");
             continue;
         }
         unique.push_back(std::move(s));
     }
+    std::sort(unique.begin(), unique.end(), [](const DungeonSkeleton& a, const DungeonSkeleton& b) { return std::tie(a.theme, a.id) < std::tie(b.theme, b.id); });
     skeletons_ = std::move(unique);
 }
 
@@ -181,16 +190,16 @@ DungeonSkeletonCatalog DungeonSkeletonCatalog::loadDirectory(const std::filesyst
     for (std::filesystem::directory_iterator it(dir, code), end; !code && it != end; it.increment(code)) {
         if (it->path().extension() == ".json") files.push_back(it->path());
     }
-    if (code) catalog.errors_.push_back("cannot read " + dir.string() + ": " + code.message());
+    if (code) catalog.note("cannot read " + dir.string() + ": " + code.message());
     std::sort(files.begin(), files.end());
     if (files.size() > kMaxSkeletonFiles) {
-        catalog.errors_.push_back(dir.string() + ": more than " + std::to_string(kMaxSkeletonFiles) + " files, the rest are ignored");
+        catalog.note(dir.string() + ": more than " + std::to_string(kMaxSkeletonFiles) + " files, the rest are ignored");
         files.resize(kMaxSkeletonFiles);
     }
     for (const std::filesystem::path& file : files) {
         const std::uintmax_t size = std::filesystem::file_size(file, code);
         if (code || size > kMaxSkeletonFileBytes) {
-            catalog.errors_.push_back(file.filename().string() + ": unreadable or larger than the limit");
+            catalog.note(file.filename().string() + ": unreadable or larger than the limit");
             continue;
         }
         std::ifstream stream(file, std::ios::binary);

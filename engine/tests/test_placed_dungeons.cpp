@@ -187,3 +187,14 @@ TEST_CASE("a duplicate skeleton id is reported and the later one ignored", "[pla
     CHECK(c.all().size() == records.size() - 1);
     CHECK_FALSE(c.errors().empty());
 }
+
+TEST_CASE("a flood of bad records is capped", "[placed_dungeons]")
+{
+    std::string text = "[";
+    for (int i = 0; i < 5000; ++i) text += i ? ",{}" : "{}";
+    text += "]";
+    const DungeonSkeletonCatalog c = DungeonSkeletonCatalog::loadText("flood.json", text);
+    CHECK(c.all().empty());
+    CHECK(c.errors().size() <= kMaxSkeletonErrors + 1);
+    CHECK_FALSE(c.errors().empty());
+}

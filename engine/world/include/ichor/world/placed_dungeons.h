@@ -40,6 +40,8 @@ inline constexpr std::size_t kMaxSkeletonFiles = 64;
 inline constexpr std::size_t kMaxSkeletonFileBytes = 1u << 20;
 inline constexpr std::size_t kMaxSkeletonRooms = 64;
 inline constexpr std::size_t kMaxSkeletonLinks = 256;
+inline constexpr std::size_t kMaxSkeletonRecords = 256;
+inline constexpr std::size_t kMaxSkeletonErrors = 64;
 
 class DungeonSkeletonCatalog {
 public:
@@ -57,6 +59,7 @@ public:
 
 private:
     void add(std::string_view fileName, std::string_view json);
+    void note(std::string message);
     void finish();
 
     std::vector<DungeonSkeleton> skeletons_;
