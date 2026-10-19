@@ -47,6 +47,10 @@
 #include "ichor/script/script_host.h"
 #include "ichor/sim/scene_io.h"
 #include "ichor/world/atmosphere.h"
+#include "ichor/ui/loading_screen.h"
+#include "ichor/ui/new_game_flow.h"
+#include "ichor/world/forge.h"
+#include "ichor/world/forged_game.h"
 #include "ichor/world/hydrology_cache.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
@@ -68,6 +72,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <chrono>
 #include <utility>
 #include <vector>
 
@@ -92,6 +98,8 @@ struct Options {
     bool editor = false;
     bool showMap = false;
     bool showNewGame = false;
+    bool forged = false; // build the world from libworldforge instead of the stand-in terrain
+    int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -162,6 +170,10 @@ bool parse(int argc, char** argv, Options& options)
             options.showMap = true;
         } else if (arg == "--new-game") {
             options.showNewGame = true;
+        } else if (arg == "--forged") {
+            options.forged = true;
+        } else if (arg == "--grid" && hasValue) {
+            if (!parseNumber(argv[++i], options.forgedGrid) || options.forgedGrid < 16 || options.forgedGrid > 1024) return false;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -236,6 +248,101 @@ void populate(ichor::Scene& scene, const ichor::SceneBundle& bundle, std::uint32
     scene.enqueue(player);
 }
 
+// The forged world has no arena: the player stands where the spawn search put them.
+void populateForged(ichor::Scene& scene, glm::dvec3 position)
+{
+    ichor::SpawnCommand player;
+    player.id = ichor::StableId::of("player");
+    player.name.value = "player";
+    player.transform.position = position;
+    player.player = ichor::Player{};
+    player.character = ichor::CharacterBody{};
+    scene.enqueue(player);
+}
+
+enum class ForgeOutcome { Built, Quit, Failed };
+
+// Forges the world for --forged through the new-game flow: a loading screen with the phase being
+// forged when there is a window, a plain wait when there is none. Quitting mid-forge cancels the job
+// and joins its thread before this returns.
+ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, const Options& options, const ichor::RenderView& blank, std::unique_ptr<ichor::ForgedGame>& out)
+{
+    ichor::WorldDesc desc;
+    desc.seed = options.seed;
+    ichor::NewGameFlow flow(true, options.forgedGrid);
+    flow.begin(desc);
+
+    std::unique_ptr<ichor::UiContext> ui;
+    std::unique_ptr<ichor::LoadingScreen> loading;
+    if (!options.headless && renderer.uiRenderInterface() != nullptr) {
+        const ichor::Extent size = platform.drawableSize();
+        ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
+        const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+        bool fontsLoaded = ui->ok();
+        for (const char* file : {"AlegreyaSans-Regular.ttf", "Cinzel.ttf"}) {
+            fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
+        }
+        if (fontsLoaded) {
+            loading = std::make_unique<ichor::LoadingScreen>(*ui);
+        }
+        if (!loading || !loading->ok()) {
+            ichor::log(ichor::LogLevel::Warn, "the loading screen could not start; the forge runs without it");
+            loading.reset();
+            ui.reset();
+        }
+    }
+    if (loading) {
+        loading->setVisible(true);
+        renderer.setUiHooks(
+            [&](std::uint32_t width, std::uint32_t height) {
+                ui->setSize(width, height);
+                loading->setView(flow.loadingView());
+                ui->update(platform.now());
+            },
+            [&] { ui->render(); });
+    }
+    ichor::logf(ichor::LogLevel::Info, "forging seed {} on a {} cell grid", options.seed, options.forgedGrid);
+    ForgeOutcome outcome = ForgeOutcome::Built;
+    while (flow.stage() == ichor::NewGameStage::Forging) {
+        platform.pumpEvents();
+        if (platform.quitRequested()) {
+            flow.cancel();
+            outcome = ForgeOutcome::Quit;
+            break;
+        }
+        flow.update();
+        if (loading) {
+            renderer.beginFrame();
+            renderer.submit(blank);
+            renderer.endFrame();
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    }
+    renderer.setUiHooks({}, {});
+    loading.reset();
+    ui.reset();
+    if (outcome == ForgeOutcome::Quit) {
+        return outcome;
+    }
+    if (flow.stage() != ichor::NewGameStage::Ready) {
+        ichor::logf(ichor::LogLevel::Error, "the forge failed: {}", flow.error());
+        return ForgeOutcome::Failed;
+    }
+    const std::unique_ptr<ichor::ForgeJob> job = flow.takeJob();
+    if (!job || job->result() == nullptr) {
+        ichor::log(ichor::LogLevel::Error, "the forge finished with no world");
+        return ForgeOutcome::Failed;
+    }
+    out = ichor::buildForgedGame(*job->result(), desc);
+    if (!out->ok()) {
+        ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", out->error);
+        return ForgeOutcome::Failed;
+    }
+    ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", out->stateHash(), out->spawn.x, out->spawn.z, out->spawn.groundY, out->spawn.found ? "" : " (no gentle dry ground found)");
+    return ForgeOutcome::Built;
+}
+
 int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
     if (!platform.init({}) || !renderer.init()) {
@@ -292,7 +399,21 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // the world's centre, above the terrain under it.
     ichor::Heightfield heightfield;
     glm::dvec3 anchor(0.0);
-    if (!options.world.empty()) {
+    std::unique_ptr<ichor::ForgedGame> forged;
+    if (options.forged) {
+        const ForgeOutcome outcome = forgeGame(platform, renderer, options, ichor::kitReferenceView(bundle, 16.0f / 9.0f), forged);
+        if (outcome != ForgeOutcome::Built) {
+            return outcome == ForgeOutcome::Quit ? 0 : 1;
+        }
+        heightfield = forged->heightfield;
+        if (!renderer.setTerrainMaterials(ichor::forgeTerrainMaterials(heightfield.desc().seed))) {
+            return 1;
+        }
+        if (!renderer.setVegetationMeshes(ichor::treeBundle(), ichor::vegetationUnblendedKinds())) {
+            ichor::log(ichor::LogLevel::Warn, "the tree meshes could not be uploaded; the world has no trees");
+        }
+        anchor = {forged->spawn.x, forged->spawn.groundY + 0.5, forged->spawn.z};
+    } else if (!options.world.empty()) {
         ichor::SceneBundle layers;
         if (!ichor::readWorld(options.world, heightfield) || !ichor::readBundle(options.world / "terrain.iscene", layers) || !renderer.setTerrainMaterials(layers)) {
             return 1;
@@ -321,7 +442,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::shared_ptr<const ichor::Hydrology> hydrology;
     std::unique_ptr<ichor::WaterField> waterField;
     if (!heightfield.empty()) {
-        hydrology = std::make_shared<const ichor::Hydrology>(ichor::loadOrComputeHydrology(options.world, heightfield));
+        hydrology = std::make_shared<const ichor::Hydrology>(forged ? ichor::computeHydrology(heightfield) : ichor::loadOrComputeHydrology(options.world, heightfield));
         waterField = std::make_unique<ichor::WaterField>(heightfield, hydrology, streaming.rivers, streaming.waterMesh);
         streaming.hydrology = hydrology;
     }
@@ -445,6 +566,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!ichor::loadScene(options.load, engine.scene())) {
             return 1;
         }
+    } else if (forged) {
+        populateForged(engine.scene(), anchor);
     } else {
         populate(engine.scene(), bundle, armMesh, armClip, anchor);
     }
@@ -763,7 +886,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
-            const glm::dvec3 target = anchor + glm::dvec3(0.0, 0.55, 0.0);
+            const glm::dvec3 target = forged ? anchor + glm::dvec3(0.0, 1.1, -30.0) : anchor + glm::dvec3(0.0, 0.55, 0.0);
             const glm::dvec3 feet = blend(previous, transform).first;
             const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
@@ -1080,7 +1203,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--screenshot file.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png]");
         return 2;
     }
 
