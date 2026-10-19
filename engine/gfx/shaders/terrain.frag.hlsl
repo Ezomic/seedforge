@@ -21,9 +21,22 @@ float4 main(PSIn i) : SV_Target
     // Positions are camera-relative; the frame carries where the camera is.
     const float height = i.worldPos.y + frame.cameraWorld.y;
     const float slope = 1.0 - n.y;
-    const float rock = smoothstep(0.28, 0.5, slope);
-    const float snow = smoothstep(230.0, 300.0, height) * (1.0 - rock * 0.6);
-    const float grass = saturate(1.0 - rock - snow);
+    float rock = smoothstep(0.28, 0.5, slope);
+    float snow = smoothstep(230.0, 300.0, height) * (1.0 - rock * 0.6);
+    float grass = saturate(1.0 - rock - snow);
+    if (i.tangent.w < 0.0) {
+        // A forged world: the cell's biome gave each vertex its grass, rock and snow weights, which sum to 1.
+        // The vertex stage normalised them as a direction, so dividing by their sum gives them back.
+        const float3 biome = abs(i.tangent.xyz) / max(abs(i.tangent.x) + abs(i.tangent.y) + abs(i.tangent.z), 1e-4);
+        const float steep = smoothstep(0.28, 0.5, slope);
+        rock = saturate(biome.y + steep);
+        snow = biome.z * (1.0 - steep * 0.6);
+        grass = biome.x * (1.0 - steep);
+        const float total = max(grass + rock + snow, 1e-4);
+        grass /= total;
+        rock /= total;
+        snow /= total;
+    }
 
     // A second, larger tiling breaks the repetition of the near one.
     const float3 g = lerp(grassTex.Sample(materialSampler, i.uv).rgb, grassTex.Sample(materialSampler, i.uv * 0.13).rgb, 0.4);
