@@ -134,12 +134,17 @@ Diff compare(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>
     return diff;
 }
 
-Tolerance tolerance()
+Tolerance toleranceFor(bool software)
 {
-    if (softwareDevice()) {
-        return {255.0, 2.0, 1000000};
+    if (software) {
+        return {2.0, 0.002, 40};
     }
     return {1.5, 0.005, 256};
+}
+
+bool within(const Diff& diff, const Tolerance& limit)
+{
+    return diff.meanAbs < limit.meanAbs && diff.fractionBad < limit.fractionBad && diff.tileBad < limit.tileBad;
 }
 
 // Every case ends here: the numbers go to golden-metrics.csv when ICHOR_GOLDEN_REPORT=1 (the tolerance study), then
@@ -153,7 +158,7 @@ void checkAgainstGolden(const std::vector<std::uint8_t>& actual, const std::vect
         std::ofstream csv(kOutDir / "golden-metrics.csv", std::ios::app);
         csv << name << ',' << diff.meanAbs << ',' << diff.fractionBad << ',' << diff.maxChannelDiff << ',' << diff.tileBad << "\n";
     }
-    const Tolerance limit = tolerance();
+    const Tolerance limit = toleranceFor(softwareDevice());
     INFO(std::format("{}: mean abs diff {:.3f}, {:.4f}% pixels over threshold, worst tile {}, worst channel {}", name, diff.meanAbs, diff.fractionBad * 100.0, diff.tileBad, diff.maxChannelDiff));
     CHECK(diff.meanAbs < limit.meanAbs);
     CHECK(diff.fractionBad < limit.fractionBad);
@@ -1163,4 +1168,80 @@ TEST_CASE("golden image: the journal over the world")
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_journal.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
     checkAgainstGolden(actual, expected, goldenPath);
+}
+
+TEST_CASE("golden image tolerance: driver noise passes, a missing element does not")
+{
+    // No GPU needed: this pins the metric itself, on the committed goldens, so loosening a bound until a
+    // removed draw call slips through turns this red.
+    for (const char* name : {"ui_hud", "ui_pause", "ui_ledger", "kit", "terrain_graded"}) {
+        std::uint32_t w = 0;
+        std::uint32_t h = 0;
+        std::vector<std::uint8_t> golden;
+        REQUIRE(readPng(kGoldenDir / (std::string(name) + ".png"), w, h, golden));
+        REQUIRE(w == kWidth);
+        INFO(name);
+
+        std::uint32_t seed = 12345;
+        const auto next = [&seed] {
+            seed = seed * 1664525u + 1013904223u;
+            return static_cast<int>(seed >> 24);
+        };
+
+        std::vector<std::uint8_t> noisy = golden;
+        for (std::size_t i = 0; i < noisy.size(); ++i) {
+            if (i % 4 != 3) {
+                noisy[i] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(noisy[i]) + next() % 5 - 2, 0, 255));
+            }
+        }
+        for (int i = 0; i < 120; ++i) { // stray edge pixels a rasteriser draws one pixel off
+            const std::size_t pixel = static_cast<std::size_t>(next()) * 2000 % (noisy.size() / 4);
+            noisy[pixel * 4] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(noisy[pixel * 4]) + 60, 0, 255));
+        }
+        CHECK(within(compare(noisy, golden, kBadThreshold), toleranceFor(true)));
+
+        // Remove one element the size of a label or an icon (64x32): the block with the most content goes flat, as if the
+        // draw call that made it was gone.
+        constexpr std::size_t kBlockW = 64;
+        constexpr std::size_t kBlockH = 32;
+        const auto spread = [&](std::size_t x0, std::size_t y0) {
+            int count = 0;
+            for (std::size_t y = y0; y < y0 + kBlockH; ++y) {
+                for (std::size_t x = x0; x < x0 + kBlockW; ++x) {
+                    const std::size_t at = (y * kWidth + x) * 4;
+                    const std::size_t base = (y0 * kWidth + x0) * 4;
+                    int worst = 0;
+                    for (std::size_t c = 0; c < 3; ++c) {
+                        worst = std::max(worst, std::abs(static_cast<int>(golden[at + c]) - static_cast<int>(golden[base + c])));
+                    }
+                    count += worst > kBadThreshold ? 1 : 0;
+                }
+            }
+            return count;
+        };
+        std::size_t bestX = 0;
+        std::size_t bestY = 0;
+        int bestSpread = -1;
+        for (std::size_t y = 0; y + kBlockH <= kHeight; y += 16) {
+            for (std::size_t x = 0; x + kBlockW <= kWidth; x += 16) {
+                const int v = spread(x, y);
+                if (v > bestSpread) {
+                    bestSpread = v;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+        std::vector<std::uint8_t> removed = golden;
+        for (std::size_t y = bestY; y < bestY + kBlockH; ++y) {
+            for (std::size_t x = bestX; x < bestX + kBlockW; ++x) {
+                for (int c = 0; c < 3; ++c) {
+                    removed[(y * kWidth + x) * 4 + c] = golden[(bestY * kWidth + bestX) * 4 + c];
+                }
+            }
+        }
+        const Diff gone = compare(removed, golden, kBadThreshold);
+        INFO(std::format("most content in a block {}, worst tile {}, fraction {}", bestSpread, gone.tileBad, gone.fractionBad));
+        CHECK_FALSE(within(gone, toleranceFor(true)));
+    }
 }
