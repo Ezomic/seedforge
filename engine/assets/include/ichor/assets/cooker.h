@@ -14,8 +14,12 @@ struct CookStats {
     std::uint32_t clips = 0;
 };
 
+struct CookOptions {
+    float rootYawDegrees = 0.0f; // see cookSkeleton
+};
+
 // glTF or GLB in, bundle out. Meshes are deduplicated and reordered for the
 // vertex cache; textures get a full mip chain; node transforms are flattened.
-bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats);
+bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats, const CookOptions& options = {});
 
 }
