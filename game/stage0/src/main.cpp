@@ -27,6 +27,7 @@ namespace {
 struct Options {
     bool headless = false;
     bool lockOn = false;
+    float mouseSensitivity = 1.0f;
     std::uint64_t frames = 0;
     std::uint64_t seed = 1;
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
@@ -54,6 +55,7 @@ bool parse(int argc, char** argv, Options& options)
         const bool hasValue = i + 1 < argc;
         if (arg == "--headless") options.headless = true;
         else if (arg == "--lock-on") options.lockOn = true;
+        else if (arg == "--mouse-sens" && hasValue) { if (!parseNumber(argv[++i], options.mouseSensitivity)) return false; }
         else if (arg == "--frames" && hasValue) { if (!parseNumber(argv[++i], options.frames)) return false; }
         else if (arg == "--seed" && hasValue) { if (!parseNumber(argv[++i], options.seed)) return false; }
         else if (arg == "--scene" && hasValue) options.scene = argv[++i];
@@ -135,6 +137,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     engine.recordInputs(!options.record.empty());
     stage.setLockOn(options.lockOn);
     platform.enableLook(options.replay.empty());
+    platform.setMouseSensitivity(options.mouseSensitivity);
 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::stage0::CameraTuning cameraTuning;
@@ -202,7 +205,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--mouse-sens X] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
         return 2;
     }
     if (!options.review.empty()) {
