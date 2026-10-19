@@ -50,6 +50,7 @@
 #include "ichor/sim/scene_io.h"
 #include "ichor/world/atmosphere.h"
 #include "ichor/world/hydrology_cache.h"
+#include "ichor/world/forged_walking.h"
 #include "ichor/world/navmesh.h"
 #include "ichor/world/vegetation.h"
 #include "ichor/world/weather.h"
@@ -371,6 +372,34 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
             const float depth = waterField->at(position.x, position.z).depth;
             return static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
+        });
+    }
+    // Walking rules for a world with water: ground too steep or water too deep to walk stops the player, and a player
+    // who keeps trying to move without getting anywhere is reported and put back on the last footing that was fine.
+    std::unique_ptr<ichor::ForgedWalking> walking;
+    if (waterField) {
+        walking = std::make_unique<ichor::ForgedWalking>(heightfield, waterField.get(), ichor::CapabilitySet{});
+        engine.scene().setVelocityFilter([&](const glm::dvec3& position, const glm::dvec3& velocity) { return walking->filterVelocity(position, velocity); });
+        engine.scene().addSystem("walk_guard", [&, detector = ichor::StuckDetector{}](ichor::Scene& scene, double dt, const ichor::InputFrame& input) mutable {
+            for (auto [entity, id, transform, player] : scene.registry().view<const ichor::StableId, const ichor::Transform, const ichor::Player>().each()) {
+                const glm::dvec3& feet = transform.position;
+                const bool wantsToMove = input.moveX != 0.0f || input.moveY != 0.0f;
+                const double probe = walking->params().probeMetres;
+                const ichor::WalkAssessment ahead = walking->assess(feet.x + input.moveX * probe, feet.z - input.moveY * probe);
+                const ichor::StuckReport stuck = detector.step(feet, wantsToMove, walking->assess(feet.x, feet.z), ahead.block, dt);
+                if (!stuck.stuck) {
+                    continue;
+                }
+                ichor::logf(ichor::LogLevel::Warn, "walking: {}", ichor::describeStuck(stuck));
+                if (stuck.canRecover) {
+                    ichor::SetTransformCommand put;
+                    put.id = id;
+                    put.transform = transform;
+                    put.transform.position = stuck.recoverTo;
+                    scene.enqueue(put);
+                    detector.reset(stuck.recoverTo);
+                }
+            }
         });
     }
     engine.setAudio(&audio);

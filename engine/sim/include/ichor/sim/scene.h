@@ -78,6 +78,12 @@ public:
     using SpeedModifier = std::function<double(const glm::dvec3& position)>;
     void setSpeedModifier(SpeedModifier modifier) { speedModifier_ = std::move(modifier); }
 
+    // Where the player may go: given the position and the velocity input asks for (after the speed modifier), it
+    // returns the velocity to use, for ground that cannot be walked. Same rules as the speed modifier: pure in the
+    // position and velocity, configuration not state, a result that is not a number counts as no movement.
+    using VelocityFilter = std::function<glm::dvec3(const glm::dvec3& position, const glm::dvec3& velocity)>;
+    void setVelocityFilter(VelocityFilter filter) { velocityFilter_ = std::move(filter); }
+
     // A reflected game component the scene hashes and snapshots beside its own.
     // Register before any snapshot is loaded; names are part of the file.
     template <class T>
@@ -146,6 +152,7 @@ private:
     void physicsSystem(double dt);
 
     SpeedModifier speedModifier_;
+    VelocityFilter velocityFilter_;
     std::uint64_t seed_;
     entt::registry registry_;
     std::unordered_map<std::uint64_t, entt::entity> index_;
