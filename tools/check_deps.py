@@ -35,7 +35,6 @@ PORT_TERMS = {
     "lua": ["Lua"],
     "ozz-animation": ["ozz-animation"],
     "miniaudio": ["miniaudio"],
-    "zlib": ["zlib"],
     "sdl3": ["SDL3"],
     "vulkan-headers": ["Vulkan"],
     "vulkan-loader": ["Vulkan"],
@@ -58,7 +57,6 @@ PACKAGE_PORTS = {
     "RmlUi": "rmlui",
     "unofficial::lua": "lua",
     "ozz": "ozz-animation",
-    "ZLIB": "zlib",
     "meshoptimizer": "meshoptimizer",
     "SDL3": "sdl3",
     "Vulkan": "vulkan-loader",
@@ -72,7 +70,6 @@ PACKAGE_PORTS = {
 FIND_PACKAGE_PORTS = {
     "ozz-animation": "ozz-animation",
     "Stb": "stb",
-    "ZLIB": "zlib",
     "directx-dxc": "directx-dxc",
     "recastnavigation": "recastnavigation",
     "unofficial-lua": "lua",

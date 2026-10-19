@@ -277,12 +277,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     ExileDemo exile;
-    if (!options.exile.empty()) {
-        exile.meshBase = renderer.meshCount();
-        exile.clipBase = animations.clipCount();
-        if (!ichor::cookExile(options.exile, {}, exile.bundle, exile.kit) || !renderer.uploadBundle(exile.bundle) || !animations.load(exile.bundle)) {
-            return 1;
-        }
+    if (!options.exile.empty() && !loadExileDemo(options.exile, renderer, animations, exile)) {
+        return 1;
     }
     audio.addBundle(bundle);
     // Mesh indices run across the bundles in upload order, which is what a MeshRef holds.
@@ -294,8 +290,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     for (const ichor::Mesh& mesh : actor.meshes) {
         pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
     }
-    for (const ichor::Mesh& mesh : exile.bundle.meshes) {
-        pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
+    for (const ichor::SceneBundle& kit : exile.kit.bundles) {
+        for (const ichor::Mesh& mesh : kit.meshes) {
+            pickBounds.push_back({mesh.boundsMin, mesh.boundsMax});
+        }
     }
     ichor::SceneBundle splashSounds;
     splashSounds.sounds.push_back(ichor::makeSplashClip());
