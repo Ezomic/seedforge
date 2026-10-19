@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/assets/bundle.h"
+#include "ichor/world/forged_biome.h"
 #include "ichor/world/heightfield.h"
 #include "ichor/world/hydrology.h"
 #include "ichor/world/water_mesh.h"
@@ -60,6 +61,11 @@ struct StreamerConfig {
     std::shared_ptr<const PlacedPoiSet> pois;
     // The forged settlements' placeholder buildings (placeForgedSettlements). Without a set the payloads carry none.
     std::shared_ptr<const PlacedBuildingSet> buildings;
+    // The forged biomes (biomesFromForgedWorld). With them each vertex carries its splat weights (in its tangent,
+    // with w = -1 to say so) and the trees follow the cell's biome; without them the terrain and trees are the stand-in's.
+    std::shared_ptr<const ForgedBiomeField> biomes;
+    // Which ground the navmesh may stand on (water, roads); the surface must outlive the streamer. Null is open ground.
+    std::shared_ptr<const NavSurface> navSurface;
     // The manifest's items (placeForgedLoot). Without a set the payloads carry none.
     std::shared_ptr<const PlacedLootSet> loot;
 };
