@@ -103,8 +103,11 @@ struct Options {
     bool showNewGame = false;
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
+<<<<<<< HEAD
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
+=======
+>>>>>>> origin/main
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -632,7 +635,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         glm::dvec3 origin{0.0};
         std::vector<ichor::PlacedPoi> pois;
         std::vector<ichor::PlacedBuilding> buildings;
+<<<<<<< HEAD
         std::size_t plants = 0;
+=======
+>>>>>>> origin/main
     };
     std::map<ichor::CellId, ResidentCell> cells;
     streamer.onLoaded([&](const ichor::CellPayload& payload) {
@@ -646,6 +652,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             ichor::FrameStages::Scope timer(engine.stages(), "up.trees", true);
             cell.grove = renderer.uploadVegetationCell(payload.plants);
         }
+<<<<<<< HEAD
         {
             ichor::FrameStages::Scope timer(engine.stages(), "up.water", true);
             cell.water = renderer.uploadWaterCell(payload.water);
@@ -658,6 +665,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
                 static_cast<float>(heightfield.desc().metresPerSample));
         }
+=======
+        cell.water = renderer.uploadWaterCell(payload.water);
+        cell.pois = payload.pois;
+        cell.buildings = payload.buildings;
+        engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
+            static_cast<float>(heightfield.desc().metresPerSample));
+>>>>>>> origin/main
         cells[payload.cell.id] = cell;
         ichor::FrameStages::Scope navTimer(engine.stages(), "up.nav", true);
         ichor::NavTile tile = payload.nav;
