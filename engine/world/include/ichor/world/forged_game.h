@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -38,6 +39,8 @@ struct ForgedSpawn {
     double x = 0.0;
     double z = 0.0;
     float groundY = 0.0f;
+    double faceX = 0.0; // the point the search aimed at (the settlement, else the world centre): where the view looks
+    double faceZ = 0.0;
 };
 
 struct ForgedSpawnParams {
@@ -63,7 +66,15 @@ struct ForgedGame {
     WorldDesc desc; // forgedWorldDesc of the requested one: the height range and water level of the forge
     std::shared_ptr<const worldforge::ForgedWorld> world;
     Heightfield heightfield; // the roads phase's terrain
-    ForgedBiomeField biomes;
+    std::shared_ptr<const ForgedBiomeField> biomes;
+    ForgedWater water; // the forged rivers and lakes as the engine's Hydrology, with the parameters to pair it with
+    std::unique_ptr<WaterField> waterField; // over `heightfield` and `water`; what the player wades through
+    std::shared_ptr<const ForgedRoads> roads;
+    std::shared_ptr<const PlacedPoiSet> pois;
+    std::shared_ptr<const PlacedBuildingSet> buildings;
+    std::shared_ptr<const NavSurface> navSurface; // water and roads as the navmesh sees them; reads `waterField` and `roads`
+    ForgedRegionTiers tiers;
+    MapLayerStack mapLayers;
     ForgedSpawn spawn;
     std::string error; // empty on success
 
@@ -72,6 +83,18 @@ struct ForgedGame {
     // A digest of every piece: the same seed and grid always give the same value.
     std::uint64_t stateHash() const;
 };
+
+// The grey-box meshes the app draws the placed world with: one road ribbon per cell that has a road, a
+// pillar for each point of interest and one unit box for the buildings (scaled per building).
+// Mesh indices are positions in `bundle.meshes`; add the renderer's mesh count from before the upload.
+struct ForgedScenery {
+    SceneBundle bundle;
+    std::map<CellId, std::uint32_t> roadMesh;
+    std::map<std::string, std::uint32_t> poiMesh; // by PlacedPoi::id, at its own height with its base on y = 0
+    std::uint32_t buildingMesh = 0;          // a box 1 m wide and deep and 1 m tall: scale by 2 * half extents and the height
+};
+
+ForgedScenery buildForgedScenery(const ForgedGame& game);
 
 // Builds the game from a finished forge. Fails, with a message, when the result is empty or a bake step
 // refuses the world. Never throws.

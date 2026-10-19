@@ -1,8 +1,10 @@
 #include "ichor/world/forge_job.h"
 #include "ichor/world/forged_game.h"
+#include "ichor/world/streamer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -129,4 +131,104 @@ TEST_CASE("an empty forge result is refused with a message", "[forged_game]")
     const ForgeJobResult empty;
     const auto game = buildForgedGame(empty, descFor(1));
     CHECK_FALSE(game->ok());
+}
+
+TEST_CASE("the forged game carries every piece the app draws and walks", "[forged_game]")
+{
+    const auto game = gameFor(1);
+    REQUIRE(game->biomes);
+    REQUIRE_FALSE(game->biomes->empty());
+    REQUIRE(game->water.hydrology);
+    REQUIRE(game->waterField);
+    REQUIRE(game->roads);
+    REQUIRE(game->pois);
+    REQUIRE(game->buildings);
+    REQUIRE(game->navSurface);
+    CHECK(game->tiers.ok());
+    CHECK_FALSE(game->mapLayers.empty());
+    CHECK_FALSE(game->pois->empty());
+    CHECK_FALSE(game->roads->empty());
+}
+
+TEST_CASE("the spawn is dry, clear of buildings and next to the settlement nearest the centre", "[forged_game]")
+{
+    const auto game = gameFor(1);
+    const ForgedSpawn& spawn = game->spawn;
+    REQUIRE(spawn.found);
+    CHECK_FALSE(game->waterField->at(spawn.x, spawn.z).wet());
+    for (const PlacedBuilding& b : game->buildings->all()) {
+        const bool inside = std::abs(spawn.x - b.x) < b.halfWidthM && std::abs(spawn.z - b.z) < b.halfDepthM;
+        CHECK_FALSE(inside);
+    }
+    const double centre = game->desc.sizeMetres * 0.5;
+    double nearest = 1e30;
+    double townX = centre;
+    double townZ = centre;
+    for (const PlacedPoi& poi : game->pois->all()) {
+        const double d = std::hypot(poi.x - centre, poi.z - centre);
+        if (poi.kind == PlacedPoiKind::Settlement && d < nearest) {
+            nearest = d;
+            townX = poi.x;
+            townZ = poi.z;
+        }
+    }
+    CHECK(std::hypot(spawn.x - townX, spawn.z - townZ) < 400.0);
+}
+
+TEST_CASE("the scenery has a mesh for every placed point of interest, one for buildings and one per road cell", "[forged_game]")
+{
+    const auto game = gameFor(1);
+    const ForgedScenery scenery = buildForgedScenery(*game);
+    CHECK(scenery.poiMesh.size() == game->pois->all().size());
+    for (const PlacedPoi& poi : game->pois->all()) {
+        REQUIRE(scenery.poiMesh.contains(poi.id));
+        CHECK(scenery.poiMesh.at(poi.id) < scenery.bundle.meshes.size());
+    }
+    CHECK(scenery.buildingMesh < scenery.bundle.meshes.size());
+    CHECK_FALSE(scenery.roadMesh.empty());
+    for (const Mesh& mesh : scenery.bundle.meshes) {
+        REQUIRE_FALSE(mesh.vertices.empty());
+        for (const Submesh& submesh : mesh.submeshes) {
+            CHECK(submesh.material < scenery.bundle.materials.size());
+        }
+    }
+}
+
+TEST_CASE("a streamed cell of a forged world carries its biome splat, its placed objects and a forest of its biome", "[forged_game]")
+{
+    const auto game = gameFor(1);
+    StreamerConfig forged;
+    forged.biomes = game->biomes;
+    forged.pois = game->pois;
+    forged.buildings = game->buildings;
+    forged.vegetation = true;
+    forged.lodCount = 1;
+
+    double grassLow = 1e9;
+    double grassHigh = -1e9;
+    std::size_t placed = 0;
+    for (std::uint32_t z = 0; z < game->desc.cellsPerSide(); ++z) {
+        for (std::uint32_t x = 0; x < game->desc.cellsPerSide(); ++x) {
+            CellPayload payload;
+            WorldStreamer::buildPayload(game->heightfield, {static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)}, forged, payload);
+            placed += payload.pois.size();
+            for (const Vertex& v : payload.lods[0].vertices) {
+                REQUIRE(v.tangent.w == -1.0f);
+                const double sum = v.tangent.x + v.tangent.y + v.tangent.z;
+                REQUIRE(std::abs(sum - 1.0) < 1e-4);
+                grassLow = std::min<double>(grassLow, v.tangent.x);
+                grassHigh = std::max<double>(grassHigh, v.tangent.x);
+            }
+        }
+    }
+    CHECK(placed == game->pois->all().size());
+    // The biomes differ across the world, so the grass weight is not one number everywhere.
+    CHECK(grassHigh - grassLow > 0.2);
+
+    CellPayload standIn;
+    WorldStreamer::buildPayload(game->heightfield, {2, 2}, StreamerConfig{.lodCount = 1}, standIn);
+    for (const Vertex& v : standIn.lods[0].vertices) {
+        REQUIRE(v.tangent.w == 1.0f);
+    }
+    CHECK(standIn.pois.empty());
 }

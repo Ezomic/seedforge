@@ -63,6 +63,8 @@ ForgedSpawn findForgedSpawn(const Heightfield& heightfield, const WaterField* wa
             targetZ = sz;
         }
     }
+    spawn.faceX = targetX;
+    spawn.faceZ = targetZ;
     spawn.x = centre;
     spawn.z = centre;
     spawn.groundY = heightfield.heightAt(centre, centre);
@@ -113,6 +115,30 @@ std::uint64_t ForgedGame::stateHash() const
     h = hashCombine(h, spawn.found ? 1 : 0);
     h = hashCombine(h, std::bit_cast<std::uint64_t>(spawn.x));
     h = hashCombine(h, std::bit_cast<std::uint64_t>(spawn.z));
+    h = hashCombine(h, roads ? roads->segmentCount() : 0);
+    h = hashCombine(h, pois ? pois->all().size() : 0);
+    h = hashCombine(h, buildings ? buildings->all().size() : 0);
+    if (pois) {
+        for (const PlacedPoi& poi : pois->all()) {
+            h = hashCombine(h, hash64(poi.id));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(poi.x));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(poi.z));
+        }
+    }
+    if (buildings) {
+        for (const PlacedBuilding& building : buildings->all()) {
+            h = hashCombine(h, hash64(building.id));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(building.x));
+            h = hashCombine(h, std::bit_cast<std::uint64_t>(building.z));
+        }
+    }
+    for (const std::uint8_t tier : tiers.tiers) {
+        h = hashCombine(h, tier);
+    }
+    if (water.hydrology) {
+        h = hashCombine(h, water.hydrology->side);
+        h = hashCombine(h, static_cast<std::uint64_t>(water.rivers.riverThreshold));
+    }
     return h;
 }
 
@@ -125,23 +151,121 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     }
     game->world = result.world;
     game->desc = forgedWorldDesc(requested);
+    const worldforge::ForgedWorld& world = *game->world;
 
-    ForgedHeightfield terrain = heightfieldFromForgedRoads(*game->world, game->desc);
+    ForgedHeightfield terrain = heightfieldFromForgedRoads(world, game->desc);
     if (!terrain.ok()) {
         game->error = "terrain: " + terrain.error;
         return game;
     }
     game->heightfield = std::move(terrain.field);
 
-    ForgedBiomes biomes = biomesFromForgedWorld(*game->world, game->desc);
+    ForgedBiomes biomes = biomesFromForgedWorld(world, game->desc);
     if (!biomes.ok()) {
         game->error = "biomes: " + biomes.error;
         return game;
     }
-    game->biomes = std::move(biomes.field);
+    game->biomes = std::make_shared<const ForgedBiomeField>(std::move(biomes.field));
 
-    game->spawn = findForgedSpawn(game->heightfield, nullptr, {});
+    game->water = waterFromForgedWorld(world, game->heightfield);
+    if (!game->water.ok()) {
+        game->error = "water: " + game->water.error;
+        return game;
+    }
+    game->waterField = std::make_unique<WaterField>(game->heightfield, game->water.hydrology, game->water.rivers);
+
+    game->roads = std::make_shared<const ForgedRoads>(world, game->desc);
+    game->navSurface = std::make_shared<const ForgedNavSurface>(*game->waterField, game->roads.get());
+
+    PlacedPois pois = placeForgedPois(world, game->heightfield);
+    if (!pois.ok()) {
+        game->error = "points of interest: " + pois.error;
+        return game;
+    }
+    game->pois = std::make_shared<const PlacedPoiSet>(std::move(pois.set));
+
+    PlacedSettlements settlements = placeForgedSettlements(world, game->heightfield, game->roads.get(), game->waterField.get());
+    if (!settlements.ok()) {
+        game->error = "settlements: " + settlements.error;
+        return game;
+    }
+    game->buildings = std::make_shared<const PlacedBuildingSet>(std::move(settlements.set));
+
+    game->tiers = forgedRegionTiers(world, game->desc);
+    if (!game->tiers.ok()) {
+        game->error = "region tiers: " + game->tiers.error;
+        return game;
+    }
+    game->mapLayers = MapLayerStack(renderMapImage(game->heightfield), world);
+
+    std::vector<std::pair<double, double>> towns;
+    for (const PlacedPoi& poi : game->pois->all()) {
+        if (poi.kind == PlacedPoiKind::Settlement) {
+            towns.emplace_back(poi.x, poi.z);
+        }
+    }
+    const PlacedBuildingSet& buildings = *game->buildings;
+    constexpr double kClearM = 4.0;
+    game->spawn = findForgedSpawn(game->heightfield, game->waterField.get(), towns, [&](double x, double z) {
+        for (const PlacedBuilding& b : buildings.all()) {
+            if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) {
+                return true;
+            }
+        }
+        return false;
+    });
     return game;
+}
+
+ForgedScenery buildForgedScenery(const ForgedGame& game)
+{
+    ForgedScenery scenery;
+    SceneBundle& bundle = scenery.bundle;
+    const auto material = [&](const char* name, glm::vec3 colour, float roughness) {
+        Material m;
+        m.name = name;
+        m.baseColorFactor = glm::vec4(colour, 1.0f);
+        m.metallicFactor = 0.0f;
+        m.roughnessFactor = roughness;
+        bundle.materials.push_back(m);
+    };
+    material("road", {0.22f, 0.17f, 0.12f}, 0.95f);
+    material("settlement", {0.62f, 0.38f, 0.22f}, 0.8f);
+    material("dungeon", {0.30f, 0.20f, 0.36f}, 0.8f);
+    material("landmark", {0.62f, 0.60f, 0.54f}, 0.85f);
+    material("building", {0.55f, 0.52f, 0.48f}, 0.9f);
+
+    const auto push = [&](Mesh mesh, std::uint32_t materialIndex) {
+        for (Submesh& submesh : mesh.submeshes) {
+            submesh.material = materialIndex;
+        }
+        bundle.meshes.push_back(std::move(mesh));
+        return static_cast<std::uint32_t>(bundle.meshes.size() - 1);
+    };
+    if (game.roads && !game.roads->empty()) {
+        const std::uint32_t side = game.desc.cellsPerSide();
+        for (std::uint32_t z = 0; z < side; ++z) {
+            for (std::uint32_t x = 0; x < side; ++x) {
+                const CellId id{static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)};
+                Mesh ribbon = game.roads->buildMesh(game.heightfield, id);
+                if (ribbon.vertices.empty()) {
+                    continue;
+                }
+                if (ribbon.submeshes.empty()) {
+                    ribbon.submeshes.push_back({0, static_cast<std::uint32_t>(ribbon.indices.size()), 0});
+                }
+                scenery.roadMesh[id] = push(std::move(ribbon), 0);
+            }
+        }
+    }
+    if (game.pois) {
+        for (const PlacedPoi& poi : game.pois->all()) {
+            const std::uint32_t kind = static_cast<std::uint32_t>(poi.kind);
+            scenery.poiMesh[poi.id] = push(placedPoiMarkerMesh(poi.kind, poi.silhouetteM), 1 + kind);
+        }
+    }
+    scenery.buildingMesh = push(placedBuildingMesh(0.5f, 0.5f, 1.0f, 0.0f), 4);
+    return scenery;
 }
 
 }
