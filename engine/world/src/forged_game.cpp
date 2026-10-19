@@ -119,6 +119,63 @@ ForgedSpawn findForgedSpawn(const Heightfield& heightfield, const WaterField* wa
     return spawn;
 }
 
+// Turns the spawn's view toward the most to see: sixteen headings, each scored by how far the eye sees along it
+// before the ground rises above eye level, plus a bonus for a place of interest or a road ahead.
+static void chooseForgedView(ForgedGame& game)
+{
+    ForgedSpawn& spawn = game.spawn;
+    if (!spawn.found || game.heightfield.empty()) {
+        return;
+    }
+    constexpr int kHeadings = 16;
+    constexpr double kReach = 300.0;
+    const double eye = spawn.groundY + 1.6;
+    double bestScore = -1.0;
+    double bestX = 0.0;
+    double bestZ = -1.0;
+    for (int i = 0; i < kHeadings; ++i) {
+        const double angle = 6.283185307179586 * i / kHeadings;
+        const double dx = std::sin(angle);
+        const double dz = -std::cos(angle);
+        double seen = 0.0;
+        for (double d = 10.0; d <= kReach; d += 10.0) {
+            const double x = spawn.x + dx * d;
+            const double z = spawn.z + dz * d;
+            if (x < 0.0 || z < 0.0 || x > game.desc.sizeMetres || z > game.desc.sizeMetres || game.heightfield.heightAt(x, z) > eye) {
+                break;
+            }
+            seen = d;
+        }
+        double bonus = 0.0;
+        if (game.pois) {
+            for (const PlacedPoi& poi : game.pois->all()) {
+                const double px = poi.x - spawn.x;
+                const double pz = poi.z - spawn.z;
+                const double distance = std::hypot(px, pz);
+                if (distance > 8.0 && distance < 500.0 && (px * dx + pz * dz) / distance > 0.94) {
+                    bonus = std::max(bonus, 150.0);
+                }
+            }
+        }
+        if (game.roads) {
+            for (double d = 10.0; d <= 120.0; d += 10.0) {
+                if (game.roads->coverageAt(spawn.x + dx * d, spawn.z + dz * d) > 0.5) {
+                    bonus = std::max(bonus, 100.0);
+                    break;
+                }
+            }
+        }
+        const double score = seen + bonus;
+        if (score > bestScore) {
+            bestScore = score;
+            bestX = dx;
+            bestZ = dz;
+        }
+    }
+    spawn.faceX = spawn.x + bestX * 100.0;
+    spawn.faceZ = spawn.z + bestZ * 100.0;
+}
+
 std::uint64_t ForgedGame::stateHash() const
 {
     std::uint64_t h = hashCombine(desc.seed, world ? world->worldHash() : 0);
@@ -225,6 +282,7 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
         }
         return false;
     });
+    chooseForgedView(*game);
     return game;
 }
 
