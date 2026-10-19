@@ -288,7 +288,13 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     }
     const PlacedBuildingSet& buildings = *game->buildings;
     constexpr double kClearM = 4.0;
+    constexpr double kPoiClearM = 30.0; // a marker pillar is tall: not the first thing the player sees
     game->spawn = findForgedSpawn(game->heightfield, game->waterField.get(), towns, [&](double x, double z) {
+        for (const PlacedPoi& poi : game->pois->all()) {
+            if (std::hypot(x - poi.x, z - poi.z) < kPoiClearM) {
+                return true;
+            }
+        }
         for (const PlacedBuilding& b : buildings.all()) {
             if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) {
                 return true;
