@@ -1,11 +1,14 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <forgecli/forge.h>
+#include <forgecli/overlay.h>
 
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <string>
 
 TEST_CASE("the map viewer fixture matches what forge-cli produces today", "[forgecli][viewer]")
 {
@@ -33,4 +36,12 @@ TEST_CASE("the map viewer fixture matches what forge-cli produces today", "[forg
         CHECK(got[i]["name"] == want[i]["name"]);
         CHECK(got[i]["hash"] == want[i]["hash"]);
     }
+
+    REQUIRE(expected["runs"][0].contains("overlay"));
+    CHECK(expected["runs"][0]["overlay"] == "seed_1/overlay.json");
+    std::ifstream overlayFile(fixture / expected["runs"][0]["overlay"].get<std::string>(), std::ios::binary);
+    REQUIRE(overlayFile);
+    const std::string onDisk((std::istreambuf_iterator<char>(overlayFile)), std::istreambuf_iterator<char>());
+    const auto world = worldforge::forgeWorld(1, 64, forgecli::defaultForgeConfig(64), worldforge::ForgePhase::Content);
+    CHECK(nlohmann::json::parse(onDisk) == nlohmann::json::parse(forgecli::overlayJson(world)));
 }

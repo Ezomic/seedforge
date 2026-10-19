@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <worldforge/forge_world.h>
+#include <worldforge/world_validation.h>
 
 namespace forgecli {
 
@@ -39,6 +40,10 @@ struct Phase {
 // POI spacing shrink with the grid so a small map still gets sites, and a fixed faction set stands
 // in for the axiom-resolved one. Item ids, NPC archetypes and dungeon archetypes come from the data scan.
 worldforge::ForgeConfig defaultForgeConfig(int size);
+
+// The sanity thresholds forge-cli scores a world with (--validate and the gallery captions). Without --data no item or
+// NPC ids are bound, so the quest gates stay open; the rest are the library defaults.
+worldforge::GateThresholds sanityThresholds();
 
 struct ContentPools {
     std::vector<std::string> itemIds;
@@ -78,6 +83,7 @@ struct LayerRecord {
 struct SeedRecord {
     std::uint64_t seed = 0;
     std::string error; // non-empty when a phase failed for this seed
+    std::string overlay; // relative path of the manifest overlay JSON; empty when none was written
     std::vector<LayerRecord> layers;
     bool validated = false;
     bool rejected = false;                // set when validated and no attempt passed every gate

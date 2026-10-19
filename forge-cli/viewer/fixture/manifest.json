@@ -3,7 +3,7 @@
   "size": 64,
   "phases": ["tectonics", "region_tiers", "erosion", "hydrology", "climate", "biomes", "resources", "settlements", "roads", "politics", "pois", "binding"],
   "runs": [
-    {"seed": 1, "layers": [
+    {"seed": 1, "overlay": "seed_1/overlay.json", "layers": [
       {"name": "plates", "phase": "tectonics", "file": "seed_1/plates.png", "width": 64, "height": 64, "channels": 3, "hash": "4c69858509baee99"},
       {"name": "boundary", "phase": "tectonics", "file": "seed_1/boundary.png", "width": 64, "height": 64, "channels": 1, "hash": "b9e886218c2b7fea"},
       {"name": "height", "phase": "tectonics", "file": "seed_1/height.png", "width": 64, "height": 64, "channels": 1, "hash": "051d5cdacf4b7b9a"},

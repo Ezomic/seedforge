@@ -52,10 +52,19 @@ folder, `index.html?src=fixture/` loads it without the picker.
 
     node forge-cli/viewer/check.js [out/]   # smoke test: parser plus JS hash equals the C++ hash
 
+Each seed also gets `seed_N/overlay.json` (when the run reaches phase 11 and writes files), named by
+`overlay` on the run in `manifest.json`: every settlement and POI with its cell and kind (settlement,
+dungeon, ruin, landmark) and what the content manifest binds to it (items, cast, dungeon slot with archetype
+and seed). The viewer draws these as markers (square, triangle, diamond, circle) above the layers, with a
+checkbox per kind and a hover label. Items, cast and dungeons need `--data DIR`; without it only the sites
+show. It is not a layer and not hashed.
+
+    ichor_forge_cli --seed 7 --size 256 --data data --out out/   # then open viewer/index.html, choose out/
+
 `viewer/fixture/` is real forge-cli output (seed 1, size 64); regenerate it with
 `ichor_forge_cli --seed 1 --size 64 --out forge-cli/viewer/fixture` when a phase changes, since
 `check.js` fails on a stale hash. Deferred: drag-and-drop of a folder, and overlays for roads,
-territory, POIs and contested cells, which appear automatically once forge-cli writes them as layers.
+territory and contested cells, which appear automatically once forge-cli writes them as layers.
 
 ## Forge budget
 
