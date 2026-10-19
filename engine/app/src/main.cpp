@@ -36,6 +36,7 @@
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
+#include "ichor/gfx/walk_camera.h"
 #include "ichor/gfx/vulkan_renderer.h"
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
@@ -950,7 +951,6 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
-            const glm::dvec3 target = forged ? anchor + glm::dvec3(forgedLook.x, 1.1, forgedLook.y) : anchor + glm::dvec3(0.0, 0.55, 0.0);
             const glm::dvec3 feet = blend(previous, transform).first;
             const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
             view.camera.position = eye;
@@ -958,7 +958,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (options.compassTarget) {
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
-            view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+            view.camera.rotation = ichor::walkCameraRotation();
         }
         const double cellMetres = heightfield.desc().cellMetres;
         for (const auto& [id, cell] : cells) {
