@@ -100,6 +100,7 @@ struct Options {
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
+    float mouseSensitivity = 1.0f; // scales the right-button mouse look
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
@@ -124,6 +125,8 @@ bool parse(int argc, char** argv, Options& options)
             options.headless = true;
         } else if (arg == "--audio-probe") {
             options.audioProbe = true;
+        } else if (arg == "--mouse-sens" && hasValue) {
+            if (!parseNumber(argv[++i], options.mouseSensitivity)) return false;
         } else if (arg == "--frames" && hasValue) {
             if (!parseNumber(argv[++i], options.frames)) return false;
         } else if (arg == "--seed" && hasValue) {
@@ -678,6 +681,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     if (ui) {
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
+        platform.enableLook(true);
+        platform.setMouseSensitivity(options.mouseSensitivity);
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
         }
@@ -741,6 +746,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::PickCamera pickCamera;
     ichor::SurfaceWetness surfaceWetness;
+    float viewYaw = 0.0f;
+    engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
+        viewYaw = ichor::nextWalkYaw(viewYaw, input.lookX, dt);
+        for (auto [entity, player, body] : scene.registry().view<const ichor::Player, ichor::CharacterBody>().each()) {
+            body.intent = ichor::walkRelativeIntent(body.intent, viewYaw);
+        }
+    });
     engine.setViewBuilder([&](const ichor::Scene& scene, double alpha, ichor::RenderView& view) {
         view.sunDirection = reference.sunDirection;
         view.lines = reference.lines;
@@ -788,7 +800,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (options.compassTarget) {
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
-            view.camera.rotation = ichor::walkCameraRotation();
+            view.camera.rotation = ichor::walkCameraRotation(viewYaw);
         }
         const double cellMetres = heightfield.desc().cellMetres;
         for (const auto& [id, cell] : cells) {

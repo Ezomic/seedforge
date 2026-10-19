@@ -93,7 +93,7 @@ void SdlPlatform::pumpEvents()
     if (lookEnabled_) {
         if (keys[SDL_SCANCODE_E]) frame.buttons |= InputFrame::LockOn;
         const float mouse = mouseLook_.step(elapsed);
-        const float arrows = (keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
+        const float arrows = arrowsReserved_ ? 0.0f : (keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
         frame.lookX = std::clamp(mouse + arrows, -1.0f, 1.0f);
     }
 
