@@ -103,6 +103,8 @@ struct Options {
     bool showNewGame = false;
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
+    std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
+    bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame of a windowed run; empty is none
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -169,6 +171,12 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
         } else if (arg == "--screenshot" && hasValue) {
             options.screenshot = argv[++i];
+        } else if (arg == "--frame-stats" && hasValue) {
+            if (!parseNumber(argv[++i], options.frameStats)) return false;
+        } else if (arg == "--weather" && hasValue) {
+            const std::string_view mode = argv[++i];
+            if (mode != "rain" && mode != "dry") return false;
+            options.rain = mode == "rain";
         } else if (arg == "--editor") {
             options.editor = true;
         } else if (arg == "--map") {
@@ -624,21 +632,34 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         glm::dvec3 origin{0.0};
         std::vector<ichor::PlacedPoi> pois;
         std::vector<ichor::PlacedBuilding> buildings;
+        std::size_t plants = 0;
     };
     std::map<ichor::CellId, ResidentCell> cells;
     streamer.onLoaded([&](const ichor::CellPayload& payload) {
         ResidentCell cell;
         cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
-        cell.handle = renderer.uploadTerrainCell(payload.lods);
+        {
+            ichor::FrameStages::Scope timer(engine.stages(), "up.terrain", true);
+            cell.handle = renderer.uploadTerrainCell(payload.lods);
+        }
         if (!payload.plants.empty()) {
+            ichor::FrameStages::Scope timer(engine.stages(), "up.trees", true);
             cell.grove = renderer.uploadVegetationCell(payload.plants);
         }
-        cell.water = renderer.uploadWaterCell(payload.water);
+        {
+            ichor::FrameStages::Scope timer(engine.stages(), "up.water", true);
+            cell.water = renderer.uploadWaterCell(payload.water);
+        }
         cell.pois = payload.pois;
         cell.buildings = payload.buildings;
-        engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
-            static_cast<float>(heightfield.desc().metresPerSample));
+        cell.plants = payload.plants.size();
+        {
+            ichor::FrameStages::Scope timer(engine.stages(), "up.physics", true);
+            engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
+                static_cast<float>(heightfield.desc().metresPerSample));
+        }
         cells[payload.cell.id] = cell;
+        ichor::FrameStages::Scope navTimer(engine.stages(), "up.nav", true);
         ichor::NavTile tile = payload.nav;
         if (!tile.empty() && !navigation.addTile(payload.cell.id, std::move(tile))) {
             ichor::logf(ichor::LogLevel::Warn, "navmesh: tile {},{} was not added", payload.cell.id.x, payload.cell.id.z);
@@ -670,6 +691,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         // the budget alone. While the gate holds no ticks run, so it advances
         // the streamer itself until the required ring is in.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
+            ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(playerPosition(scene));
         });
         engine.setTickGate([&](const ichor::Scene& scene) {
@@ -677,6 +699,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             if (streamer.ready(position)) {
                 return true;
             }
+            ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(position);
             return streamer.ready(position);
         });
@@ -704,9 +727,14 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::bindData(scripts, data);
     ichor::bindChronicle(scripts, chronicle, engine.scene());
     ichor::bindJournal(scripts, chronicle, engine.scene(), journalTemplates);
-    const auto weatherNow = [&] {
-        return ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(engine.scene().tickCount()) * config.fixedDt / options.daySeconds * 24.0);
+    const auto weatherAtTick = [&](std::uint64_t tick) {
+        ichor::Weather weather = ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(tick) * config.fixedDt / options.daySeconds * 24.0);
+        if (!options.rain) {
+            weather.rain = 0.0f;
+        }
+        return weather;
     };
+    const auto weatherNow = [&] { return weatherAtTick(engine.scene().tickCount()); };
     // The hour is read from the tick, as the sky is, so a script sees what the player sees.
     ichor::bindWorld(scripts, {
         [&](double x, double z) { return waterField ? static_cast<double>(waterField->at(x, z).depth) : 0.0; },
@@ -916,7 +944,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // Weather follows the hours since the world began, so it needs no saved state either.
             // The editor can pin either one.
             ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
-            ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : ichor::weatherAt(worldSeed, options.startHour + static_cast<double>(scene.tickCount()) * config.fixedDt / options.daySeconds * 24.0), atmosphere);
+            ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : weatherAtTick(scene.tickCount()), atmosphere);
             ichor::applyAtmosphere(atmosphere, view);
             view.wetness = surfaceWetness.update(atmosphere.rain, scene.tickCount(), config.fixedDt);
             ichor::applyPalette(palette, view);
@@ -1186,6 +1214,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         if (!engine.frame(dt)) {
             break;
+        }
+        if (options.frameStats != 0 && engine.frameCount() % options.frameStats == 0) {
+            std::size_t plantTotal = 0;
+            for (const auto& [id, cell] : cells) plantTotal += cell.plants;
+            ichor::logf(ichor::LogLevel::Info, "frame {} cells {} plants {} stages (mean/peak ms): {}", engine.frameCount(), cells.size(), plantTotal, engine.stages().summary());
+            engine.stages().reset();
         }
         // The audio thread holds a lock while it renders, so only a change is worth taking it for.
         const ichor::ReverbSettings reverb = reverbField.at(playerPosition(engine.scene()));

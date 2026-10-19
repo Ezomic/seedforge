@@ -21,6 +21,9 @@ namespace {
 constexpr std::uint32_t kShadowSize = 2048;
 constexpr std::uint32_t kMaxMaterials = 256;
 constexpr std::uint32_t kMaxDebugLines = 65536;
+// One stamp before the first pass and one after each, in draw order.
+constexpr std::array<const char*, 8> kPassNames{"shadow", "sky", "instances", "terrain", "trees", "water", "rain", "overlay"};
+constexpr std::uint32_t kMaxTimestamps = static_cast<std::uint32_t>(kPassNames.size()) + 1;
 constexpr std::uint32_t kMaxJoints = 4096;
 constexpr float kShadowDistance = 60.0f;
 constexpr float kShaftAnisotropy = 0.65f; // Henyey-Greenstein g: how much fog throws the sun's light on towards the eye
@@ -167,6 +170,7 @@ SceneRenderer::~SceneRenderer()
     ctx_.destroyImage(whiteTexture_);
     ctx_.destroyImage(flatNormalTexture_);
     for (auto& slot : slots_) {
+        vkDestroyQueryPool(device, slot.timestamps, nullptr);
         ctx_.destroyBuffer(slot.frameUbo);
         ctx_.destroyBuffer(slot.debugVertices);
         ctx_.destroyBuffer(slot.jointPalette);
@@ -745,7 +749,21 @@ bool SceneRenderer::createDefaultTextures()
 
 bool SceneRenderer::createFrameSlots()
 {
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(ctx_.physicalDevice(), &properties);
+    if (properties.limits.timestampComputeAndGraphics == VK_TRUE) {
+        timestampPeriodNs_ = properties.limits.timestampPeriod;
+    }
     for (auto& slot : slots_) {
+        if (timestampPeriodNs_ > 0.0f) {
+            // Without the stamps the passes simply go unmeasured.
+            VkQueryPoolCreateInfo queryInfo{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+            queryInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+            queryInfo.queryCount = kMaxTimestamps;
+            if (vkCreateQueryPool(ctx_.device(), &queryInfo, nullptr, &slot.timestamps) != VK_SUCCESS) {
+                slot.timestamps = VK_NULL_HANDLE;
+            }
+        }
         slot.frameUbo = ctx_.createBuffer(sizeof(FrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VulkanContext::HostAccess::Write);
         slot.debugVertices = ctx_.createBuffer(sizeof(DebugVertex) * 2 * kMaxDebugLines, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VulkanContext::HostAccess::Write);
         slot.jointPalette = ctx_.createBuffer(sizeof(glm::mat4) * kMaxJoints, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VulkanContext::HostAccess::Write);
@@ -1147,6 +1165,30 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         vmaFlushAllocation(ctx_.allocator(), frame.jointPalette.allocation, 0, sizeof(glm::mat4) * jointCount);
     }
 
+    // The slot's last frame has retired (its fence was waited before this frame began), so its stamps can be read.
+    if (frame.timestamps != VK_NULL_HANDLE && frame.timestampsWritten > 1) {
+        std::array<std::uint64_t, kMaxTimestamps> stamps{};
+        const VkResult read = vkGetQueryPoolResults(ctx_.device(), frame.timestamps, 0, frame.timestampsWritten, sizeof(stamps), stamps.data(), sizeof(std::uint64_t),
+            VK_QUERY_RESULT_64_BIT);
+        if (read == VK_SUCCESS) {
+            gpuPasses_.clear();
+            for (std::uint32_t i = 1; i < frame.timestampsWritten; ++i) {
+                const double ms = static_cast<double>(stamps[i] - stamps[i - 1]) * static_cast<double>(timestampPeriodNs_) * 1.0e-6;
+                gpuPasses_.push_back({kPassNames[i - 1], ms});
+            }
+        }
+    }
+    std::uint32_t stamp = 0;
+    const auto markPass = [&] {
+        if (frame.timestamps != VK_NULL_HANDLE && stamp < kMaxTimestamps) {
+            vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frame.timestamps, stamp++);
+        }
+    };
+    if (frame.timestamps != VK_NULL_HANDLE) {
+        vkCmdResetQueryPool(cmd, frame.timestamps, 0, kMaxTimestamps);
+    }
+    markPass();
+
     const auto drawTerrain = [&](bool shadowPass, std::uint32_t cascade) {
         if (view.terrain.empty() || terrainSet_ == VK_NULL_HANDLE) {
             return;
@@ -1287,6 +1329,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
         1, kCascadeCount);
+    markPass(); // shadow
 
     // Main pass
     VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
@@ -1318,10 +1361,13 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipeline_);
         vkCmdDraw(cmd, 3, 1, 0, 0);
     }
+    markPass(); // sky
     drawInstances(false, 0);
+    markPass(); // instances
     drawTerrain(false, 0);
-
+    markPass(); // terrain
     drawVegetation(false, 0);
+    markPass(); // trees
 
     if (!view.waterCells.empty() && waterMeshPipeline_ != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, waterMeshPipeline_);
@@ -1347,11 +1393,13 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, waterPipeline_);
         vkCmdDraw(cmd, 3, 1, 0, 0);
     }
+    markPass(); // water
 
     if (view.rainIntensity > 0.001f && rainPipeline_ != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, rainPipeline_);
         vkCmdDraw(cmd, 3, 1, 0, 0);
     }
+    markPass(); // rain
 
     if (lineCount > 0 && debugPipeline_ != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, debugPipeline_);
@@ -1367,6 +1415,8 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
         overlay(cmd);
     }
     vkCmdEndRendering(cmd);
+    markPass(); // lines and overlay
+    frame.timestampsWritten = stamp;
 }
 
 }

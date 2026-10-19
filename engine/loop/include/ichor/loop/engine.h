@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/core/fixed_step.h"
+#include "ichor/core/frame_stages.h"
 #include "ichor/core/input.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/sim/scene.h"
@@ -64,6 +65,10 @@ public:
     // The time a frame takes, smoothed over the last few dozen, in milliseconds; zero before the first. A paused
     // frame, which has no time of its own, leaves it as it was.
     double frameMilliseconds() const { return frameMillis_; }
+    // Where each frame's time goes: sim, view, begin (waits for the GPU's last use of the slot), submit, text,
+    // present (the swapchain wait). Callers add their own stages, such as the streamer's cell uploads.
+    FrameStages& stages() { return stages_; }
+    const FrameStages& stages() const { return stages_; }
     const Scene& scene() const { return scene_; }
     Scene& scene() { return scene_; }
 
@@ -88,6 +93,7 @@ private:
     bool replaying_ = false;
     std::uint64_t frameCount_ = 0;
     double frameMillis_ = 0.0;
+    FrameStages stages_;
 };
 
 }

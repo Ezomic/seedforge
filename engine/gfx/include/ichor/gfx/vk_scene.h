@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/gfx/render_view.h"
+#include "ichor/gfx/renderer.h"
 #include "ichor/gfx/vk_context.h"
 
 #include <array>
@@ -49,6 +50,9 @@ public:
         VkImageView color, VkImageView depth, VkExtent2D extent,
         const std::function<void(VkCommandBuffer)>& overlay = {});
 
+    // GPU time per pass of the last frame whose slot has been read back; see Renderer::gpuPasses.
+    const std::vector<Renderer::GpuPassTime>& gpuPasses() const { return gpuPasses_; }
+
     static constexpr VkFormat depthFormat() { return VK_FORMAT_D32_SFLOAT; }
 
 private:
@@ -63,6 +67,8 @@ private:
         GpuBuffer debugVertices;
         GpuBuffer jointPalette;
         VkDescriptorSet frameSet = VK_NULL_HANDLE;
+        VkQueryPool timestamps = VK_NULL_HANDLE;
+        std::uint32_t timestampsWritten = 0; // how many stamps the slot's last frame recorded; zero before its first
     };
 
     bool createShadowMap();
@@ -111,6 +117,8 @@ private:
     std::vector<MaterialConstants> materials_;
     std::vector<GpuMesh> meshes_;
     bool paletteOverflowLogged_ = false;
+    std::vector<Renderer::GpuPassTime> gpuPasses_;
+    float timestampPeriodNs_ = 0.0f; // zero when the queue cannot timestamp
 
     // Terrain: the splat layers' textures and set, and one mesh per LOD per cell.
     std::vector<GpuImage> terrainTextures_;

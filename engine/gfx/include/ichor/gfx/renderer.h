@@ -53,6 +53,18 @@ public:
     // when a compiled shader changes; a renderer without shaders does nothing.
     virtual bool reloadShaders() { return true; }
 
+    // How long the GPU spent on each pass of a recent frame, in milliseconds, in draw order. Empty until a frame has
+    // finished, and always empty where there is no GPU (the null renderer). Presentation only.
+    struct GpuPassTime {
+        const char* name;
+        double ms;
+    };
+    virtual const std::vector<GpuPassTime>& gpuPasses() const
+    {
+        static const std::vector<GpuPassTime> none;
+        return none;
+    }
+
     virtual void beginFrame() = 0;
     virtual void submit(const RenderView& view) = 0;
     virtual void endFrame() = 0;
