@@ -115,6 +115,30 @@ bool decodeForgedWorldCache(const std::vector<std::uint8_t>& bytes, const Forged
     return true;
 }
 
+std::optional<ForgedWorldKey> peekForgedWorldKey(const std::vector<std::uint8_t>& bytes)
+{
+    BinaryReader r(bytes);
+    std::array<char, 4> magic{};
+    std::uint32_t version = 0;
+    ForgedWorldKey key;
+    if (!r.read(magic) || magic != kMagic || !r.read(version) || version != kVersion || !r.read(key.seed) || !r.read(key.genVersion) || !r.read(key.gridSize)
+        || !r.read(key.configHash) || !r.read(key.descHash)) {
+        return std::nullopt;
+    }
+    return key;
+}
+
+bool decodeStoredForgedWorld(const std::vector<std::uint8_t>& bytes, ForgedWorldKey& key, CachedForgedWorld& out)
+{
+    out = CachedForgedWorld{};
+    const std::optional<ForgedWorldKey> stamped = peekForgedWorldKey(bytes);
+    if (!stamped || !decodeForgedWorldCache(bytes, *stamped, out)) {
+        return false;
+    }
+    key = *stamped;
+    return true;
+}
+
 std::filesystem::path forgedWorldCachePath(const std::filesystem::path& directory, const ForgedWorldKey& key)
 {
     char name[160];

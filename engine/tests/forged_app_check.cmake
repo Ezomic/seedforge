@@ -1,0 +1,25 @@
+# Runs the app headless with --forged and checks the run is deterministic: the same seed gives the same
+# scene state hash twice and another seed gives a different one. Needs ICHOR (the executable).
+function(forged_run seed out_var)
+    execute_process(COMMAND "${ICHOR}" --headless --forged --grid 64 --seed ${seed} --frames 60
+        RESULT_VARIABLE code OUTPUT_VARIABLE text ERROR_VARIABLE text)
+    if(NOT code EQUAL 0)
+        message(FATAL_ERROR "ichor --forged --seed ${seed} exited with ${code}:\n${text}")
+    endif()
+    string(REGEX MATCH "exit after [0-9]+ frames, [0-9]+ ticks, state ([0-9a-f]+)" matched "${text}")
+    if(NOT matched)
+        message(FATAL_ERROR "ichor --forged --seed ${seed} logged no state hash:\n${text}")
+    endif()
+    set(${out_var} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+endfunction()
+
+forged_run(1 first)
+forged_run(1 second)
+forged_run(2 other)
+if(NOT first STREQUAL second)
+    message(FATAL_ERROR "the same seed gave two scene hashes: ${first} and ${second}")
+endif()
+if(first STREQUAL other)
+    message(FATAL_ERROR "seeds 1 and 2 gave the same scene hash ${first}")
+endif()
+message(STATUS "forged runs agree: seed 1 ${first}, seed 2 ${other}")
