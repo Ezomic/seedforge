@@ -201,6 +201,9 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
             auto& rotation = raw.roots.back().transform.rotation;
             const glm::quat turned = yawQuat(rootYawDegrees) * glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
             rotation = {turned.x, turned.y, turned.z, turned.w};
+            auto& translation = raw.roots.back().transform.translation;
+            const glm::vec3 moved = yawQuat(rootYawDegrees) * glm::vec3(translation.x, translation.y, translation.z);
+            translation = {moved.x, moved.y, moved.z};
         }
     }
     if (!raw.Validate()) {
@@ -322,7 +325,10 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
                 trs.rotation = glm::normalize(glm::quat(q[3], q[0], q[1], q[2]));
             }
             if (channels[j].scale) sampleChannel<3>(*channels[j].scale, t, &trs.scale.x);
-            if (isRoot && rootYawDegrees != 0.0f) trs.rotation = yawQuat(rootYawDegrees) * trs.rotation;
+            if (isRoot && rootYawDegrees != 0.0f) {
+                trs.rotation = yawQuat(rootYawDegrees) * trs.rotation;
+                trs.translation = yawQuat(rootYawDegrees) * trs.translation;
+            }
             track.translations.push_back({t, {trs.translation.x, trs.translation.y, trs.translation.z}});
             track.rotations.push_back({t, {trs.rotation.x, trs.rotation.y, trs.rotation.z, trs.rotation.w}});
             track.scales.push_back({t, {trs.scale.x, trs.scale.y, trs.scale.z}});

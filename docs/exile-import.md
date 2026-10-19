@@ -13,20 +13,19 @@ the spear and the shield.
 - Metres, Y up, about 2 m tall, feet on y = 0. Joint 0 is a `root` bone above `mixamorig:Hips`, so the engine's root
   motion (the scene subtracts the root joint's translation) works as it is: 35 joints, root plus 34 bones.
 - The body faces **+Z**. Ichor's characters face -Z (`character_pose.h`). `CookOptions::rootYawDegrees` turns every
-  root joint half a way round about the vertical, in the skeleton and in the clips, and leaves its translation (the
-  root motion) as authored. `cookExile` passes 180. The mesh and the inverse bind matrices are untouched.
+  root joint half a way round about the vertical, in the skeleton and in the clips, and turns its translation (the
+  root motion) with it, so travel along the way the body faces stays along it. `cookExile` passes 180. The mesh and the inverse bind matrices are untouched.
 - Clips: `block death dodge hit idle run swing thrust walk`, lowercase, 24 fps keys resampled at 60 Hz by the cooker.
 
 ## Root motion
 
-Walk travels 4.18 m over 3.96 s and Run about 5.2 m/s, along -Z, which after the turn is the way the body faces.
+Clips are authored so the root travels the way the legs plant their feet, along the way the body faces (+Z in the file, -Z after the turn). Walk is a loop of 2.7 s at about 1.05 m/s (2.86 m per loop) and Run a loop of 1.75 s at about 5.2 m/s (9.1 m per loop). The planted ankle moves at about 0.07 m/s in Walk.
 
 ## Loops
 
-Idle loops (last pose within 2 cm of the first). Walk (0.45 m) and Run (1.03 m) do not: the last frame is in another
-stride, so looping them pops. Hit, Swing and Death end far from where they start, as one-shots do. The clips are
-placeholders and not loop-blended; `idle loops` in `test_animation_exile.cpp` pins the numbers so a re-export that
-does loop turns it red.
+Idle, Walk and Run loop: the last frame is a copy of the first (hips height included) and the root moves a constant
+forward distance per loop. Hit, Swing and Death end far from where they start, as one-shots do. `idle, walk and run
+loop` in `test_animation_exile.cpp` checks the seam.
 
 ## Sockets
 
@@ -37,4 +36,4 @@ matrix times `JointSocket::local`. `applyAttachment` (`ichor/sim/attachment.h`) 
 
 ## Placeholder status
 
-Props untextured, one take per clip, clips not blended to loop.
+Props untextured, one take per clip.
