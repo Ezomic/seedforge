@@ -116,7 +116,7 @@ TEST_CASE("the lift puts the model on the floor in every state, where the raw cl
     CHECK(frame.lift > 0.5f);
 }
 
-TEST_CASE("each combat state picks its clip")
+TEST_CASE("each combat state picks its Bull-Warden clip")
 {
     CHECK(poseOf(inState(CombatState::Idle, 0.0f)).clip == kit().clips.idle);
     CHECK(poseOf(inState(CombatState::Idle, 0.0f), true).clip == kit().clips.walk);
