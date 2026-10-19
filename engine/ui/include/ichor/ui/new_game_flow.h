@@ -22,7 +22,7 @@ enum class NewGameStage { Choosing, Forging, Ready, Failed };
 // Ready with no job, and the app keeps drawing the stand-in.
 class NewGameFlow {
 public:
-    explicit NewGameFlow(bool forged, int gridSize = kForgedDefaultGridSize);
+    explicit NewGameFlow(bool forged, int gridSize = kForgedDefaultGridSize, worldforge::ForgeConfig config = {});
 
     // Begin was clicked. Ignored unless the stage is Choosing or Failed. A desc that is not valid
     // fails the flow at once.
@@ -43,6 +43,7 @@ public:
 private:
     bool forged_;
     int gridSize_;
+    worldforge::ForgeConfig config_;
     NewGameStage stage_ = NewGameStage::Choosing;
     std::string error_;
     std::unique_ptr<ForgeJob> job_;

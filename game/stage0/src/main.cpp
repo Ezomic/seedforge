@@ -8,6 +8,7 @@
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
 #include "ichor/platform/sdl_platform.h"
+#include "ichor/stage0/bull_warden.h"
 #include "ichor/stage0/camera_rig.h"
 #include "ichor/stage0/ai_knobs.h"
 #include "ichor/stage0/character_visuals.h"
@@ -21,6 +22,7 @@
 #include <charconv>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string_view>
 
 namespace {
@@ -29,6 +31,7 @@ struct Options {
     bool headless = false;
     bool lockOn = false;
     float mouseSensitivity = 1.0f;
+    bool bullWarden = false;
     bool exilePlayer = false;
     std::uint64_t frames = 0;
     std::uint64_t seed = 1;
@@ -58,6 +61,7 @@ bool parse(int argc, char** argv, Options& options)
         if (arg == "--headless") options.headless = true;
         else if (arg == "--lock-on") options.lockOn = true;
         else if (arg == "--mouse-sens" && hasValue) { if (!parseNumber(argv[++i], options.mouseSensitivity)) return false; }
+        else if (arg == "--bull-warden") options.bullWarden = true;
         else if (arg == "--exile-player") options.exilePlayer = true;
         else if (arg == "--frames" && hasValue) { if (!parseNumber(argv[++i], options.frames)) return false; }
         else if (arg == "--seed" && hasValue) { if (!parseNumber(argv[++i], options.seed)) return false; }
@@ -100,6 +104,15 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     audio.addBundle(bundle);
+
+    // The Bull-Warden replaces only how the foe is drawn; the simulation never sees it.
+    std::unique_ptr<ichor::stage0::BullWardenKit> bullWarden;
+    if (options.bullWarden) {
+        bullWarden = std::make_unique<ichor::stage0::BullWardenKit>();
+        if (!ichor::stage0::cookBullWarden(std::filesystem::path(ICHOR_ART_DIR) / "monsters" / "bull_warden", *bullWarden)) return 1;
+        bullWarden->mesh = renderer.meshCount();
+        if (!renderer.uploadBundle(bullWarden->bundle)) return 1;
+    }
 
     ichor::stage0::Tuning tuning;
     tuning.lightWindupCue = audio.findSound("A_WindupLight");
@@ -182,7 +195,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         std::vector<ichor::LineSegment> lines;
         scene.physics().debugLines(lines);
         stage.debugLines(scene, lines);
-        ichor::stage0::appendCharacterInstances(scene, alpha, tuning, greyBox, view.instances, exilePlayer.loaded());
+        ichor::stage0::appendCharacterInstances(scene, alpha, tuning, greyBox, view.instances, exilePlayer.loaded(), bullWarden ? foe : entt::null);
+        if (bullWarden) ichor::stage0::appendBullWarden(scene, stage.foeId(), alpha, tuning, *bullWarden, view);
         if (exilePlayer.loaded()) {
             const double renderNow = platform.now();
             exilePlayer.append(scene, alpha, renderNow - exileClock, static_cast<float>(config.fixedDt), tuning, view);
@@ -219,7 +233,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--exile-player] [--mouse-sens X] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
+        ichor::log(ichor::LogLevel::Info, "usage: stage0 [--headless] [--lock-on] [--exile-player] [--bull-warden] [--mouse-sens X] [--frames N] [--seed S] [--scene kit.iscene] [--fights out.csv] [--record in.iinp] [--replay in.iinp] [--review-fight fights.fights/fight_001.ifrd] [--knobs data_dir] [--session label] [--variable name] [--screenshot out.png]");
         return 2;
     }
     if (!options.review.empty()) {

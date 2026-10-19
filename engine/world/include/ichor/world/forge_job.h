@@ -36,7 +36,9 @@ struct ForgeJobResult {
 // belong to the one thread that owns the job.
 class ForgeJob {
 public:
-    explicit ForgeJob(WorldDesc desc, int gridSize = kForgedDefaultGridSize, PhaseObserver extraObserver = {});
+    // `config` is the forge's; the default is what the new-game flow always used. A config that names items, cast archetypes
+    // or dungeon archetypes fills the content manifest (phase 11) with them and changes nothing before that phase.
+    explicit ForgeJob(WorldDesc desc, int gridSize = kForgedDefaultGridSize, PhaseObserver extraObserver = {}, worldforge::ForgeConfig config = {});
     ~ForgeJob();
     ForgeJob(const ForgeJob&) = delete;
     ForgeJob& operator=(const ForgeJob&) = delete;
@@ -63,6 +65,7 @@ private:
     WorldDesc desc_;
     int gridSize_;
     PhaseObserver extraObserver_;
+    worldforge::ForgeConfig config_;
     ForgeProgress progress_;
     std::atomic<bool> cancelRequested_{false};
     std::thread worker_;

@@ -19,10 +19,11 @@ PhaseProgress toPhaseProgress(const worldforge::ForgeProgress& p)
 
 }
 
-ForgeJob::ForgeJob(WorldDesc desc, int gridSize, PhaseObserver extraObserver)
+ForgeJob::ForgeJob(WorldDesc desc, int gridSize, PhaseObserver extraObserver, worldforge::ForgeConfig config)
     : desc_(desc)
     , gridSize_(gridSize)
     , extraObserver_(std::move(extraObserver))
+    , config_(std::move(config))
 {
 }
 
@@ -97,7 +98,7 @@ void ForgeJob::run()
             }
         };
         auto world = std::make_shared<const worldforge::ForgedWorld>(
-            worldforge::forgeWorld(desc_.seed, gridSize_, {}, worldforge::ForgePhase::Content, onProgress));
+            worldforge::forgeWorld(desc_.seed, gridSize_, config_, worldforge::ForgePhase::Content, onProgress));
         if (cancelRequested_.load()) {
             throw Cancelled{};
         }

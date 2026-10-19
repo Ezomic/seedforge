@@ -8,7 +8,13 @@
 #include "ichor/world/forged_roads.h"
 #include "ichor/world/forged_water.h"
 #include "ichor/world/heightfield.h"
+#include "ichor/data/data_set.h"
+#include "ichor/graph/quest_expansion.h"
 #include "ichor/world/map_layers.h"
+#include "ichor/world/placed_cast.h"
+#include "ichor/world/placed_dungeons.h"
+#include "ichor/world/placed_loot.h"
+#include "ichor/world/placed_quests.h"
 #include "ichor/world/placed_pois.h"
 #include "ichor/world/placed_settlements.h"
 #include "ichor/world/water_field.h"
@@ -16,6 +22,7 @@
 #include <worldforge/forge_world.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -58,6 +65,25 @@ struct ForgedSpawnParams {
 ForgedSpawn findForgedSpawn(const Heightfield& heightfield, const WaterField* water, const std::vector<std::pair<double, double>>& settlements,
     const std::function<bool(double, double)>& blocked = {}, const ForgedSpawnParams& params = {});
 
+// What the manifest-driven content needs from the data layer: the item catalogue the loot is placed from, the
+// dungeon skeletons, the quest rules and the cast's schedules. A default-built value places none of them.
+struct ForgedContentInputs {
+    std::vector<LootItemInfo> lootCatalogue;
+    std::shared_ptr<const DungeonSkeletonCatalog> skeletons;
+    std::shared_ptr<const graph::quest::Ruleset> questRules;
+    PlacedCastParams cast;
+};
+
+struct ForgedContentSetup {
+    ForgedContentInputs inputs;
+    worldforge::ForgeConfig config; // names the items, cast archetypes and dungeon themes, so the forged manifest has them
+    std::vector<std::string> problems; // what could not be loaded; the content that needs it is left out
+};
+
+// Reads the catalogue (tables notable_items and catalogue), the skeletons (dungeon_skeletons/) and the quest rules
+// (quests/expansion_rules.json). The cast archetypes are a fixed list: the shipped data has no table for them yet.
+ForgedContentSetup loadForgedContentSetup(const DataSet& data, const std::filesystem::path& dataDir);
+
 struct ForgedGame {
     ForgedGame() = default;
     ForgedGame(const ForgedGame&) = delete;
@@ -74,14 +100,20 @@ struct ForgedGame {
     std::shared_ptr<const PlacedBuildingSet> buildings;
     std::shared_ptr<const NavSurface> navSurface; // water and roads as the navmesh sees them; reads `waterField` and `roads`
     ForgedRegionTiers tiers;
+    std::shared_ptr<const PlacedLootSet> loot; // the manifest's items, lying at their dungeons and landmarks; null without content inputs
+    std::shared_ptr<const PlacedCastSet> cast; // the manifest's cast, near their home settlements, with schedules
+    std::shared_ptr<const PlacedQuestSet> quests;
+    std::shared_ptr<const DungeonSkeletonCatalog> skeletons;
+    std::unique_ptr<DungeonLayouts> dungeons; // bakes a layout on first ask; one owner, the game thread
     MapLayerStack mapLayers;
     ForgedSpawn spawn;
     std::string error; // empty on success
+    std::vector<std::string> contentProblems; // loot, cast or quests that could not be placed and were left out
 
     bool ok() const { return error.empty(); }
 
     // A digest of the forged world's hash, the terrain, the spawn, the placed objects, the road count and the
-// region tiers: the same seed and grid always give the same value.
+// region tiers, loot, cast and quests: the same seed and grid always give the same value.
     std::uint64_t stateHash() const;
 };
 
@@ -92,6 +124,8 @@ struct ForgedScenery {
     SceneBundle bundle;
     std::map<CellId, std::uint32_t> roadMesh;
     std::map<std::string, std::uint32_t> poiMesh; // by PlacedPoi::id, at its own height with its base on y = 0
+    std::uint32_t lootMesh = 0;     // a unit box, drawn small on the ground where an item lies
+    std::uint32_t castMesh = 0;     // a unit box, scaled to a person
     std::uint32_t buildingMesh = 0;          // a box 1 m wide and deep and 1 m tall: scale by 2 * half extents and the height
 };
 
@@ -99,6 +133,6 @@ ForgedScenery buildForgedScenery(const ForgedGame& game);
 
 // Builds the game from a finished forge. Fails, with a message, when the result is empty or a bake step
 // refuses the world. Never throws.
-std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const WorldDesc& requested);
+std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const WorldDesc& requested, const ForgedContentInputs& content = {});
 
 }

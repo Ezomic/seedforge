@@ -10,6 +10,7 @@ struct WindowDesc {
     std::string title = "Ichor";
     int width = 1280;
     int height = 720;
+    bool hidden = false; // created never shown: nothing appears on the desktop
 };
 
 struct Extent {
