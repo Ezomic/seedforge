@@ -140,8 +140,10 @@ jobs:
           restore-keys: |
             ccache-linux-walk-
             ccache-linux-
+      # Release without sanitizers: the first run of this job under ASan Debug took about 190 s per seed at grid 1024, so 8 seeds
+      # alone overran the budget. Memory errors in the walker are covered by the sanitizer jobs on the PR suite's 129 grid.
       - name: Configure
-        run: cmake --preset linux-headless-asan
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
         working-directory: engine
       - name: Build
         run: cmake --build --preset linux-headless-asan --target ichor_tests_world

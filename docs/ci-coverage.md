@@ -67,6 +67,6 @@ The night fails when a seed is silently stuck:
 - it stopped without a blocker and a report, or without having walked;
 - no seed on a grid had a trip to walk, or the 1200 second budget (`ICHOR_NIGHTLY_WALK_BUDGET_S`) ran out before every seed ran (that seed prints as `SILENT not run`).
 
-A seed with no second settlement 60 m or more from the spawn settlement prints `no trip` and does not fail (seeds 5 and 6 at 256 today); it is visible in the log, not a verdict. Local timings on a Release build: all 8 seeds took about 60 s at 256 and about 190 s at 1024. The sanitizer build is slower, which is why the budget guard exists.
+A seed with no second settlement 60 m or more from the spawn settlement prints `no trip` and does not fail (seeds 5 and 6 at 256 today); it is visible in the log, not a verdict. Local timings on a Release build: all 8 seeds took about 60 s at 256 and about 190 s at 1024. The first CI run used the sanitizer Debug build and took about 190 s per seed at 1024 (the budget ran out after 6 seeds), so this job configures the same preset as Release with sanitizers off. The budget guard stays so a slow night fails loudly instead of timing out.
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
