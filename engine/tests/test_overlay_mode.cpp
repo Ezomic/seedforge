@@ -21,7 +21,7 @@ std::vector<OverlayMode> pressTimes(OverlayToggle toggle, const std::vector<bool
 
 }
 
-TEST_CASE("the overlay starts compact and cycles off, compact, full on each press")
+TEST_CASE("the overlay starts compact and each press steps it to full, then off, then compact")
 {
     OverlayToggle toggle;
     REQUIRE(toggle.mode == OverlayMode::Compact);
