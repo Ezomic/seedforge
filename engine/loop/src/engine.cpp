@@ -90,11 +90,17 @@ bool Engine::frame(double frameSeconds)
         FrameStages::Scope timer(stages_, "submit");
         renderer_.submit(view_);
     }
-    renderer_.debugText(std::format("frame {}  {:.0f} fps  {:.1f} ms  tick {}  sim {:.2f} s{}{}", frameCount_, frameMillis_ > 0.0 ? 1000.0 / frameMillis_ : 0.0, frameMillis_, scene_.tickCount(), scene_.time(),
-        replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
-    renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
-    renderer_.debugText("ms (mean/peak) " + stages_.summary());
-    if (overlayBuilder_) {
+    overlayToggle_.update(platform_.overlayKey());
+    const double fps = frameMillis_ > 0.0 ? 1000.0 / frameMillis_ : 0.0;
+    if (overlayToggle_.mode == OverlayMode::Compact) {
+        renderer_.debugText(std::format("{:.0f} fps  {:.1f} ms", fps, frameMillis_));
+    } else if (overlayToggle_.mode == OverlayMode::Full) {
+        renderer_.debugText(std::format("frame {}  {:.0f} fps  {:.1f} ms  tick {}  sim {:.2f} s{}{}", frameCount_, fps, frameMillis_, scene_.tickCount(), scene_.time(),
+            replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
+        renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
+        renderer_.debugText("ms (mean/peak) " + stages_.summary());
+    }
+    if (overlayBuilder_ && overlayToggle_.mode == OverlayMode::Full) {
         overlay_.clear();
         overlayBuilder_(scene_, overlay_);
         for (std::string& line : overlay_) {

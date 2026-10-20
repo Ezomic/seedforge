@@ -12,6 +12,7 @@
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
+#include "ichor/core/overlay_mode.h"
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
@@ -119,6 +120,7 @@ struct Options {
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
+    std::optional<ichor::OverlayMode> overlay; // --overlay [off|compact|full]; none is compact in play and off for a screenshot
     bool showWindow = false; // with --screenshot: a visible window, only to compare it with the hidden render
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -192,6 +194,14 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
+        } else if (arg == "--overlay") {
+            options.overlay = ichor::OverlayMode::Compact;
+            if (i + 1 < argc) {
+                if (const std::optional<ichor::OverlayMode> mode = ichor::parseOverlayMode(argv[i + 1])) {
+                    options.overlay = mode;
+                    ++i;
+                }
+            }
         } else if (arg == "--show-window") {
             options.showWindow = true;
         } else if (arg == "--screenshot" && hasValue) {
@@ -621,6 +631,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::EngineConfig config;
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
+    engine.setOverlayMode(ichor::startingOverlayMode(!options.screenshot.empty(), options.overlay));
     engine.scene().setAnimations(&animations);
     // The stand-in world has no roads, so its field is empty and the bonus never applies.
     const ichor::NullRoadField noRoads;
@@ -1520,7 +1531,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
