@@ -1,0 +1,104 @@
+// Renders the Exile player in idle, run and a heavy swing, driven by the real combat code, on a
+// headless Vulkan device: no window is created. Writes one PNG with the three side by side.
+#include "ichor/assets/bundle_io.h"
+#include "ichor/assets/image.h"
+#include "ichor/core/log.h"
+#include "ichor/gfx/vk_offscreen.h"
+#include "ichor/sim/scene.h"
+#include "ichor/stage0/combat.h"
+#include "ichor/stage0/exile_player.h"
+#include "ichor/stage0/grey_box_mesh.h"
+
+#include <glm/gtc/quaternion.hpp>
+
+#include <filesystem>
+
+namespace {
+
+constexpr std::uint32_t kWidth = 640;
+constexpr std::uint32_t kHeight = 480;
+constexpr double kDt = 1.0 / 60.0;
+
+using namespace ichor;
+using namespace ichor::stage0;
+
+struct Shot {
+    const char* label;
+    std::vector<std::uint8_t> pixels;
+};
+
+}
+
+int main(int argc, char** argv)
+{
+    const std::filesystem::path out = argc > 1 ? argv[1] : "exile_player.png";
+    const std::filesystem::path artDir = argc > 2 ? argv[2] : std::filesystem::path(ICHOR_ART_DIR) / "exile";
+
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        log(LogLevel::Error, "no Vulkan 1.3 device available");
+        return 1;
+    }
+    SceneBundle bundle;
+    const GreyBoxMeshes greyBox = appendGreyBoxMeshes(bundle);
+    if (!renderer.uploadBundle(bundle)) return 1;
+
+    ExilePlayer exile;
+    if (!exile.prepare(artDir, static_cast<std::uint32_t>(bundle.meshes.size()))) return 1;
+    for (const SceneBundle& part : exile.kit().bundles) {
+        if (!renderer.uploadBundle(part)) return 1;
+    }
+
+    const Tuning tuning;
+    std::vector<Shot> shots;
+    const auto shoot = [&](const char* label, const InputFrame& input, int ticks, bool untilActive) {
+        Scene scene(1);
+        Stage0 stage(tuning);
+        stage.install(scene, {0.0, 0.0, 3.0}, {0.0, 0.0, -9.0});
+        scene.tick(kDt);
+        stage.resetFight(scene);
+        for (int i = 0; i < 30; ++i) scene.tick(kDt);
+        RenderView view;
+        for (int i = 0; i < 400; ++i) {
+            if (i >= ticks && !untilActive) break;
+            scene.tick(kDt, input);
+            const entt::entity player = scene.find(stage.playerId());
+            view.instances.clear();
+            view.jointPalette.clear();
+            exile.append(scene, 1.0, kDt, static_cast<float>(kDt), tuning, view);
+            if (untilActive && scene.registry().get<Combatant>(player).combatState() == CombatState::Active) break;
+        }
+        const glm::dvec3 feet = scene.registry().get<Transform>(scene.find(stage.playerId())).position;
+        for (int i = -4; i <= 4; ++i) {
+            const double at = static_cast<double>(i) * 0.5;
+            view.lines.push_back({feet + glm::dvec3(at, 0.0, -2.0), feet + glm::dvec3(at, 0.0, 2.0), glm::vec3(0.35f)});
+            view.lines.push_back({feet + glm::dvec3(-2.0, 0.0, at), feet + glm::dvec3(2.0, 0.0, at), glm::vec3(0.35f)});
+        }
+        view.sunDirection = glm::normalize(glm::vec3(-0.5f, 0.9f, 0.35f));
+        const glm::dvec3 eye = feet + glm::dvec3(-1.9, 1.3, -2.4);
+        const glm::dvec3 target = feet + glm::dvec3(0.0, 0.9, 0.0);
+        view.camera.position = eye;
+        view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+        Shot shot{label, {}};
+        if (!renderer.render(view, shot.pixels)) return false;
+        shots.push_back(std::move(shot));
+        return true;
+    };
+
+    InputFrame run;
+    run.moveY = 1.0f;
+    InputFrame heavy;
+    heavy.buttons = InputFrame::Heavy;
+    if (!shoot("idle", {}, 5, false) || !shoot("run", run, 45, false) || !shoot("swing", heavy, 0, true)) return 1;
+
+    std::vector<std::uint8_t> strip(static_cast<std::size_t>(kWidth) * shots.size() * kHeight * 4);
+    for (std::size_t s = 0; s < shots.size(); ++s) {
+        for (std::uint32_t y = 0; y < kHeight; ++y) {
+            std::copy_n(shots[s].pixels.begin() + static_cast<std::ptrdiff_t>(y) * kWidth * 4, kWidth * 4,
+                strip.begin() + (static_cast<std::ptrdiff_t>(y) * kWidth * static_cast<std::ptrdiff_t>(shots.size()) + static_cast<std::ptrdiff_t>(s) * kWidth) * 4);
+        }
+    }
+    if (!writePng(out, kWidth * static_cast<std::uint32_t>(shots.size()), kHeight, strip.data())) return 1;
+    logf(LogLevel::Info, "wrote {}", out.string());
+    return 0;
+}

@@ -100,7 +100,7 @@ std::vector<double> probes(double from, double to)
 }
 
 // Whether a box of this footprint can stand here; `lowest` is set to the lowest ground under it.
-bool standable(const Footprint& f, const Heightfield& field, const RoadField* roads, const WaterField* water, const PlacedSettlementParams& p, float& lowest)
+bool standableImpl(const Footprint& f, const Heightfield& field, const RoadField* roads, const WaterField* water, const PlacedSettlementParams& p, float& lowest)
 {
     const double extent = field.desc().sizeMetres;
     const double rx = f.hw + p.roadMarginM;
@@ -146,7 +146,7 @@ void placeCluster(const SettlementSite& site, const Heightfield& field, const Ro
         if (dx * dx + dz * dz > radius * radius) continue;
         if (std::any_of(placed.begin(), placed.end(), [&](const PlacedBuilding& b) { return overlaps(f, b, p.buildingGapM); })) continue;
         float lowest = 0.0f;
-        if (!standable(f, field, roads, water, p, lowest)) continue;
+        if (!standableImpl(f, field, roads, water, p, lowest)) continue;
         PlacedBuilding b;
         b.id = std::format("{}_b{:03}", site.id, placed.size());
         b.settlementId = site.id;
@@ -206,20 +206,46 @@ PlacedSettlements placeSettlementBuildings(const std::vector<SettlementSite>& si
     return out;
 }
 
+bool forgedSettlementSites(const worldforge::ForgedWorld& world, const Heightfield& heightfield, std::vector<SettlementSite>& sites, std::string& error)
+{
+    sites.clear();
+    if (heightfield.empty() || !heightfield.desc().valid()) {
+        error = "the heightfield is empty";
+        return false;
+    }
+    if (!world.settlements().has_value()) {
+        error = world.ok() ? "the forged world stopped before the settlements phase" : world.error();
+        return false;
+    }
+    if (world.size() < 2) {
+        error = "the forged world has no grid";
+        return false;
+    }
+    const auto& forged = world.settlements()->sites;
+    const double extent = heightfield.desc().sizeMetres;
+    for (std::size_t i = 0; i < forged.size(); ++i) {
+        const worldforge::Settlement& s = forged[i];
+        if (s.x < 0 || s.y < 0 || s.x >= world.size() || s.y >= world.size()) {
+            error = std::format("settlement {} lies off the forged grid", i);
+            return false;
+        }
+        sites.push_back({worldforge::detail::forgeSettlementId(i), s.tier, metresOf(s.x, world.size(), extent), metresOf(s.y, world.size(), extent)});
+    }
+    return true;
+}
+
+bool footprintStandable(double x, double z, double halfWidthM, double halfDepthM, const Heightfield& heightfield, const RoadField* roads, const WaterField* water,
+    const PlacedSettlementParams& params, float& lowest)
+{
+    return standableImpl(Footprint{x, z, halfWidthM, halfDepthM}, heightfield, roads, water, params, lowest);
+}
+
 PlacedSettlements placeForgedSettlements(const worldforge::ForgedWorld& world, const Heightfield& heightfield, const RoadField* roads,
     const WaterField* water, const PlacedSettlementParams& params)
 {
-    if (heightfield.empty() || !heightfield.desc().valid()) return failure("the heightfield is empty");
-    if (!world.settlements().has_value()) return failure(world.ok() ? "the forged world stopped before the settlements phase" : world.error());
-    if (world.size() < 2) return failure("the forged world has no grid");
-    const auto& forged = world.settlements()->sites;
-    const double extent = heightfield.desc().sizeMetres;
     std::vector<SettlementSite> sites;
-    for (std::size_t i = 0; i < forged.size(); ++i) {
-        const worldforge::Settlement& s = forged[i];
-        if (s.x < 0 || s.y < 0 || s.x >= world.size() || s.y >= world.size()) return failure(std::format("settlement {} lies off the forged grid", i));
-        sites.push_back({worldforge::detail::forgeSettlementId(i), s.tier, metresOf(s.x, world.size(), extent), metresOf(s.y, world.size(), extent)});
-    }
+    std::string error;
+    if (!forgedSettlementSites(world, heightfield, sites, error)) return failure(std::move(error));
     return placeSettlementBuildings(sites, heightfield, roads, water, params);
 }
 

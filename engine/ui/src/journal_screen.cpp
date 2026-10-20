@@ -23,9 +23,9 @@ constexpr const char* kJournalDocument = R"(<rml><head><style>
     #tabs { text-align: center; padding-bottom: 10px; }
     .tab { display: inline-block; padding: 4px 18px 4px 18px; margin: 0px 6px 0px 6px; font-family: Cinzel; font-size: 20px; color: #8c8468; border-bottom: 2px #3a3426; }
     #list { position: absolute; top: 135px; bottom: 22px; left: 28px; right: 28px; overflow-y: auto; }
-    scrollbarvertical { width: 10px; }
-    scrollbarvertical slidertrack { background-color: #2a261c; }
-    scrollbarvertical sliderbar { width: 10px; background-color: #a08850; }
+    scrollbarvertical { width: 8px; margin-left: 6px; }
+    scrollbarvertical slidertrack { background-color: #26221a; }
+    scrollbarvertical sliderbar { width: 8px; background-color: #a08850; }
     scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0px; height: 0px; }
     .tab:hover { color: #e8d8a8; }
     .tab.active { color: #e8d8a8; border-bottom: 2px #a08850; }
@@ -137,7 +137,6 @@ void JournalScreen::setRows(const std::vector<JournalRow>& rows)
     for (const JournalRow& row : shown_) {
         markup += "<div class=\"entry\"><span class=\"when\">" + escapeRml(row.time) + "</span>" + escapeRml(row.text) + "</div>";
     }
-    list_->SetProperty("top", "78px");
     list_->SetInnerRML(markup);
 }
 
@@ -153,7 +152,6 @@ void JournalScreen::setTabs(const std::vector<JournalModelTab>& tabs)
     shownTab_ = active_;
     tabsWritten_ = true;
     tabs_->SetInnerRML(journalTabBarMarkup(shownTabs_, active_));
-    list_->SetProperty("top", "135px");
     list_->SetInnerRML(journalTabBodyMarkup(shownTabs_, active_));
 }
 

@@ -326,6 +326,13 @@ worldforge::ForgeConfig defaultForgeConfig(int size)
     const std::int64_t clamped = std::clamp(size, worldforge::kTectonicsMinSize, worldforge::kTectonicsMaxSize);
     const std::int64_t area = clamped * clamped;
     config.hydrology.riverThreshold = std::max<std::int64_t>(16, config.hydrology.riverThreshold * area / (1024 * 1024));
+    constexpr std::int64_t kReferenceSize = 256;
+    const std::int64_t areaFactor = std::max<std::int64_t>(1, area / (kReferenceSize * kReferenceSize));
+    const std::int64_t sizeFactorPercent = std::max<std::int64_t>(100, clamped * 100 / kReferenceSize);
+    config.settlements.maxSettlements = static_cast<int>(std::min<std::int64_t>(worldforge::kSettlementMaxSites, config.settlements.maxSettlements * areaFactor));
+    config.pois.maxPois = static_cast<int>(std::min<std::int64_t>(worldforge::kPoiMaxPois, config.pois.maxPois * areaFactor));
+    config.pois.viewRangeCells = static_cast<int>(std::min<std::int64_t>(worldforge::kPoiMaxViewRangeCells, config.pois.viewRangeCells * sizeFactorPercent / 100));
+    config.landmarks.viewRangeCells = static_cast<int>(std::min<std::int64_t>(worldforge::kLandmarkMaxRangeCells, config.landmarks.viewRangeCells * sizeFactorPercent / 100));
     worldforge::FactionSpec contiguous;
     worldforge::FactionSpec ore;
     ore.strategy = worldforge::ClaimStrategy::ResourceFollowing;

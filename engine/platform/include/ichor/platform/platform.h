@@ -10,6 +10,7 @@ struct WindowDesc {
     std::string title = "Ichor";
     int width = 1280;
     int height = 720;
+    bool hidden = false; // created never shown: nothing appears on the desktop
 };
 
 struct Extent {
@@ -55,10 +56,14 @@ public:
     // For the UI only: the simulation never reads it. Platforms without a mouse report none.
     virtual Pointer pointer() const { return {}; }
     virtual NavKeys navKeys() const { return {}; }
+    // Whether F3, the debug overlay key, is down as of the last pump.
+    virtual bool overlayKey() const { return false; }
     // While set, the arrow keys are not the player's movement (the editor nudges with them).
     virtual void reserveArrowKeys(bool reserved) { (void)reserved; }
-    // While set, the mouse (captured) and the left and right arrows turn the player (InputFrame::lookX) instead of moving.
+    // While set, the mouse (captured while the right button is held) and the left and right arrows turn the player (InputFrame::lookX) instead of moving.
     virtual void enableLook(bool enabled) { (void)enabled; }
+    // Scales how far the mouse turns the player; 1 is the default. Only meaningful with enableLook.
+    virtual void setMouseSensitivity(float sensitivity) { (void)sensitivity; }
 };
 
 }

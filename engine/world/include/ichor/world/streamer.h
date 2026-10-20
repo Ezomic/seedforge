@@ -1,10 +1,12 @@
 #pragma once
 
 #include "ichor/assets/bundle.h"
+#include "ichor/world/forged_biome.h"
 #include "ichor/world/heightfield.h"
 #include "ichor/world/hydrology.h"
 #include "ichor/world/water_mesh.h"
 #include "ichor/world/navmesh.h"
+#include "ichor/world/placed_cast.h"
 #include "ichor/world/placed_loot.h"
 #include "ichor/world/placed_pois.h"
 #include "ichor/world/placed_settlements.h"
@@ -35,6 +37,7 @@ struct CellPayload {
     Mesh water;             // the cell's rivers and lakes; no vertices when water is off or the cell is dry
     std::vector<PlacedPoi> pois; // the forged settlements, dungeons and landmarks standing in the cell; empty without a PlacedPoiSet
     std::vector<PlacedBuilding> buildings; // the settlements' building clusters standing in the cell; empty without a PlacedBuildingSet
+    std::vector<NpcSpawn> cast; // the manifest cast standing in the cell; empty without a PlacedCastSet
     std::vector<PlacedLoot> loot; // the manifest items lying in the cell; empty without a PlacedLootSet
 };
 
@@ -60,8 +63,15 @@ struct StreamerConfig {
     std::shared_ptr<const PlacedPoiSet> pois;
     // The forged settlements' placeholder buildings (placeForgedSettlements). Without a set the payloads carry none.
     std::shared_ptr<const PlacedBuildingSet> buildings;
+    // The forged biomes (biomesFromForgedWorld). With them each vertex carries its splat weights (in its tangent,
+    // with w = -1 to say so) and the trees follow the cell's biome; without them the terrain and trees are the stand-in's.
+    std::shared_ptr<const ForgedBiomeField> biomes;
+    // Which ground the navmesh may stand on (water, roads); the surface must outlive the streamer. Null is open ground.
+    std::shared_ptr<const NavSurface> navSurface;
     // The manifest's items (placeForgedLoot). Without a set the payloads carry none.
     std::shared_ptr<const PlacedLootSet> loot;
+    // The manifest cast (placeForgedCast). Without a set the payloads carry none.
+    std::shared_ptr<const PlacedCastSet> cast;
 };
 
 // Keeps the cells around the player resident, building them on a worker

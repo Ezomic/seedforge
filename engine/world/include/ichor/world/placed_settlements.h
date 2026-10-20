@@ -110,6 +110,16 @@ PlacedSettlements placeSettlementBuildings(const std::vector<SettlementSite>& si
 PlacedSettlements placeForgedSettlements(const worldforge::ForgedWorld& world, const Heightfield& heightfield, const RoadField* roads,
     const WaterField* water, const PlacedSettlementParams& params = {});
 
+// The forged world's settlement sites (phase 7) in world metres, in the forge's order. Fails, with a message in `error`,
+// when the world did not reach the settlements phase, has no grid, or the heightfield is empty.
+bool forgedSettlementSites(const worldforge::ForgedWorld& world, const Heightfield& heightfield, std::vector<SettlementSite>& sites, std::string& error);
+
+// Whether a footprint of these half extents centred at (x, z) is inside the world, within params.maxHeightDeltaM of its
+// centre's height, dry and clear of roads (params.roadMargin included): the rule buildings are placed by. `lowest` is
+// set to the lowest ground under it.
+bool footprintStandable(double x, double z, double halfWidthM, double halfDepthM, const Heightfield& heightfield, const RoadField* roads, const WaterField* water,
+    const PlacedSettlementParams& params, float& lowest);
+
 // A placeholder building: a box with a flat roof, `foundationM` below y = 0 up to `heightM`, centred on
 // the origin in x and z. Five faces (no floor), 20 vertices.
 Mesh placedBuildingMesh(float halfWidthM, float halfDepthM, float heightM, float foundationM = 0.5f);

@@ -1,0 +1,101 @@
+name: nightly
+
+# Not a required check and not path filtered: it runs on a schedule (and by hand) against main to catch what a single
+# green PR run cannot, namely tests that only fail under parallel random-order execution and world generator
+# changes that push a fixed set of seeds over a design check. See docs/ci-coverage.md.
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: ctest-stress rounds
+        default: "3"
+      size:
+        description: forge-cli grid size for the sanity report
+        default: "128"
+
+jobs:
+  stress-and-sanity:
+    name: ctest-stress + world sanity (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      STRESS_ROUNDS: ${{ inputs.rounds || '3' }}
+      SANITY_SIZE: ${{ inputs.size || '128' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-${{ github.sha }}
+          restore-keys: ccache-linux-
+      - name: Configure
+        run: cmake --preset linux-headless-asan
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan
+        working-directory: engine
+      - name: ctest-stress
+        id: stress
+        run: |
+          set -o pipefail
+          bin/ctest-stress -p linux-headless-asan -n "$STRESS_ROUNDS" | tee stress.log
+      - name: World sanity report (seeds 1-8)
+        id: sanity
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          python3 tools/world_sanity.py engine/build/linux-headless-asan/forge-cli/ichor_forge_cli \
+            --seeds 1-8 --size "$SANITY_SIZE" --out world-sanity | tee sanity.log
+      - name: Summarize failures
+        if: ${{ failure() }}
+        run: |
+          {
+            echo "## Nightly failures"
+            if [ "${{ steps.stress.outcome }}" = "failure" ]; then
+              echo "### ctest-stress: flaky or failing tests (failure count per test)"
+              echo '```'
+              sed -n '/failures per test:/,$p' stress.log
+              echo '```'
+            fi
+            if [ "${{ steps.sanity.outcome }}" = "failure" ]; then
+              echo "### World sanity: failing seeds and design checks"
+              echo '```'
+              grep -E '^(FAIL|  design check failed|world_sanity:|land_share)' sanity.log
+              echo '```'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload failure logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-logs
+          path: |
+            stress.log
+            sanity.log
+            world-sanity/manifest.json
+            world-sanity/validation.json
+            engine/build/linux-headless-asan/ctest-stress-fail-*.log
+          if-no-files-found: ignore

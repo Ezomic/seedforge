@@ -103,6 +103,8 @@ worldforge::GateThresholds permissive()
     t.minSettlementReachPermille = 0;
     t.minPoiReachPermille = 0;
     t.minLandmarkCoveragePermille = 0;
+    t.minLandSharePermille = 0;
+    t.maxLandSharePermille = 1000;
     return t;
 }
 
@@ -190,4 +192,21 @@ TEST_CASE("invalid thresholds draw an X caption instead of crashing", "[forge_cl
     REQUIRE(result.sanity.size() == 1);
     CHECK(forgecli::sanityCaption(result.sanity[0]) == "X");
     CHECK(forgecli::sanitySummary(result.sanity).find("invalid thresholds") != std::string::npos);
+}
+
+TEST_CASE("the sanity summary prints the land share of each world", "[forge_cli][gallery][sanity]")
+{
+    worldforge::ValidationReport report;
+    report.gates = { gate("land_share", worldforge::GateStatus::Pass) };
+    report.gates[0].value = 379;
+    const forgecli::SanityRow row = forgecli::sanityRow(report);
+    CHECK(row.landSharePermille == 379);
+    CHECK(forgecli::sanitySummary({ row }).find("land 37.9%") != std::string::npos);
+
+    auto opts = options(6, 8);
+    opts.thresholds = permissive();
+    const auto result = forgecli::makeGallery(opts);
+    REQUIRE(result.sanity.size() == 3);
+    for (const forgecli::SanityRow& r : result.sanity) CHECK(r.landSharePermille > 0);
+    CHECK(forgecli::sanitySummary(result.sanity).find(" land ") != std::string::npos);
 }
