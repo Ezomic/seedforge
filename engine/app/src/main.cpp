@@ -98,6 +98,9 @@ struct Options {
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
+    std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
+    float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
+    int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
@@ -154,6 +157,12 @@ bool parse(int argc, char** argv, Options& options)
             options.actor = argv[++i];
         } else if (arg == "--exile" && hasValue) {
             options.exile = argv[++i];
+        } else if (arg == "--kit" && hasValue) {
+            options.kit = argv[++i];
+        } else if (arg == "--overlook" && hasValue) {
+            if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
+        } else if (arg == "--settlement" && hasValue) {
+            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
@@ -467,6 +476,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!renderer.setVegetationMeshes(ichor::treeBundle(), ichor::vegetationUnblendedKinds())) {
             ichor::log(ichor::LogLevel::Warn, "the tree meshes could not be uploaded; the world has no trees");
         }
+        if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
+            ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
+        }
         anchor = {forged->spawn.x, forged->spawn.groundY + 0.5, forged->spawn.z};
         // The view looks 30 m toward the place the spawn was searched around, north when the spawn is on top of it.
         const glm::dvec2 toward(forged->spawn.faceX - forged->spawn.x, forged->spawn.faceZ - forged->spawn.z);
@@ -497,6 +509,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     bool sceneryDrawn = false;
     if (forged) {
         scenery = ichor::buildForgedScenery(*forged);
+        if (!ichor::addSettlementKit(scenery, *forged, options.kit)) {
+            ichor::logf(ichor::LogLevel::Warn, "the settlement kit could not be loaded from {}; the buildings are drawn as boxes", options.kit.string());
+        }
         sceneryBase = renderer.meshCount();
         sceneryDrawn = renderer.uploadBundle(scenery.bundle);
         if (!sceneryDrawn) {
@@ -1089,6 +1104,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = ichor::walkCameraRotation(viewYaw);
+            if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
+                const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
+                const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
+                view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 2.0);
+                view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
         }
         const double cellMetres = heightfield.desc().cellMetres;
         for (const auto& [id, cell] : cells) {
@@ -1129,7 +1150,17 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 instance.basis = glm::mat3(glm::vec3(0.6f, 0.0f, 0.0f), glm::vec3(0.0f, 1.8f, 0.0f), glm::vec3(0.0f, 0.0f, 0.6f));
                 view.instances.push_back(instance);
             }
+            if (scenery.kitLoaded) {
+                for (const ichor::KitInstance& piece : forged->kit->inCell(id)) {
+                    ichor::RenderInstance instance;
+                    instance.mesh = sceneryBase + scenery.kitMesh.mesh[static_cast<std::size_t>(piece.piece)];
+                    instance.position = {piece.x, static_cast<double>(piece.groundY), piece.z};
+                    instance.basis = ichor::kitBasis(piece.quarterTurns);
+                    view.instances.push_back(instance);
+                }
+            }
             for (const ichor::PlacedBuilding& building : cell.buildings) {
+                if (scenery.kitLoaded) break; // the kit pieces above stand in for the boxes
                 // The box is 1 m cubed from its base up; it sinks half a metre so a foundation never floats on a rise.
                 constexpr float kSink = 0.5f;
                 ichor::RenderInstance instance;
@@ -1438,7 +1469,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 

@@ -17,6 +17,7 @@
 #include "ichor/world/placed_quests.h"
 #include "ichor/world/placed_pois.h"
 #include "ichor/world/placed_settlements.h"
+#include "ichor/world/settlement_kit.h"
 #include "ichor/world/water_field.h"
 
 #include <worldforge/forge_world.h>
@@ -98,6 +99,8 @@ struct ForgedGame {
     std::shared_ptr<const ForgedRoads> roads;
     std::shared_ptr<const PlacedPoiSet> pois;
     std::shared_ptr<const PlacedBuildingSet> buildings;
+    std::vector<SettlementSite> sites; // the settlements in the forge's order, in world metres
+    std::shared_ptr<const SettlementKitSet> kit; // the textured pieces that stand in for the buildings
     std::shared_ptr<const NavSurface> navSurface; // water and roads as the navmesh sees them; reads `waterField` and `roads`
     ForgedRegionTiers tiers;
     std::shared_ptr<const PlacedLootSet> loot; // the manifest's items, lying at their dungeons and landmarks; null without content inputs
@@ -124,12 +127,22 @@ struct ForgedScenery {
     SceneBundle bundle;
     std::map<CellId, std::uint32_t> roadMesh;
     std::map<std::string, std::uint32_t> poiMesh; // by PlacedPoi::id, at its own height with its base on y = 0
+    bool kitLoaded = false;                  // the textured kit cooked into `bundle`; when false the buildings are drawn as boxes
+    KitMeshes kitMesh;                       // by KitPiece, valid when kitLoaded
     std::uint32_t lootMesh = 0;     // a unit box, drawn small on the ground where an item lies
     std::uint32_t castMesh = 0;     // a unit box, scaled to a person
     std::uint32_t buildingMesh = 0;          // a box 1 m wide and deep and 1 m tall: scale by 2 * half extents and the height
 };
 
 ForgedScenery buildForgedScenery(const ForgedGame& game);
+
+// Cooks the settlement kit (the GLBs under `folder`) into the scenery bundle, only the pieces the game uses. On a
+// failure (folder missing, a file does not cook) the scenery is left as it was and the buildings stay boxes.
+bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder);
+
+// Moves the spawn to dry, gentle ground nearest the middle of settlement `index` (in the forge's order), clear of its
+// buildings and kit pieces, and aims the view at it. Returns false, leaving the spawn alone, for an index past the end.
+bool spawnAtSettlement(ForgedGame& game, std::size_t index);
 
 // Builds the game from a finished forge. Fails, with a message, when the result is empty or a bake step
 // refuses the world. Never throws.
