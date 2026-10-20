@@ -49,10 +49,10 @@ GalleryResult makeGallery(const GalleryOptions& options);
 SanityRow sanityRow(const worldforge::ValidationReport& report);
 
 // Each world is forged once with its own seed, so a score can read FAIL where --validate would accept a reroll.
-// "5/7" then the position of each failed gate ("5/7 2 4"), or "X" when the thresholds are invalid. The caption font has only digits, '/', '-' and 'X'.
+// "5/8" then the position of each failed gate ("5/8 2 4"), or "X" when the thresholds are invalid. The caption font has only digits, '/', '-' and 'X'.
 std::string sanityCaption(const SanityRow& row);
 
-// One line per row ("seed 3 5/7 FAIL road_connected no_dead_ends land 37.9%"), then the gate numbering the captions use.
+// One line per row ("seed 3 5/8 FAIL road_connected no_dead_ends land 37.9%"), then the gate numbering the captions use.
 std::string sanitySummary(const std::vector<SanityRow>& rows);
 
 // `gallery --seeds A..B [--size N] [--out FILE]`; argv[1] is the subcommand name. Returns the exit code.

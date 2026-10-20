@@ -187,6 +187,7 @@ TEST_CASE("a river wall splits the settlements and POIs, and a road crossing rej
     GateThresholds t;
     t.minSettlementReachPermille = 1000;
     t.minPoiReachPermille = 1000;
+    t.maxLandSharePermille = 1000;
 
     HandWorld split;
     split.wall(16);
@@ -293,7 +294,8 @@ TEST_CASE("a mostly ocean world fails the land share gate and a balanced one pas
     CHECK(gate(b, "land_share").value == 500);
 
     HandWorld flat;
-    const GateResult& all = gate(validateWorld(flat.world()), "land_share");
+    const ValidationReport full = validateWorld(flat.world());
+    const GateResult& all = gate(full, "land_share");
     CHECK(all.status == GateStatus::Fail);
     CHECK(all.value == 1000);
     CHECK(all.cause.find("too much") != std::string::npos);
