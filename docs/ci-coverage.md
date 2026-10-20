@@ -38,7 +38,7 @@ Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/
 
 ## Nightly run (SEED-494)
 
-`.github/workflows/nightly.yml` runs every night at 02:17 UTC (and on demand: Actions, nightly, Run workflow, with optional `rounds` and `size` inputs). It is not a required check and is not path filtered; it runs against the default branch. One Linux job (`linux-headless-asan` preset, 30 minute timeout) builds once, then runs two steps, and the second runs even when the first fails so one night reports both problems:
+`.github/workflows/nightly.yml` runs every night at 02:17 UTC (and on demand: Actions, nightly, Run workflow, with optional `rounds` and `size` inputs). It is not a required check and is not path filtered; it runs against the default branch. One Linux job (`linux-headless-asan` preset, 100 minute timeout, because one sanitizer round of the suite takes about 23 minutes on the hosted runner and the first scheduled run to get past the 126 error was cancelled at 30 minutes in round 2) builds once, then runs two steps, and the second runs even when the first fails so one night reports both problems:
 
 | Step | Command | Catches |
 |---|---|---|
