@@ -304,3 +304,129 @@ TEST_CASE("poi: malformed input and out-of-range parameters are rejected", "[wor
     CHECK_FALSE(accepted([](PoiParams& p) { p.roadClearance = -1; }));
     CHECK_FALSE(accepted([](PoiParams& p) { p.settlementClearance = kPoiMaxClearance + 1; }));
 }
+
+namespace {
+
+RoadMap cornerRoad()
+{
+    RoadMap r = flatRoad(kSize, kSize, 50);
+    addPath(r, 4, 6, 30, 12);
+    return r;
+}
+
+PoiParams coverageParams(int reserve)
+{
+    PoiParams p;
+    p.maxPois = 8;
+    p.minSpacing = 12;
+    p.viewRangeCells = 24;
+    p.coverageReserve = reserve;
+    p.coverage.viewRangeCells = 30;
+    p.coverage.nearRangeCells = 6;
+    return p;
+}
+
+int coverageOf(const RoadMap& r, const PoiMap& m, const PoiParams& p)
+{
+    std::vector<Landmark> marks;
+    for (const Poi& poi : m.pois) marks.push_back({ poi.x, poi.y, p.coverageHeightM });
+    const auto report = validateLandmarkCoverage({ r.width, r.height, r.heightM, marks }, p.coverage);
+    REQUIRE(report.has_value());
+    return report->coveragePermille;
+}
+
+}
+
+TEST_CASE("poi: the coverage pass reaches land the road viewpoints cannot see", "[worldforge][poi]")
+{
+    const RoadMap r = cornerRoad();
+    const PoiMap without = place(r, coverageParams(0));
+    const PoiMap with = place(r, coverageParams(4));
+    CHECK(coverageOf(r, with, coverageParams(4)) > coverageOf(r, without, coverageParams(0)) + 200);
+    CHECK(coverageOf(r, with, coverageParams(4)) >= 900);
+    CHECK(with.pois.size() <= 8);
+}
+
+TEST_CASE("poi: coverage POIs keep the clearances, the spacing and the land", "[worldforge][poi]")
+{
+    const RoadMap r = cornerRoad();
+    const PoiParams p = coverageParams(4);
+    const PoiMap m = place(r, p);
+    for (std::size_t i = 0; i < m.pois.size(); ++i) {
+        CHECK(r.heightM[r.index(m.pois[i].x, m.pois[i].y)] > 0);
+        CHECK(r.road[r.index(m.pois[i].x, m.pois[i].y)] == 0);
+        for (std::size_t j = i + 1; j < m.pois.size(); ++j) {
+            const int dx = m.pois[i].x - m.pois[j].x;
+            const int dy = m.pois[i].y - m.pois[j].y;
+            CHECK(dx * dx + dy * dy >= p.minSpacing * p.minSpacing);
+        }
+    }
+    const PoiMap again = place(r, p);
+    CHECK(hashPoiMap(again) == hashPoiMap(m));
+}
+
+TEST_CASE("poi: the coverage pass places on land with no roads and no scored POIs", "[worldforge][poi]")
+{
+    RoadMap r = flatRoad(kSize, kSize, 50);
+    CHECK(place(r, coverageParams(0)).pois.empty());
+    const PoiMap m = place(r, coverageParams(4));
+    CHECK_FALSE(m.pois.empty());
+    CHECK(m.viewpointCount == 0);
+}
+
+TEST_CASE("poi: crowded land relaxes the clearances instead of staying uncovered", "[worldforge][poi]")
+{
+    RoadMap r = flatRoad(kSize, kSize, 50);
+    SettlementMap s;
+    s.seed = r.seed;
+    s.width = r.width;
+    s.height = r.height;
+    for (int y = 4; y < kSize; y += 8) {
+        for (int x = 4; x < kSize; x += 8) {
+            Settlement site;
+            site.x = x;
+            site.y = y;
+            s.sites.push_back(site);
+        }
+    }
+    PoiParams p = coverageParams(4);
+    p.minSpacing = 4;
+    const PoiMap strict = place(r, coverageParams(0), &s);
+    const PoiMap relaxed = place(r, p, &s);
+    CHECK(strict.pois.empty());
+    CHECK_FALSE(relaxed.pois.empty());
+    for (const Poi& poi : relaxed.pois) {
+        const bool nearSite = std::any_of(s.sites.begin(), s.sites.end(), [&](const Settlement& site) {
+            return std::abs(site.x - poi.x) <= p.settlementClearance && std::abs(site.y - poi.y) <= p.settlementClearance;
+        });
+        CHECK(nearSite);
+    }
+}
+
+TEST_CASE("poi: the coverage reserve is validated and the coverage POIs stay in the validator window", "[worldforge][poi]")
+{
+    RoadMap r = cornerRoad();
+    PoiParams p = coverageParams(0);
+    p.coverageReserve = p.maxPois + 1;
+    CHECK_FALSE(placePois(r, nullptr, p).has_value());
+    p = coverageParams(4);
+    p.coverageReserve = -1;
+    CHECK_FALSE(placePois(r, nullptr, p).has_value());
+    p = coverageParams(4);
+    p.coverageHeightM = 0;
+    CHECK_FALSE(placePois(r, nullptr, p).has_value());
+    p = coverageParams(4);
+    p.coverage.viewRangeCells = 0;
+    CHECK_FALSE(placePois(r, nullptr, p).has_value());
+
+    PoiParams many;
+    many.maxPois = kPoiMaxPois;
+    many.minSpacing = 3;
+    many.coverageReserve = 64;
+    many.coverage.viewRangeCells = 10;
+    many.coverage.nearRangeCells = 2;
+    const PoiMap m = place(r, many);
+    CHECK(m.pois.size() <= static_cast<std::size_t>(kPoiMaxPois));
+    many.coverageReserve = kLandmarkMaxLandmarks + 1;
+    CHECK_FALSE(placePois(r, nullptr, many).has_value());
+}
