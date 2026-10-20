@@ -15,6 +15,9 @@ namespace {
 constexpr double kMinPace = 0.1;
 constexpr int kSnapRings = 6;
 constexpr int kLookahead = 64;
+constexpr double kMaxPieces = 4096.0;
+constexpr double kMaxParamMetres = 1.0e6;
+constexpr std::size_t kMaxNodesLimit = 50'000'000;
 
 bool finite2(const glm::dvec3& v)
 {
@@ -35,7 +38,7 @@ bool onMap(const ForgedWalking& walking, const glm::dvec3& p)
 bool segmentWalkable(const ForgedWalking& walking, double ax, double az, double bx, double bz, double checkMetres)
 {
     const double length = flat(bx - ax, bz - az);
-    const int pieces = std::max(1, static_cast<int>(std::ceil(length / checkMetres)));
+    const int pieces = std::max(1, static_cast<int>(std::min(std::ceil(length / checkMetres), kMaxPieces)));
     for (int i = 1; i <= pieces; ++i) {
         const double t = static_cast<double>(i) / pieces;
         if (!walking.assess(ax + (bx - ax) * t, az + (bz - az) * t).walkable()) {
@@ -84,13 +87,12 @@ Grid makeGrid(const ForgedWalking& walking, double minX, double minZ, double max
     const double w = std::min(size, maxX) - g.x0;
     const double h = std::min(size, maxZ) - g.z0;
     g.step = params.stepMetres;
-    const auto count = [&](double span) { return static_cast<int>(std::floor(span / g.step)) + 1; };
-    double nodes = static_cast<double>(count(w)) * static_cast<double>(count(h));
-    if (nodes > static_cast<double>(params.maxNodes)) {
-        g.step *= std::sqrt(nodes / static_cast<double>(params.maxNodes)) * 1.01;
+    const auto count = [&](double span) { return std::floor(std::max(0.0, span) / g.step) + 1.0; };
+    while (count(w) * count(h) > static_cast<double>(params.maxNodes)) {
+        g.step *= 1.05;
     }
-    g.nx = count(w);
-    g.nz = count(h);
+    g.nx = static_cast<int>(count(w));
+    g.nz = static_cast<int>(count(h));
     return g;
 }
 
@@ -115,11 +117,11 @@ Search searchWindow(const ForgedWalking& walking, const glm::dvec3& from, const 
         float& p = pace[static_cast<std::size_t>(grid.index(i, j))];
         if (p < 0.0f) {
             const WalkAssessment a = walking.assess(grid.xOf(i), grid.zOf(j));
-            p = a.walkable() ? std::max(static_cast<float>(kMinPace), a.speedFactor()) : 0.0f;
+            p = a.walkable() ? std::clamp(a.speedFactor(), static_cast<float>(kMinPace), 1.0f) : 0.0f;
         }
         return p;
     };
-    const auto nodeNear = [&](const glm::dvec3& p, int& bi, int& bj) {
+    const auto nodeNear = [&](const glm::dvec3& p, int& bi, int& bj, bool mustReach) {
         const int ci = std::clamp(static_cast<int>(std::lround((p.x - grid.x0) / grid.step)), 0, grid.nx - 1);
         const int cj = std::clamp(static_cast<int>(std::lround((p.z - grid.z0) / grid.step)), 0, grid.nz - 1);
         double best = std::numeric_limits<double>::infinity();
@@ -128,7 +130,7 @@ Search searchWindow(const ForgedWalking& walking, const glm::dvec3& from, const 
             for (int i = std::max(0, ci - kSnapRings); i <= std::min(grid.nx - 1, ci + kSnapRings); ++i) {
                 if (paceAt(i, j) <= 0.0f) continue;
                 const double d = flat(grid.xOf(i) - p.x, grid.zOf(j) - p.z);
-                if (d < best) {
+                if (d < best && (!mustReach || segmentWalkable(walking, p.x, p.z, grid.xOf(i), grid.zOf(j), checkMetres))) {
                     best = d;
                     bi = i;
                     bj = j;
@@ -141,7 +143,7 @@ Search searchWindow(const ForgedWalking& walking, const glm::dvec3& from, const 
 
     int si = 0;
     int sj = 0;
-    out.startOk = nodeNear(from, si, sj);
+    out.startOk = nodeNear(from, si, sj, true);
     const double goalReach = std::max(goalRadius, grid.step);
     bool goalAny = false;
     {
@@ -277,7 +279,8 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
     WalkRoute route;
     const bool paramsOk = std::isfinite(params.stepMetres) && params.stepMetres >= 0.5 && std::isfinite(params.checkMetres) && params.checkMetres >= 0.05
         && std::isfinite(params.clearanceMetres) && params.clearanceMetres >= 0.0 && std::isfinite(params.marginMetres) && params.marginMetres >= 0.0
-        && std::isfinite(params.goalRadiusMetres) && params.goalRadiusMetres >= 0.0 && params.maxNodes >= 16;
+        && params.stepMetres <= kMaxParamMetres && std::isfinite(params.goalRadiusMetres) && params.goalRadiusMetres >= 0.0
+        && params.goalRadiusMetres <= kMaxParamMetres && params.maxNodes >= 16 && params.maxNodes <= kMaxNodesLimit;
     if (!paramsOk || !finite2(from) || !finite2(goal) || !onMap(walking, from) || !onMap(walking, goal)) {
         return route;
     }
@@ -291,9 +294,15 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
 
     Search search = searchWindow(walking, from, goal, makeGrid(walking, minX, minZ, maxX, maxZ, params), params.goalRadiusMetres, params.checkMetres);
     route.nodesSearched = search.searched;
+    bool retried = false;
     if (!search.found && !wholeWorld && search.startOk && search.goalOk) {
+        retried = true;
         search = searchWindow(walking, from, goal, makeGrid(walking, 0.0, 0.0, size, size, params), params.goalRadiusMetres, params.checkMetres);
         route.nodesSearched += search.searched;
+    }
+    if (retried && (!search.startOk || !search.goalOk)) {
+        route.failure = WalkRouteFailure::NoGroundRoute; // the coarser grid of the whole world lost an end the window had
+        return route;
     }
     if (!search.startOk) {
         route.failure = WalkRouteFailure::StartBlocked;

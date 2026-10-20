@@ -151,6 +151,18 @@ TEST_CASE("a route search survives hostile input and a tiny node budget", "[walk
     params = {};
     params.maxNodes = 0;
     REQUIRE(findWalkRoute(walking, a, b, params).failure == WalkRouteFailure::BadInput);
+    params = {};
+    params.maxNodes = std::numeric_limits<std::size_t>::max();
+    REQUIRE(findWalkRoute(walking, a, b, params).failure == WalkRouteFailure::BadInput);
+    params = {};
+    params.goalRadiusMetres = 1.0e300;
+    REQUIRE(findWalkRoute(walking, a, b, params).failure == WalkRouteFailure::BadInput);
+    params = {};
+    params.stepMetres = 1.0e300;
+    REQUIRE(findWalkRoute(walking, a, b, params).failure == WalkRouteFailure::BadInput);
+    params = {};
+    params.checkMetres = 0.05; // the probes are capped per move, so a fine spacing cannot run away
+    REQUIRE(findWalkRoute(walking, a, b, params).found);
 
     params = {};
     params.maxNodes = 400; // the grid is widened to fit, the answer is still a route round the ridge
