@@ -83,7 +83,7 @@ jobs:
             if [ "${{ steps.sanity.outcome }}" = "failure" ]; then
               echo "### World sanity: failing seeds and design checks"
               echo '```'
-              grep -E '^(FAIL|  design check failed|world_sanity:)' sanity.log
+              grep -E '^(FAIL|  design check failed|world_sanity:|land_share)' sanity.log
               echo '```'
             fi
           } | tee -a "$GITHUB_STEP_SUMMARY"

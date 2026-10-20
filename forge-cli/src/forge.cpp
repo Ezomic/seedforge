@@ -76,6 +76,7 @@ void validateSeed(const RunOptions& options, const worldforge::ForgeConfig& conf
     record.validated = true;
     record.rejected = !v.accepted;
     const worldforge::ValidationReport& last = v.attempts.back().report;
+    record.landSharePermille = worldforge::landSharePermille(last);
     if (!last.error.empty()) record.causes.push_back(last.error);
     for (const worldforge::GateResult& g : last.gates) {
         if (g.status == worldforge::GateStatus::Fail) record.causes.push_back(g.id + ": " + g.cause);
@@ -106,7 +107,7 @@ std::string manifestJson(const RunOptions& options, const std::vector<SeedRecord
         out += std::string(i ? ",\n" : "\n") + "    {\"seed\": " + std::to_string(s.seed);
         if (!s.error.empty()) out += ", \"error\": " + jsonString(s.error);
         if (s.validated) {
-            out += std::string(", \"validation\": {\"rejected\": ") + (s.rejected ? "true" : "false") + ", \"causes\": [";
+            out += std::string(", \"validation\": {\"rejected\": ") + (s.rejected ? "true" : "false") + ", \"land_share_permille\": " + std::to_string(s.landSharePermille) + ", \"causes\": [";
             for (std::size_t c = 0; c < s.causes.size(); ++c) out += (c ? ", " : "") + jsonString(s.causes[c]);
             out += "]}";
         }
