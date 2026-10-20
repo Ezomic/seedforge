@@ -113,6 +113,7 @@ void SdlPlatform::pumpEvents()
     pointer_.inside = (SDL_GetWindowFlags(window_) & SDL_WINDOW_MOUSE_FOCUS) != 0;
     navKeys_ = {keys[SDL_SCANCODE_LEFT], keys[SDL_SCANCODE_RIGHT], keys[SDL_SCANCODE_UP], keys[SDL_SCANCODE_DOWN], keys[SDL_SCANCODE_PAGEUP], keys[SDL_SCANCODE_PAGEDOWN],
         down(SDL_SCANCODE_LSHIFT, SDL_SCANCODE_RSHIFT)};
+    overlayKey_ = keys[SDL_SCANCODE_F3];
     input_ = frame;
 }
 

@@ -3,6 +3,7 @@
 #include "ichor/core/fixed_step.h"
 #include "ichor/core/frame_stages.h"
 #include "ichor/core/input.h"
+#include "ichor/core/overlay_mode.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/sim/scene.h"
 
@@ -39,6 +40,9 @@ public:
     // the interpolation alpha for rendering between two fixed steps.
     void setViewBuilder(ViewBuilder builder) { viewBuilder_ = std::move(builder); }
     void setOverlayBuilder(OverlayBuilder builder) { overlayBuilder_ = std::move(builder); }
+    // F3 steps it round off, compact and full.
+    void setOverlayMode(OverlayMode mode) { overlayToggle_.mode = mode; }
+    OverlayMode overlayMode() const { return overlayToggle_.mode; }
 
     // While the gate says no, no simulation tick runs and no time is owed
     // afterwards; rendering continues. Streaming holds the world here until
@@ -86,6 +90,7 @@ private:
     TickGate tickGate_;
     bool gated_ = false;
     std::vector<std::string> overlay_;
+    OverlayToggle overlayToggle_;
     InputStream recorded_;
     InputStream replay_;
     std::size_t replayIndex_ = 0;

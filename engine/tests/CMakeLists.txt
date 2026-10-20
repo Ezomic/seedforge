@@ -9,7 +9,7 @@ include(Catch)
 # test_editor_panels.cpp and test_golden_image.cpp have their own executables, since they need the runtime build.
 set(ichor_test_groups world ui sim core)
 set(ichor_test_group_world "^test_(hostile_|placed_|campaign_roundtrip|worldforge_|forge_|forged_|hydrology|terrain|roads|water_|golden|world_|featured_seeds|seed_harness|save_forged_world|codec_fuzz|vegetation|placement_clear|dungeon_|corridor_caps|cooker|debug_images|map_image|ue_export|minor_site|poleis|territory$|tension_sampling|shaft_sightline|verticality|silhouette_check|material_limits|rebuild|dark_age_ecology|wading_splash|cloud_shadow|road_encounter|trade_routes|phase_pipeline|determinism|temenos_field|vantage_reveal|lost$|snapshot_tail|fast_travel|travel_cost|traversal_|climb_rules|diving|physics)")
-set(ichor_test_group_ui "^test_(ui$|editor|picking|subtitle|loading_|nudge|journal|map_|inventory_model|player_messages|waypoint|hub_shortcut|guide_light|settings|bundle_render|lighting|atmosphere|animation|boat|headless_boot|main_spine|spine_cast|ambience|audio|music|ducking|reverb|rain|weather|settlement_audio|territory_audio|territory_politics_audio|oneshot|outdoor|room_reverb|file_watch|standing_display|new_game|death_markers|chronicle_export|failure_states|character_screen|combat_hud|hud_|contract_board|cooker_|landmark_compass|world_screen|world_title|merchant_service|stash)")
+set(ichor_test_group_ui "^test_(ui$|editor|picking|subtitle|loading_|nudge|journal|map_|inventory_model|player_messages|waypoint|hub_shortcut|guide_light|settings|bundle_render|lighting|atmosphere|animation|boat|headless_boot|overlay_mode|main_spine|spine_cast|ambience|audio|music|ducking|reverb|rain|weather|settlement_audio|territory_audio|territory_politics_audio|oneshot|outdoor|room_reverb|file_watch|standing_display|new_game|death_markers|chronicle_export|failure_states|character_screen|combat_hud|hud_|contract_board|cooker_|landmark_compass|world_screen|world_title|merchant_service|stash)")
 set(ichor_test_group_sim "^test_(npc_|faction|incumbent|hostility|standing|contested|conflicts|consequence|ledger_|economy|law_|synergy|quest|setpiece|notable_|axiom|campaign|dialogue|encounter|enemy|challenger|custodian|herald|parasite|refusenik|catalogue|capabilit|capability|loot|info_loot|discovery_xp|milestones|power_growth|stat_growth|respec|trainers|wallet|merchant|access_fees|abilities|incompatible_wants|last_favour|directive_merge|downed_revive|coop|ironman|wants_fears|slot_roll)")
 set(ichor_test_group_core "^test_(atomic_file|autosave_policy|codex_|data|delta_store|dmath|embedding|entity_id|file_io|fixed_step|frame_budget|graph_rewrite|hash|id_audit|lint|reflect_binary|rng|routing|save|script|unordered_audit|validation|world$|xref)")
 
@@ -78,6 +78,8 @@ set_tests_properties(seed_harness_cli PROPERTIES PASS_REGULAR_EXPRESSION "\"coun
 if(ENGINE_RUNTIME)
     add_test(NAME forged_app_determinism COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_app_check.cmake)
     set_tests_properties(forged_app_determinism PROPERTIES TIMEOUT 300)
+    add_test(NAME forged_campaign_app COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_campaign_app_check.cmake)
+    set_tests_properties(forged_campaign_app PROPERTIES TIMEOUT 300)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp
     )

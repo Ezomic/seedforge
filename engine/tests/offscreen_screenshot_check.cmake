@@ -36,4 +36,28 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files ${root}/hidden.png ${r
 if(NOT same EQUAL 0)
     message(FATAL_ERROR "the hidden and the windowed screenshots differ: ${root}")
 endif()
+
+# A screenshot shows the scene with no debug overlay unless --overlay asks for one: the default run must
+# match an explicit --overlay off byte for byte, and the compact and full overlays must each change it.
+foreach(mode off compact full)
+    execute_process(COMMAND ${ICHOR} --seed 7 --frames 3 --screenshot ${root}/overlay_${mode}.png --overlay ${mode}
+        RESULT_VARIABLE overlayResult OUTPUT_VARIABLE overlayOut ERROR_VARIABLE overlayErr TIMEOUT 120)
+    if(NOT overlayResult EQUAL 0)
+        message(FATAL_ERROR "the --overlay ${mode} screenshot run failed (${overlayResult}): ${overlayOut}${overlayErr}")
+    endif()
+endforeach()
+execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files ${root}/hidden.png ${root}/overlay_off.png RESULT_VARIABLE sameAsOff)
+if(NOT sameAsOff EQUAL 0)
+    message(FATAL_ERROR "the default screenshot is not the same as --overlay off, so it draws an overlay: ${root}")
+endif()
+foreach(mode compact full)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files ${root}/hidden.png ${root}/overlay_${mode}.png RESULT_VARIABLE sameAsDefault)
+    if(sameAsDefault EQUAL 0)
+        message(FATAL_ERROR "--overlay ${mode} left the screenshot unchanged, so it draws nothing: ${root}")
+    endif()
+endforeach()
+execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files ${root}/overlay_compact.png ${root}/overlay_full.png RESULT_VARIABLE sameCompactFull)
+if(sameCompactFull EQUAL 0)
+    message(FATAL_ERROR "the compact and full overlays render the same: ${root}")
+endif()
 file(REMOVE_RECURSE "${root}")

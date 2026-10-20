@@ -65,7 +65,7 @@
 // either limit.
 namespace worldforge {
 
-constexpr int kRoadsMaxSites = 128;
+constexpr int kRoadsMaxSites = 256;
 constexpr std::size_t kRoadsMaxPathCells = 1u << 22;
 constexpr std::uint64_t kRoadsMaxExpansions = 1ull << 28;
 constexpr std::uint8_t kRoadsImpassable = 255;
