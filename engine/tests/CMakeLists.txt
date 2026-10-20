@@ -111,7 +111,10 @@ if(ENGINE_RUNTIME)
     endif()
     catch_discover_tests(ichor_gfx_tests)
 
+    add_test(NAME offscreen_screenshot_hidden
+        COMMAND ${CMAKE_COMMAND} -DMODE=hidden -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/offscreen_screenshot_check.cmake)
     add_test(NAME offscreen_screenshot_matches_window
-        COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/offscreen_screenshot_check.cmake)
-    set_tests_properties(offscreen_screenshot_matches_window PROPERTIES SKIP_REGULAR_EXPRESSION "no usable Vulkan device" RUN_SERIAL TRUE)
+        COMMAND ${CMAKE_COMMAND} -DMODE=window -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/offscreen_screenshot_check.cmake)
+    set_tests_properties(offscreen_screenshot_hidden offscreen_screenshot_matches_window PROPERTIES SKIP_REGULAR_EXPRESSION "no usable Vulkan device" RUN_SERIAL TRUE)
+    set_tests_properties(offscreen_screenshot_matches_window PROPERTIES LABELS needs_display)
 endif()

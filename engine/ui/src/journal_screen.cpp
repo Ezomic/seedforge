@@ -23,6 +23,10 @@ constexpr const char* kJournalDocument = R"(<rml><head><style>
     #tabs { text-align: center; padding-bottom: 10px; }
     .tab { display: inline-block; padding: 4px 18px 4px 18px; margin: 0px 6px 0px 6px; font-family: Cinzel; font-size: 20px; color: #8c8468; border-bottom: 2px #3a3426; }
     #list { position: absolute; top: 135px; bottom: 22px; left: 28px; right: 28px; overflow-y: auto; }
+    scrollbarvertical { width: 8px; margin-left: 6px; }
+    scrollbarvertical slidertrack { background-color: #26221a; }
+    scrollbarvertical sliderbar { width: 8px; background-color: #a08850; }
+    scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0px; height: 0px; }
     .tab:hover { color: #e8d8a8; }
     .tab.active { color: #e8d8a8; border-bottom: 2px #a08850; }
     .group { font-family: Cinzel; font-size: 20px; color: #a08850; letter-spacing: 2px; padding: 12px 0px 4px 0px; }
