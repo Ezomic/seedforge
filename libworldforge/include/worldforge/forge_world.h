@@ -63,6 +63,9 @@
 // (default 256). The erosion cost is checked against ForgeConfig::erosionBudgetCellPasses with
 // planErosionBudget; a size that would need downscaled erosion is refused at Erosion, because the
 // runner has no upsampling step.
+// Below kErosionReferenceSide (256) the erosion rounds and thermal rate are scaled with the side by scaleErosionToGrid, so a
+// small grid keeps about the same share of land as a large one; ForgeConfig::erosion is the setting at the reference side.
+// The budget above is checked on the unscaled setting, which can only cost more than the scaled run.
 //
 // Determinism: integer only in this file, no libm, no unordered container, no threads, no engine
 // includes. The progress callback must not mutate shared generator state; it observes only.
@@ -367,7 +370,7 @@ inline ForgedWorld forgeWorld(std::uint64_t seed, int size = kForgeDefaultSize, 
                    err = "size " + std::to_string(size) + " exceeds the erosion budget of " + std::to_string(config.erosionBudgetCellPasses) + " cell passes";
                    return std::nullopt;
                }
-               w.eroded = erodeTectonics(*w.tectonics, config.erosion);
+               w.eroded = erodeTectonics(*w.tectonics, scaleErosionToGrid(config.erosion, size));
                if (!w.eroded) {
                    err = rejected;
                    return std::nullopt;
