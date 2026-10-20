@@ -31,6 +31,12 @@ Saves/
       manual_03.sav
 ```
 
+A forged campaign (`ichor --forged --campaign NAME`) stores `forged_world.bin` (heightfield and content
+manifest) and `forged_phases.bin` (the hydrology, biome, settlement, road, politics and POI maps the bake reads).
+A load builds the game from those two files and never runs the forge; a world made by an older `genVersion` loads
+as stored with a warning, a newer one is refused. A campaign saved before `forged_phases.bin` existed is still
+rebuilt by forging and checked against its stored hash.
+
 `engine/save` implements this split (`Campaign`, `SaveSlots`); a world folder with no `manifest.bin`
 is treated as an interrupted forge. The blob list is whatever the bake hands it, so the exact
 file set above is a sketch until the real bake (doc 08 phase 12) exists.

@@ -80,8 +80,18 @@ void ForgeJob::finish(ForgeJobState state, std::string error)
     error_ = std::move(error);
 }
 
+namespace {
+std::atomic<std::uint64_t> g_forgesStarted{0};
+}
+
+std::uint64_t ForgeJob::forgesStarted()
+{
+    return g_forgesStarted.load();
+}
+
 void ForgeJob::run()
 {
+    g_forgesStarted.fetch_add(1);
     try {
         const PhaseObserver observer = progress_.observer();
         const auto onProgress = [&](const worldforge::ForgeProgress& p) {
