@@ -65,6 +65,7 @@
 // runner has no upsampling step.
 // Below kErosionReferenceSide (256) the erosion rounds and thermal rate are scaled with the side by scaleErosionToGrid, so a
 // small grid keeps about the same share of land as a large one; ForgeConfig::erosion is the setting at the reference side.
+// The budget above is checked on the unscaled setting, which can only cost more than the scaled run.
 //
 // Determinism: integer only in this file, no libm, no unordered container, no threads, no engine
 // includes. The progress callback must not mutate shared generator state; it observes only.

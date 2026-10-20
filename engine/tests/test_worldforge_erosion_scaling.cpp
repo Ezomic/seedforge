@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <cstdio>
 #include <map>
 #include <utility>
 #include <vector>
@@ -127,7 +126,7 @@ TEST_CASE("scaleErosionToGrid keeps disabled terms disabled and never rounds an 
     CHECK(scaleErosionToGrid(ErosionParams{}, -5).thermalRate == 1);
 }
 
-TEST_CASE("scaled params stay valid for erodeTectonics", "[worldforge][erosion_scaling]")
+TEST_CASE("scaled params never exceed the input and stay valid for erodeTectonics", "[worldforge][erosion_scaling]")
 {
     const auto base = generateTectonics(1, { 64, 64, 12 });
     REQUIRE(base.has_value());
@@ -135,7 +134,12 @@ TEST_CASE("scaled params stay valid for erodeTectonics", "[worldforge][erosion_s
     maxed.iterations = kErosionMaxIterations;
     maxed.thermalPasses = 0;
     maxed.thermalRate = kErosionMaxRate;
-    for (const int side : { 1, 63, 64, 255, 256 }) CHECK(erodeTectonics(*base, scaleErosionToGrid(maxed, side)).has_value());
+    for (const int side : { 1, 63, 64, 255, 256 }) {
+        const ErosionParams p = scaleErosionToGrid(maxed, side);
+        CHECK(p.iterations <= maxed.iterations);
+        CHECK(p.thermalRate <= maxed.thermalRate);
+        CHECK(erodeTectonics(*base, p).has_value());
+    }
 }
 
 TEST_CASE("the land erosion removes is about the same at 64, 128 and 256", "[worldforge][erosion_scaling]")
@@ -162,15 +166,4 @@ TEST_CASE("the land erosion removes is about the same from 64 to 1024", "[.erosi
     const Spread spread = worstLossSpread({ 64, 128, 256, 1024 });
     INFO("worst per seed spread of land lost to erosion, in points: scaled " << spread.scaled);
     CHECK(spread.scaled < kLossSpreadTolerancePoints1024);
-}
-
-TEST_CASE("print land share tables for erosion scaling", "[.erosion_scaling_table]")
-{
-    for (const int size : { 64, 128, 256, 1024 }) {
-        std::printf("size %d (tectonic / after unscaled erosion / after scaled erosion, land %%)\n", size);
-        for (std::uint64_t seed = 1; seed <= 8; ++seed) {
-            const Shares s = measure(seed, size);
-            std::printf("  seed %llu: %5.1f / %5.1f / %5.1f\n", static_cast<unsigned long long>(seed), s.tectonic, s.unscaled, s.scaled);
-        }
-    }
 }
