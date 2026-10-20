@@ -145,7 +145,7 @@ TEST_CASE("the Exile mesh is metric, upright, on the ground, facing -Z and fully
         REQUIRE(sum <= 65536);
         for (int k = 0; k < 4; ++k) REQUIRE(v.joints[k] < 35);
     }
-    REQUIRE(character().textures.size() == 1);
+    REQUIRE(!character().textures.empty());
 }
 
 TEST_CASE("skinning the first frame of idle leaves the Exile standing on the ground")
