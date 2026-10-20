@@ -49,6 +49,7 @@ At 1024 erosion is neutral (36.7% to 36.8%); at 256 it costs 2 points; at 64 it 
 
 ## Recommendation
 
+- Resolved by SEED-499: forgeWorld now scales the erosion rounds and the thermal rate with side / 256 on grids smaller than 256 (`scaleErosionToGrid`), so the land erosion removes is about the same at 64, 128 and 256 and seeds 3, 4 and 5 forge at 64. Sizes 256 and up are unchanged. The bullet below is the original recommendation.
 - Treat the size 64 failures as an artefact. Do not tune erosion to rescue 64. Keep tests off 64 for seeds that are mostly ocean (PR 410 did: gallery uses 6 to 8), or make erosion scale its work to the grid.
 - The nightly sanity report (SEED-494) uses seeds 1 to 8 at size 128, where all 8 are accepted and 7 pass on the first attempt. Size 256 is also green after rerolls.
 - Decide what "sane at 1024" means. Either scale `maxSettlements` and `maxPois` (and ideally the view range) with area in forge-cli's config, or make the gate density per land area. Until then a 1024 run is red by construction and cannot be used to judge terrain.

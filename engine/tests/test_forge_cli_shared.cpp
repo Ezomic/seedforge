@@ -38,12 +38,12 @@ void writeText(const std::filesystem::path& path, const std::string& text)
 
 TEST_CASE("the four original phases keep their layer hashes", "[forge_cli][forge_shared]")
 {
-    // Recorded from the stand-alone per-phase code that forgeWorld replaced (seed 1, size 64).
+    // Seed 1, size 64. Recorded from the stand-alone per-phase code that forgeWorld replaced; the erosion dependent layers were re-recorded when SEED-499 scaled erosion to the grid.
     const std::map<std::string, std::string> golden = {
         {"plates", "4c69858509baee99"}, {"boundary", "b9e886218c2b7fea"}, {"height", "051d5cdacf4b7b9a"},
-        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "ad8258f0d9bea137"}, {"rivers", "f90f4647c9bdc988"},
-        {"lakes", "82d72a57feb055e9"}, {"height_carved", "9d9bd7446a798ffb"}, {"biome", "9c5c8098431a7306"},
-        {"biome_blend", "d7eafc431d1b729a"},
+        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "b1da0e32792d8c6c"}, {"rivers", "6fc883deacaac4af"},
+        {"lakes", "82d72a57feb055e9"}, {"height_carved", "507a4437b2c949a2"}, {"biome", "216c77811b59150a"},
+        {"biome_blend", "0ebe08b0c49f5fdb"},
     };
     const auto result = forgecli::runForge(oneSeed(1));
     REQUIRE(result.error.empty());
@@ -97,7 +97,7 @@ TEST_CASE("a phase subset is forged only as far as it needs", "[forge_cli][forge
 
 TEST_CASE("every phase draws something that is not flat", "[forge_cli][forge_shared]")
 {
-    const auto world = worldforge::forgeWorld(11, 128, forgecli::defaultForgeConfig(128));
+    const auto world = worldforge::forgeWorld(12, 128, forgecli::defaultForgeConfig(128));
     REQUIRE(world.complete());
     for (const auto& phase : forgecli::phaseRegistry()) {
         const auto r = forgecli::phaseLayers(phase, world);
