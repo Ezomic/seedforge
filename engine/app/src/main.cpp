@@ -115,6 +115,7 @@ struct Options {
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
+    ichor::CampaignWorldPlan campaignPlan; // what main() decided for `campaign` before run()
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
@@ -215,6 +216,7 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.forgedGrid) || options.forgedGrid < 16 || options.forgedGrid > 1024) return false;
         } else if (arg == "--campaign" && hasValue) {
             options.campaign = argv[++i];
+            if (options.campaign.empty()) return false;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -398,25 +400,28 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     return ForgeOutcome::Built;
 }
 
-// --campaign: before the forge, decide between forging anew and rebuilding the stored world, which fixes the seed and grid.
-bool planCampaign(const Options& options, ichor::CampaignWorldPlan& plan, Options& forgeOptions)
+// --campaign, before anything else runs: decide between forging anew and rebuilding the stored world. A stored world
+// fixes the seed and grid for the whole run, so the engine and scripts see the campaign's seed, not the command line's.
+bool planCampaign(Options& options)
 {
-    plan = ichor::planCampaignWorld(options.saves, options.campaign);
+    options.campaignPlan = ichor::planCampaignWorld(options.saves, options.campaign);
+    const ichor::CampaignWorldPlan& plan = options.campaignPlan;
     if (plan.action == ichor::CampaignWorldAction::Refuse) {
         ichor::logf(ichor::LogLevel::Error, "{}", plan.message);
         return false;
     }
     if (plan.action == ichor::CampaignWorldAction::Rebuild) {
         ichor::logf(plan.warn ? ichor::LogLevel::Warn : ichor::LogLevel::Info, "{}", plan.message);
-        forgeOptions.seed = plan.key.seed;
-        forgeOptions.forgedGrid = plan.key.gridSize;
+        options.seed = plan.key.seed;
+        options.forgedGrid = plan.key.gridSize;
     }
     return true;
 }
 
 // --campaign: after the forge, save the new world or hold the rebuilt one to what was stored.
-bool finishCampaign(const Options& options, const ichor::CampaignWorldPlan& plan, const ichor::ForgedGame& game)
+bool finishCampaign(const Options& options, const ichor::ForgedGame& game)
 {
+    const ichor::CampaignWorldPlan& plan = options.campaignPlan;
     if (plan.action == ichor::CampaignWorldAction::Rebuild) {
         const std::string problem = ichor::verifyRebuiltWorld(plan, game);
         if (!problem.empty()) {
@@ -430,14 +435,14 @@ bool finishCampaign(const Options& options, const ichor::CampaignWorldPlan& plan
     desc.seed = options.seed;
     const ichor::CampaignStatus status = ichor::saveCampaignWorld(options.saves, options.campaign, desc, options.forgedGrid, game);
     if (status != ichor::CampaignStatus::Ok) {
-        ichor::logf(ichor::LogLevel::Error, "campaign '{}': the world could not be saved (status {})", options.campaign, static_cast<int>(status));
+        ichor::logf(ichor::LogLevel::Error, "campaign '{}': the world could not be saved ({})", options.campaign, ichor::campaignStatusText(status));
         return false;
     }
     ichor::logf(ichor::LogLevel::Info, "campaign '{}': the forged world is saved under {}", options.campaign, options.saves.string());
     return true;
 }
 
-int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
+int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
     const bool hidden = !options.screenshot.empty() && !options.showWindow;
     if (!platform.init({.hidden = hidden}) || !renderer.init()) {
@@ -509,16 +514,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::ForgedGame> forged;
     glm::dvec2 forgedLook(0.0, -30.0);
     if (options.forged) {
-        Options forgeOptions = options;
-        ichor::CampaignWorldPlan campaignPlan;
-        if (!options.campaign.empty() && !planCampaign(options, campaignPlan, forgeOptions)) {
-            return 1;
-        }
-        const ForgeOutcome outcome = forgeGame(platform, renderer, forgeOptions, ichor::kitReferenceView(bundle, 16.0f / 9.0f), forged);
+        const ForgeOutcome outcome = forgeGame(platform, renderer, options, ichor::kitReferenceView(bundle, 16.0f / 9.0f), forged);
         if (outcome != ForgeOutcome::Built) {
             return outcome == ForgeOutcome::Quit ? 0 : 1;
         }
-        if (!options.campaign.empty() && !finishCampaign(forgeOptions, campaignPlan, *forged)) {
+        if (!options.campaign.empty() && !finishCampaign(options, *forged)) {
             return 1;
         }
         if (!renderer.setTerrainMaterials(ichor::forgeTerrainMaterials(forged->desc.seed))) {
@@ -1529,6 +1529,9 @@ int main(int argc, char** argv)
     }
     if (!options.forged && !options.campaign.empty()) {
         ichor::log(ichor::LogLevel::Warn, "--campaign only applies with --forged and is ignored");
+    }
+    if (options.forged && !options.campaign.empty() && !planCampaign(options)) {
+        return 1;
     }
     if (options.audioProbe) {
         ichor::MiniaudioDevice device;

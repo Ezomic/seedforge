@@ -33,6 +33,8 @@ CampaignWorldPlan planCampaignWorld(const std::filesystem::path& root, std::stri
 // Empty when `game` is the stored world, else why it is not.
 std::string verifyRebuiltWorld(const CampaignWorldPlan& plan, const ForgedGame& game);
 
+const char* campaignStatusText(CampaignStatus status);
+
 // Saves the forged `game` as campaign `campaign`. `requested` is the WorldDesc it was forged from.
 CampaignStatus saveCampaignWorld(const std::filesystem::path& root, std::string_view campaign, const WorldDesc& requested, int gridSize, const ForgedGame& game);
 
