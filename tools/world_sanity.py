@@ -3,6 +3,7 @@
 
     python tools/world_sanity.py <path-to-ichor_forge_cli> [--seeds 1-8] [--size 128] [--data data] [--out DIR]
 
+Prints each seed's land share (land_share seed N: P%) before the verdicts.
 Exit: 0 every seed accepted, 1 some seed rejected or failed to forge, 2 usage or setup error.
 """
 import argparse
@@ -55,6 +56,9 @@ def main() -> int:
     bad = 0
     for r in runs:
         seed = r["seed"]
+        share = r.get("validation", {}).get("land_share_permille", -1)
+        if share >= 0:
+            print(f"land_share seed {seed}: {share / 10:.1f}%")
         if "error" in r:
             print(f"FAIL seed {seed}: forge error: {r['error']}")
             bad += 1

@@ -128,6 +128,7 @@ SanityRow sanityRow(const worldforge::ValidationReport& report)
     SanityRow row;
     row.seed = report.seed;
     row.error = report.error;
+    row.landSharePermille = worldforge::landSharePermille(report);
     for (std::size_t i = 0; i < report.gates.size(); ++i) {
         const worldforge::GateResult& g = report.gates[i];
         row.gateIds.push_back(g.id);
@@ -159,6 +160,7 @@ std::string sanitySummary(const std::vector<SanityRow>& rows)
         out += row.error.empty() ? std::to_string(row.passed) + "/" + std::to_string(row.evaluated) : std::string("invalid thresholds");
         out += row.error.empty() && row.failedGates.empty() ? " PASS" : " FAIL";
         for (const std::string& id : row.failedGates) out += " " + id;
+        if (row.landSharePermille >= 0) out += " land " + std::to_string(row.landSharePermille / 10) + "." + std::to_string(row.landSharePermille % 10) + "%";
         out += "\n";
     }
     if (!rows.empty()) {

@@ -24,6 +24,7 @@
 //  - landmark_coverage:    the landmark coverage report's permille, at least minLandmarkCoveragePermille.
 //  - quest_items:          items the manifest placed, at least minQuestItems.
 //  - quest_cast:           cast members the manifest bound to a settlement, at least minQuestCast.
+//  - land_share:           permille of cells whose terrain is above seaLevelM, inside [minLandSharePermille, maxLandSharePermille].
 //  - axiom_directives_starved: skipped, reported as not implemented (axioms are not resolved yet).
 //
 // Reach is plain walkability; the walkable cells fall into groups, the largest group of settlements
@@ -83,6 +84,8 @@ struct GateThresholds {
     int minLandmarkCoveragePermille = 550; // in [0, 1000]
     int minQuestItems = 1;                 // in [0, 65536]
     int minQuestCast = 1;                  // in [0, 65536]
+    int minLandSharePermille = 100;        // in [0, 1000]; seeds 4 and 5 forge 4 to 9 percent land and pass every other gate
+    int maxLandSharePermille = 800;        // in [minLandSharePermille, 1000]; the 16 seed range at size 1024 is 9 to 86 percent, mean 38
 };
 
 struct GateResult {
@@ -93,6 +96,8 @@ struct GateResult {
     std::int64_t max = kGateUnbounded; // kGateUnbounded when there is no upper bound
     std::string cause;                 // empty on pass
 };
+
+constexpr std::int64_t kLandShareNotMeasured = -1; // the land_share value of a world that could not be scored
 
 struct ValidationReport {
     std::uint64_t seed = 0;
@@ -106,13 +111,21 @@ struct ValidationReport {
     }
 };
 
+// The land share in permille a report measured, or kLandShareNotMeasured when the world was unusable or the report has no such gate.
+inline std::int64_t landSharePermille(const ValidationReport& r)
+{
+    const auto it = std::find_if(r.gates.begin(), r.gates.end(), [](const GateResult& g) { return g.id == "land_share"; });
+    return it == r.gates.end() ? kLandShareNotMeasured : it->value;
+}
+
 inline bool thresholdsValid(const GateThresholds& t)
 {
     const auto permille = [](int v) { return v >= 0 && v <= 1000; };
     return t.cellSizeM >= 1 && t.cellSizeM <= 1024 && t.seaLevelM >= kTectonicsMinHeightM && t.seaLevelM <= kTectonicsMaxHeightM && t.maxWalkSlopePermille >= 0
         && t.maxWalkSlopePermille <= 100000 && t.minSettlementsPerKm2Milli >= 0 && t.maxSettlementsPerKm2Milli >= t.minSettlementsPerKm2Milli && t.maxRoadComponents >= 1
         && t.maxRoadComponents <= 256 && permille(t.minSettlementReachPermille) && permille(t.minPoiReachPermille) && permille(t.minLandmarkCoveragePermille)
-        && t.minQuestItems >= 0 && t.minQuestItems <= 65536 && t.minQuestCast >= 0 && t.minQuestCast <= 65536;
+        && t.minQuestItems >= 0 && t.minQuestItems <= 65536 && t.minQuestCast >= 0 && t.minQuestCast <= 65536 && permille(t.minLandSharePermille)
+        && permille(t.maxLandSharePermille) && t.maxLandSharePermille >= t.minLandSharePermille;
 }
 
 namespace detail {
@@ -249,6 +262,8 @@ inline ValidationReport validateWorld(const ForgedWorld& w, const GateThresholds
         unmet("landmark_coverage", t.minLandmarkCoveragePermille);
         unmet("quest_items", t.minQuestItems);
         unmet("quest_cast", t.minQuestCast);
+        unmet("land_share", t.minLandSharePermille, t.maxLandSharePermille);
+        report.gates.back().value = kLandShareNotMeasured;
         report.gates.push_back(detail::gateAxiomSkipped());
         return report;
     }
@@ -296,6 +311,16 @@ inline ValidationReport validateWorld(const ForgedWorld& w, const GateThresholds
         detail::gateAtLeast("landmark_coverage", w.landmarkCoverage()->coveragePermille, t.minLandmarkCoveragePermille, "too much of the walkable world has no landmark in view"));
     report.gates.push_back(detail::gateAtLeast("quest_items", static_cast<std::int64_t>(manifest.items.size()), t.minQuestItems, "too few items placed at a ruin or dungeon"));
     report.gates.push_back(detail::gateAtLeast("quest_cast", static_cast<std::int64_t>(manifest.cast.size()), t.minQuestCast, "too few cast members bound to a settlement"));
+
+    std::int64_t landCells = 0;
+    for (const auto h : roads.heightM) landCells += h > t.seaLevelM ? 1 : 0;
+    GateResult landGate = detail::gateAtLeast("land_share", landCells * 1000 / static_cast<std::int64_t>(roads.heightM.size()), t.minLandSharePermille, "too little of the world is above sea level");
+    landGate.max = t.maxLandSharePermille;
+    if (landGate.value > t.maxLandSharePermille) {
+        landGate.status = GateStatus::Fail;
+        landGate.cause = "too much of the world is above sea level";
+    }
+    report.gates.push_back(std::move(landGate));
     report.gates.push_back(detail::gateAxiomSkipped());
     return report;
 }
