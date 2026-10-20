@@ -25,6 +25,7 @@ public:
     InputFrame input() const override { return input_; }
     Pointer pointer() const override { return pointer_; }
     NavKeys navKeys() const override { return navKeys_; }
+    bool overlayKey() const override { return overlayKey_; }
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
     void enableLook(bool enabled) override;
     void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
@@ -41,6 +42,7 @@ private:
     InputFrame input_;
     Pointer pointer_;
     NavKeys navKeys_;
+    bool overlayKey_ = false;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
     MouseLook mouseLook_;
