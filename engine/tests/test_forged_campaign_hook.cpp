@@ -78,12 +78,12 @@ CachedForgedWorld storedFrom(const ForgedGame& game)
 
 }
 
-TEST_CASE("a saved campaign plans a rebuild of the same seed and grid, and the rebuild matches", "[forged_campaign_hook]")
+TEST_CASE("a campaign saved without phase maps plans a rebuild of the same seed and grid, and the rebuild matches", "[forged_campaign_hook]")
 {
     Scratch dir;
     const auto game = forgeGameFor(1);
     REQUIRE(planCampaignWorld(dir.path, "alpha").action == CampaignWorldAction::ForgeAndSave);
-    REQUIRE(saveCampaignWorld(dir.path, "alpha", requestedWorld(1), kGrid, *game) == CampaignStatus::Ok);
+    REQUIRE(saveForgedWorld(dir.path, "alpha", forgedWorldKey(requestedWorld(1), kGrid), storedFrom(*game)) == CampaignStatus::Ok);
 
     const CampaignWorldPlan plan = planCampaignWorld(dir.path, "alpha");
     REQUIRE(plan.action == CampaignWorldAction::Rebuild);
@@ -101,7 +101,7 @@ TEST_CASE("a rebuild that is not the stored world is reported, never accepted", 
 {
     Scratch dir;
     const auto game = forgeGameFor(1);
-    REQUIRE(saveCampaignWorld(dir.path, "alpha", requestedWorld(1), kGrid, *game) == CampaignStatus::Ok);
+    REQUIRE(saveForgedWorld(dir.path, "alpha", forgedWorldKey(requestedWorld(1), kGrid), storedFrom(*game)) == CampaignStatus::Ok);
     const CampaignWorldPlan plan = planCampaignWorld(dir.path, "alpha");
     REQUIRE(plan.action == CampaignWorldAction::Rebuild);
 

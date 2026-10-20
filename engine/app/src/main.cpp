@@ -315,6 +315,21 @@ void populateForged(ichor::Scene& scene, glm::dvec3 position)
 
 enum class ForgeOutcome { Built, Quit, Failed };
 
+ForgeOutcome reportForgedGame(const ichor::ForgedGame& game)
+{
+    if (!game.ok()) {
+        ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", game.error);
+        return ForgeOutcome::Failed;
+    }
+    for (const std::string& problem : game.contentProblems) {
+        ichor::logf(ichor::LogLevel::Warn, "forged content left out: {}", problem);
+    }
+    ichor::logf(ichor::LogLevel::Info, "forged content: {} items, {} cast, {} quests ({} refused), {} dungeon slots", game.loot ? game.loot->all().size() : 0, game.cast ? game.cast->all().size() : 0,
+        game.quests ? game.quests->all().size() : 0, game.quests ? game.quests->refused().size() : 0, game.dungeons ? game.dungeons->poiIds().size() : 0);
+    ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", game.stateHash(), game.spawn.x, game.spawn.z, game.spawn.groundY, game.spawn.found ? "" : " (no gentle dry ground found)");
+    return ForgeOutcome::Built;
+}
+
 // Forges the world for --forged through the new-game flow: a loading screen with the phase being
 // forged when there is a window, a plain wait when there is none. Quitting mid-forge cancels the job
 // and joins its thread before this returns.
@@ -330,6 +345,10 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     ichor::ForgedContentSetup content = ichor::loadForgedContentSetup(contentData, options.data);
     for (const std::string& problem : content.problems) {
         ichor::logf(ichor::LogLevel::Warn, "forged content: {}", problem);
+    }
+    if (options.campaignPlan.action == ichor::CampaignWorldAction::Load) {
+        out = ichor::buildStoredCampaignGame(options.campaignPlan, desc, content.inputs);
+        return reportForgedGame(*out);
     }
     ichor::NewGameFlow flow(true, options.forgedGrid, content.config);
     flow.begin(desc);
@@ -397,17 +416,7 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
         return ForgeOutcome::Failed;
     }
     out = ichor::buildForgedGame(*job->result(), desc, content.inputs);
-    if (!out->ok()) {
-        ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", out->error);
-        return ForgeOutcome::Failed;
-    }
-    for (const std::string& problem : out->contentProblems) {
-        ichor::logf(ichor::LogLevel::Warn, "forged content left out: {}", problem);
-    }
-    ichor::logf(ichor::LogLevel::Info, "forged content: {} items, {} cast, {} quests ({} refused), {} dungeon slots", out->loot ? out->loot->all().size() : 0, out->cast ? out->cast->all().size() : 0,
-        out->quests ? out->quests->all().size() : 0, out->quests ? out->quests->refused().size() : 0, out->dungeons ? out->dungeons->poiIds().size() : 0);
-    ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", out->stateHash(), out->spawn.x, out->spawn.z, out->spawn.groundY, out->spawn.found ? "" : " (no gentle dry ground found)");
-    return ForgeOutcome::Built;
+    return reportForgedGame(*out);
 }
 
 // --campaign, before anything else runs: decide between forging anew and rebuilding the stored world. A stored world
@@ -420,7 +429,7 @@ bool planCampaign(Options& options)
         ichor::logf(ichor::LogLevel::Error, "{}", plan.message);
         return false;
     }
-    if (plan.action == ichor::CampaignWorldAction::Rebuild) {
+    if (plan.action != ichor::CampaignWorldAction::ForgeAndSave) {
         ichor::logf(plan.warn ? ichor::LogLevel::Warn : ichor::LogLevel::Info, "{}", plan.message);
         options.seed = plan.key.seed;
         options.forgedGrid = plan.key.gridSize;
@@ -432,6 +441,10 @@ bool planCampaign(Options& options)
 bool finishCampaign(const Options& options, const ichor::ForgedGame& game)
 {
     const ichor::CampaignWorldPlan& plan = options.campaignPlan;
+    if (plan.action == ichor::CampaignWorldAction::Load) {
+        ichor::logf(ichor::LogLevel::Info, "campaign '{}': built from the stored files, {} forges run", options.campaign, ichor::ForgeJob::forgesStarted());
+        return true;
+    }
     if (plan.action == ichor::CampaignWorldAction::Rebuild) {
         const std::string problem = ichor::verifyRebuiltWorld(plan, game);
         if (!problem.empty()) {
