@@ -167,7 +167,13 @@ void Scene::applyInput(const InputFrame& input, double dt)
             }
         }
         const double speed = player.metresPerSecond * ((input.buttons & InputFrame::Sprint) != 0 ? 2.0 : 1.0) * kept;
-        const glm::dvec3 velocity(stick.x * speed, 0.0, -stick.y * speed);
+        glm::dvec3 velocity(stick.x * speed, 0.0, -stick.y * speed);
+        if (velocityFilter_) {
+            if (const auto* where = registry_.try_get<Transform>(entity)) {
+                const glm::dvec3 allowed = velocityFilter_(where->position, velocity);
+                velocity = std::isfinite(allowed.x) && std::isfinite(allowed.y) && std::isfinite(allowed.z) ? allowed : glm::dvec3(0.0);
+            }
+        }
         if (auto* body = registry_.try_get<CharacterBody>(entity)) {
             body->intent = glm::vec3(velocity);
             physics_->setCharacterIntent(id, body->intent);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/platform/mouse_look.h"
 #include "ichor/platform/platform.h"
 
 #include <functional>
@@ -26,6 +27,7 @@ public:
     NavKeys navKeys() const override { return navKeys_; }
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
     void enableLook(bool enabled) override;
+    void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
 
     SDL_Window* window() const { return window_; }
 
@@ -41,7 +43,7 @@ private:
     NavKeys navKeys_;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
-    float mouseSpeedX_ = 0.0f; // window units per second, smoothed over a few pumps so ticks that skip a pump lose nothing
+    MouseLook mouseLook_;
     double lastPump_ = 0.0;
     std::function<void(const SDL_Event&)> hook_;
 };
