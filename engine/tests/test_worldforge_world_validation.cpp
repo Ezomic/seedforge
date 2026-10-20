@@ -39,6 +39,8 @@ GateThresholds lax()
     t.minLandmarkCoveragePermille = 0;
     t.minQuestItems = 0;
     t.minQuestCast = 0;
+    t.minLandSharePermille = 0;
+    t.maxLandSharePermille = 1000;
     return t;
 }
 
@@ -113,6 +115,12 @@ struct HandWorld {
             p.roads->road[at(x, y)] = road;
         }
     }
+    void ocean(int landColumns)
+    {
+        for (int y = 0; y < kGrid; ++y) {
+            for (int x = landColumns; x < kGrid; ++x) p.roads->heightM[at(x, y)] = -20;
+        }
+    }
     ForgedWorld world() const { return ForgedWorld(p); }
 };
 
@@ -120,9 +128,11 @@ struct HandWorld {
 
 TEST_CASE("validateWorld reports every gate in order and always skips the axiom gate", "[worldforge][validation]")
 {
-    const ValidationReport r = validateWorld(HandWorld().world());
-    REQUIRE(r.gates.size() == 8);
-    const std::vector<std::string> ids = { "settlement_density", "road_connected", "settlement_reach", "no_dead_ends", "landmark_coverage", "quest_items", "quest_cast", "axiom_directives_starved" };
+    GateThresholds t;
+    t.maxLandSharePermille = 1000;
+    const ValidationReport r = validateWorld(HandWorld().world(), t);
+    REQUIRE(r.gates.size() == 9);
+    const std::vector<std::string> ids = { "settlement_density", "road_connected", "settlement_reach", "no_dead_ends", "landmark_coverage", "quest_items", "quest_cast", "land_share", "axiom_directives_starved" };
     for (std::size_t i = 0; i < ids.size(); ++i) CHECK(r.gates[i].id == ids[i]);
     CHECK(r.passed());
     CHECK(failedIds(r).empty());
@@ -177,6 +187,7 @@ TEST_CASE("a river wall splits the settlements and POIs, and a road crossing rej
     GateThresholds t;
     t.minSettlementReachPermille = 1000;
     t.minPoiReachPermille = 1000;
+    t.maxLandSharePermille = 1000;
 
     HandWorld split;
     split.wall(16);
@@ -248,7 +259,7 @@ TEST_CASE("an incomplete or failed world fails every evaluated gate with its cau
     REQUIRE_FALSE(failed.ok());
     const ValidationReport r = validateWorld(failed);
     CHECK_FALSE(r.passed());
-    REQUIRE(r.gates.size() == 8);
+    REQUIRE(r.gates.size() == 9);
     for (const GateResult& g : r.gates) {
         if (g.id == "axiom_directives_starved") continue;
         CHECK(g.status == GateStatus::Fail);
@@ -260,6 +271,69 @@ TEST_CASE("an incomplete or failed world fails every evaluated gate with its cau
     const ValidationReport p = validateWorld(partial);
     CHECK_FALSE(p.passed());
     CHECK(gate(p, "quest_items").cause.find("every phase") != std::string::npos);
+}
+
+TEST_CASE("a mostly ocean world fails the land share gate and a balanced one passes", "[worldforge][validation][land_share]")
+{
+    HandWorld thin;
+    thin.ocean(2);
+    const ValidationReport r = validateWorld(thin.world());
+    const GateResult& land = gate(r, "land_share");
+    CHECK(land.status == GateStatus::Fail);
+    CHECK(land.value == 62);
+    CHECK(land.min == 100);
+    CHECK(land.max == 800);
+    CHECK(land.cause.find("too little") != std::string::npos);
+    CHECK(landSharePermille(r) == 62);
+    CHECK_FALSE(r.passed());
+
+    HandWorld balanced;
+    balanced.ocean(16);
+    const ValidationReport b = validateWorld(balanced.world());
+    CHECK(gate(b, "land_share").status == GateStatus::Pass);
+    CHECK(gate(b, "land_share").value == 500);
+
+    HandWorld flat;
+    const ValidationReport full = validateWorld(flat.world());
+    const GateResult& all = gate(full, "land_share");
+    CHECK(all.status == GateStatus::Fail);
+    CHECK(all.value == 1000);
+    CHECK(all.cause.find("too much") != std::string::npos);
+}
+
+TEST_CASE("the land share gate alone fails a thin world when every other gate is lax", "[worldforge][validation][land_share]")
+{
+    HandWorld thin;
+    thin.ocean(2);
+    GateThresholds t = lax();
+    t.minLandSharePermille = 100;
+    t.maxLandSharePermille = 800;
+    CHECK(failedIds(validateWorld(thin.world(), t)) == std::vector<std::string>{ "land_share" });
+    CHECK(failedIds(validateWorld(thin.world(), lax())).empty());
+}
+
+TEST_CASE("the land share bounds are inclusive and move with the thresholds", "[worldforge][validation][land_share]")
+{
+    HandWorld h;
+    h.ocean(16);
+    GateThresholds t = lax();
+    t.minLandSharePermille = 500;
+    t.maxLandSharePermille = 500;
+    CHECK(gate(validateWorld(h.world(), t), "land_share").status == GateStatus::Pass);
+    t.minLandSharePermille = 501;
+    t.maxLandSharePermille = 600;
+    CHECK(gate(validateWorld(h.world(), t), "land_share").status == GateStatus::Fail);
+    t.minLandSharePermille = 400;
+    t.maxLandSharePermille = 499;
+    CHECK(gate(validateWorld(h.world(), t), "land_share").status == GateStatus::Fail);
+}
+
+TEST_CASE("a world that could not be scored reports no land share", "[worldforge][validation][land_share]")
+{
+    const ValidationReport r = validateWorld(forgeWorld(1, 4, smallConfig()));
+    CHECK(gate(r, "land_share").status == GateStatus::Fail);
+    CHECK(landSharePermille(r) == kLandShareNotMeasured);
+    CHECK(landSharePermille(ValidationReport{}) == kLandShareNotMeasured);
 }
 
 TEST_CASE("out of range thresholds produce an error report that never passes", "[worldforge][validation]")
@@ -287,6 +361,12 @@ TEST_CASE("out of range thresholds produce an error report that never passes", "
     bad([](GateThresholds& t) { t.minPoiReachPermille = -1; });
     bad([](GateThresholds& t) { t.minQuestItems = 70000; });
     bad([](GateThresholds& t) { t.seaLevelM = 30000; });
+    bad([](GateThresholds& t) { t.minLandSharePermille = -1; });
+    bad([](GateThresholds& t) { t.maxLandSharePermille = 1001; });
+    bad([](GateThresholds& t) {
+        t.minLandSharePermille = 600;
+        t.maxLandSharePermille = 500;
+    });
 }
 
 TEST_CASE("validating a real forged world never changes its hash and is repeatable", "[worldforge][validation]")
@@ -335,7 +415,7 @@ TEST_CASE("the text and JSON reports carry the same gates and parse back", "[wor
     CHECK(j["gates"][2]["min"] == 1000);
     CHECK(j["gates"][2]["max"].is_null());
     CHECK(j["gates"][0]["max"] == t.maxSettlementsPerKm2Milli);
-    CHECK(j["gates"][7]["status"] == "skipped");
+    CHECK(j["gates"][8]["status"] == "skipped");
 }
 
 TEST_CASE("hostile gate text is escaped so the JSON stays valid", "[worldforge][validation]")
@@ -452,7 +532,7 @@ TEST_CASE("hand-built hostile worlds fail every gate instead of crashing", "[wor
     const auto allFail = [](const ForgedWorld& w) {
         const ValidationReport r = validateWorld(w);
         CHECK_FALSE(r.passed());
-        REQUIRE(r.gates.size() == 8);
+        REQUIRE(r.gates.size() == 9);
         for (const GateResult& g : r.gates) {
             if (g.id == "axiom_directives_starved") continue;
             CHECK(g.status == GateStatus::Fail);
