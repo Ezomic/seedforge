@@ -98,8 +98,8 @@ TEST_CASE("nightly: the walk bot on big forged worlds arrives or names what stop
             const bool named = r.outcome == WalkOutcome::Arrived || (r.outcome == WalkOutcome::Blocked && r.blocker != WalkBlock::None && !r.report.empty());
             const bool moved = r.metresWalked > 1.0 || r.outcome == WalkOutcome::Blocked;
             const bool ok = named && moved;
-            say(std::format("WALK grid {} seed {}: {} {}, trip {:.0f} m, path {}, walked {:.0f} m in {:.0f} s sim, {:.0f} m short, wall {:.1f} s{}{}", grid, seed,
-                ok ? "ok" : "SILENT", outcomeName(r.outcome), walk.trip, walk.hadPath ? "yes" : "no", r.metresWalked, r.seconds, r.metresLeft, wall,
+            say(std::format("WALK grid {} seed {}: {} {}, trip {:.0f} m, walked {:.0f} m in {:.0f} s sim, {:.0f} m short, wall {:.1f} s | {}{}{}", grid, seed,
+                ok ? "ok" : "SILENT", outcomeName(r.outcome), walk.trip, r.metresWalked, r.seconds, r.metresLeft, wall, describeRoute(walk),
                 r.report.empty() ? "" : " | blocker: ", r.report));
             if (r.outcome == WalkOutcome::Arrived) {
                 ++arrived;
