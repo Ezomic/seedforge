@@ -166,7 +166,7 @@ TEST_CASE("skinning the first frame of idle leaves the Exile standing on the gro
     REQUIRE(highest == Catch::Approx(2.0f).margin(0.25f));
 }
 
-TEST_CASE("walk travels about 4.2 m and run about 5 m/s along the way the body faces, from the root joint")
+TEST_CASE("walk travels about 1.05 m/s and run about 5.2 m/s along the way the body faces, from the root joint")
 {
     const auto owned = loadAnimations();
     const AnimationSet& set = *owned;
@@ -183,19 +183,24 @@ TEST_CASE("walk travels about 4.2 m and run about 5 m/s along the way the body f
     };
     float walkSeconds = 0.0f;
     const glm::vec3 walk = travel("walk", walkSeconds);
-    REQUIRE(walkSeconds == Catch::Approx(4.0f).margin(0.1f));
-    REQUIRE(glm::length(glm::vec2(walk.x, walk.z)) == Catch::Approx(4.2f).margin(0.2f));
-    REQUIRE(glm::dot(glm::vec2(walk.x, walk.z), forward) > 3.8f);
+    REQUIRE(walkSeconds == Catch::Approx(2.7f).margin(0.15f));
+    REQUIRE(glm::dot(glm::vec2(walk.x, walk.z), forward) / walkSeconds == Catch::Approx(1.05f).margin(0.1f));
+    REQUIRE(std::abs(walk.y) < 0.05f);
 
     float runSeconds = 0.0f;
     const glm::vec3 run = travel("run", runSeconds);
-    REQUIRE(glm::dot(glm::vec2(run.x, run.z), forward) / runSeconds == Catch::Approx(5.0f).margin(0.5f));
+    // The run is turned about 10 degrees so its legs sweep along the travel, so the speed is the length of the
+    // travel and the direction is only checked to be roughly the way the body faces.
+    const glm::vec2 runTravel(run.x, run.z);
+    REQUIRE(glm::length(runTravel) / runSeconds == Catch::Approx(5.2f).margin(0.5f));
+    REQUIRE(glm::dot(glm::normalize(runTravel), forward) > 0.8f);
+    REQUIRE(std::abs(run.y) < 0.05f);
 }
 
 TEST_CASE("the feet plant while the body travels: the root travel matches the legs")
 {
     // If the root travelled against the legs the planted ankle would slide at about twice walking speed (1.8 m/s
-    // against 0.76 here). Run has too few planted frames at 60 Hz to say anything.
+    // against 0.07 here). Run has too few planted frames at 60 Hz to say anything.
     const float walk = plantedFootSpeed("walk");
     INFO("planted ankle speed in walk: " << walk << " m/s");
     REQUIRE(walk < 1.0f);
@@ -281,7 +286,7 @@ TEST_CASE("the cooked Exile survives the bundle file")
     REQUIRE(loaded.clips[1].ozzBytes == character().clips[1].ozzBytes);
 }
 
-TEST_CASE("idle loops: its last pose meets its first, which walk and run, as authored, do not")
+TEST_CASE("idle, walk and run loop: the last pose meets the first")
 {
     const auto owned = loadAnimations();
     const AnimationSet& set = *owned;
@@ -301,10 +306,8 @@ TEST_CASE("idle loops: its last pose meets its first, which walk and run, as aut
         return widest;
     };
     REQUIRE(seam("idle") < 0.05f);
-    // Placeholder clips are not loop-blended. This pins that down, so a re-exported pair that does
-    // loop turns it red and the note in docs/exile-import.md goes.
-    REQUIRE(seam("walk") > 0.2f);
-    REQUIRE(seam("run") > 0.5f);
+    REQUIRE(seam("walk") < 0.05f);
+    REQUIRE(seam("run") < 0.05f);
 }
 
 TEST_CASE("a joint attachment carries a prop with the holder's joint")
