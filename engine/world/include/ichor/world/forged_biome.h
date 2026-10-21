@@ -30,6 +30,12 @@ struct BiomeSurface {
 
 const BiomeSurface& biomeSurface(worldforge::BiomeId biome);
 
+struct BiomeBlend {
+    worldforge::BiomeId primary = worldforge::BiomeId::Crag;
+    worldforge::BiomeId secondary = worldforge::BiomeId::Crag;
+    float weight = 0.0f;
+};
+
 // The forged biomes laid over the engine's world. Cells are looked up by world position in metres,
 // the first and last forged cell sitting on the world's edges like the forged heights do.
 class ForgedBiomeField {
@@ -46,6 +52,10 @@ public:
     // The biome that holds most of a streaming cell's land (water only when the cell has no land), ties
     // to the lowest id. It depends on the cell alone, never on which cells were asked for before.
     worldforge::BiomeId cellBiome(const WorldDesc& desc, CellId id) const;
+
+    // The nearest cell's two biomes and how far the second one reaches in (0 is all primary, 1 all secondary), the
+    // same blend the splat weights use. An empty field is all Crag.
+    BiomeBlend blendAt(double x, double z) const;
 
     // Splat weights and ground colour at a position: the nearest cell's biome blended with its secondary
     // biome by the map's blend byte, so the terrain fades across a border instead of cutting at it.
