@@ -12,6 +12,8 @@
 #include "ichor/audio/reverb.h"
 #include "ichor/audio/soundscape.h"
 #include "ichor/audio/wading_splash.h"
+#include "ichor/core/asset_roots.h"
+#include "ichor/core/controls_overlay.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
@@ -40,6 +42,7 @@
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
 #include "ichor/gfx/walk_camera.h"
+#include "ichor/gfx/vk_context.h"
 #include "ichor/gfx/vulkan_renderer.h"
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
@@ -99,9 +102,11 @@ struct Options {
     bool audioProbe = false; // open the device, play nothing, exit
     std::uint64_t frames = 0; // 0 runs until quit
     std::uint64_t seed = 1;
+    std::filesystem::path content = ICHOR_CONTENT_DIR; // cooked bundles and fonts; a packaged build points it beside the exe
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
+    std::filesystem::path exileDefault = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile"; // the player's model in --forged when --exile is not given
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
@@ -128,6 +133,7 @@ struct Options {
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
     std::optional<ichor::OverlayMode> overlay; // --overlay [off|compact|full]; none is compact in play and off for a screenshot
+    bool controls = false; // --controls: start with the F1 controls card open
     bool showWindow = false; // with --screenshot: a visible window, only to compare it with the hidden render
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -216,6 +222,8 @@ bool parse(int argc, char** argv, Options& options)
                     ++i;
                 }
             }
+        } else if (arg == "--controls") {
+            options.controls = true;
         } else if (arg == "--show-window") {
             options.showWindow = true;
         } else if (arg == "--screenshot" && hasValue) {
@@ -374,7 +382,7 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
-        const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+        const std::filesystem::path fonts = options.content / "fonts";
         bool fontsLoaded = ui->ok();
         for (const char* file : {"AlegreyaSans-Regular.ttf", "Cinzel.ttf"}) {
             fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
@@ -481,7 +489,39 @@ bool finishCampaign(const Options& options, const ichor::ForgedGame& game)
     return true;
 }
 
-int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
+// The "press F1" hint is for a person's first play: it shows until the marker file exists, which is written as it shows.
+// A headless or screenshot run neither shows it nor writes the marker.
+bool firstRunHint(const Options& options)
+{
+    if (options.headless || options.controls || !options.screenshot.empty()) {
+        return false;
+    }
+    const std::filesystem::path marker = options.saves / ".controls_seen";
+    std::error_code ec;
+    if (std::filesystem::exists(marker, ec)) {
+        return false;
+    }
+    std::filesystem::create_directories(options.saves, ec);
+    std::ofstream(marker) << "seen\n";
+    return true;
+}
+
+// A packaged build has its content, shaders, scripts, data and art beside the executable; point every default there.
+void usePackagedRoots(Options& options, const ichor::AssetRoots& roots)
+{
+    options.content = roots.content;
+    options.scene = roots.content / "kit.iscene";
+    options.actor = roots.content / "arm.iscene";
+    options.world = roots.content / "world";
+    options.exileDefault = roots.art / "exile";
+    options.saves = roots.content.parent_path() / "saves";
+    options.kit = roots.art / "settlement_kit";
+    options.script = roots.scripts / "main.lua";
+    options.data = roots.data;
+    ichor::setShaderDirectory(roots.shaders);
+}
+
+int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
     const bool hidden = !options.screenshot.empty() && !options.showWindow;
     if (!platform.init({.hidden = hidden}) || !renderer.init()) {
@@ -522,7 +562,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     }
     ExileDemo exile;
     const bool exileByDefault = options.forged && !options.noExilePlayer && options.exile.empty();
-    const std::filesystem::path exileFolder = exileByDefault ? std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile" : options.exile;
+    const std::filesystem::path exileFolder = exileByDefault ? options.exileDefault : options.exile;
     if (!exileFolder.empty() && !loadExileDemo(exileFolder, renderer, animations, exile)) {
         if (!exileByDefault) {
             return 1;
@@ -685,6 +725,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.setOverlayMode(ichor::startingOverlayMode(!options.screenshot.empty(), options.overlay));
+    engine.setControlsOverlay(ichor::startControlsOverlay(firstRunHint(options), options.controls));
     engine.scene().setAnimations(&animations);
     // The stand-in world has no roads, so its field is empty and the bonus never applies.
     const ichor::NullRoadField noRoads;
@@ -1086,7 +1127,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
-        const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+        const std::filesystem::path fonts = options.content / "fonts";
         bool fontsLoaded = ui->ok();
         for (const char* file : {"AlegreyaSans-Regular.ttf", "Cinzel.ttf"}) {
             fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
@@ -1374,7 +1415,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 
     ichor::FileWatcher watcher;
     watcher.watch(options.scene);
-    watcher.watchDirectory(ICHOR_SHADER_DIR, ".spv");
+    watcher.watchDirectory(ichor::shaderDirectory(), ".spv");
     watcher.watch(options.script);
     watcher.watchTree(options.data, ".json");
 
@@ -1683,8 +1724,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 int main(int argc, char** argv)
 {
     Options options;
+    if (const std::optional<ichor::AssetRoots> roots = ichor::packagedAssetRoots(ichor::executableDirectory())) {
+        usePackagedRoots(options, *roots);
+        ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
+    }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 

@@ -58,6 +58,8 @@ public:
     virtual NavKeys navKeys() const { return {}; }
     // Whether F3, the debug overlay key, is down as of the last pump.
     virtual bool overlayKey() const { return false; }
+    // Whether F1, the controls card key, is down as of the last pump.
+    virtual bool helpKey() const { return false; }
     // While set, the arrow keys are not the player's movement (the editor nudges with them).
     virtual void reserveArrowKeys(bool reserved) { (void)reserved; }
     // While set, the mouse (captured while the right button is held) and the left and right arrows turn the player (InputFrame::lookX) instead of moving.

@@ -13,6 +13,20 @@
 
 namespace ichor {
 
+namespace {
+std::filesystem::path g_shaderDirectory = ICHOR_SHADER_DIR;
+}
+
+void setShaderDirectory(std::filesystem::path directory)
+{
+    g_shaderDirectory = std::move(directory);
+}
+
+const std::filesystem::path& shaderDirectory()
+{
+    return g_shaderDirectory;
+}
+
 bool vkCheck(VkResult result, const char* what)
 {
     if (result != VK_SUCCESS) {
@@ -313,7 +327,7 @@ bool VulkanContext::immediate(const std::function<void(VkCommandBuffer)>& record
 
 VkShaderModule VulkanContext::loadShader(std::string_view name)
 {
-    const std::filesystem::path path = std::filesystem::path(ICHOR_SHADER_DIR) / std::string(name);
+    const std::filesystem::path path = shaderDirectory() / std::string(name);
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) {
         logf(LogLevel::Error, "cannot open shader {}", path.string());
