@@ -139,14 +139,15 @@ TEST_CASE("the tree meshes are closed over valid indices and face outward")
 {
     const SceneBundle bundle = treeBundle();
     REQUIRE(bundle.meshes.size() == static_cast<std::size_t>(VegetationKind::Count));
-    REQUIRE(bundle.materials.size() == 4); // trunk, conifer, broadleaf, rock
+    REQUIRE(bundle.materials.size() == 10); // trunk, conifer, broadleaf, rock, then the biome plants
     for (const Mesh& mesh : bundle.meshes) {
         INFO(mesh.name);
         const bool rock = mesh.name == "rock";
+        const bool single = rock || mesh.name == "grass" || mesh.name == "dead_tree" || mesh.name == "cactus" || mesh.name == "dry_shrub" || mesh.name == "reed";
         REQUIRE(mesh.indices.size() % 3 == 0);
-        REQUIRE(mesh.submeshes.size() == (rock ? 1u : 2u)); // a rock is all one material
+        REQUIRE(mesh.submeshes.size() == (single ? 1u : 2u)); // a rock, a bare tree or a tuft is all one material
         REQUIRE(mesh.submeshes[0].firstIndex == 0);
-        if (!rock) {
+        if (!single) {
             REQUIRE(mesh.submeshes[0].firstIndex + mesh.submeshes[0].indexCount == mesh.submeshes[1].firstIndex);
         }
         REQUIRE(mesh.submeshes.back().firstIndex + mesh.submeshes.back().indexCount == mesh.indices.size());
@@ -172,9 +173,11 @@ TEST_CASE("the tree meshes are closed over valid indices and face outward")
             REQUIRE(mesh.boundsMin.y < 0.0f);
             REQUIRE(mesh.boundsMax.y > 0.4f);
             REQUIRE(mesh.boundsMax.y < 1.2f);
-        } else {
-            REQUIRE(mesh.boundsMin.y >= 0.0f);
+        } else if (mesh.name == "conifer" || mesh.name == "broadleaf" || mesh.name == "dead_tree") {
+            REQUIRE(mesh.boundsMin.y >= -0.05f); // a tilted trunk base dips a hair
             REQUIRE(mesh.boundsMax.y > 3.0f);
+        } else {
+            REQUIRE(mesh.boundsMax.y > 0.3f);
         }
     }
 }

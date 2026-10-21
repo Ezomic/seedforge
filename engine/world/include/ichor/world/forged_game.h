@@ -6,6 +6,7 @@
 #include "ichor/world/forged_navmesh.h"
 #include "ichor/world/forged_region_tiers.h"
 #include "ichor/world/forged_roads.h"
+#include "ichor/world/forged_scenery_scatter.h"
 #include "ichor/world/forged_water.h"
 #include "ichor/world/heightfield.h"
 #include "ichor/data/data_set.h"
@@ -140,9 +141,17 @@ ForgedScenery buildForgedScenery(const ForgedGame& game);
 // failure (folder missing, a file does not cook) the scenery is left as it was and the buildings stay boxes.
 bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder);
 
+// What the biome scenery keeps clear of in this game: roads (with their shoulders), the settlements' buildings and
+// open water. The guard reads `game`'s roads and water, so the game must outlive it.
+SceneryGuard forgedSceneryGuard(const ForgedGame& game);
+
 // Moves the spawn to dry, gentle ground nearest the middle of settlement `index` (in the forge's order), clear of its
 // buildings and kit pieces, and aims the view at it. Returns false, leaving the spawn alone, for an index past the end.
 bool spawnAtSettlement(ForgedGame& game, std::size_t index);
+
+// Moves the spawn to dry, gentle ground inside `biome`, as near the world's middle as such ground is, and faces it
+// north. Returns false, leaving the spawn alone, when the world has no such ground.
+bool spawnInBiome(ForgedGame& game, worldforge::BiomeId biome);
 
 // Builds the game from a finished forge. Fails, with a message, when the result is empty or a bake step
 // refuses the world. Never throws.

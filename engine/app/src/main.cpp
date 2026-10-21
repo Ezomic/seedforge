@@ -10,6 +10,7 @@
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
 #include "ichor/audio/reverb.h"
+#include "ichor/audio/soundscape.h"
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
@@ -106,6 +107,7 @@ struct Options {
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
     std::string waterView; // --forged: start on the bank of a large river or the biggest lake ("river" or "lake")
+    std::optional<worldforge::BiomeId> biome; // --forged --biome NAME: start inside this biome (forest, desert, ...)
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
     bool enterDungeon = false; // --forged: go in as soon as an entrance is in reach, as if Enter were pressed
@@ -176,12 +178,15 @@ bool parse(int argc, char** argv, Options& options)
         } else if (arg == "--water-view" && hasValue) {
             options.waterView = argv[++i];
             if (options.waterView != "river" && options.waterView != "lake") return false;
+        } else if (arg == "--biome" && hasValue) {
+            options.biome = worldforge::biomeFromName(argv[++i]);
+            if (!options.biome || options.settlement >= 0) return false;
         } else if (arg == "--dungeon" && hasValue) {
             if (!parseNumber(argv[++i], options.dungeon) || options.dungeon < 0) return false;
         } else if (arg == "--enter-dungeon") {
             options.enterDungeon = true;
         } else if (arg == "--settlement" && hasValue) {
-            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
+            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0 || options.biome) return false;
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
@@ -584,6 +589,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (!options.waterView.empty() && !waterViewed) {
             ichor::logf(ichor::LogLevel::Warn, "--water-view {}: this world has no {} with a dry bank; the usual spawn is kept", options.waterView, options.waterView);
         }
+        if (options.biome && !ichor::spawnInBiome(*forged, *options.biome)) {
+            ichor::logf(ichor::LogLevel::Warn, "--biome {}: the forged world has no dry, gentle ground inside it; the usual spawn is kept", worldforge::kBiomeNames[static_cast<std::size_t>(*options.biome)]);
+        }
         if (options.dungeon >= 0 && !ichor::spawnAtDungeon(*forged, static_cast<std::size_t>(options.dungeon))) {
             ichor::logf(ichor::LogLevel::Warn, "--dungeon {} has no entrance with open ground beside it; the usual spawn is kept", options.dungeon);
         }
@@ -649,6 +657,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         streaming.rivers = forged->water.rivers;
         streaming.hydrology = forged->water.hydrology;
         streaming.biomes = forged->biomes;
+        streaming.scenery = ichor::forgedSceneryGuard(*forged);
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
@@ -884,6 +893,41 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         return position;
     };
+    // The forged world's soundscape: a bed per biome that crossfades along the borders, day and night variants, the
+    // sound of a settlement near it, and footsteps by surface. Audio only reads the scene, so none of it is sim state.
+    // A bed or step whose clip does not exist is silent.
+    ichor::Soundscape soundscape;
+    ichor::BedMixer bedMixer;
+    std::vector<ichor::SettlementSoundType> settlementTypes;
+    if (forged && forged->biomes) {
+        std::string soundscapeError;
+        if (!ichor::Soundscape::load(data, soundscape, soundscapeError)) {
+            ichor::logf(ichor::LogLevel::Warn, "data: {}; the forged world stays silent", soundscapeError);
+        }
+        for (const ichor::SettlementSite& site : forged->sites) {
+            settlementTypes.push_back(ichor::settlementTypeForBiome(worldforge::kBiomeNames[static_cast<std::size_t>(forged->biomes->biomeAt(site.x, site.z))]));
+        }
+        engine.scene().addSystem("footsteps", [&, pacer = ichor::FootstepPacer{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
+            for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+                const glm::dvec3& feet = transform.position;
+                if (!pacer.step(feet.x, feet.z)) {
+                    continue;
+                }
+                const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
+                const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
+                // Wading has its own splash.
+                if (surface == ichor::SoundSurface::Water) {
+                    continue;
+                }
+                if (const auto step = ichor::footstepFor(soundscape, surface)) {
+                    const std::uint32_t clip = audio.findSound(step->clip);
+                    if (clip != ichor::Mixer::kNoSound) {
+                        audio.play(clip, feet, false, step->gain);
+                    }
+                }
+            }
+        });
+    }
     if (!heightfield.empty()) {
         // Streaming advances once per tick, so residency follows the path and
         // the budget alone. While the gate holds no ticks run, so it advances
@@ -1250,9 +1294,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 view.camera.position = glm::dvec3(forged->spawn.x, forged->spawn.groundY + options.overlook, forged->spawn.z);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
-            if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
-                const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
-                const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
+            const bool overlookSettlement = forged && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size();
+            if (forged && options.overlook > 0.0f && (overlookSettlement || options.biome)) {
+                const double lookX = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].x : forged->spawn.x;
+                const double lookZ = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].z : forged->spawn.z;
+                const glm::dvec3 centre(lookX, forged->heightfield.heightAt(lookX, lookZ), lookZ);
                 view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 2.0);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
@@ -1545,9 +1591,35 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const ichor::Weather sky = weatherNow();
         const ichor::WeatherAudioTargets weatherAudio = ichor::weatherAudioTargets(sky.overcast, sky.rain);
-        ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
-        ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
-        ambience.apply(audio);
+        if (forged && forged->biomes && !soundscape.empty()) {
+            const glm::dvec3 feet = playerPosition(engine.scene());
+            const float hour = ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour);
+            const ichor::BiomeBlend here = forged->biomes->blendAt(feet.x, feet.z);
+            std::vector<ichor::BedGain> beds = ichor::blendedBeds(soundscape, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
+            ichor::addBeds(beds, {{"A_Wind", weatherAudio.wind}, {"A_Rain", weatherAudio.rain}});
+            for (std::size_t i = 0; i < forged->sites.size(); ++i) {
+                const ichor::SettlementSite& site = forged->sites[i];
+                const float distance = static_cast<float>(std::hypot(feet.x - site.x, feet.z - site.z));
+                if (!(distance < ichor::kSettlementMaxRangeM)) {
+                    continue;
+                }
+                const float size = static_cast<float>(std::min<std::size_t>(site.tier, ichor::kSettlementTierCount - 1)) / static_cast<float>(ichor::kSettlementTierCount - 1);
+                if (const auto bed = ichor::settlementBed(soundscape, site.id, size, settlementTypes[i], distance, 0.0f, 0.0f)) {
+                    ichor::addBeds(beds, {*bed});
+                }
+            }
+            ichor::budgetBeds(beds);
+            for (const ichor::BedGain& change : bedMixer.step(beds, dt)) {
+                const std::uint32_t clip = audio.findSound(change.clip);
+                if (clip != ichor::Mixer::kNoSound) {
+                    audio.setAmbience(clip, change.gain);
+                }
+            }
+        } else {
+            ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
+            ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
+            ambience.apply(audio);
+        }
         musicPlayer.update(static_cast<double>(engine.scene().tickCount()) * config.fixedDt, audio);
         if (editing) {
             // New objects appear a few metres in front of the player.
@@ -1628,7 +1700,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --water-view river|lake [--overlook M]] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
