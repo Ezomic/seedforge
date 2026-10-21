@@ -27,7 +27,7 @@ constexpr double kCos[13] = {1.0, 0.9659258262890683, 0.8660254037844387, 0.7071
 constexpr double kSin[13] = {0.0, 0.25881904510252074, 0.5, 0.7071067811865476, 0.8660254037844387, 0.9659258262890683, 1.0,
     0.9659258262890683, 0.8660254037844387, 0.7071067811865476, 0.5, 0.25881904510252074, 0.0};
 
-double distance(double dx, double dz)
+double flatDistance(double dx, double dz)
 {
     return std::sqrt(dx * dx + dz * dz);
 }
@@ -62,7 +62,7 @@ bool standable(const ForgedGame& game, const std::vector<PlacedBuilding>& buildi
 bool searchAround(const ForgedGame& game, const std::vector<PlacedBuilding>& buildings, glm::dvec2 centre, glm::dvec2 first, const std::vector<double>& radii,
     glm::dvec2& found, glm::dvec2 avoid = {0.0, 0.0}, double avoidM = 0.0)
 {
-    const double length = distance(first.x, first.y);
+    const double length = flatDistance(first.x, first.y);
     if (!(length > 1e-9)) {
         first = glm::dvec2(1.0, 0.0);
     } else {
@@ -76,7 +76,7 @@ bool searchAround(const ForgedGame& game, const std::vector<PlacedBuilding>& bui
                 const double sn = sign * kSin[step];
                 const glm::dvec2 direction(first.x * c - first.y * sn, first.x * sn + first.y * c);
                 const glm::dvec2 at = centre + direction * radius;
-                if (avoidM > 0.0 && distance(at.x - avoid.x, at.y - avoid.y) < avoidM) continue;
+                if (avoidM > 0.0 && flatDistance(at.x - avoid.x, at.y - avoid.y) < avoidM) continue;
                 if (standable(game, buildings, at.x, at.y)) {
                     found = at;
                     return true;
@@ -95,7 +95,7 @@ bool settlementAt(const ForgedGame& game, double x, double z, std::size_t& index
     bool inside = false;
     for (std::size_t i = 0; i < game.sites.size(); ++i) {
         const SettlementSite& site = game.sites[i];
-        const double distance = distance(x - site.x, z - site.z);
+        const double distance = flatDistance(x - site.x, z - site.z);
         if (distance <= radiusOf(site) + kEdgeSlackM && distance < best) {
             best = distance;
             index = i;
@@ -124,7 +124,7 @@ CombatSite findCombatSite(const ForgedGame& game)
     // The settlement nearest the spawn first; a settlement ringed by water or cliffs hands over to the next nearest.
     std::vector<std::pair<double, std::size_t>> order;
     for (std::size_t i = 0; i < game.sites.size(); ++i) {
-        order.emplace_back(distance(game.sites[i].x - game.spawn.x, game.sites[i].z - game.spawn.z), i);
+        order.emplace_back(flatDistance(game.sites[i].x - game.spawn.x, game.sites[i].z - game.spawn.z), i);
     }
     std::sort(order.begin(), order.end());
     for (const auto& [distance, index] : order) {
