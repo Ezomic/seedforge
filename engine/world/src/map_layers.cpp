@@ -44,6 +44,9 @@ constexpr std::array<Colour, 8> kFactionColours = {{
 }};
 
 constexpr Colour kFord{250, 250, 250}; // a road on a river; it stays visible when cells share a pixel
+constexpr Colour kRiver{40, 120, 255};
+constexpr Colour kRoadHalo{244, 226, 170};
+constexpr Colour kLake{96, 170, 255}; // lighter than a river so a lake reads as a body of water
 constexpr std::uint8_t kBiomeAlpha = 120;
 constexpr std::uint8_t kTerritoryAlpha = 100;
 
@@ -103,6 +106,32 @@ Overlay splattedOverlay(std::uint32_t side, int width, int height, Colourise col
     return overlay;
 }
 
+// A pale edge around every road pixel, so a one-pixel road still stands out from the biome colours.
+void haloRoads(Overlay& overlay, std::uint32_t side)
+{
+    const Overlay roads = overlay;
+    for (std::uint32_t y = 0; y < side; ++y) {
+        for (std::uint32_t x = 0; x < side; ++x) {
+            const std::size_t pixel = static_cast<std::size_t>(y) * side + x;
+            if (roads[pixel * 4 + 3] == 0) {
+                continue;
+            }
+            const std::int32_t around[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+            for (const auto& step : around) {
+                const std::int64_t nx = static_cast<std::int64_t>(x) + step[0];
+                const std::int64_t ny = static_cast<std::int64_t>(y) + step[1];
+                if (nx < 0 || ny < 0 || nx >= side || ny >= side) {
+                    continue;
+                }
+                const std::size_t neighbour = static_cast<std::size_t>(ny) * side + static_cast<std::size_t>(nx);
+                if (roads[neighbour * 4 + 3] == 0) {
+                    put(overlay, neighbour, kRoadHalo, 210);
+                }
+            }
+        }
+    }
+}
+
 bool anyVisible(const Overlay& overlay)
 {
     for (std::size_t i = 3; i < overlay.size(); i += 4) {
@@ -154,6 +183,7 @@ MapLayerStack::MapLayerStack(MapImage base, const worldforge::ForgedWorld& world
                 put(o, pixel, ford ? kFord : Colour{92, 52, 20}, 255);
             }
         });
+        haloRoads(overlay_[slot(MapLayer::Roads)], side);
     }
     const auto& politics = world.politics();
     if (politics && gridUsable(politics->width, politics->height, politics->owner.size())) {
@@ -166,11 +196,21 @@ MapLayerStack::MapLayerStack(MapImage base, const worldforge::ForgedWorld& world
     }
     const auto& hydrology = world.hydrology();
     if (hydrology && gridUsable(hydrology->width, hydrology->height, hydrology->river.size())) {
-        overlay_[slot(MapLayer::Rivers)] = splattedOverlay(side, hydrology->width, hydrology->height, [&](Overlay& o, std::size_t pixel, std::size_t cell) {
-            if (hydrology->river[cell] != 0) {
-                put(o, pixel, Colour{40, 120, 255}, 255);
+        Overlay waters = sampledOverlay(side, hydrology->width, hydrology->height, [&](Overlay& o, std::size_t pixel, std::size_t cell) {
+            if (cell < hydrology->lakeDepthM.size() && hydrology->lakeDepthM[cell] != 0) {
+                put(o, pixel, kLake, 255);
             }
         });
+        for (int cy = 0; cy < hydrology->height; ++cy) {
+            const std::size_t row = static_cast<std::size_t>(pixelOf(cy, hydrology->height, side)) * side;
+            for (int cx = 0; cx < hydrology->width; ++cx) {
+                const std::size_t cell = static_cast<std::size_t>(cy) * static_cast<std::size_t>(hydrology->width) + static_cast<std::size_t>(cx);
+                if (hydrology->river[cell] != 0) {
+                    put(waters, row + pixelOf(cx, hydrology->width, side), kRiver, 255);
+                }
+            }
+        }
+        overlay_[slot(MapLayer::Rivers)] = std::move(waters);
     }
     for (std::size_t i = 0; i < kMapLayerCount; ++i) {
         present_[i] = anyVisible(overlay_[i]);

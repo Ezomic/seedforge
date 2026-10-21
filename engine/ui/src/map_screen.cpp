@@ -29,6 +29,18 @@ constexpr const char* kMapDocument = R"(<rml><head><style>
     #title { font-family: Cinzel; font-size: 34px; color: #e8d8a8; letter-spacing: 3px; text-align: center; padding-bottom: 12px; }
     #frame { position: relative; width: 50vh; height: 50vh; margin: 0px auto 0px auto; border: 2px #a08850; background-color: #1c2230; }
     #picture { width: 100%; height: 100%; }
+    #places { position: absolute; left: 0px; top: 0px; width: 100%; height: 100%; }
+    .place { position: absolute; width: 0px; height: 0px; }
+    .icon { position: absolute; background-color: #e8d8a8; border: 2px #10141a; }
+    .t0 .icon { left: -3px; top: -3px; width: 4px; height: 4px; border-radius: 4px; }
+    .t1 .icon { left: -4px; top: -4px; width: 6px; height: 6px; border-radius: 6px; background-color: #f0e0b0; }
+    .t2 .icon { left: -6px; top: -6px; width: 8px; height: 8px; background-color: #f0c860; }
+    .t3 .icon { left: -8px; top: -8px; width: 12px; height: 12px; background-color: #f0a030; border: 2px #fff4d0; }
+    .name { position: absolute; left: -60px; width: 120px; top: 7px; text-align: center; font-family: Alegreya Sans; color: #f4ecd0; }
+    .t0 .name { font-size: 12px; color: #c8c0a0; }
+    .t1 .name { font-size: 14px; }
+    .t2 .name { font-size: 16px; }
+    .t3 .name { font-size: 19px; top: 10px; color: #fff4d0; }
     #marker { position: absolute; left: 50%; top: 50%; width: 0px; height: 0px; }
     #dot { position: absolute; left: -6px; top: -6px; width: 8px; height: 8px; border-radius: 6px; background-color: #f0b040; border: 2px #10141a; }
     #layers { text-align: center; padding-top: 12px; }
@@ -39,7 +51,7 @@ constexpr const char* kMapDocument = R"(<rml><head><style>
 </style></head><body>
     <div id="card"><div id="close">&#215;</div><div id="title">THE MAP</div>
         <div id="empty">The world is not drawn yet.</div>
-        <div id="frame"><mappicture id="picture"></mappicture><mapmarker id="marker"><div id="dot"></div></mapmarker></div>
+        <div id="frame"><mappicture id="picture"></mappicture><div id="places"></div><mapmarker id="marker"><div id="dot"></div></mapmarker></div>
         <div id="layers"><div class="layer" id="layer0">Biomes</div><div class="layer" id="layer1">Roads</div><div class="layer" id="layer2">Territories</div><div class="layer" id="layer3">Rivers</div></div>
     </div>
 </body></rml>)";
@@ -137,6 +149,36 @@ private:
 Rml::ElementInstancerGeneric<MapPicture> g_pictureInstancer;
 Rml::ElementInstancerGeneric<MapMarker> g_markerInstancer;
 
+std::string escaped(const std::string& text)
+{
+    std::string out;
+    for (const char c : text) {
+        switch (c) {
+        case '&': out += "&amp;"; break;
+        case '<': out += "&lt;"; break;
+        case '>': out += "&gt;"; break;
+        case '"': out += "&quot;"; break;
+        default: out += c;
+        }
+    }
+    return out;
+}
+
+struct Box {
+    float x;
+    float y;
+    float w;
+    float h;
+};
+
+bool overlaps(const Box& a, const Box& b)
+{
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+constexpr float kIconHalf[4] = {3.0f, 4.0f, 6.0f, 8.0f};
+constexpr float kFontPx[4] = {12.0f, 14.0f, 16.0f, 19.0f};
+
 float degreesOf(float radians)
 {
     if (!std::isfinite(radians)) {
@@ -164,8 +206,9 @@ MapScreen::MapScreen(UiContext& ui)
     picture_ = document_->GetElementById("picture");
     marker_ = document_->GetElementById("marker");
     empty_ = document_->GetElementById("empty");
+    places_ = document_->GetElementById("places");
     layersRow_ = document_->GetElementById("layers");
-    if (layersRow_ == nullptr || close_ == nullptr || frame_ == nullptr || picture_ == nullptr || marker_ == nullptr || empty_ == nullptr || dynamic_cast<MapPicture*>(picture_) == nullptr
+    if (layersRow_ == nullptr || places_ == nullptr || close_ == nullptr || frame_ == nullptr || picture_ == nullptr || marker_ == nullptr || empty_ == nullptr || dynamic_cast<MapPicture*>(picture_) == nullptr
         || dynamic_cast<MapMarker*>(marker_) == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
@@ -244,6 +287,7 @@ void MapScreen::setVisible(bool visible)
     visible_ = visible;
     if (visible_) {
         document_->Show();
+        redrawPlaces();
     } else {
         document_->Hide();
     }
@@ -257,6 +301,7 @@ void MapScreen::setImage(const MapImage& image)
     plain_ = image.empty() ? MapImage{} : image;
     stack_ = MapLayerStack{};
     redraw();
+    redrawPlaces();
 }
 
 void MapScreen::setLayerStack(MapLayerStack stack)
@@ -266,6 +311,92 @@ void MapScreen::setLayerStack(MapLayerStack stack)
     }
     stack_ = std::move(stack);
     redraw();
+    redrawPlaces();
+}
+
+void MapScreen::setDiscovery(const MapDiscovery& discovery)
+{
+    if (document_ == nullptr || (discovery_ && *discovery_ == discovery)) {
+        return;
+    }
+    discovery_ = discovery;
+    redraw();
+    redrawPlaces();
+}
+
+void MapScreen::clearDiscovery()
+{
+    if (document_ == nullptr || !discovery_) {
+        return;
+    }
+    discovery_.reset();
+    redraw();
+    redrawPlaces();
+}
+
+void MapScreen::setSettlements(std::vector<MapSettlement> settlements)
+{
+    if (document_ == nullptr) {
+        return;
+    }
+    settlements_ = std::move(settlements);
+    redrawPlaces();
+}
+
+void MapScreen::redrawPlaces()
+{
+    std::string rml;
+    shownNames_.clear();
+    std::vector<Box> taken;
+    const std::uint32_t side = stack_.empty() ? plain_.width : stack_.base().width;
+    const bool fogApplies = discovery_ && discovery_->side() == side;
+    std::vector<const MapSettlement*> shown;
+    for (const MapSettlement& place : settlements_) {
+        if (fogApplies && !discovery_->seen(place.at)) {
+            continue;
+        }
+        shownNames_.push_back(place.name);
+        shown.push_back(&place);
+    }
+    const float measured = frame_->GetBox().GetSize(Rml::BoxArea::Border).x;
+    const float frame = measured > 1.0f ? measured : 360.0f;
+    std::vector<Box> icons;
+    for (const MapSettlement* place : shown) {
+        const int tier = std::min<int>(place->tier, 3);
+        const float half = kIconHalf[static_cast<std::size_t>(tier)] + 2.0f;
+        icons.push_back({std::clamp(place->at.u, 0.0f, 1.0f) * frame - half, std::clamp(place->at.v, 0.0f, 1.0f) * frame - half, half * 2.0f, half * 2.0f});
+    }
+    for (std::size_t index = 0; index < shown.size(); ++index) {
+        const MapSettlement* place = shown[index];
+        const int tier = std::min<int>(place->tier, 3);
+        const float px = std::clamp(place->at.u, 0.0f, 1.0f) * frame;
+        const float py = std::clamp(place->at.v, 0.0f, 1.0f) * frame;
+        const float font = kFontPx[static_cast<std::size_t>(tier)];
+        const float w = static_cast<float>(place->name.size()) * font * 0.5f + 4.0f;
+        const float h = font + 2.0f;
+        const float gap = kIconHalf[static_cast<std::size_t>(tier)] + 4.0f;
+        // Below, above, right, left: the first spot where the label meets no icon and no earlier label.
+        const Box spots[4] = {{px - w / 2, py + gap, w, h}, {px - w / 2, py - gap - h, w, h}, {px + gap, py - h / 2, w, h}, {px - gap - w, py - h / 2, w, h}};
+        std::size_t chosen = 0;
+        for (std::size_t i = 0; i < 4; ++i) {
+            bool clear = spots[i].x >= 0.0f && spots[i].x + w <= frame && spots[i].y >= 0.0f && spots[i].y + h <= frame;
+            for (const Box& other : taken) {
+                clear = clear && !overlaps(spots[i], other);
+            }
+            for (std::size_t other = 0; other < icons.size(); ++other) {
+                clear = clear && (other == index || !overlaps(spots[i], icons[other]));
+            }
+            if (clear) {
+                chosen = i;
+                break;
+            }
+        }
+        taken.push_back(spots[chosen]);
+        const Box& spot = spots[chosen];
+        rml += std::format(R"(<div class="place t{}" style="left: {:.2f}%; top: {:.2f}%;"><div class="icon"></div><div class="name" style="left: {:.0f}px; top: {:.0f}px; width: {:.0f}px; text-align: {};">{}</div></div>)", tier,
+            std::clamp(place->at.u, 0.0f, 1.0f) * 100.0f, std::clamp(place->at.v, 0.0f, 1.0f) * 100.0f, spot.x - px, spot.y - py, w, chosen == 2 ? "left" : chosen == 3 ? "right" : "center", escaped(place->name));
+    }
+    places_->SetInnerRML(rml);
 }
 
 void MapScreen::setLayer(MapLayer layer, bool on)
@@ -279,7 +410,10 @@ void MapScreen::setLayer(MapLayer layer, bool on)
 
 void MapScreen::redraw()
 {
-    const MapImage drawing = stack_.empty() ? plain_ : stack_.composite(layers_);
+    MapImage drawing = stack_.empty() ? plain_ : stack_.composite(layers_);
+    if (discovery_ && !drawing.empty()) {
+        drawing = withFog(drawing, *discovery_);
+    }
     const bool drawn = !drawing.empty();
     static_cast<MapPicture*>(picture_)->setImage(drawing);
     frame_->SetProperty("display", drawn ? "block" : "none");

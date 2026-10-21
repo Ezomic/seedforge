@@ -144,6 +144,21 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
         return mesh;
     }
 
+    // 1 for a sample with water on all eight sides, 0 for one at the water's edge or dry. The shader fades the
+    // water from it, so the shore ramps from the edge samples (where the surface meets the ground, however the
+    // sample grid steps) into the water over a sample, and does not end on a hard saw-tooth. Samples beyond the
+    // cell are read too, so that neighbouring cells agree.
+    const auto openWater = [&](std::uint32_t i, std::uint32_t j) {
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (!waterAt(heightfield, hydrology, rivers, params, static_cast<std::int64_t>(firstX) + i + dx, static_cast<std::int64_t>(firstZ) + j + dz).has_value()) {
+                    return 0.0f;
+                }
+            }
+        }
+        return 1.0f;
+    };
+
     // A vertex per sample that a drawn quad touches, shared between its quads.
     std::vector<std::int64_t> vertexOf(level.size(), -1);
     const float spacing = static_cast<float>(desc.metresPerSample);
@@ -162,7 +177,7 @@ Mesh buildWaterMesh(const Heightfield& heightfield, const Hydrology& hydrology, 
             v.weights[0] = 65535;
             // How far the surface stands over the ground here, in metres; the shader fades, tints and foams the
             // shore from it. Negative where the surface is sunk below the bank.
-            v.uv = {level[at] - heightfield.heightAtSample(firstX + i, firstZ + j), 0.0f};
+            v.uv = {level[at] - heightfield.heightAtSample(firstX + i, firstZ + j), openWater(i, j)};
             vertexOf[at] = static_cast<std::int64_t>(mesh.vertices.size());
             mesh.vertices.push_back(v);
         }
