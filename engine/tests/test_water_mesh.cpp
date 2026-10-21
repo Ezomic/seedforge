@@ -359,7 +359,10 @@ TEST_CASE("each vertex carries how far the surface stands over the ground: over 
         } else {
             REQUIRE(v.uv.x <= -0.6f + 1e-3f); // sunk below the bank by at least the submerge depth
         }
-        REQUIRE(v.uv.y == 0.0f);
+        REQUIRE((v.uv.y == 0.0f || v.uv.y == 1.0f));
+        if (!isLake(h, field, x, z, rivers)) {
+            REQUIRE(v.uv.y == 0.0f); // dry samples are not open water
+        }
     }
 
     // A river's water lies the surface offset over its bed, wherever it runs.

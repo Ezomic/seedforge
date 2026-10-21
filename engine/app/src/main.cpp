@@ -63,6 +63,7 @@
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
 #include "ichor/world/forged_game.h"
+#include "ichor/world/forged_water_view.h"
 #include "ichor/npc/schedule.h"
 #include "ichor/ui/journal_screen_model.h"
 #include "ichor/world/hydrology_cache.h"
@@ -110,6 +111,7 @@ struct Options {
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
+    std::string waterView; // --forged: start on the bank of a large river or the biggest lake ("river" or "lake")
     std::optional<worldforge::BiomeId> biome; // --forged --biome NAME: start inside this biome (forest, desert, ...)
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
@@ -180,6 +182,9 @@ bool parse(int argc, char** argv, Options& options)
             options.kit = argv[++i];
         } else if (arg == "--overlook" && hasValue) {
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
+        } else if (arg == "--water-view" && hasValue) {
+            options.waterView = argv[++i];
+            if (options.waterView != "river" && options.waterView != "lake") return false;
         } else if (arg == "--biome" && hasValue) {
             options.biome = worldforge::biomeFromName(argv[++i]);
             if (!options.biome || options.settlement >= 0) return false;
@@ -605,6 +610,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     glm::dvec3 anchor(0.0);
     std::unique_ptr<ichor::ForgedGame> forged;
     glm::dvec2 forgedLook(0.0, -30.0);
+    bool waterViewed = false; // --water-view found a bank to stand on
     if (options.forged) {
         const ForgeOutcome outcome = forgeGame(platform, renderer, options, ichor::kitReferenceView(bundle, 16.0f / 9.0f), forged);
         if (outcome != ForgeOutcome::Built) {
@@ -621,6 +627,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
             ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
+        }
+        waterViewed = !options.waterView.empty() && ichor::spawnAtWater(*forged, options.waterView == "river" ? ichor::WaterViewKind::River : ichor::WaterViewKind::Lake);
+        if (!options.waterView.empty() && !waterViewed) {
+            ichor::logf(ichor::LogLevel::Warn, "--water-view {}: this world has no {} with a dry bank; the usual spawn is kept", options.waterView, options.waterView);
         }
         if (options.biome && !ichor::spawnInBiome(*forged, *options.biome)) {
             ichor::logf(ichor::LogLevel::Warn, "--biome {}: the forged world has no dry, gentle ground inside it; the usual spawn is kept", worldforge::kBiomeNames[static_cast<std::size_t>(*options.biome)]);
@@ -1302,6 +1312,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
             view.waterLevel = options.waterLevel.value_or(heightfield.desc().waterLevel());
+            view.forgedWaterLook = forged != nullptr;
         }
         const bool inDungeon = dungeonEntry && ichor::inDungeonPocket(playerPosition(scene));
         if (inDungeon) {
@@ -1340,6 +1351,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = ichor::walkCameraRotation(viewYaw);
+            if (forged && options.overlook > 0.0f && waterViewed) {
+                const glm::dvec3 target(forged->spawn.faceX, forged->heightfield.heightAt(forged->spawn.faceX, forged->spawn.faceZ), forged->spawn.faceZ);
+                view.camera.position = glm::dvec3(forged->spawn.x, forged->spawn.groundY + options.overlook, forged->spawn.z);
+                view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
             const bool overlookSettlement = forged && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size();
             if (forged && options.overlook > 0.0f && (overlookSettlement || options.biome)) {
                 const double lookX = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].x : forged->spawn.x;
@@ -1750,7 +1766,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 

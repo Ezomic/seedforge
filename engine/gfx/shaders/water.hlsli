@@ -43,15 +43,29 @@ float2 riverRipple(float2 relative, float2 cameraWorld, float2 flow, float time,
     return along * wave * breakup * strength * 0.3;
 }
 
+// The forged rivers and lakes: the colour of the water body at a depth, turquoise in the shallows to deep
+// blue by kTintDepth metres. The same numbers are in ichor/gfx/water_look.h, which the tests hold to.
+static const float3 kShallowTint = float3(0.10, 0.52, 0.50);
+static const float3 kDeepTint = float3(0.015, 0.10, 0.26);
+static const float kTintDepth = 4.0;
+
+float3 depthTint(float depth)
+{
+    return lerp(kShallowTint, kDeepTint, smoothstep(0.0, kTintDepth, depth));
+}
+
 // The colour and opacity of a point on a water surface. `position` is camera-relative, which is
 // also the view ray from the camera to the point; `depth` is how far the surface stands over the
 // ground there, which softens the shore: clear and pale in the shallows, a thin band of foam at the edge.
-float4 shadeWater(float3 position, float2 pixel, float depth, float2 flow = 0.0)
+float4 shadeWater(float3 position, float2 pixel, float depth, float2 flow = 0.0, bool forgedLook = false, float bank = 1.0)
 {
     const float travelled = length(position);
     const float3 direction = position / max(travelled, 1e-4);
     float2 slope = ripple(position.xz + frame.cameraWorld.xz, frame.skyParams.z, travelled);
     slope += riverRipple(position.xz, frame.cameraWorld.xz, flow, frame.skyParams.z, travelled);
+    if (forgedLook) {
+        slope *= 3.0;
+    }
     float3 normal = normalize(float3(-slope.x, 1.0, -slope.y));
     const float3 view = -direction;
     // A surface seen from underneath, such as a river on a hillside above the viewer, is shaded
@@ -74,14 +88,42 @@ float4 shadeWater(float3 position, float2 pixel, float depth, float2 flow = 0.0)
     const float3 light = frame.ambient.rgb * 2.0 + sunlight * 0.06 * saturate(frame.sunDirection.y);
     const float3 deep = frame.waterColor.rgb * light;
     const float3 pale = frame.waterColor.rgb * 3.0 * light + float3(0.02, 0.035, 0.03) * light;
-    const float3 body = lerp(pale, deep, smoothstep(0.0, 2.0, depth));
+    float3 body = lerp(pale, deep, smoothstep(0.0, 2.0, depth));
+    if (forgedLook) {
+        const float3 lit = frame.ambient.rgb * 4.0 + sunlight * 0.5 * saturate(frame.sunDirection.y);
+        body = depthTint(depth) * lit;
+    }
 
     float3 surface = lerp(body, reflection, fresnel);
     // A band of foam where the water meets the bank.
     const float foam = smoothstep(0.0, 0.04, depth) * (1.0 - smoothstep(0.08, 0.22, depth));
-    surface = lerp(surface, float3(0.9, 0.95, 1.0) * (frame.ambient.rgb * 3.0 + sunlight * 0.12), foam * 0.55);
+    const float3 foamColour = float3(0.9, 0.95, 1.0) * (frame.ambient.rgb * 3.0 + sunlight * 0.12);
+    if (forgedLook) {
+        // A faint, broken wet line at the bank and, on a river, pale streaks that run with the current.
+        const float2 world = position.xz + frame.cameraWorld.xz;
+        const float broken = 0.5 + 0.5 * sin(world.x * 1.9 + frame.skyParams.z * 0.6) * sin(world.y * 2.3 - frame.skyParams.z * 0.5);
+        const float edge = smoothstep(0.0, 0.06, depth) * (1.0 - smoothstep(0.06, 0.4, depth));
+        surface = lerp(surface, foamColour, edge * broken * 0.3);
+        const float current = saturate(length(flow));
+        if (current > 0.0) {
+            const float2 along = flow / max(length(flow), 1e-4);
+            const float2 across = float2(-along.y, along.x);
+            const float bend = sin(dot(world, along) * 0.45 - frame.skyParams.z * 1.2) * 1.4;
+            const float streak = smoothstep(0.55, 1.0, sin(dot(world, across) * 2.1 + bend));
+            surface += foamColour * streak * current * 0.08 * (1.0 - smoothstep(10.0, 60.0, travelled));
+        }
+    } else {
+        surface = lerp(surface, foamColour, foam * 0.55);
+    }
 
     float4 color = toneMap(applyFog(surface, position, pixel));
+    if (forgedLook) {
+        // Clear to the bed at the waterline, thickening over the first half metre, then nearly opaque in the deeps.
+        // The shore also ramps up from the edge samples, so it is soft where the sample grid steps.
+        color.a = smoothstep(0.0, 0.5, depth) * bank * lerp(0.55, 0.97, smoothstep(0.0, 1.5, depth));
+        color.a = lerp(color.a, 1.0, fresnel * 0.5 * smoothstep(0.0, 0.5, depth));
+        return color;
+    }
     // Open water is nearly opaque at a glance; the shallows and the very edge clear to the bed.
     color.a = lerp(0.7, 1.0, fresnel) * lerp(0.65, 1.0, smoothstep(0.0, 0.8, depth)) * smoothstep(0.0, 0.05, depth + 0.02);
     return color;
