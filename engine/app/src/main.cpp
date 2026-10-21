@@ -1137,7 +1137,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // Time of day follows the tick, so it needs no saved state and a replay sees the same sky.
             // Weather follows the hours since the world began, so it needs no saved state either.
             // The editor can pin either one.
-            ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
+            ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour, forgedSky ? forgedAtmosphere.sunPath : ichor::SunPath{});
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : weatherAtTick(scene.tickCount()), atmosphere);
             if (forgedSky) {
                 ichor::applyForgedAtmosphere(forgedAtmosphere, biomeLook, atmosphere);

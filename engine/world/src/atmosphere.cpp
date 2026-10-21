@@ -29,13 +29,16 @@ float hourOfDay(std::uint64_t tick, double fixedDt, double dayLengthSeconds, flo
     return static_cast<float>(hour - 24.0 * std::floor(hour / 24.0));
 }
 
-Atmosphere atmosphereAt(float hour)
+Atmosphere atmosphereAt(float hour, const SunPath& path)
 {
     hour -= 24.0f * std::floor(hour / 24.0f);
     // The sun climbs from the east at 6, peaks at noon, and sets in the west at 18.
     const float angle = (hour - 6.0f) / 24.0f * kTwoPi;
-    const float elevation = std::sin(angle);
-    const glm::vec3 sun = glm::normalize(glm::vec3(std::cos(angle), elevation, 0.3f));
+    const float lift = std::isfinite(path.elevationLift) ? std::clamp(path.elevationLift, 0.0f, 0.5f) : 0.0f;
+    // The circle is squeezed towards its top by the lift, so noon stays at 1 and the night stays deep.
+    const float elevation = std::sin(angle) * (1.0f - lift) + lift;
+    const float run = std::cos(angle) * std::sqrt(std::max(0.0f, 1.0f - elevation * elevation));
+    const glm::vec3 sun = glm::normalize(glm::vec3(run, elevation, 0.3f));
 
     // How much of the day's colour is up: zero below about five degrees under the horizon.
     const float day = smooth(-0.1f, 0.15f, elevation);
