@@ -19,6 +19,8 @@ public:
     void requestQuit() override { quit_ = true; }
     void setInput(const InputFrame& input) { input_ = input; }
     bool overlayKey() const override { return overlayKey_; }
+    bool helpKey() const override { return helpKey_; }
+    void setHelpKey(bool down) { helpKey_ = down; }
     void setOverlayKey(bool down) { overlayKey_ = down; }
     unsigned pumpCount() const { return pumps_; }
 
@@ -29,6 +31,7 @@ private:
     unsigned pumps_ = 0;
     InputFrame input_;
     bool overlayKey_ = false;
+    bool helpKey_ = false;
 };
 
 }

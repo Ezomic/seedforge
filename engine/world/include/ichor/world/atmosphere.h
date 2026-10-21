@@ -29,8 +29,14 @@ struct Atmosphere {
     float sunElevation = 0.0f; // sine of the sun's angle along its daily circle, about its height over the horizon, for tests and tuning
 };
 
-// Hours run 0 to 24 and wrap. Sunrise is at 6 and sunset at 18.
-Atmosphere atmosphereAt(float hour);
+// How far the sun's daily circle is raised above the horizon: 0 puts the sun on the horizon at 6 and
+// 18, a little more keeps it up at those hours so they are golden rather than dark.
+struct SunPath {
+    float elevationLift = 0.0f;
+};
+
+// Hours run 0 to 24 and wrap. With the default path sunrise is at 6 and sunset at 18.
+Atmosphere atmosphereAt(float hour, const SunPath& path = {});
 
 // The hour of the day after `tick` fixed steps, when a whole day lasts
 // `dayLengthSeconds` of simulated time and play starts at `startHour`.
