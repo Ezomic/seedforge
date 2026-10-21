@@ -57,6 +57,7 @@
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
 #include "ichor/world/forged_game.h"
+#include "ichor/world/forged_water_view.h"
 #include "ichor/npc/schedule.h"
 #include "ichor/ui/journal_screen_model.h"
 #include "ichor/world/hydrology_cache.h"
@@ -102,6 +103,7 @@ struct Options {
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
+    std::string waterView; // --forged: start on the bank of the biggest river or lake ("river" or "lake")
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
@@ -166,6 +168,9 @@ bool parse(int argc, char** argv, Options& options)
             options.kit = argv[++i];
         } else if (arg == "--overlook" && hasValue) {
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
+        } else if (arg == "--water-view" && hasValue) {
+            options.waterView = argv[++i];
+            if (options.waterView != "river" && options.waterView != "lake") return false;
         } else if (arg == "--settlement" && hasValue) {
             if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
         } else if (arg == "--world" && hasValue) {
@@ -552,6 +557,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
             ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
+        }
+        if (!options.waterView.empty() && !ichor::spawnAtWater(*forged, options.waterView == "river" ? ichor::WaterViewKind::River : ichor::WaterViewKind::Lake)) {
+            ichor::logf(ichor::LogLevel::Warn, "--water-view {}: this world has no {} with a dry bank; the usual spawn is kept", options.waterView, options.waterView);
         }
         anchor = {forged->spawn.x, forged->spawn.groundY + 0.5, forged->spawn.z};
         // The view looks 30 m toward the place the spawn was searched around, north when the spawn is on top of it.
@@ -1152,6 +1160,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
             view.waterLevel = options.waterLevel.value_or(heightfield.desc().waterLevel());
+            view.forgedWaterLook = forged != nullptr;
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -1179,6 +1188,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = ichor::walkCameraRotation(viewYaw);
+            if (forged && options.overlook > 0.0f && !options.waterView.empty()) {
+                const glm::dvec3 target(forged->spawn.faceX, forged->heightfield.heightAt(forged->spawn.faceX, forged->spawn.faceZ), forged->spawn.faceZ);
+                view.camera.position = glm::dvec3(forged->spawn.x, forged->spawn.groundY + options.overlook, forged->spawn.z);
+                view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
             if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
                 const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
                 const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
@@ -1544,7 +1558,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--water-view river|lake] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 

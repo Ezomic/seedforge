@@ -123,6 +123,7 @@ struct RenderView {
     std::vector<glm::mat4> jointPalette; // skinning matrices, model space times inverse bind
     std::vector<TerrainDraw> terrain;
     std::vector<VegetationDraw> vegetation;
+    bool forgedWaterLook = false; // rivers and lakes shaded by depth (turquoise shallows to deep blue, soft shore); the sea and the stand-in water keep their look
     std::vector<WaterDraw> waterCells; // rivers and lakes, drawn with the sea's shading
     std::vector<DebugLine> lines;
 };
