@@ -241,24 +241,28 @@ TEST_CASE("temperature falls with elevation and with latitude", "[worldforge][cl
 
 TEST_CASE("real terrain: high land is colder than low land in the same latitude band", "[worldforge][climate]")
 {
-    const auto base = makeErodedBase(kSeed, 256, 128, 16);
-    const auto out = climate(base);
-    std::int64_t highSum = 0, lowSum = 0, highN = 0, lowN = 0;
-    for (int y = 48; y < 80; ++y) {
-        for (int x = 0; x < 256; ++x) {
-            const auto c = base.index(x, y);
-            if (base.heightM[c] > 1000) {
-                highSum += out.temperatureC10[c];
-                ++highN;
-            } else if (base.heightM[c] > 0 && base.heightM[c] < 300) {
-                lowSum += out.temperatureC10[c];
-                ++lowN;
+    // Not every seed raises mountains inside this band, so take the first one that does.
+    for (std::uint64_t seed = kSeed; seed < kSeed + 32; ++seed) {
+        const auto base = makeErodedBase(seed, 256, 128, 16);
+        const auto out = climate(base);
+        std::int64_t highSum = 0, lowSum = 0, highN = 0, lowN = 0;
+        for (int y = 48; y < 80; ++y) {
+            for (int x = 0; x < 256; ++x) {
+                const auto c = base.index(x, y);
+                if (base.heightM[c] > 1000) {
+                    highSum += out.temperatureC10[c];
+                    ++highN;
+                } else if (base.heightM[c] > 0 && base.heightM[c] < 300) {
+                    lowSum += out.temperatureC10[c];
+                    ++lowN;
+                }
             }
         }
+        if (highN == 0 || lowN == 0) continue;
+        CHECK(static_cast<double>(highSum) / highN + 50.0 < static_cast<double>(lowSum) / lowN);
+        return;
     }
-    REQUIRE(highN > 0);
-    REQUIRE(lowN > 0);
-    CHECK(static_cast<double>(highSum) / highN + 50.0 < static_cast<double>(lowSum) / lowN);
+    FAIL("no seed has both high and low land in the band");
 }
 
 TEST_CASE("moisture and temperature stay in range", "[worldforge][climate]")

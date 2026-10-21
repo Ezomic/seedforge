@@ -23,7 +23,7 @@ worldforge::ForgeConfig lowRiverThreshold()
 }
 
 constexpr int kGrid = 257;
-constexpr std::uint64_t kSeed = 13;
+constexpr std::uint64_t kFirstSeed = 1;
 constexpr float kFord = 0.5f;
 
 struct Crossing {
@@ -112,6 +112,16 @@ std::unique_ptr<Fixture> makeFixtureOwned(std::uint64_t seed)
     return owned;
 }
 
+std::unique_ptr<Fixture> makeFixtureWithCrossings()
+{
+    for (std::uint64_t seed = kFirstSeed; seed < kFirstSeed + 40; ++seed) {
+        auto owned = makeFixtureOwned(seed);
+        if (!owned->crossings.empty()) return owned;
+    }
+    FAIL("no seed has a lake or river wide enough to cross");
+    return makeFixtureOwned(kFirstSeed);
+}
+
 std::unique_ptr<NavWorld> bakeNav(const Fixture& f, const RoadField* roads, bool respectWater)
 {
     auto nav = std::make_unique<NavWorld>();
@@ -157,7 +167,7 @@ float deepestWater(const Fixture& f, const std::vector<glm::dvec3>& path)
 
 TEST_CASE("a path over the forged navmesh does not cross open lake water, and one over the plain navmesh does")
 {
-    const auto owned = makeFixtureOwned(kSeed);
+    const auto owned = makeFixtureWithCrossings();
     const Fixture& f = *owned;
     REQUIRE(!f.crossings.empty());
     const auto plain = bakeNav(f, nullptr, false);
@@ -181,7 +191,7 @@ TEST_CASE("a path over the forged navmesh does not cross open lake water, and on
 
 TEST_CASE("a road over the water is a bridge: the path crosses where the road does")
 {
-    const auto owned = makeFixtureOwned(kSeed);
+    const auto owned = makeFixtureWithCrossings();
     const Fixture& f = *owned;
     REQUIRE(!f.crossings.empty());
     const Crossing& c = f.crossings.front();
@@ -200,7 +210,7 @@ TEST_CASE("a road over the water is a bridge: the path crosses where the road do
 
 TEST_CASE("the surface blocks open water, lets a road bridge it, and leaves dry ground walkable")
 {
-    const auto owned = makeFixtureOwned(kSeed);
+    const auto owned = makeFixtureWithCrossings();
     const Fixture& f = *owned;
     const ForgedNavSurface surface(*f.waterField, nullptr);
     const Crossing& c = f.crossings.front();

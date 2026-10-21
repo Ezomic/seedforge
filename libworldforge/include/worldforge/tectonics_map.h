@@ -66,9 +66,12 @@ struct TectonicMap {
 
 namespace detail {
 
+constexpr std::int64_t kContinentShareMinPermille = 400; // the continental plates take a share of the map drawn from this range
+constexpr std::int64_t kContinentShareSpanPermille = 300;
+
 constexpr std::uint64_t kTectonicsDomain = 0x7465637431706c74ull;
 
-enum TectonicsSalt : std::uint32_t { kSaltPosition = 1, kSaltType = 2, kSaltDrift = 3, kSaltBase = 4, kSaltWarpX = 5, kSaltWarpY = 6, kSaltRidge = 7, kSaltRelief = 8 };
+enum TectonicsSalt : std::uint32_t { kSaltPosition = 1, kSaltType = 2, kSaltDrift = 3, kSaltBase = 4, kSaltWarpX = 5, kSaltWarpY = 6, kSaltRidge = 7, kSaltRelief = 8, kSaltContinentShare = 9 };
 
 constexpr std::uint64_t tectonicsHash(std::uint64_t seed, std::uint32_t salt, std::uint32_t a)
 {
@@ -189,6 +192,33 @@ inline int boundaryPeakM(BoundaryKind kind, PlateType self, int pairContinental)
     return 0;
 }
 
+// Plate types are chosen after the plates are laid out, so the continental share of the map is a
+// per-seed target rather than a coin flip per plate. Plate 0 is always continental and plate 1 always
+// oceanic; the other plates join plate 0 in hash order while they still fit under the target, so a
+// seed can no longer draw a map of small continental slivers in a sea of oceanic plates.
+inline void assignPlateTypes(std::uint64_t worldSeed, TectonicMap& map, std::size_t cells)
+{
+    const std::size_t count = map.plates.size();
+    std::vector<std::int64_t> area(count, 0);
+    for (const std::uint8_t id : map.plateId) ++area[id];
+
+    const std::int64_t share = kContinentShareMinPermille + static_cast<std::int64_t>(tectonicsHash(worldSeed, kSaltContinentShare, 0) % static_cast<std::uint64_t>(kContinentShareSpanPermille + 1));
+    const std::int64_t target = static_cast<std::int64_t>(cells) * share / 1000;
+
+    for (TectonicPlate& plate : map.plates) plate.type = PlateType::Oceanic;
+    map.plates[0].type = PlateType::Continental;
+    std::int64_t continental = area[0];
+
+    std::vector<std::pair<std::uint64_t, std::size_t>> order;
+    for (std::size_t i = 2; i < count; ++i) order.emplace_back(tectonicsHash(worldSeed, kSaltType, static_cast<std::uint32_t>(i)), i);
+    std::sort(order.begin(), order.end());
+    for (const auto& [key, i] : order) {
+        if (continental + area[i] > target) continue;
+        map.plates[i].type = PlateType::Continental;
+        continental += area[i];
+    }
+}
+
 }
 
 // Returns nullopt when the size or plate count is outside the kTectonics* limits.
@@ -222,12 +252,9 @@ inline std::optional<TectonicMap> generateTectonics(std::uint64_t worldSeed, con
         TectonicPlate& plate = map.plates[static_cast<std::size_t>(i)];
         plate.seedX = static_cast<int>(cell % static_cast<std::size_t>(w));
         plate.seedY = static_cast<int>(cell / static_cast<std::size_t>(w));
-        plate.type = (i == 0) ? PlateType::Continental : (i == 1) ? PlateType::Oceanic : (detail::tectonicsHash(worldSeed, detail::kSaltType, ui) % 5 < 2 ? PlateType::Continental : PlateType::Oceanic);
         const std::uint64_t drift = detail::tectonicsHash(worldSeed, detail::kSaltDrift, ui);
         plate.driftX = static_cast<int>(drift % 17) - 8;
         plate.driftY = static_cast<int>((drift >> 32) % 17) - 8;
-        const std::uint64_t base = detail::tectonicsHash(worldSeed, detail::kSaltBase, ui);
-        plate.baseHeightM = plate.type == PlateType::Continental ? 100 + static_cast<int>(base % 400) : -4000 + static_cast<int>(base % 1500);
     }
 
     // Voronoi with a warped lookup point, so plate edges meander instead of being straight bisectors.
@@ -254,6 +281,13 @@ inline std::optional<TectonicMap> generateTectonics(std::uint64_t worldSeed, con
             }
             map.plateId[map.index(x, y)] = static_cast<std::uint8_t>(bestPlate);
         }
+    }
+
+    detail::assignPlateTypes(worldSeed, map, cells);
+    for (int i = 0; i < count; ++i) {
+        TectonicPlate& plate = map.plates[static_cast<std::size_t>(i)];
+        const std::uint64_t base = detail::tectonicsHash(worldSeed, detail::kSaltBase, static_cast<std::uint32_t>(i));
+        plate.baseHeightM = plate.type == PlateType::Continental ? 100 + static_cast<int>(base % 400) : -4000 + static_cast<int>(base % 1500);
     }
 
     std::vector<std::uint8_t> kindTable(static_cast<std::size_t>(count) * static_cast<std::size_t>(count), 0);
