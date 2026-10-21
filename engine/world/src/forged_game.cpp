@@ -465,9 +465,8 @@ bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std:
     return true;
 }
 
-bool spawnAtSettlement(ForgedGame& game, std::size_t index)
+ForgedSpawn settlementSpawn(const ForgedGame& game, std::size_t index)
 {
-    if (index >= game.sites.size()) return false;
     const SettlementSite& site = game.sites[index];
     constexpr double kClearM = 4.0;
     const std::vector<PlacedBuilding> buildings = game.buildings ? game.buildings->ofSettlement(site.id) : std::vector<PlacedBuilding>{};
@@ -477,7 +476,7 @@ bool spawnAtSettlement(ForgedGame& game, std::size_t index)
             if (piece.settlementId == site.id) pieces.push_back(piece);
         }
     }
-    game.spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
+    ForgedSpawn spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
         for (const PlacedBuilding& b : buildings) {
             if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) return true;
         }
@@ -486,8 +485,15 @@ bool spawnAtSettlement(ForgedGame& game, std::size_t index)
         }
         return false;
     });
-    game.spawn.faceX = site.x;
-    game.spawn.faceZ = site.z;
+    spawn.faceX = site.x;
+    spawn.faceZ = site.z;
+    return spawn;
+}
+
+bool spawnAtSettlement(ForgedGame& game, std::size_t index)
+{
+    if (index >= game.sites.size()) return false;
+    game.spawn = settlementSpawn(game, index);
     return true;
 }
 

@@ -144,6 +144,9 @@ bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std:
 // buildings and kit pieces, and aims the view at it. Returns false, leaving the spawn alone, for an index past the end.
 bool spawnAtSettlement(ForgedGame& game, std::size_t index);
 
+// The spawn spawnAtSettlement would pick for settlement `index` (which must be below game.sites.size()), without moving game.spawn.
+ForgedSpawn settlementSpawn(const ForgedGame& game, std::size_t index);
+
 // Builds the game from a finished forge. Fails, with a message, when the result is empty or a bake step
 // refuses the world. Never throws.
 std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const WorldDesc& requested, const ForgedContentInputs& content = {});

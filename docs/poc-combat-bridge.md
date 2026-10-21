@@ -37,6 +37,11 @@ behaviour.
    (the respawn at the last settlement, the enemy's post).
 3. Death classification calls a wall "cornered" using `kArenaHalf`. In the open world every spot would count
    as against a wall, so an `arena` flag (default true, false after `attach`) keeps that telemetry honest.
+4. The camera framing (`frameCamera`) clamps the eye to the arena's walls, and the "was the attacker on
+   screen" telemetry uses it. At world coordinates both would be wrong, so outside the arena `viewPose` works
+   the pose out around the player and moves it back (the arena case adds and subtracts zero).
+5. `spawnFoe` is split out of `install`, so the bridge can hold the enemy back until the ground under its
+   post is resident.
 
 Nothing else in stage0 is edited.
 
@@ -52,7 +57,7 @@ A new small library `game/combat_bridge` (`ichor_combat_bridge`, one `add_subdir
   its ground is resident, tracks the last settlement entered, respawns the player there a few seconds after
   death (the manual retry button still works), and answers the HUD (health, stamina). It also builds the
   third person view: Exile and Bull-Warden instances, the camera, and the stage0 telegraph lines.
-- App wiring in `main.cpp` (small): the `--combat`, `--combat-bot SKILL` and `--combat-start enemy` flags,
+- App wiring in `main.cpp` (small): the `--combat`, `--combat-bot SKILL` and `--combat-duel` flags,
   the bridge creation, one call in the view builder, one in the HUD hook, and not registering the first
   person `walk_look` system (the bridge owns steering and the camera in combat mode).
 - `Engine::setInputSource`: a hook that lets a function supply the per tick input (used by `--combat-bot`;
@@ -67,6 +72,11 @@ Dungeon room entries as enemy sites, more than one enemy, other roles, the bow, 
 that returns the enemy to its post, a lock-on camera in the world, saving a fight in a campaign, and any
 tuning. A foe whose ground cell unloads (the player outruns it by more than the streaming radius) has no
 floor; the respawn resets it.
+
+Also not supported: saving or loading a fight (the bridge keeps its phase, last settlement and respawn timer
+outside the scene, so `--combat` is ignored with `--load` and `--load-slot`), and bit-identical replays in
+live play, where the tick on which the enemy's ground cell arrives depends on the streaming thread (headless
+and `--screenshot` runs stream synchronously and are deterministic).
 
 ## What gets reworked if the combat design changes
 
