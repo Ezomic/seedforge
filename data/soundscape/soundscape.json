@@ -1,0 +1,216 @@
+[
+ {
+  "id": "biome_ocean",
+  "kind": "biome",
+  "bed": "A_Bed_Surf",
+  "bed_gain": 0.5,
+  "dawn": "",
+  "day": "",
+  "dusk": "",
+  "night": ""
+ },
+ {
+  "id": "biome_lake",
+  "kind": "biome",
+  "bed": "A_Bed_Lake",
+  "bed_gain": 0.35,
+  "dawn": "",
+  "day": "",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_glacier",
+  "kind": "biome",
+  "bed": "A_Wind",
+  "bed_gain": 0.25,
+  "dawn": "",
+  "day": "",
+  "dusk": "",
+  "night": ""
+ },
+ {
+  "id": "biome_tundra",
+  "kind": "biome",
+  "bed": "A_Wind",
+  "bed_gain": 0.2,
+  "dawn": "",
+  "day": "",
+  "dusk": "",
+  "night": "A_Night_Wolves"
+ },
+ {
+  "id": "biome_taiga",
+  "kind": "biome",
+  "bed": "A_Bed_Taiga",
+  "bed_gain": 0.3,
+  "dawn": "A_Dawn_Birds",
+  "day": "",
+  "dusk": "",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_forest",
+  "kind": "biome",
+  "bed": "A_Bed_Forest",
+  "bed_gain": 0.35,
+  "dawn": "A_Dawn_Birds",
+  "day": "A_Day_Insects",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_grassland",
+  "kind": "biome",
+  "bed": "A_Bed_Grassland",
+  "bed_gain": 0.3,
+  "dawn": "A_Dawn_Birds",
+  "day": "A_Day_Insects",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_desert",
+  "kind": "biome",
+  "bed": "A_Wind",
+  "bed_gain": 0.2,
+  "dawn": "",
+  "day": "",
+  "dusk": "",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_savanna",
+  "kind": "biome",
+  "bed": "A_Bed_Savanna",
+  "bed_gain": 0.3,
+  "dawn": "A_Dawn_Birds",
+  "day": "A_Day_Insects",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_rainforest",
+  "kind": "biome",
+  "bed": "A_Bed_Rainforest",
+  "bed_gain": 0.45,
+  "dawn": "A_Dawn_Birds",
+  "day": "A_Day_Insects",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_alpine",
+  "kind": "biome",
+  "bed": "A_Wind",
+  "bed_gain": 0.3,
+  "dawn": "A_Dawn_Birds",
+  "day": "",
+  "dusk": "",
+  "night": ""
+ },
+ {
+  "id": "biome_crag",
+  "kind": "biome",
+  "bed": "A_Wind",
+  "bed_gain": 0.25,
+  "dawn": "",
+  "day": "",
+  "dusk": "",
+  "night": ""
+ },
+ {
+  "id": "biome_marsh",
+  "kind": "biome",
+  "bed": "A_Bed_Marsh",
+  "bed_gain": 0.35,
+  "dawn": "A_Dawn_Birds",
+  "day": "A_Day_Insects",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_lowland_farm",
+  "kind": "biome",
+  "bed": "A_Bed_Farmland",
+  "bed_gain": 0.25,
+  "dawn": "A_Dawn_Birds",
+  "day": "A_Day_Insects",
+  "dusk": "A_Dusk_Crickets",
+  "night": "A_Night_Insects"
+ },
+ {
+  "id": "biome_salt_blight",
+  "kind": "biome",
+  "bed": "A_Bed_Blight",
+  "bed_gain": 0.2,
+  "dawn": "",
+  "day": "",
+  "dusk": "",
+  "night": ""
+ },
+ {
+  "id": "biome_tidal_ruin",
+  "kind": "biome",
+  "bed": "A_Bed_Surf",
+  "bed_gain": 0.4,
+  "dawn": "",
+  "day": "",
+  "dusk": "A_Dusk_Crickets",
+  "night": ""
+ },
+ {
+  "id": "step_grass",
+  "kind": "step",
+  "clip": "A_Step_Grass",
+  "gain": 0.35
+ },
+ {
+  "id": "step_rock",
+  "kind": "step",
+  "clip": "A_Step_Rock",
+  "gain": 0.45
+ },
+ {
+  "id": "step_road",
+  "kind": "step",
+  "clip": "A_Step_Road",
+  "gain": 0.4
+ },
+ {
+  "id": "step_snow",
+  "kind": "step",
+  "clip": "A_Step_Snow",
+  "gain": 0.4
+ },
+ {
+  "id": "settlement_chatter",
+  "kind": "settlement",
+  "clip": "A_Settlement_Chatter",
+  "gain": 0.4
+ },
+ {
+  "id": "settlement_bell",
+  "kind": "settlement",
+  "clip": "A_Settlement_Bell",
+  "gain": 0.5
+ },
+ {
+  "id": "settlement_mill",
+  "kind": "settlement",
+  "clip": "A_Settlement_Mill",
+  "gain": 0.45
+ },
+ {
+  "id": "settlement_surf",
+  "kind": "settlement",
+  "clip": "A_Settlement_Surf",
+  "gain": 0.5
+ },
+ {
+  "id": "settlement_machinery",
+  "kind": "settlement",
+  "clip": "A_Settlement_Machinery",
+  "gain": 0.5
+ }
+]

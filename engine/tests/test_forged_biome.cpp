@@ -237,3 +237,24 @@ TEST_CASE("a real forged world gives every cell a biome")
     invalid.cellMetres = 0;
     REQUIRE_FALSE(biomesFromForgedWorld(world, invalid).ok());
 }
+
+TEST_CASE("the blend at a position is the two biomes and the byte the splat uses")
+{
+    const WorldDesc desc = smallWorld();
+    worldforge::BiomeMap map = halvesMap();
+    map.secondary[map.index(2, 2)] = static_cast<std::uint8_t>(BiomeId::Marsh);
+    map.blend[map.index(2, 2)] = 255;
+    const ForgedBiomeField biomes(map, desc.sizeMetres);
+
+    const double step = static_cast<double>(desc.sizeMetres) / (kGrid - 1);
+    const BiomeBlend marsh = biomes.blendAt(2 * step, 2 * step);
+    REQUIRE(marsh.primary == BiomeId::Forest);
+    REQUIRE(marsh.secondary == BiomeId::Marsh);
+    REQUIRE(marsh.weight == 1.0f);
+    REQUIRE(biomes.blendAt(0.0, 0.0).weight == 0.0f);
+    REQUIRE(biomes.blendAt(desc.sizeMetres, 0.0).primary == BiomeId::Desert);
+
+    const BiomeBlend none = ForgedBiomeField{}.blendAt(10.0, 10.0);
+    REQUIRE(none.primary == BiomeId::Crag);
+    REQUIRE(none.weight == 0.0f);
+}

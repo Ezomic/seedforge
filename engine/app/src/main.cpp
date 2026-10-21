@@ -1,6 +1,7 @@
 #include "exile_demo.h"
 
 #include "ichor/anim/animation.h"
+#include "ichor/anim/exile_avatar.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
@@ -9,7 +10,10 @@
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
 #include "ichor/audio/reverb.h"
+#include "ichor/audio/soundscape.h"
 #include "ichor/audio/wading_splash.h"
+#include "ichor/core/asset_roots.h"
+#include "ichor/core/controls_overlay.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
@@ -38,6 +42,7 @@
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/gfx/reference_view.h"
 #include "ichor/gfx/walk_camera.h"
+#include "ichor/gfx/vk_context.h"
 #include "ichor/gfx/vulkan_renderer.h"
 #include "ichor/loop/engine.h"
 #include "ichor/platform/null_platform.h"
@@ -53,6 +58,7 @@
 #include "ichor/world/atmosphere.h"
 #include "ichor/ui/loading_screen.h"
 #include "ichor/ui/new_game_flow.h"
+#include "ichor/world/dungeon_entry.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
@@ -96,13 +102,18 @@ struct Options {
     bool audioProbe = false; // open the device, play nothing, exit
     std::uint64_t frames = 0; // 0 runs until quit
     std::uint64_t seed = 1;
+    std::filesystem::path content = ICHOR_CONTENT_DIR; // cooked bundles and fonts; a packaged build points it beside the exe
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
+    std::filesystem::path exileDefault = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile"; // the player's model in --forged when --exile is not given
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
+    std::optional<worldforge::BiomeId> biome; // --forged --biome NAME: start inside this biome (forest, desert, ...)
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
+    int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
+    bool enterDungeon = false; // --forged: go in as soon as an entrance is in reach, as if Enter were pressed
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
@@ -113,6 +124,7 @@ struct Options {
     bool showMap = false;
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
+    bool noExilePlayer = false; // --forged walks as the Exile unless this is set, and then as the wire capsule from inside
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
@@ -121,6 +133,7 @@ struct Options {
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
     std::optional<ichor::OverlayMode> overlay; // --overlay [off|compact|full]; none is compact in play and off for a screenshot
+    bool controls = false; // --controls: start with the F1 controls card open
     bool showWindow = false; // with --screenshot: a visible window, only to compare it with the hidden render
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -166,8 +179,15 @@ bool parse(int argc, char** argv, Options& options)
             options.kit = argv[++i];
         } else if (arg == "--overlook" && hasValue) {
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
+        } else if (arg == "--biome" && hasValue) {
+            options.biome = worldforge::biomeFromName(argv[++i]);
+            if (!options.biome || options.settlement >= 0) return false;
+        } else if (arg == "--dungeon" && hasValue) {
+            if (!parseNumber(argv[++i], options.dungeon) || options.dungeon < 0) return false;
+        } else if (arg == "--enter-dungeon") {
+            options.enterDungeon = true;
         } else if (arg == "--settlement" && hasValue) {
-            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
+            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0 || options.biome) return false;
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
@@ -202,6 +222,8 @@ bool parse(int argc, char** argv, Options& options)
                     ++i;
                 }
             }
+        } else if (arg == "--controls") {
+            options.controls = true;
         } else if (arg == "--show-window") {
             options.showWindow = true;
         } else if (arg == "--screenshot" && hasValue) {
@@ -220,6 +242,8 @@ bool parse(int argc, char** argv, Options& options)
             options.showNewGame = true;
         } else if (arg == "--no-forged-atmosphere") {
             options.standInAtmosphere = true;
+        } else if (arg == "--no-exile-player") {
+            options.noExilePlayer = true;
         } else if (arg == "--forged") {
             options.forged = true;
         } else if (arg == "--grid" && hasValue) {
@@ -358,7 +382,7 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
-        const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+        const std::filesystem::path fonts = options.content / "fonts";
         bool fontsLoaded = ui->ok();
         for (const char* file : {"AlegreyaSans-Regular.ttf", "Cinzel.ttf"}) {
             fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
@@ -465,7 +489,39 @@ bool finishCampaign(const Options& options, const ichor::ForgedGame& game)
     return true;
 }
 
-int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
+// The "press F1" hint is for a person's first play: it shows until the marker file exists, which is written as it shows.
+// A headless or screenshot run neither shows it nor writes the marker.
+bool firstRunHint(const Options& options)
+{
+    if (options.headless || options.controls || !options.screenshot.empty()) {
+        return false;
+    }
+    const std::filesystem::path marker = options.saves / ".controls_seen";
+    std::error_code ec;
+    if (std::filesystem::exists(marker, ec)) {
+        return false;
+    }
+    std::filesystem::create_directories(options.saves, ec);
+    std::ofstream(marker) << "seen\n";
+    return true;
+}
+
+// A packaged build has its content, shaders, scripts, data and art beside the executable; point every default there.
+void usePackagedRoots(Options& options, const ichor::AssetRoots& roots)
+{
+    options.content = roots.content;
+    options.scene = roots.content / "kit.iscene";
+    options.actor = roots.content / "arm.iscene";
+    options.world = roots.content / "world";
+    options.exileDefault = roots.art / "exile";
+    options.saves = roots.content.parent_path() / "saves";
+    options.kit = roots.art / "settlement_kit";
+    options.script = roots.scripts / "main.lua";
+    options.data = roots.data;
+    ichor::setShaderDirectory(roots.shaders);
+}
+
+int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
 {
     const bool hidden = !options.screenshot.empty() && !options.showWindow;
     if (!platform.init({.hidden = hidden}) || !renderer.init()) {
@@ -505,8 +561,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     ExileDemo exile;
-    if (!options.exile.empty() && !loadExileDemo(options.exile, renderer, animations, exile)) {
-        return 1;
+    const bool exileByDefault = options.forged && !options.noExilePlayer && options.exile.empty();
+    const std::filesystem::path exileFolder = exileByDefault ? options.exileDefault : options.exile;
+    if (!exileFolder.empty() && !loadExileDemo(exileFolder, renderer, animations, exile)) {
+        if (!exileByDefault) {
+            return 1;
+        }
+        ichor::logf(ichor::LogLevel::Warn, "the Exile did not load from {} (git lfs pull --include=\"art/exile/*\"); the player stays the wire capsule", exileFolder.string());
+        exile = ExileDemo{};
+    }
+    ichor::ExileAvatar exileAvatar;
+    if (options.forged && !options.noExilePlayer && !exile.kit.bundles[0].meshes.empty() && !exileAvatar.prepare(exile.kit, exile.meshBase)) {
+        ichor::log(ichor::LogLevel::Warn, "the Exile has no walking clips; the player stays the wire capsule");
     }
     audio.addBundle(bundle);
     // Mesh indices run across the bundles in upload order, which is what a MeshRef holds.
@@ -553,6 +619,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
             ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
         }
+        if (options.biome && !ichor::spawnInBiome(*forged, *options.biome)) {
+            ichor::logf(ichor::LogLevel::Warn, "--biome {}: the forged world has no dry, gentle ground inside it; the usual spawn is kept", worldforge::kBiomeNames[static_cast<std::size_t>(*options.biome)]);
+        }
+        if (options.dungeon >= 0 && !ichor::spawnAtDungeon(*forged, static_cast<std::size_t>(options.dungeon))) {
+            ichor::logf(ichor::LogLevel::Warn, "--dungeon {} has no entrance with open ground beside it; the usual spawn is kept", options.dungeon);
+        }
         anchor = {forged->spawn.x, forged->spawn.groundY + 0.5, forged->spawn.z};
         // The view looks 30 m toward the place the spawn was searched around, north when the spawn is on top of it.
         const glm::dvec2 toward(forged->spawn.faceX - forged->spawn.x, forged->spawn.faceZ - forged->spawn.z);
@@ -579,6 +651,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     // The roads, points of interest and buildings are grey-box meshes uploaded once; the view draws the ones in resident cells.
     ichor::ForgedScenery scenery;
     std::set<std::string> bakedDungeons;
+    std::unique_ptr<ichor::DungeonEntry> dungeonEntry;
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
     if (forged) {
@@ -590,6 +663,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         sceneryDrawn = renderer.uploadBundle(scenery.bundle);
         if (!sceneryDrawn) {
             ichor::log(ichor::LogLevel::Warn, "the roads and placed buildings could not be uploaded; the world is drawn without them");
+        }
+        const std::uint32_t dungeonKitBase = renderer.meshCount();
+        if (renderer.uploadBundle(ichor::buildDungeonKit())) {
+            dungeonEntry = std::make_unique<ichor::DungeonEntry>(*forged, dungeonKitBase, ichor::DungeonEntryParams{.autoEnter = options.enterDungeon});
+        } else {
+            ichor::log(ichor::LogLevel::Warn, "the dungeon kit could not be uploaded; dungeons cannot be entered");
         }
     }
     ichor::StreamerConfig streaming;
@@ -608,6 +687,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         streaming.rivers = forged->water.rivers;
         streaming.hydrology = forged->water.hydrology;
         streaming.biomes = forged->biomes;
+        streaming.scenery = ichor::forgedSceneryGuard(*forged);
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
@@ -645,6 +725,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.setOverlayMode(ichor::startingOverlayMode(!options.screenshot.empty(), options.overlay));
+    engine.setControlsOverlay(ichor::startControlsOverlay(firstRunHint(options), options.controls));
     engine.scene().setAnimations(&animations);
     // The stand-in world has no roads, so its field is empty and the bonus never applies.
     const ichor::NullRoadField noRoads;
@@ -652,6 +733,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     int roadBonusPermille = ichor::kDefaultRoadBonusPermille;
     if (waterField) {
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
+            if (ichor::inDungeonPocket(position)) return 1.0; // a dungeon is outside the world: no water or road there
             const float depth = waterField->at(position.x, position.z).depth;
             return static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
         });
@@ -662,10 +744,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::ForgedWalking> walking;
     if (forged && waterField) {
         walking = std::make_unique<ichor::ForgedWalking>(heightfield, waterField, ichor::CapabilitySet{});
-        engine.scene().setVelocityFilter([&](const glm::dvec3& position, const glm::dvec3& velocity) { return walking->filterVelocity(position, velocity); });
+        engine.scene().setVelocityFilter([&](const glm::dvec3& position, const glm::dvec3& velocity) { return ichor::inDungeonPocket(position) ? velocity : walking->filterVelocity(position, velocity); });
         engine.scene().addSystem("walk_guard", [&, detector = ichor::StuckDetector{}](ichor::Scene& scene, double dt, const ichor::InputFrame& input) mutable {
             for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
                 const glm::dvec3& feet = transform.position;
+                if (ichor::inDungeonPocket(feet)) continue;
                 const bool wantsToMove = input.moveX != 0.0f || input.moveY != 0.0f;
                 const double probe = walking->params().probeMetres;
                 const ichor::WalkAssessment ahead = walking->assess(feet.x + input.moveX * probe, feet.z - input.moveY * probe);
@@ -682,6 +765,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         engine.scene().addSystem("wading_splash", [&, splash = ichor::WadingSplash{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
             for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
                 const glm::dvec3& feet = transform.position;
+                if (ichor::inDungeonPocket(feet)) continue;
                 if (const auto cue = splash.step(feet.x, feet.z, waterField->at(feet.x, feet.z).depth)) {
                     audio.play(splashCue, feet, false, cue->gain);
                 }
@@ -736,9 +820,13 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     musicPlayer.bind(audio);
 
     constexpr std::uint32_t kGenVersion = 1;
-    const auto saveContext = [&] { return ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
+    // With --campaign the slots live in the campaign's own folder, beside the world they belong to.
+    const std::optional<ichor::Campaign> campaign = forged && !options.campaign.empty() ? ichor::Campaign::open(options.saves, options.campaign) : std::nullopt;
+    const auto saveContext = [&] { return campaign ? campaign->slotContext(data.digest()) : ichor::SaveContext{worldSeed, kGenVersion, data.digest()}; };
     // Ironman keeps its own directory, so a normal run can never load its rolling slot.
-    ichor::SaveSlots slots(options.saves / ((options.ironman ? "ironman-" : "campaign-") + std::to_string(worldSeed)) / "slots", ichor::SavePolicy{options.ironman, 3});
+    const ichor::SavePolicy savePolicy{options.ironman, 3};
+    ichor::SaveSlots slots = campaign ? campaign->slots(savePolicy)
+                                      : ichor::SaveSlots(options.saves / ((options.ironman ? "ironman-" : "campaign-") + std::to_string(worldSeed)) / "slots", savePolicy);
     // The player's settings live beside the campaigns, not in one, and never touch the simulation.
     const std::filesystem::path settingsPath = options.saves / "settings.cfg";
     ichor::Settings settings = ichor::loadSettings(settingsPath);
@@ -836,17 +924,57 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         return position;
     };
+    // The forged world's soundscape: a bed per biome that crossfades along the borders, day and night variants, the
+    // sound of a settlement near it, and footsteps by surface. Audio only reads the scene, so none of it is sim state.
+    // A bed or step whose clip does not exist is silent.
+    ichor::Soundscape soundscape;
+    ichor::BedMixer bedMixer;
+    std::vector<ichor::SettlementSoundType> settlementTypes;
+    if (forged && forged->biomes) {
+        std::string soundscapeError;
+        if (!ichor::Soundscape::load(data, soundscape, soundscapeError)) {
+            ichor::logf(ichor::LogLevel::Warn, "data: {}; the forged world stays silent", soundscapeError);
+        }
+        for (const ichor::SettlementSite& site : forged->sites) {
+            settlementTypes.push_back(ichor::settlementTypeForBiome(worldforge::kBiomeNames[static_cast<std::size_t>(forged->biomes->biomeAt(site.x, site.z))]));
+        }
+        engine.scene().addSystem("footsteps", [&, pacer = ichor::FootstepPacer{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
+            for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+                const glm::dvec3& feet = transform.position;
+                if (!pacer.step(feet.x, feet.z)) {
+                    continue;
+                }
+                const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
+                const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
+                // Wading has its own splash.
+                if (surface == ichor::SoundSurface::Water) {
+                    continue;
+                }
+                if (const auto step = ichor::footstepFor(soundscape, surface)) {
+                    const std::uint32_t clip = audio.findSound(step->clip);
+                    if (clip != ichor::Mixer::kNoSound) {
+                        audio.play(clip, feet, false, step->gain);
+                    }
+                }
+            }
+        });
+    }
     if (!heightfield.empty()) {
         // Streaming advances once per tick, so residency follows the path and
         // the budget alone. While the gate holds no ticks run, so it advances
         // the streamer itself until the required ring is in.
+        if (dungeonEntry) {
+            dungeonEntry->install(engine.scene());
+        }
+        // Inside a dungeon the player is outside the world: the cells around the entrance stay as they were.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
+            if (ichor::inDungeonPocket(playerPosition(scene))) return;
             ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(playerPosition(scene));
         });
         engine.setTickGate([&](const ichor::Scene& scene) {
             const glm::dvec3 position = playerPosition(scene);
-            if (streamer.ready(position)) {
+            if (ichor::inDungeonPocket(position) || streamer.ready(position)) {
                 return true;
             }
             ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
@@ -999,7 +1127,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
-        const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+        const std::filesystem::path fonts = options.content / "fonts";
         bool fontsLoaded = ui->ok();
         for (const char* file : {"AlegreyaSans-Regular.ttf", "Cinzel.ttf"}) {
             fontsLoaded = fontsLoaded && ui->loadFontFace(fonts / file);
@@ -1119,6 +1247,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::SurfaceWetness surfaceWetness;
     // A forged world starts facing the place the spawn was searched around.
     float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
+    exileAvatar.face(viewYaw);
     engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
         viewYaw = ichor::nextWalkYaw(viewYaw, input.lookX, dt);
         for (auto [entity, player, body] : scene.registry().view<const ichor::Player, ichor::CharacterBody>().each()) {
@@ -1137,7 +1266,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // Time of day follows the tick, so it needs no saved state and a replay sees the same sky.
             // Weather follows the hours since the world began, so it needs no saved state either.
             // The editor can pin either one.
-            ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour);
+            ichor::Atmosphere atmosphere = ichor::atmosphereAt(hour, forgedSky ? forgedAtmosphere.sunPath : ichor::SunPath{});
             ichor::applyWeather(editing && editorEnvironment.overrideWeather ? editorEnvironment.weather : weatherAtTick(scene.tickCount()), atmosphere);
             if (forgedSky) {
                 ichor::applyForgedAtmosphere(forgedAtmosphere, biomeLook, atmosphere);
@@ -1152,6 +1281,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             // The flag moves only the drawn water, a debugging aid; trees follow the world's own level.
             view.waterEnabled = options.waterLevel.has_value() || heightfield.desc().hasWater();
             view.waterLevel = options.waterLevel.value_or(heightfield.desc().waterLevel());
+        }
+        const bool inDungeon = dungeonEntry && ichor::inDungeonPocket(playerPosition(scene));
+        if (inDungeon) {
+            ichor::applyDungeonInterior(view);
+            dungeonEntry->appendInstances(view);
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -1171,24 +1305,32 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
-            const glm::dvec3 feet = blend(previous, transform).first;
-            const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
+            glm::dvec3 feet = blend(previous, transform).first;
+            glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
+            if (exileAvatar.loaded()) {
+                // The Exile walks in front of a camera behind it; the avatar is drawn only, so the sim never sees it.
+                feet = exileAvatar.appendPlayer(previous.position, transform.position, alpha, config.fixedDt, scene.time() + alpha * config.fixedDt, heightfield.heightAt(feet.x, feet.z), view);
+                eye = ichor::walkFollowPosition(feet, viewYaw);
+                eye.y = ichor::followClearY(eye.y, heightfield.heightAt(eye.x, eye.z));
+            }
             view.camera.position = eye;
             hudWater = waterField ? waterField->at(feet.x, feet.z).depth : 0.0f;
             if (options.compassTarget) {
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = ichor::walkCameraRotation(viewYaw);
-            if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
-                const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
-                const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
+            const bool overlookSettlement = forged && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size();
+            if (forged && options.overlook > 0.0f && (overlookSettlement || options.biome)) {
+                const double lookX = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].x : forged->spawn.x;
+                const double lookZ = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].z : forged->spawn.z;
+                const glm::dvec3 centre(lookX, forged->heightfield.heightAt(lookX, lookZ), lookZ);
                 view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 2.0);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
         }
         const double cellMetres = heightfield.desc().cellMetres;
         for (const auto& [id, cell] : cells) {
-            if (cell.handle == ichor::Renderer::kNoHandle) continue;
+            if (inDungeon || cell.handle == ichor::Renderer::kNoHandle) continue;
             const glm::dvec3 centre = cell.origin + glm::dvec3(cellMetres * 0.5, 0.0, cellMetres * 0.5);
             const double distance = glm::length(glm::dvec2(centre.x - view.camera.position.x, centre.z - view.camera.position.z)) / cellMetres;
             const std::uint32_t lod = distance < 1.2 ? 0u : distance < 2.2 ? 1u : 2u;
@@ -1252,15 +1394,28 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         pickCamera = {view.camera.position, view.camera.rotation, view.camera.fovY};
         std::vector<ichor::LineSegment> colliders;
-        scene.physics().debugLines(colliders);
+        if (!inDungeon && !exileAvatar.loaded()) {
+            scene.physics().debugLines(colliders);
+        }
         for (const ichor::LineSegment& line : colliders) {
             view.lines.push_back({line.a, line.b, line.color});
+        }
+        if (dungeonEntry) {
+            ichor::applyFade(view, dungeonEntry->fade(scene));
+            if (const std::string prompt = dungeonEntry->prompt(scene); !prompt.empty()) {
+                hudGuide = prompt;
+            } else if (!options.compassTarget) {
+                hudGuide.clear();
+            }
+            if (const std::optional<double> yaw = dungeonEntry->takeViewYaw()) {
+                viewYaw = static_cast<float>(*yaw);
+            }
         }
     });
 
     ichor::FileWatcher watcher;
     watcher.watch(options.scene);
-    watcher.watchDirectory(ICHOR_SHADER_DIR, ".spv");
+    watcher.watchDirectory(ichor::shaderDirectory(), ".spv");
     watcher.watch(options.script);
     watcher.watchTree(options.data, ".json");
 
@@ -1461,9 +1616,35 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const ichor::Weather sky = weatherNow();
         const ichor::WeatherAudioTargets weatherAudio = ichor::weatherAudioTargets(sky.overcast, sky.rain);
-        ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
-        ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
-        ambience.apply(audio);
+        if (forged && forged->biomes && !soundscape.empty()) {
+            const glm::dvec3 feet = playerPosition(engine.scene());
+            const float hour = ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour);
+            const ichor::BiomeBlend here = forged->biomes->blendAt(feet.x, feet.z);
+            std::vector<ichor::BedGain> beds = ichor::blendedBeds(soundscape, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
+            ichor::addBeds(beds, {{"A_Wind", weatherAudio.wind}, {"A_Rain", weatherAudio.rain}});
+            for (std::size_t i = 0; i < forged->sites.size(); ++i) {
+                const ichor::SettlementSite& site = forged->sites[i];
+                const float distance = static_cast<float>(std::hypot(feet.x - site.x, feet.z - site.z));
+                if (!(distance < ichor::kSettlementMaxRangeM)) {
+                    continue;
+                }
+                const float size = static_cast<float>(std::min<std::size_t>(site.tier, ichor::kSettlementTierCount - 1)) / static_cast<float>(ichor::kSettlementTierCount - 1);
+                if (const auto bed = ichor::settlementBed(soundscape, site.id, size, settlementTypes[i], distance, 0.0f, 0.0f)) {
+                    ichor::addBeds(beds, {*bed});
+                }
+            }
+            ichor::budgetBeds(beds);
+            for (const ichor::BedGain& change : bedMixer.step(beds, dt)) {
+                const std::uint32_t clip = audio.findSound(change.clip);
+                if (clip != ichor::Mixer::kNoSound) {
+                    audio.setAmbience(clip, change.gain);
+                }
+            }
+        } else {
+            ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
+            ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
+            ambience.apply(audio);
+        }
         musicPlayer.update(static_cast<double>(engine.scene().tickCount()) * config.fixedDt, audio);
         if (editing) {
             // New objects appear a few metres in front of the player.
@@ -1543,8 +1724,12 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
 int main(int argc, char** argv)
 {
     Options options;
+    if (const std::optional<ichor::AssetRoots> roots = ichor::packagedAssetRoots(ichor::executableDirectory())) {
+        usePackagedRoots(options, *roots);
+        ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
+    }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
