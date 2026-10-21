@@ -32,7 +32,7 @@ glm::vec2 riverFlowAtSample(const Heightfield& heightfield, const Hydrology& hyd
 // bed. Every quad with water at any corner is drawn; its dry corners are sunk below the ground,
 // so the surface ends where it meets the bank, at the true shoreline and not on the sample grid.
 // Each vertex carries in uv.x how far the surface stands over the ground there, zero or less at the
-// waterline and beyond, and in tangent the flow: xz a unit direction (x axis where there is none) and w
+// waterline and beyond, in uv.y 1 where water lies on all eight sides of the sample and 0 at the water's edge and beyond (the shader ramps the shore from it), and in tangent the flow: xz a unit direction (x axis where there is none) and w
 // how much of it there is, the length of riverFlowAtSample, zero on lakes. A cell with no water comes back with no vertices. The hydrology must be of this heightfield,
 // or the result is empty. A pure function of the ground, so a cell built twice is the same, and
 // neighbours agree along their shared edge.

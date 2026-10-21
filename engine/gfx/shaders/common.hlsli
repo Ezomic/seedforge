@@ -21,7 +21,7 @@ struct FrameData {
     float4 wind;            // xy direction on the ground plane, z strength, w fog height falloff per metre
     float4 shaftParams;     // x light shaft strength (0 is off), y scattering anisotropy, z cloud cover (0 clear to 1 solid)
     float4 waterColor;      // rgb colour of deep water, w 0 when there is no water
-    float4 waterParams;     // x height of the surface in world metres
+    float4 waterParams;     // x height of the surface in world metres, y 1 for the forged rivers and lakes look
     float4 gradeParams;     // x saturation, y contrast, z exposure
     float4 gradeShadows;    // rgb multiplier on the dark end
     float4 gradeHighlights; // rgb multiplier on the bright end

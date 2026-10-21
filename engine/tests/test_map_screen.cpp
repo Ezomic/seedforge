@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <limits>
+#include <string>
+#include <vector>
 
 using namespace ichor;
 using Catch::Approx;
@@ -317,4 +319,48 @@ TEST_CASE("a new picture drops the old layers, and the layers survive a hidden m
     frame(f.ui, f.renderer, 0.2);
     REQUIRE(pictureHash(f.renderer) != layered);
     REQUIRE_FALSE(map.layerButtonCentre(MapLayer::Biomes).has_value());
+}
+
+TEST_CASE("fog darkens the picture, and a settlement shows with its name only once its ground is seen")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setLayerStack(MapLayerStack(sampleImage(128), layerWorld()));
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.0);
+    const std::uint64_t clear = pictureHash(f.renderer);
+
+    map.setSettlements({{"settlement_0001", "Brenor", 3, {0.25f, 0.25f}}, {"settlement_0002", "Kamoth", 0, {0.75f, 0.75f}}});
+    REQUIRE(map.placeNames() == std::vector<std::string>{"Brenor", "Kamoth"});
+
+    MapDiscovery fog;
+    map.setDiscovery(fog);
+    frame(f.ui, f.renderer, 0.1);
+    REQUIRE(pictureHash(f.renderer) != clear);
+    REQUIRE(map.placeNames().empty());
+
+    fog.reveal({0.25f, 0.25f}, 0.05f);
+    map.setDiscovery(fog);
+    frame(f.ui, f.renderer, 0.2);
+    REQUIRE(map.placeNames() == std::vector<std::string>{"Brenor"});
+
+    fog.reveal({0.75f, 0.75f}, 0.05f);
+    map.setDiscovery(fog);
+    REQUIRE(map.placeNames().size() == 2);
+
+    map.clearDiscovery();
+    frame(f.ui, f.renderer, 0.3);
+    REQUIRE(pictureHash(f.renderer) == clear);
+}
+
+TEST_CASE("a settlement name with markup is shown as text and does not break the map")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setImage(sampleImage(128));
+    map.setSettlements({{"a", "<b>x</b> & \"y\"", 1, {0.5f, 0.5f}}, {"b", "", 9, {2.0f, -1.0f}}});
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.0);
+    REQUIRE(map.placeNames().size() == 2);
+    REQUIRE(map.ok());
 }
