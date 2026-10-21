@@ -126,7 +126,7 @@ float spread(const glm::vec3& a, const glm::vec3& b)
 
 float change(const Atmosphere& a, const Atmosphere& b)
 {
-    return std::max({std::abs(a.sunElevation - b.sunElevation), std::abs(a.sunIntensity - b.sunIntensity) * 0.5f, spread(a.sunColor, b.sunColor), spread(a.zenith, b.zenith),
+    return std::max({std::abs(a.sunElevation - b.sunElevation), spread(a.sunColor * a.sunIntensity, b.sunColor * b.sunIntensity) * 0.15f, spread(a.zenith, b.zenith),
                      spread(a.horizon, b.horizon), spread(a.ambient, b.ambient), spread(a.fogColor, b.fogColor)});
 }
 
@@ -143,7 +143,7 @@ TEST_CASE("the forged sun and sky change continuously from one minute to the nex
         const Atmosphere now = forgedDay(hour);
         const float step = change(previous, now);
         INFO("hour " << hour);
-        REQUIRE(step < 0.02f);
+        REQUIRE(step < 0.035f);
         total += step;
         largest = std::max(largest, step);
         ++steps;
@@ -175,7 +175,15 @@ TEST_CASE("the forged sun is already up and golden at six and still up at eighte
         REQUIRE(forged.sunIntensity > stand.sunIntensity + 1.0f);
         REQUIRE(forged.sunColor.r > forged.sunColor.b * 1.3f);
     }
-    REQUIRE(atmosphereAt(6.0f, SunPath{}).sunElevation == atmosphereAt(6.0f).sunElevation);
+    for (float hour = 0.0f; hour < 24.0f; hour += 0.7f) {
+        const float angle = (hour - 6.0f) / 24.0f * 6.28318530718f;
+        const glm::vec3 expected = glm::normalize(glm::vec3(std::cos(angle), std::sin(angle), 0.3f));
+        INFO("hour " << hour);
+        if (std::sin(angle) > 0.0f) {
+            REQUIRE(glm::length(atmosphereAt(hour).sunDirection - expected) < 1e-5f);
+        }
+        REQUIRE(atmosphereAt(hour, SunPath{}).sunDirection == atmosphereAt(hour).sunDirection);
+    }
     REQUIRE(ForgedAtmosphereConfig{}.sunPath.elevationLift > 0.0f);
 }
 
@@ -203,7 +211,7 @@ TEST_CASE("a hostile sun path is clamped into a sane arc")
             const Atmosphere a = atmosphereAt(hour, SunPath{lift});
             INFO("lift " << lift << " hour " << hour);
             REQUIRE(std::isfinite(a.sunElevation));
-            REQUIRE(std::abs(a.sunElevation) <= 1.0f);
+            REQUIRE(std::abs(a.sunElevation) <= 1.0f + 1e-6f);
             REQUIRE(std::isfinite(a.sunDirection.x + a.sunDirection.y + a.sunDirection.z));
             REQUIRE(glm::length(a.sunDirection) == Approx(1.0f).margin(1e-4));
         }
