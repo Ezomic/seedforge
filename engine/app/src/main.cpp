@@ -169,9 +169,9 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
         } else if (arg == "--biome" && hasValue) {
             options.biome = worldforge::biomeFromName(argv[++i]);
-            if (!options.biome) return false;
+            if (!options.biome || options.settlement >= 0) return false;
         } else if (arg == "--settlement" && hasValue) {
-            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
+            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0 || options.biome) return false;
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {

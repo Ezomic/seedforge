@@ -3,8 +3,6 @@
 #include "ichor/core/hash.h"
 #include "ichor/core/rng.h"
 
-#include <glm/geometric.hpp>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -21,7 +19,7 @@ constexpr float kPatchScaleM = 90.0f;
 
 // In BiomeId order.
 constexpr std::array<BiomeScenery, worldforge::kBiomeCount> kScenery = {{
-    //                grass  bush   shrub  cactus reed   stone  dead   conifer dead
+    //                grass  bush   shrub  cactus reed   stone  deadTree conifer deadShare
     /* Ocean       */ {0.00f, 0.00f, 0.00f, 0.000f, 0.00f, 0.00f, 0.00f, 0.0f, 0.0f},
     /* Lake        */ {0.00f, 0.00f, 0.00f, 0.000f, 0.00f, 0.00f, 0.00f, 0.0f, 0.0f},
     /* Glacier     */ {0.00f, 0.00f, 0.00f, 0.000f, 0.00f, 0.02f, 0.00f, 0.0f, 0.0f},
@@ -99,8 +97,10 @@ bool nearWater(const SceneryGuard& guard, double x, double z)
     if (!guard.wet) {
         return false;
     }
-    constexpr double kReach = kReedShoreM;
-    return guard.wet(x + kReach, z) || guard.wet(x - kReach, z) || guard.wet(x, z + kReach) || guard.wet(x, z - kReach);
+    for (const double reach : {1.5, static_cast<double>(kReedShoreM)}) {
+        if (guard.wet(x + reach, z) || guard.wet(x - reach, z) || guard.wet(x, z + reach) || guard.wet(x, z - reach)) return true;
+    }
+    return false;
 }
 
 void coverPass(const Heightfield& heightfield, const ForgedBiomeField& biomes, const SceneryGuard& guard, CellId id, const VegetationParams& base, std::uint64_t cellSeed,
@@ -151,7 +151,7 @@ void coverPass(const Heightfield& heightfield, const ForgedBiomeField& biomes, c
                 {VegetationKind::DryShrub, scenery.shrub * level},
                 {VegetationKind::Cactus, scenery.cactus * level},
                 {VegetationKind::Reed, scenery.reed},
-                {VegetationKind::Rock, scenery.stone * (1.0f + 2.0f * (1.0f - level))},
+                {VegetationKind::Rock, scenery.stone},
             }};
             // Walk the raw chances so a candidate's species does not move when the slope scales another one down.
             float cursor = 0.0f;

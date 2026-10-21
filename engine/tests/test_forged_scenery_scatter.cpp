@@ -172,10 +172,13 @@ TEST_CASE("reeds stand on the shore and not in the water")
     REQUIRE(kindsIn(scatter(BiomeId::Marsh)).contains(static_cast<std::uint32_t>(VegetationKind::Reed)) == false);
 }
 
-TEST_CASE("water and ice biomes grow nothing")
+TEST_CASE("water biomes grow no plants, only the odd rock")
 {
-    REQUIRE(scatter(BiomeId::Ocean).empty());
-    REQUIRE(scatter(BiomeId::Lake).empty());
+    for (const BiomeId biome : {BiomeId::Ocean, BiomeId::Lake}) {
+        for (const VegetationInstance& p : scatter(biome)) {
+            REQUIRE(p.kind == static_cast<std::uint32_t>(VegetationKind::Rock));
+        }
+    }
 }
 
 TEST_CASE("an empty biome field scatters without crashing")

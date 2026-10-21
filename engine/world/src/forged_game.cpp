@@ -482,12 +482,13 @@ SceneryGuard forgedSceneryGuard(const ForgedGame& game)
     SceneryGuard guard;
     guard.wet = [water](double x, double z) { return water != nullptr && water->at(x, z).wet(); };
     guard.blocked = [index, roads, water, bucketOf](double x, double z) {
+        if (!std::isfinite(x) || !std::isfinite(z)) return true;
         if (roads && roads->query(x, z).coverage > 0.0f) return true;
         if (water != nullptr && water->at(x, z).wet()) return true;
         const int bx = bucketOf(x);
         const int bz = bucketOf(z);
-        for (int dz = -1; dz <= 1; ++dz) {
-            for (int dx = -1; dx <= 1; ++dx) {
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
                 const auto found = index->find({bx + dx, bz + dz});
                 if (found == index->end()) continue;
                 for (const PlacedBuilding& b : found->second) {
@@ -535,8 +536,9 @@ bool spawnInBiome(ForgedGame& game, worldforge::BiomeId biome)
     const double size = game.desc.sizeMetres;
     const double centre = size * 0.5;
     const ForgedBiomeField& field = *game.biomes;
+    const SceneryGuard guard = forgedSceneryGuard(game);
     const auto inside = [&](double x, double z) {
-        return field.biomeAt(x, z) == biome && field.biomeAt(x + kInteriorM, z) == biome && field.biomeAt(x - kInteriorM, z) == biome
+        return !guard.blocked(x, z) && field.biomeAt(x, z) == biome && field.biomeAt(x + kInteriorM, z) == biome && field.biomeAt(x - kInteriorM, z) == biome
             && field.biomeAt(x, z + kInteriorM) == biome && field.biomeAt(x, z - kInteriorM) == biome;
     };
     std::vector<std::pair<double, std::pair<double, double>>> candidates;
