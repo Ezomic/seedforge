@@ -105,7 +105,7 @@ struct Options {
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
-    std::string waterView; // --forged: start on the bank of the biggest river or lake ("river" or "lake")
+    std::string waterView; // --forged: start on the bank of a large river or the biggest lake ("river" or "lake")
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
     bool enterDungeon = false; // --forged: go in as soon as an entrance is in reach, as if Enter were pressed
@@ -562,6 +562,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     glm::dvec3 anchor(0.0);
     std::unique_ptr<ichor::ForgedGame> forged;
     glm::dvec2 forgedLook(0.0, -30.0);
+    bool waterViewed = false; // --water-view found a bank to stand on
     if (options.forged) {
         const ForgeOutcome outcome = forgeGame(platform, renderer, options, ichor::kitReferenceView(bundle, 16.0f / 9.0f), forged);
         if (outcome != ForgeOutcome::Built) {
@@ -579,7 +580,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
             ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
         }
-        if (!options.waterView.empty() && !ichor::spawnAtWater(*forged, options.waterView == "river" ? ichor::WaterViewKind::River : ichor::WaterViewKind::Lake)) {
+        waterViewed = !options.waterView.empty() && ichor::spawnAtWater(*forged, options.waterView == "river" ? ichor::WaterViewKind::River : ichor::WaterViewKind::Lake);
+        if (!options.waterView.empty() && !waterViewed) {
             ichor::logf(ichor::LogLevel::Warn, "--water-view {}: this world has no {} with a dry bank; the usual spawn is kept", options.waterView, options.waterView);
         }
         if (options.dungeon >= 0 && !ichor::spawnAtDungeon(*forged, static_cast<std::size_t>(options.dungeon))) {
@@ -1243,7 +1245,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = ichor::walkCameraRotation(viewYaw);
-            if (forged && options.overlook > 0.0f && !options.waterView.empty()) {
+            if (forged && options.overlook > 0.0f && waterViewed) {
                 const glm::dvec3 target(forged->spawn.faceX, forged->heightfield.heightAt(forged->spawn.faceX, forged->spawn.faceZ), forged->spawn.faceZ);
                 view.camera.position = glm::dvec3(forged->spawn.x, forged->spawn.groundY + options.overlook, forged->spawn.z);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
