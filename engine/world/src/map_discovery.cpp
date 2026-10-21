@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <set>
+#include <string>
 
 namespace ichor {
 
@@ -62,8 +63,8 @@ void MapDiscovery::revealSegment(MapPoint from, MapPoint to, float radius)
     if (!std::isfinite(from.u) || !std::isfinite(from.v) || !std::isfinite(to.u) || !std::isfinite(to.v)) {
         return;
     }
-    const float length = std::max(std::fabs(to.u - from.u), std::fabs(to.v - from.v)) * static_cast<float>(side_);
-    const int steps = std::clamp(static_cast<int>(length) * 2 + 1, 1, 1 << 16);
+    const float length = std::min(std::max(std::fabs(to.u - from.u), std::fabs(to.v - from.v)), 1.0f) * static_cast<float>(side_);
+    const int steps = static_cast<int>(length) * 2 + 1;
     for (int i = 0; i <= steps; ++i) {
         const float t = static_cast<float>(i) / static_cast<float>(steps);
         reveal({from.u + (to.u - from.u) * t, from.v + (to.v - from.v) * t}, radius);
@@ -125,6 +126,9 @@ std::vector<MapSettlement> mapSettlements(const WorldDesc& desc, std::uint64_t w
         std::string name = settlementMapName(worldSeed, site.id);
         for (std::uint64_t salt = 1; used.contains(name) && salt < 64; ++salt) {
             name = settlementMapName(worldSeed + salt, site.id);
+        }
+        for (std::uint64_t n = 2; used.contains(name); ++n) {
+            name = settlementMapName(worldSeed, site.id) + " " + std::to_string(n);
         }
         used.insert(name);
         out.push_back({site.id, std::move(name), std::min<std::uint8_t>(site.tier, 3), mapPosition(desc, site.x, site.z)});

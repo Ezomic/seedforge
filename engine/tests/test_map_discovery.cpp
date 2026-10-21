@@ -102,6 +102,7 @@ TEST_CASE("discovery survives hostile input")
     d.reveal({0.2f, 0.2f}, -3.0f);
     REQUIRE(d.seenCount() == 2);
 
+    d.revealSegment({1.0e30f, 0.0f}, {-1.0e30f, 0.0f}, 0.001f);
     d.reveal({-5.0f, 9.0f}, 0.02f);
     REQUIRE(d.seen({0.0f, 1.0f}));
 
@@ -161,5 +162,11 @@ TEST_CASE("map settlements keep the sites' order, tiers and unique names, and pu
         names.insert(places[i].name);
     }
     REQUIRE(names.size() == places.size());
+    std::vector<SettlementSite> same(300, SettlementSite{"settlement_0001", 0, 1.0, 1.0});
+    std::set<std::string> distinct;
+    for (const MapSettlement& place : mapSettlements(desc, 5, same)) {
+        distinct.insert(place.name);
+    }
+    REQUIRE(distinct.size() == same.size());
     REQUIRE(mapSettlements(desc, 5, {}).empty());
 }

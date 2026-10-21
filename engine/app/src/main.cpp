@@ -1000,7 +1000,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::MapScreenBinding> mapBinding;
-    ichor::MapDiscovery mapFog;
+    ichor::MapDiscovery mapFog(forged && !forged->mapLayers.empty() ? forged->mapLayers.base().width : ichor::kMapSide);
     ichor::MapAnnotationStore mapMarks;
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;

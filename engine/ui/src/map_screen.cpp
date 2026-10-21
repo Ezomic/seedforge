@@ -149,6 +149,21 @@ private:
 Rml::ElementInstancerGeneric<MapPicture> g_pictureInstancer;
 Rml::ElementInstancerGeneric<MapMarker> g_markerInstancer;
 
+std::string escaped(const std::string& text)
+{
+    std::string out;
+    for (const char c : text) {
+        switch (c) {
+        case '&': out += "&amp;"; break;
+        case '<': out += "&lt;"; break;
+        case '>': out += "&gt;"; break;
+        case '"': out += "&quot;"; break;
+        default: out += c;
+        }
+    }
+    return out;
+}
+
 struct Box {
     float x;
     float y;
@@ -272,6 +287,7 @@ void MapScreen::setVisible(bool visible)
     visible_ = visible;
     if (visible_) {
         document_->Show();
+        redrawPlaces();
     } else {
         document_->Hide();
     }
@@ -342,7 +358,8 @@ void MapScreen::redrawPlaces()
         shownNames_.push_back(place.name);
         shown.push_back(&place);
     }
-    const float frame = std::max(frame_->GetBox().GetSize(Rml::BoxArea::Border).x, 0.0f) > 1.0f ? frame_->GetBox().GetSize(Rml::BoxArea::Border).x : 360.0f;
+    const float measured = frame_->GetBox().GetSize(Rml::BoxArea::Border).x;
+    const float frame = measured > 1.0f ? measured : 360.0f;
     std::vector<Box> icons;
     for (const MapSettlement* place : shown) {
         const int tier = std::min<int>(place->tier, 3);
@@ -362,7 +379,7 @@ void MapScreen::redrawPlaces()
         const Box spots[4] = {{px - w / 2, py + gap, w, h}, {px - w / 2, py - gap - h, w, h}, {px + gap, py - h / 2, w, h}, {px - gap - w, py - h / 2, w, h}};
         std::size_t chosen = 0;
         for (std::size_t i = 0; i < 4; ++i) {
-            bool clear = spots[i].x >= 0.0f && spots[i].x + w <= frame;
+            bool clear = spots[i].x >= 0.0f && spots[i].x + w <= frame && spots[i].y >= 0.0f && spots[i].y + h <= frame;
             for (const Box& other : taken) {
                 clear = clear && !overlaps(spots[i], other);
             }
@@ -377,7 +394,7 @@ void MapScreen::redrawPlaces()
         taken.push_back(spots[chosen]);
         const Box& spot = spots[chosen];
         rml += std::format(R"(<div class="place t{}" style="left: {:.2f}%; top: {:.2f}%;"><div class="icon"></div><div class="name" style="left: {:.0f}px; top: {:.0f}px; width: {:.0f}px; text-align: {};">{}</div></div>)", tier,
-            std::clamp(place->at.u, 0.0f, 1.0f) * 100.0f, std::clamp(place->at.v, 0.0f, 1.0f) * 100.0f, spot.x - px, spot.y - py, w, chosen == 2 ? "left" : chosen == 3 ? "right" : "center", place->name);
+            std::clamp(place->at.u, 0.0f, 1.0f) * 100.0f, std::clamp(place->at.v, 0.0f, 1.0f) * 100.0f, spot.x - px, spot.y - py, w, chosen == 2 ? "left" : chosen == 3 ? "right" : "center", escaped(place->name));
     }
     places_->SetInnerRML(rml);
 }

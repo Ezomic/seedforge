@@ -352,3 +352,15 @@ TEST_CASE("fog darkens the picture, and a settlement shows with its name only on
     frame(f.ui, f.renderer, 0.3);
     REQUIRE(pictureHash(f.renderer) == clear);
 }
+
+TEST_CASE("a settlement name with markup is shown as text and does not break the map")
+{
+    Fixture f;
+    MapScreen map(f.ui);
+    map.setImage(sampleImage(128));
+    map.setSettlements({{"a", "<b>x</b> & \"y\"", 1, {0.5f, 0.5f}}, {"b", "", 9, {2.0f, -1.0f}}});
+    map.setVisible(true);
+    frame(f.ui, f.renderer, 0.0);
+    REQUIRE(map.placeNames().size() == 2);
+    REQUIRE(map.ok());
+}
