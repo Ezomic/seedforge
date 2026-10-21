@@ -93,6 +93,10 @@ bool Engine::frame(double frameSeconds)
         renderer_.submit(view_);
     }
     overlayToggle_.update(platform_.overlayKey());
+    controls_ = stepControlsOverlay(controls_, platform_.helpKey(), frameSeconds);
+    for (std::string& line : controlsOverlayLines(controls_)) {
+        renderer_.debugText(std::move(line));
+    }
     const double fps = frameMillis_ > 0.0 ? 1000.0 / frameMillis_ : 0.0;
     if (overlayToggle_.mode == OverlayMode::Compact) {
         renderer_.debugText(std::format("{:.0f} fps  {:.1f} ms", fps, frameMillis_));
