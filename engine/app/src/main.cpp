@@ -122,6 +122,7 @@ struct Options {
     bool ironman = false;
     bool editor = false;
     bool showMap = false;
+    int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
     bool noExilePlayer = false; // --forged walks as the Exile unless this is set, and then as the wire capsule from inside
@@ -238,6 +239,8 @@ bool parse(int argc, char** argv, Options& options)
             options.editor = true;
         } else if (arg == "--map") {
             options.showMap = true;
+        } else if (arg == "--map-explore" && hasValue) {
+            if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
         } else if (arg == "--new-game") {
             options.showNewGame = true;
         } else if (arg == "--no-forged-atmosphere") {
@@ -1111,6 +1114,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::MapScreenBinding> mapBinding;
+    ichor::MapDiscovery mapFog(forged && !forged->mapLayers.empty() ? forged->mapLayers.base().width : ichor::kMapSide);
     ichor::MapAnnotationStore mapMarks;
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
@@ -1145,6 +1149,16 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui);
             if (forged) {
                 mapScreen->setLayerStack(forged->mapLayers);
+                for (const ichor::MapLayer layer : {ichor::MapLayer::Biomes, ichor::MapLayer::Roads, ichor::MapLayer::Rivers}) {
+                    mapScreen->setLayer(layer, true);
+                }
+                mapScreen->setSettlements(ichor::mapSettlements(forged->desc, forged->desc.seed, forged->sites));
+                ichor::MapPoint from = ichor::mapPosition(forged->desc, forged->spawn.x, forged->spawn.z);
+                for (std::size_t i = 0; i < static_cast<std::size_t>(options.mapExplore) && i < forged->sites.size(); ++i) {
+                    const ichor::MapPoint to = ichor::mapPosition(forged->desc, forged->sites[i].x, forged->sites[i].z);
+                    mapFog.revealSegment(from, to, ichor::kMapRevealRadius);
+                    from = to;
+                }
             } else {
                 mapScreen->setImage(ichor::renderMapImage(heightfield));
             }
@@ -1231,6 +1245,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 if (characterScreen->visible()) {
                     // The app has no progression state yet, so only health is known.
                     characterScreen->bind({{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}});
+                }
+                if (forged) {
+                    const glm::dvec3 walker = playerPosition(engine.scene());
+                    mapFog.reveal(ichor::mapPosition(forged->desc, walker.x, walker.z), ichor::kMapRevealRadius);
+                    if (mapScreen->visible()) {
+                        mapScreen->setDiscovery(mapFog);
+                    }
                 }
                 if (mapScreen->visible()) {
                     const glm::dvec3 feet = playerPosition(engine.scene());
@@ -1729,7 +1750,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
