@@ -91,7 +91,10 @@ TEST_CASE("the real soundscape table names every biome, surface and settlement s
         REQUIRE(soundscape.biome(name) != nullptr);
     }
     for (int s = 0; s < static_cast<int>(kSoundSurfaceCount); ++s) {
-        REQUIRE(soundscape.step(static_cast<SoundSurface>(s)) != nullptr);
+        // Wading has its own splash, so water has no footstep.
+        if (static_cast<SoundSurface>(s) != SoundSurface::Water) {
+            REQUIRE(soundscape.step(static_cast<SoundSurface>(s)) != nullptr);
+        }
     }
     for (const SettlementSound sound : {SettlementSound::Chatter, SettlementSound::Bell, SettlementSound::Mill, SettlementSound::Surf, SettlementSound::Machinery}) {
         REQUIRE(soundscape.settlement(sound) != nullptr);
@@ -310,7 +313,7 @@ TEST_CASE("the surface under the feet follows water, road, then the ground")
 
     const float nan = std::numeric_limits<float>::quiet_NaN();
     REQUIRE(soundSurface(nan, nan, nan, nan, nan) == SoundSurface::Grass);
-    REQUIRE(soundSurface(0, 1, 0, 0, std::numeric_limits<float>::infinity()) == SoundSurface::Rock);
+    REQUIRE(soundSurface(0, 1, 0, 0, std::numeric_limits<float>::infinity()) == SoundSurface::Water);
 }
 
 TEST_CASE("footsteps follow the ground covered and nothing else")

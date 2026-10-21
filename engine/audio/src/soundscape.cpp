@@ -108,7 +108,7 @@ void clampBeds(std::vector<BedGain>& beds)
 
 SoundSurface soundSurface(float grass, float rock, float snow, float roadCoverage, float waterDepth)
 {
-    if (waterDepth > kWaterSurfaceDepth && std::isfinite(waterDepth)) {
+    if (waterDepth > kWaterSurfaceDepth) {
         return SoundSurface::Water;
     }
     if (roadCoverage >= kRoadSurfaceCoverage) {

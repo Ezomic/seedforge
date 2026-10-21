@@ -178,12 +178,6 @@
   "gain": 0.4
  },
  {
-  "id": "step_water",
-  "kind": "step",
-  "clip": "A_Splash",
-  "gain": 0.5
- },
- {
   "id": "step_snow",
   "kind": "step",
   "clip": "A_Step_Snow",

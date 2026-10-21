@@ -1529,7 +1529,10 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             for (std::size_t i = 0; i < forged->sites.size(); ++i) {
                 const ichor::SettlementSite& site = forged->sites[i];
                 const float distance = static_cast<float>(std::hypot(feet.x - site.x, feet.z - site.z));
-                const float size = static_cast<float>(site.tier) / static_cast<float>(ichor::kSettlementTierCount - 1);
+                if (!(distance < ichor::kSettlementMaxRangeM)) {
+                    continue;
+                }
+                const float size = static_cast<float>(std::min<std::size_t>(site.tier, ichor::kSettlementTierCount - 1)) / static_cast<float>(ichor::kSettlementTierCount - 1);
                 if (const auto bed = ichor::settlementBed(soundscape, site.id, size, settlementTypes[i], distance, 0.0f, 0.0f)) {
                     ichor::addBeds(beds, {*bed});
                 }

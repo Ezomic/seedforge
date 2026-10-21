@@ -16,7 +16,7 @@ class DataSet;
 // The soundscape of a forged world: which looping bed answers which biome, which footstep answers
 // which surface, which sound a settlement makes. The selection is a pure function of the biome, the
 // surface and the hour of the day, so it holds no sim state, never feeds the world hash and sounds
-// the same on every platform (no libm, no wall clock). A bed whose clip does not exist is silence,
+// the same on every platform (no wall clock). A bed whose clip does not exist is silence,
 // and silence is a valid state: nothing here ever requires a clip to be present.
 
 // What the player stands on, in the order a tie is broken.
