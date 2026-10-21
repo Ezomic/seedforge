@@ -1,6 +1,7 @@
 #include "exile_demo.h"
 
 #include "ichor/anim/animation.h"
+#include "ichor/anim/exile_avatar.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
@@ -113,6 +114,7 @@ struct Options {
     bool showMap = false;
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
+    bool noExilePlayer = false; // --forged walks as the Exile unless this is set, and then as the wire capsule from inside
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
@@ -220,6 +222,8 @@ bool parse(int argc, char** argv, Options& options)
             options.showNewGame = true;
         } else if (arg == "--no-forged-atmosphere") {
             options.standInAtmosphere = true;
+        } else if (arg == "--no-exile-player") {
+            options.noExilePlayer = true;
         } else if (arg == "--forged") {
             options.forged = true;
         } else if (arg == "--grid" && hasValue) {
@@ -505,8 +509,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         return 1;
     }
     ExileDemo exile;
-    if (!options.exile.empty() && !loadExileDemo(options.exile, renderer, animations, exile)) {
-        return 1;
+    const bool exileByDefault = options.forged && !options.noExilePlayer && options.exile.empty();
+    const std::filesystem::path exileFolder = exileByDefault ? std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile" : options.exile;
+    if (!exileFolder.empty() && !loadExileDemo(exileFolder, renderer, animations, exile)) {
+        if (!exileByDefault) {
+            return 1;
+        }
+        ichor::logf(ichor::LogLevel::Warn, "the Exile did not load from {} (git lfs pull --include=\"art/exile/*\"); the player stays the wire capsule", exileFolder.string());
+        exile = ExileDemo{};
+    }
+    ichor::ExileAvatar exileAvatar;
+    if (options.forged && !options.noExilePlayer && !exile.kit.bundles[0].meshes.empty() && !exileAvatar.prepare(exile.kit, exile.meshBase)) {
+        ichor::log(ichor::LogLevel::Warn, "the Exile has no walking clips; the player stays the wire capsule");
     }
     audio.addBundle(bundle);
     // Mesh indices run across the bundles in upload order, which is what a MeshRef holds.
@@ -1119,6 +1133,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::SurfaceWetness surfaceWetness;
     // A forged world starts facing the place the spawn was searched around.
     float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
+    exileAvatar.face(viewYaw);
     engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
         viewYaw = ichor::nextWalkYaw(viewYaw, input.lookX, dt);
         for (auto [entity, player, body] : scene.registry().view<const ichor::Player, ichor::CharacterBody>().each()) {
@@ -1171,8 +1186,14 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
             view.instances.push_back(instance);
         }
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
-            const glm::dvec3 feet = blend(previous, transform).first;
-            const glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
+            glm::dvec3 feet = blend(previous, transform).first;
+            glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
+            if (exileAvatar.loaded()) {
+                // The Exile walks in front of a camera behind it; the avatar is drawn only, so the sim never sees it.
+                feet = exileAvatar.appendPlayer(previous.position, transform.position, alpha, config.fixedDt, scene.time() + alpha * config.fixedDt, heightfield.heightAt(feet.x, feet.z), view);
+                eye = ichor::walkFollowPosition(feet, viewYaw);
+                eye.y = ichor::followClearY(eye.y, heightfield.heightAt(eye.x, eye.z));
+            }
             view.camera.position = eye;
             hudWater = waterField ? waterField->at(feet.x, feet.z).depth : 0.0f;
             if (options.compassTarget) {
@@ -1252,7 +1273,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         pickCamera = {view.camera.position, view.camera.rotation, view.camera.fovY};
         std::vector<ichor::LineSegment> colliders;
-        scene.physics().debugLines(colliders);
+        if (!exileAvatar.loaded()) {
+            scene.physics().debugLines(colliders);
+        }
         for (const ichor::LineSegment& line : colliders) {
             view.lines.push_back({line.a, line.b, line.color});
         }
@@ -1544,7 +1567,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
