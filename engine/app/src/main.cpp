@@ -104,6 +104,7 @@ struct Options {
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
+    std::optional<worldforge::BiomeId> biome; // --forged --biome NAME: start inside this biome (forest, desert, ...)
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
     bool enterDungeon = false; // --forged: go in as soon as an entrance is in reach, as if Enter were pressed
@@ -172,12 +173,15 @@ bool parse(int argc, char** argv, Options& options)
             options.kit = argv[++i];
         } else if (arg == "--overlook" && hasValue) {
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
+        } else if (arg == "--biome" && hasValue) {
+            options.biome = worldforge::biomeFromName(argv[++i]);
+            if (!options.biome || options.settlement >= 0) return false;
         } else if (arg == "--dungeon" && hasValue) {
             if (!parseNumber(argv[++i], options.dungeon) || options.dungeon < 0) return false;
         } else if (arg == "--enter-dungeon") {
             options.enterDungeon = true;
         } else if (arg == "--settlement" && hasValue) {
-            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0) return false;
+            if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0 || options.biome) return false;
         } else if (arg == "--world" && hasValue) {
             options.world = argv[++i];
         } else if (arg == "--script" && hasValue) {
@@ -577,6 +581,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         if (options.settlement >= 0 && !ichor::spawnAtSettlement(*forged, static_cast<std::size_t>(options.settlement))) {
             ichor::logf(ichor::LogLevel::Warn, "--settlement {} is past the forged world's {} settlements; the usual spawn is kept", options.settlement, forged->sites.size());
         }
+        if (options.biome && !ichor::spawnInBiome(*forged, *options.biome)) {
+            ichor::logf(ichor::LogLevel::Warn, "--biome {}: the forged world has no dry, gentle ground inside it; the usual spawn is kept", worldforge::kBiomeNames[static_cast<std::size_t>(*options.biome)]);
+        }
         if (options.dungeon >= 0 && !ichor::spawnAtDungeon(*forged, static_cast<std::size_t>(options.dungeon))) {
             ichor::logf(ichor::LogLevel::Warn, "--dungeon {} has no entrance with open ground beside it; the usual spawn is kept", options.dungeon);
         }
@@ -642,6 +649,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         streaming.rivers = forged->water.rivers;
         streaming.hydrology = forged->water.hydrology;
         streaming.biomes = forged->biomes;
+        streaming.scenery = ichor::forgedSceneryGuard(*forged);
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
@@ -1255,9 +1263,11 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
                 hudGuide = ichor::targetGuide(feet.x, feet.z, options.compassTarget->first, options.compassTarget->second);
             }
             view.camera.rotation = ichor::walkCameraRotation(viewYaw);
-            if (forged && options.overlook > 0.0f && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size()) {
-                const ichor::SettlementSite& site = forged->sites[static_cast<std::size_t>(options.settlement)];
-                const glm::dvec3 centre(site.x, forged->heightfield.heightAt(site.x, site.z), site.z);
+            const bool overlookSettlement = forged && options.settlement >= 0 && static_cast<std::size_t>(options.settlement) < forged->sites.size();
+            if (forged && options.overlook > 0.0f && (overlookSettlement || options.biome)) {
+                const double lookX = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].x : forged->spawn.x;
+                const double lookZ = overlookSettlement ? forged->sites[static_cast<std::size_t>(options.settlement)].z : forged->spawn.z;
+                const glm::dvec3 centre(lookX, forged->heightfield.heightAt(lookX, lookZ), lookZ);
                 view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 2.0);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
@@ -1633,7 +1643,7 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 

@@ -15,16 +15,9 @@ namespace {
 
 constexpr float kTwoPi = 6.28318530718f;
 
-// A smooth patchwork of forest and clearing: a few overlapping waves of
-// distance, so the density has no grid in it. Deterministic through dmath.
 float forestDensity(double x, double z, float scale)
 {
-    const auto fx = static_cast<float>(x / scale);
-    const auto fz = static_cast<float>(z / scale);
-    const float a = dmath::sin(fx * 1.7f + 0.3f) * dmath::sin(fz * 1.3f + 1.1f);
-    const float b = dmath::sin(fx * 3.1f + fz * 2.3f + 2.0f);
-    const float value = 0.5f + 0.35f * a + 0.15f * b;
-    return std::clamp((value - 0.25f) * 1.8f, 0.0f, 1.0f);
+    return forestPatch(x, z, scale);
 }
 
 // Stone is never smooth: each corner of a rounded blob is pushed in or out by a repeatable amount.
@@ -64,6 +57,27 @@ struct Builder {
             const glm::vec3 normal(c, slope, s);
             vertex({c * bottomRadius, bottomY, s * bottomRadius}, normal);
             vertex({c * topRadius, topY, s * topRadius}, normal);
+        }
+        for (int i = 0; i < sides; ++i) {
+            const std::uint32_t a = first + static_cast<std::uint32_t>(i) * 2;
+            mesh.indices.insert(mesh.indices.end(), {a, a + 1, a + 2, a + 2, a + 1, a + 3});
+        }
+    }
+
+    // A cone or cylinder frustum along any axis, from one point to another: a branch, a blade, an arm.
+    void stick(glm::vec3 from, glm::vec3 to, float fromRadius, float toRadius, int sides)
+    {
+        const glm::vec3 axis = glm::normalize(to - from);
+        const glm::vec3 across = glm::normalize(glm::cross(axis, std::abs(axis.y) < 0.9f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f)));
+        const glm::vec3 up = glm::cross(across, axis);
+        const float slope = (fromRadius - toRadius) / glm::length(to - from);
+        const auto first = static_cast<std::uint32_t>(mesh.vertices.size());
+        for (int i = 0; i <= sides; ++i) {
+            const float angle = kTwoPi * static_cast<float>(i) / static_cast<float>(sides);
+            const glm::vec3 radial = across * dmath::cos(angle) + up * dmath::sin(angle);
+            const glm::vec3 normal = radial + axis * slope;
+            vertex(from + radial * fromRadius, normal);
+            vertex(to + radial * toRadius, normal);
         }
         for (int i = 0; i < sides; ++i) {
             const std::uint32_t a = first + static_cast<std::uint32_t>(i) * 2;
@@ -138,6 +152,18 @@ Builder start(const char* name)
     return builder;
 }
 
+}
+
+// A smooth patchwork of forest and clearing: a few overlapping waves of
+// distance, so the density has no grid in it. Deterministic through dmath.
+float forestPatch(double x, double z, float scale)
+{
+    const auto fx = static_cast<float>(x / scale);
+    const auto fz = static_cast<float>(z / scale);
+    const float a = dmath::sin(fx * 1.7f + 0.3f) * dmath::sin(fz * 1.3f + 1.1f);
+    const float b = dmath::sin(fx * 3.1f + fz * 2.3f + 2.0f);
+    const float value = 0.5f + 0.35f * a + 0.15f * b;
+    return std::clamp((value - 0.25f) * 1.8f, 0.0f, 1.0f);
 }
 
 void scatterVegetation(const Heightfield& heightfield, CellId id, const VegetationParams& params, std::vector<VegetationInstance>& out)
@@ -241,6 +267,12 @@ SceneBundle treeBundle()
     material("conifer", {0.06f, 0.22f, 0.10f}, 0.9f);
     material("broadleaf", {0.16f, 0.34f, 0.08f}, 0.85f);
     material("rock", {0.34f, 0.33f, 0.31f}, 0.95f);
+    material("grass", {0.20f, 0.42f, 0.10f}, 0.9f);
+    material("bush", {0.12f, 0.30f, 0.09f}, 0.9f);
+    material("deadwood", {0.32f, 0.27f, 0.22f}, 0.95f);
+    material("cactus", {0.16f, 0.36f, 0.20f}, 0.85f);
+    material("dry_shrub", {0.45f, 0.36f, 0.18f}, 0.95f);
+    material("reed", {0.42f, 0.46f, 0.20f}, 0.9f);
 
     {
         Builder b = start("conifer");
@@ -264,6 +296,56 @@ SceneBundle treeBundle()
         Mesh mesh = std::move(b.mesh);
         mesh.submeshes.push_back({0, static_cast<std::uint32_t>(mesh.indices.size()), 3});
         bundle.meshes.push_back(std::move(mesh));
+    }
+    const auto plain = [&](Builder& b, std::uint32_t materialIndex) {
+        Mesh mesh = std::move(b.mesh);
+        mesh.submeshes.push_back({0, static_cast<std::uint32_t>(mesh.indices.size()), materialIndex});
+        bundle.meshes.push_back(std::move(mesh));
+    };
+    {
+        Builder b = start("grass");
+        b.stick({0.0f, 0.0f, 0.0f}, {0.05f, 0.7f, 0.0f}, 0.09f, 0.0f, 3);
+        b.stick({0.12f, 0.0f, 0.06f}, {0.34f, 0.5f, 0.12f}, 0.08f, 0.0f, 3);
+        b.stick({-0.1f, 0.0f, 0.08f}, {-0.3f, 0.55f, 0.14f}, 0.08f, 0.0f, 3);
+        b.stick({0.02f, 0.0f, -0.1f}, {-0.04f, 0.6f, -0.3f}, 0.08f, 0.0f, 3);
+        plain(b, 4);
+    }
+    {
+        Builder b = start("bush");
+        b.frustum(0.0f, 0.35f, 0.07f, 0.05f, 4);
+        const auto trunk = static_cast<std::uint32_t>(b.mesh.indices.size());
+        b.crown(0.7f, 0.85f);
+        bundle.meshes.push_back(finish(b, trunk, 5));
+    }
+    {
+        Builder b = start("dead_tree");
+        b.stick({0.0f, 0.0f, 0.0f}, {0.15f, 4.4f, 0.0f}, 0.26f, 0.06f, 5);
+        b.stick({0.05f, 2.0f, 0.0f}, {1.3f, 3.4f, 0.3f}, 0.1f, 0.03f, 4);
+        b.stick({0.1f, 3.0f, 0.0f}, {-1.0f, 4.2f, -0.4f}, 0.08f, 0.03f, 4);
+        b.stick({0.1f, 3.7f, 0.0f}, {0.6f, 5.0f, 0.6f}, 0.05f, 0.02f, 4);
+        plain(b, 6);
+    }
+    {
+        Builder b = start("cactus");
+        b.stick({0.0f, 0.0f, 0.0f}, {0.0f, 2.8f, 0.0f}, 0.24f, 0.16f, 6);
+        b.stick({0.1f, 1.1f, 0.0f}, {0.85f, 1.4f, 0.0f}, 0.12f, 0.11f, 5);
+        b.stick({0.85f, 1.3f, 0.0f}, {0.9f, 2.3f, 0.0f}, 0.11f, 0.08f, 5);
+        b.stick({-0.1f, 1.7f, 0.0f}, {-0.7f, 1.95f, 0.0f}, 0.1f, 0.09f, 5);
+        b.stick({-0.7f, 1.9f, 0.0f}, {-0.75f, 2.6f, 0.0f}, 0.09f, 0.07f, 5);
+        plain(b, 7);
+    }
+    {
+        Builder b = start("dry_shrub");
+        b.crown(0.28f, 0.55f);
+        plain(b, 8);
+    }
+    {
+        Builder b = start("reed");
+        b.stick({0.0f, 0.0f, 0.0f}, {0.04f, 1.7f, 0.02f}, 0.05f, 0.0f, 3);
+        b.stick({0.14f, 0.0f, 0.04f}, {0.3f, 1.35f, 0.1f}, 0.045f, 0.0f, 3);
+        b.stick({-0.12f, 0.0f, 0.06f}, {-0.3f, 1.5f, 0.1f}, 0.045f, 0.0f, 3);
+        b.stick({0.0f, 0.0f, -0.12f}, {-0.06f, 1.25f, -0.28f}, 0.045f, 0.0f, 3);
+        plain(b, 9);
     }
     return bundle;
 }
