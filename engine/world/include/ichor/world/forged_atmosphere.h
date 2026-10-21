@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/world/atmosphere.h"
 #include "ichor/world/forged_biome.h"
 #include "ichor/world/weather.h"
 
@@ -18,6 +19,7 @@ struct ForgedAtmosphereConfig {
     float ambientGain = 1.15f;     // multiplier on the sky light that fills the shadows
     float sunIntensityGain = 1.15f;
     glm::vec3 sunTint{1.0f, 0.97f, 0.9f}; // multiplier on the sun's colour
+    SunPath sunPath{0.15f};               // the sun is about nine degrees up at 6 and 18, so dawn and dusk are lit
 };
 
 // The biome's own look: a multiplier on the horizon (and so the fog, which shares its colour so the
