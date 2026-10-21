@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Builds Ichor and assembles a folder that runs on a clean Windows machine (no vcpkg, no Visual Studio).
+#
+#   bin/package [-p preset] [-o out-dir] [--zip] [--smoke] [--no-build]
+#
+# The folder holds ichor.exe, its DLLs, the Visual C++ runtime DLLs, content/, shaders/, scripts/, data/, art/ and
+# ichor.bat, which starts `ichor --forged` with a default seed and grid. Everything is found beside the exe, so the
+# folder can be moved anywhere. --smoke then runs the packaged exe headless from a different directory.
+# Env: ICHOR_PACKAGE_SEED (default 1), ICHOR_PACKAGE_GRID (default 128).
+set -u
+
+preset=windows-ci
+out=
+zip=0
+smoke=0
+build=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p|--preset) [ $# -ge 2 ] || { echo "package: $1 needs a value" >&2; exit 2; }; preset=$2; shift 2 ;;
+    -o|--out) [ $# -ge 2 ] || { echo "package: $1 needs a value" >&2; exit 2; }; out=$2; shift 2 ;;
+    --zip) zip=1; shift ;;
+    --smoke) smoke=1; shift ;;
+    --no-build) build=0; shift ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "package: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+bdir=$repo/engine/build/$preset
+out=${out:-$repo/dist/ichor}
+seed=${ICHOR_PACKAGE_SEED:-1}
+grid=${ICHOR_PACKAGE_GRID:-128}
+
+if [ "$build" = 1 ]; then
+  "$repo/bin/build" -p "$preset" ichor || { echo "package: build failed" >&2; exit 1; }
+fi
+
+exe=$bdir/app/ichor.exe
+[ -f "$exe" ] || { echo "package: $exe not found (is the preset a Windows one?)" >&2; exit 1; }
+for dir in "$bdir/content" "$bdir/shaders"; do
+  [ -d "$dir" ] || { echo "package: $dir not found" >&2; exit 1; }
+done
+
+rm -rf "$out" || exit 1
+mkdir -p "$out" || exit 1
+
+cp "$exe" "$out/" || exit 1
+cp "$bdir"/app/*.dll "$out/" || exit 1
+cp -r "$bdir/content" "$out/content" || exit 1
+mkdir -p "$out/shaders" && cp "$bdir"/shaders/*.spv "$out/shaders/" || exit 1
+mkdir -p "$out/scripts" && cp "$repo"/engine/content/scripts/*.lua "$out/scripts/" || exit 1
+cp -r "$repo/data" "$out/data" || exit 1
+mkdir -p "$out/art" && cp -r "$repo/art/exile" "$repo/art/settlement_kit" "$out/art/" || exit 1
+
+# The Visual C++ runtime is not on a clean machine; ship the release one beside the exe.
+crt=
+for dir in "${VCToolsRedistDir:-}" /e/VS2022/VC/Redist/MSVC/* "/c/Program Files/Microsoft Visual Studio/2022/"*/VC/Redist/MSVC/*; do
+  [ -n "$dir" ] || continue
+  cand=$(ls -d "$dir"/x64/Microsoft.VC*.CRT 2>/dev/null | head -n 1)
+  if [ -n "$cand" ]; then crt=$cand; break; fi
+done
+if [ -n "$crt" ]; then
+  cp "$crt"/*.dll "$out/" || exit 1
+else
+  echo "package: warning: the Visual C++ redistributable DLLs were not found; the target machine needs the VC++ 2015-2022 x64 runtime installed" >&2
+fi
+
+printf '@echo off\r\ncd /d "%%~dp0"\r\nichor.exe --forged --seed %s --grid %s --campaign default %%*\r\n' "$seed" "$grid" > "$out/ichor.bat"
+
+echo "package: $out ($(du -sh "$out" | cut -f1))"
+
+if [ "$smoke" = 1 ]; then
+  work=$(mktemp -d) || exit 1
+  trap 'rm -rf "$work"' EXIT
+  echo "package: smoke run from $work"
+  log=$work/smoke.log
+  (cd "$work" && "$out/ichor.exe" --headless --forged --seed "$seed" --grid 64 --frames 30) > "$log" 2>&1
+  status=$?
+  cat "$log"
+  [ "$status" = 0 ] || { echo "package: smoke run failed ($status)" >&2; exit 1; }
+  grep -q "packaged build: assets are read from" "$log" || { echo "package: the exe did not resolve its assets beside itself" >&2; exit 1; }
+  grep -q "exit after 30 frames" "$log" || { echo "package: the smoke run did not finish its frames" >&2; exit 1; }
+  echo "package: smoke run passed"
+fi
+
+if [ "$zip" = 1 ]; then
+  zipfile=$out.zip
+  rm -f "$zipfile"
+  (cd "$(dirname "$out")" && tar -a -cf "$zipfile" "$(basename "$out")") || { echo "package: zip failed" >&2; exit 1; }
+  echo "package: $zipfile ($(du -sh "$zipfile" | cut -f1))"
+fi

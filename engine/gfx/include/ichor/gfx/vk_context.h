@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <string_view>
 #include <vector>
@@ -12,6 +13,10 @@
 struct SDL_Window;
 
 namespace ichor {
+
+// Where the compiled .spv files are read from. Defaults to the build tree; a packaged build points it beside the executable.
+void setShaderDirectory(std::filesystem::path directory);
+const std::filesystem::path& shaderDirectory();
 
 struct Texture;
 
