@@ -9,6 +9,7 @@
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
 #include "ichor/audio/reverb.h"
+#include "ichor/audio/soundscape.h"
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
@@ -836,6 +837,41 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         return position;
     };
+    // The forged world's soundscape: a bed per biome that crossfades along the borders, day and night variants, the
+    // sound of a settlement near it, and footsteps by surface. Audio only reads the scene, so none of it is sim state.
+    // A bed or step whose clip does not exist is silent.
+    ichor::Soundscape soundscape;
+    ichor::BedMixer bedMixer;
+    std::vector<ichor::SettlementSoundType> settlementTypes;
+    if (forged && forged->biomes) {
+        std::string soundscapeError;
+        if (!ichor::Soundscape::load(data, soundscape, soundscapeError)) {
+            ichor::logf(ichor::LogLevel::Warn, "data: {}; the forged world stays silent", soundscapeError);
+        }
+        for (const ichor::SettlementSite& site : forged->sites) {
+            settlementTypes.push_back(ichor::settlementTypeForBiome(worldforge::kBiomeNames[static_cast<std::size_t>(forged->biomes->biomeAt(site.x, site.z))]));
+        }
+        engine.scene().addSystem("footsteps", [&, pacer = ichor::FootstepPacer{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
+            for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
+                const glm::dvec3& feet = transform.position;
+                if (!pacer.step(feet.x, feet.z)) {
+                    continue;
+                }
+                const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
+                const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
+                // Wading has its own splash.
+                if (surface == ichor::SoundSurface::Water) {
+                    continue;
+                }
+                if (const auto step = ichor::footstepFor(soundscape, surface)) {
+                    const std::uint32_t clip = audio.findSound(step->clip);
+                    if (clip != ichor::Mixer::kNoSound) {
+                        audio.play(clip, feet, false, step->gain);
+                    }
+                }
+            }
+        });
+    }
     if (!heightfield.empty()) {
         // Streaming advances once per tick, so residency follows the path and
         // the budget alone. While the gate holds no ticks run, so it advances
@@ -1461,9 +1497,32 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
         const ichor::Weather sky = weatherNow();
         const ichor::WeatherAudioTargets weatherAudio = ichor::weatherAudioTargets(sky.overcast, sky.rain);
-        ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
-        ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
-        ambience.apply(audio);
+        if (forged && forged->biomes && !soundscape.empty()) {
+            const glm::dvec3 feet = playerPosition(engine.scene());
+            const float hour = ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour);
+            const ichor::BiomeBlend here = forged->biomes->blendAt(feet.x, feet.z);
+            std::vector<ichor::BedGain> beds = ichor::blendedBeds(soundscape, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
+            ichor::addBeds(beds, {{"A_Wind", weatherAudio.wind}, {"A_Rain", weatherAudio.rain}});
+            for (std::size_t i = 0; i < forged->sites.size(); ++i) {
+                const ichor::SettlementSite& site = forged->sites[i];
+                const float distance = static_cast<float>(std::hypot(feet.x - site.x, feet.z - site.z));
+                const float size = static_cast<float>(site.tier) / static_cast<float>(ichor::kSettlementTierCount - 1);
+                if (const auto bed = ichor::settlementBed(soundscape, site.id, size, settlementTypes[i], distance, 0.0f, 0.0f)) {
+                    ichor::addBeds(beds, {*bed});
+                }
+            }
+            ichor::budgetBeds(beds);
+            for (const ichor::BedGain& change : bedMixer.step(beds, dt)) {
+                const std::uint32_t clip = audio.findSound(change.clip);
+                if (clip != ichor::Mixer::kNoSound) {
+                    audio.setAmbience(clip, change.gain);
+                }
+            }
+        } else {
+            ambience.setGain(ichor::AmbienceLayer::Bed, weatherAudio.wind);
+            ambience.setGain(ichor::AmbienceLayer::Weather, weatherAudio.rain);
+            ambience.apply(audio);
+        }
         musicPlayer.update(static_cast<double>(engine.scene().tickCount()) * config.fixedDt, audio);
         if (editing) {
             // New objects appear a few metres in front of the player.

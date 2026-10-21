@@ -125,6 +125,13 @@ glm::vec3 ForgedBiomeField::splatAt(double x, double z) const
     return a * (1.0f - w) + b * w;
 }
 
+BiomeBlend ForgedBiomeField::blendAt(double x, double z) const
+{
+    if (empty()) return {};
+    const std::size_t i = indexAt(x, z);
+    return {static_cast<BiomeId>(clampedId(biome_[i])), static_cast<BiomeId>(clampedId(secondary_[i])), static_cast<float>(blend_[i]) / 255.0f};
+}
+
 glm::vec3 ForgedBiomeField::groundColourAt(double x, double z) const
 {
     if (empty()) return biomeSurface(BiomeId::Crag).groundColour;
