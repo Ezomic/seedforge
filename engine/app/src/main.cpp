@@ -105,6 +105,7 @@ struct Options {
     std::filesystem::path scene = std::filesystem::path(ICHOR_CONTENT_DIR) / "kit.iscene";
     std::filesystem::path actor = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
     std::filesystem::path exile; // the art/exile folder; empty leaves the placeholder character out
+    std::filesystem::path exileDefault = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile"; // the player's model in --forged when --exile is not given
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
@@ -487,7 +488,7 @@ bool finishCampaign(const Options& options, const ichor::ForgedGame& game)
 // A headless or screenshot run neither shows it nor writes the marker.
 bool firstRunHint(const Options& options)
 {
-    if (options.headless || !options.screenshot.empty()) {
+    if (options.headless || options.controls || !options.screenshot.empty()) {
         return false;
     }
     const std::filesystem::path marker = options.saves / ".controls_seen";
@@ -507,7 +508,8 @@ void usePackagedRoots(Options& options, const ichor::AssetRoots& roots)
     options.scene = roots.content / "kit.iscene";
     options.actor = roots.content / "arm.iscene";
     options.world = roots.content / "world";
-    options.exile = roots.art / "exile";
+    options.exileDefault = roots.art / "exile";
+    options.saves = roots.content.parent_path() / "saves";
     options.kit = roots.art / "settlement_kit";
     options.script = roots.scripts / "main.lua";
     options.data = roots.data;
@@ -555,7 +557,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     }
     ExileDemo exile;
     const bool exileByDefault = options.forged && !options.noExilePlayer && options.exile.empty();
-    const std::filesystem::path exileFolder = exileByDefault ? std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile" : options.exile;
+    const std::filesystem::path exileFolder = exileByDefault ? options.exileDefault : options.exile;
     if (!exileFolder.empty() && !loadExileDemo(exileFolder, renderer, animations, exile)) {
         if (!exileByDefault) {
             return 1;

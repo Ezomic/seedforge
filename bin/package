@@ -32,6 +32,14 @@ out=${out:-$repo/dist/ichor}
 seed=${ICHOR_PACKAGE_SEED:-1}
 grid=${ICHOR_PACKAGE_GRID:-128}
 
+case "$seed$grid" in *[!0-9]*|'') echo "package: ICHOR_PACKAGE_SEED and ICHOR_PACKAGE_GRID must be whole numbers" >&2; exit 2 ;; esac
+case "$seed" in '') echo "package: ICHOR_PACKAGE_SEED is empty" >&2; exit 2 ;; esac
+case "$grid" in '') echo "package: ICHOR_PACKAGE_GRID is empty" >&2; exit 2 ;; esac
+mkdir -p "$(dirname "$out")" || exit 1
+outabs=$(cd "$(dirname "$out")" && pwd)/$(basename "$out")
+case "$repo/" in "$outabs"/*) echo "package: refusing to replace $outabs, which contains the repository" >&2; exit 2 ;; esac
+case "$outabs" in "$repo/engine"*|"$repo/bin"*|"$repo/data"*|"$repo/art"*|"$repo/.git"*) echo "package: refusing to replace $outabs, which is inside the repository sources" >&2; exit 2 ;; esac
+
 if [ "$build" = 1 ]; then
   "$repo/bin/build" -p "$preset" ichor || { echo "package: build failed" >&2; exit 1; }
 fi
@@ -46,8 +54,10 @@ rm -rf "$out" || exit 1
 mkdir -p "$out" || exit 1
 
 cp "$exe" "$out/" || exit 1
+compgen -G "$bdir/app/*.dll" >/dev/null || { echo "package: no DLLs beside $exe" >&2; exit 1; }
 cp "$bdir"/app/*.dll "$out/" || exit 1
 cp -r "$bdir/content" "$out/content" || exit 1
+compgen -G "$bdir/shaders/*.spv" >/dev/null || { echo "package: no compiled shaders in $bdir/shaders" >&2; exit 1; }
 mkdir -p "$out/shaders" && cp "$bdir"/shaders/*.spv "$out/shaders/" || exit 1
 mkdir -p "$out/scripts" && cp "$repo"/engine/content/scripts/*.lua "$out/scripts/" || exit 1
 cp -r "$repo/data" "$out/data" || exit 1
