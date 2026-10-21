@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 // Phase 1, Tectonics (doc 08): a deterministic plate map and a coarse base height field, on an
@@ -195,7 +196,9 @@ inline int boundaryPeakM(BoundaryKind kind, PlateType self, int pairContinental)
 // Plate types are chosen after the plates are laid out, so the continental share of the map is a
 // per-seed target rather than a coin flip per plate. Plate 0 is always continental and plate 1 always
 // oceanic; the other plates join plate 0 in hash order while they still fit under the target, so a
-// seed can no longer draw a map of small continental slivers in a sea of oceanic plates.
+// seed rarely draws a map of small continental slivers in a sea of oceanic plates. The target is
+// best effort: it holds for the default 12 plates, and with only a handful of plates the share is
+// whatever plate 0 and the plates that fit make of it.
 inline void assignPlateTypes(std::uint64_t worldSeed, TectonicMap& map, std::size_t cells)
 {
     const std::size_t count = map.plates.size();
@@ -212,7 +215,8 @@ inline void assignPlateTypes(std::uint64_t worldSeed, TectonicMap& map, std::siz
     std::vector<std::pair<std::uint64_t, std::size_t>> order;
     for (std::size_t i = 2; i < count; ++i) order.emplace_back(tectonicsHash(worldSeed, kSaltType, static_cast<std::uint32_t>(i)), i);
     std::sort(order.begin(), order.end());
-    for (const auto& [key, i] : order) {
+    for (const auto& entry : order) {
+        const std::size_t i = entry.second;
         if (continental + area[i] > target) continue;
         map.plates[i].type = PlateType::Continental;
         continental += area[i];
