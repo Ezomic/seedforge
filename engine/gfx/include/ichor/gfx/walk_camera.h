@@ -37,6 +37,24 @@ inline float nextWalkYaw(float yaw, float look, double dt)
     return wrapped;
 }
 
+// The third-person follow camera: it hangs behind the walker on the line the view looks along, so the walker stays
+// in front of it and W walks away from it. `feet` is the walker's drawn position; the camera aims at a point above it.
+inline constexpr float kFollowDistance = 4.2f;    // metres from the aim point back along the view
+inline constexpr float kFollowAimHeight = 1.5f;   // metres above the feet
+inline constexpr float kFollowGroundClearance = 0.5f; // the camera never sinks below the ground by more than this
+
+inline glm::dvec3 walkFollowPosition(glm::dvec3 feet, float yaw = 0.0f)
+{
+    const glm::dvec3 aim = feet + glm::dvec3(0.0, kFollowAimHeight, 0.0);
+    return aim - glm::dvec3(walkCameraForward(yaw)) * static_cast<double>(kFollowDistance);
+}
+
+// `cameraY` held above the terrain at the camera's own spot. Not a number for the ground leaves it alone.
+inline double followClearY(double cameraY, double groundY)
+{
+    return std::isfinite(groundY) ? std::max(cameraY, groundY + kFollowGroundClearance) : cameraY;
+}
+
 // Turns a walking velocity (forward is -Z) so that forward points along the view yaw. A zero yaw changes nothing, bit for bit.
 inline glm::vec3 walkRelativeIntent(glm::vec3 intent, float yaw)
 {
