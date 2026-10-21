@@ -148,7 +148,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     }
     if (config.vegetation) {
         if (config.biomes && !config.biomes->empty()) {
-            scatterBiomeVegetation(heightfield, *config.biomes, id, config.plants, out.plants);
+            scatterForgedScenery(heightfield, *config.biomes, config.scenery, id, config.plants, out.plants);
         } else {
             scatterVegetation(heightfield, id, config.plants, out.plants);
         }
