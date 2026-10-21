@@ -153,7 +153,7 @@ TEST_CASE("the forged game carries every piece the app draws and walks", "[forge
 
 TEST_CASE("the spawn is dry, clear of buildings and next to the settlement nearest the centre", "[forged_game]")
 {
-    const auto game = gameFor(1);
+    const auto game = gameFor(2);
     const ForgedSpawn& spawn = game->spawn;
     REQUIRE(spawn.found);
     CHECK_FALSE(game->waterField->at(spawn.x, spawn.z).wet());

@@ -13,6 +13,7 @@
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
+#include "ichor/core/overlay_mode.h"
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
@@ -55,6 +56,7 @@
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_atmosphere.h"
+#include "ichor/world/forged_campaign_hook.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/npc/schedule.h"
 #include "ichor/ui/journal_screen_model.h"
@@ -115,9 +117,12 @@ struct Options {
     bool noExilePlayer = false; // --forged walks as the Exile unless this is set, and then as the wire capsule from inside
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
     int forgedGrid = ichor::kForgedDefaultGridSize;
+    std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
+    ichor::CampaignWorldPlan campaignPlan; // what main() decided for `campaign` before run()
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
+    std::optional<ichor::OverlayMode> overlay; // --overlay [off|compact|full]; none is compact in play and off for a screenshot
     bool showWindow = false; // with --screenshot: a visible window, only to compare it with the hidden render
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
@@ -191,6 +196,14 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.startHour)) return false;
         } else if (arg == "--day-seconds" && hasValue) {
             if (!parseNumber(argv[++i], options.daySeconds) || options.daySeconds <= 0.0) return false;
+        } else if (arg == "--overlay") {
+            options.overlay = ichor::OverlayMode::Compact;
+            if (i + 1 < argc) {
+                if (const std::optional<ichor::OverlayMode> mode = ichor::parseOverlayMode(argv[i + 1])) {
+                    options.overlay = mode;
+                    ++i;
+                }
+            }
         } else if (arg == "--show-window") {
             options.showWindow = true;
         } else if (arg == "--screenshot" && hasValue) {
@@ -215,6 +228,9 @@ bool parse(int argc, char** argv, Options& options)
             options.forged = true;
         } else if (arg == "--grid" && hasValue) {
             if (!parseNumber(argv[++i], options.forgedGrid) || options.forgedGrid < 16 || options.forgedGrid > 1024) return false;
+        } else if (arg == "--campaign" && hasValue) {
+            options.campaign = argv[++i];
+            if (options.campaign.empty()) return false;
         } else if (arg == "--ironman") {
             options.ironman = true;
         } else if (arg == "--autosave" && hasValue) {
@@ -303,6 +319,21 @@ void populateForged(ichor::Scene& scene, glm::dvec3 position)
 
 enum class ForgeOutcome { Built, Quit, Failed };
 
+ForgeOutcome reportForgedGame(const ichor::ForgedGame& game)
+{
+    if (!game.ok()) {
+        ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", game.error);
+        return ForgeOutcome::Failed;
+    }
+    for (const std::string& problem : game.contentProblems) {
+        ichor::logf(ichor::LogLevel::Warn, "forged content left out: {}", problem);
+    }
+    ichor::logf(ichor::LogLevel::Info, "forged content: {} items, {} cast, {} quests ({} refused), {} dungeon slots", game.loot ? game.loot->all().size() : 0, game.cast ? game.cast->all().size() : 0,
+        game.quests ? game.quests->all().size() : 0, game.quests ? game.quests->refused().size() : 0, game.dungeons ? game.dungeons->poiIds().size() : 0);
+    ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", game.stateHash(), game.spawn.x, game.spawn.z, game.spawn.groundY, game.spawn.found ? "" : " (no gentle dry ground found)");
+    return ForgeOutcome::Built;
+}
+
 // Forges the world for --forged through the new-game flow: a loading screen with the phase being
 // forged when there is a window, a plain wait when there is none. Quitting mid-forge cancels the job
 // and joins its thread before this returns.
@@ -318,6 +349,10 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     ichor::ForgedContentSetup content = ichor::loadForgedContentSetup(contentData, options.data);
     for (const std::string& problem : content.problems) {
         ichor::logf(ichor::LogLevel::Warn, "forged content: {}", problem);
+    }
+    if (options.campaignPlan.action == ichor::CampaignWorldAction::Load) {
+        out = ichor::buildStoredCampaignGame(options.campaignPlan, desc, content.inputs);
+        return reportForgedGame(*out);
     }
     ichor::NewGameFlow flow(true, options.forgedGrid, content.config);
     flow.begin(desc);
@@ -385,17 +420,53 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
         return ForgeOutcome::Failed;
     }
     out = ichor::buildForgedGame(*job->result(), desc, content.inputs);
-    if (!out->ok()) {
-        ichor::logf(ichor::LogLevel::Error, "the forged world could not be built: {}", out->error);
-        return ForgeOutcome::Failed;
+    return reportForgedGame(*out);
+}
+
+// --campaign, before anything else runs: decide between forging anew and rebuilding the stored world. A stored world
+// fixes the seed and grid for the whole run, so the engine and scripts see the campaign's seed, not the command line's.
+bool planCampaign(Options& options)
+{
+    options.campaignPlan = ichor::planCampaignWorld(options.saves, options.campaign);
+    const ichor::CampaignWorldPlan& plan = options.campaignPlan;
+    if (plan.action == ichor::CampaignWorldAction::Refuse) {
+        ichor::logf(ichor::LogLevel::Error, "{}", plan.message);
+        return false;
     }
-    for (const std::string& problem : out->contentProblems) {
-        ichor::logf(ichor::LogLevel::Warn, "forged content left out: {}", problem);
+    if (plan.action != ichor::CampaignWorldAction::ForgeAndSave) {
+        ichor::logf(plan.warn ? ichor::LogLevel::Warn : ichor::LogLevel::Info, "{}", plan.message);
+        options.seed = plan.key.seed;
+        options.forgedGrid = plan.key.gridSize;
     }
-    ichor::logf(ichor::LogLevel::Info, "forged content: {} items, {} cast, {} quests ({} refused), {} dungeon slots", out->loot ? out->loot->all().size() : 0, out->cast ? out->cast->all().size() : 0,
-        out->quests ? out->quests->all().size() : 0, out->quests ? out->quests->refused().size() : 0, out->dungeons ? out->dungeons->poiIds().size() : 0);
-    ichor::logf(ichor::LogLevel::Info, "forged world {:016x}, spawn at {:.0f}, {:.0f}, {:.0f} m{}", out->stateHash(), out->spawn.x, out->spawn.z, out->spawn.groundY, out->spawn.found ? "" : " (no gentle dry ground found)");
-    return ForgeOutcome::Built;
+    return true;
+}
+
+// --campaign: after the forge, save the new world or hold the rebuilt one to what was stored.
+bool finishCampaign(const Options& options, const ichor::ForgedGame& game)
+{
+    const ichor::CampaignWorldPlan& plan = options.campaignPlan;
+    if (plan.action == ichor::CampaignWorldAction::Load) {
+        ichor::logf(ichor::LogLevel::Info, "campaign '{}': built from the stored files, {} forges run", options.campaign, ichor::ForgeJob::forgesStarted());
+        return true;
+    }
+    if (plan.action == ichor::CampaignWorldAction::Rebuild) {
+        const std::string problem = ichor::verifyRebuiltWorld(plan, game);
+        if (!problem.empty()) {
+            ichor::logf(ichor::LogLevel::Error, "campaign '{}': {}", options.campaign, problem);
+            return false;
+        }
+        ichor::logf(ichor::LogLevel::Info, "campaign '{}': the world matches the stored one", options.campaign);
+        return true;
+    }
+    ichor::WorldDesc desc;
+    desc.seed = options.seed;
+    const ichor::CampaignStatus status = ichor::saveCampaignWorld(options.saves, options.campaign, desc, options.forgedGrid, game);
+    if (status != ichor::CampaignStatus::Ok) {
+        ichor::logf(ichor::LogLevel::Error, "campaign '{}': the world could not be saved ({})", options.campaign, ichor::campaignStatusText(status));
+        return false;
+    }
+    ichor::logf(ichor::LogLevel::Info, "campaign '{}': the forged world is saved under {}", options.campaign, options.saves.string());
+    return true;
 }
 
 int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
@@ -483,6 +554,9 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         const ForgeOutcome outcome = forgeGame(platform, renderer, options, ichor::kitReferenceView(bundle, 16.0f / 9.0f), forged);
         if (outcome != ForgeOutcome::Built) {
             return outcome == ForgeOutcome::Quit ? 0 : 1;
+        }
+        if (!options.campaign.empty() && !finishCampaign(options, *forged)) {
+            return 1;
         }
         if (!renderer.setTerrainMaterials(ichor::forgeTerrainMaterials(forged->desc.seed))) {
             return 1;
@@ -584,6 +658,7 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     ichor::EngineConfig config;
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
+    engine.setOverlayMode(ichor::startingOverlayMode(!options.screenshot.empty(), options.overlay));
     engine.scene().setAnimations(&animations);
     // The stand-in world has no roads, so its field is empty and the bonus never applies.
     const ichor::NullRoadField noRoads;
@@ -1492,12 +1567,18 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--no-exile-player]] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--settlement N [--overlook M]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
     if (!options.forged && options.forgedGrid != ichor::kForgedDefaultGridSize) {
         ichor::log(ichor::LogLevel::Warn, "--grid only applies with --forged and is ignored");
+    }
+    if (!options.forged && !options.campaign.empty()) {
+        ichor::log(ichor::LogLevel::Warn, "--campaign only applies with --forged and is ignored");
+    }
+    if (options.forged && !options.campaign.empty() && !planCampaign(options)) {
+        return 1;
     }
     if (options.audioProbe) {
         ichor::MiniaudioDevice device;

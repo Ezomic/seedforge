@@ -6,6 +6,7 @@
 #include <worldforge/subseed.h>
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -40,7 +41,18 @@
 //
 // Placement: candidates whose score is at least minScorePermille are taken best first (ties by a
 // seed-derived hash, then cell), skipping any within minSpacing cells (Euclidean) of one already
-// taken, up to maxPois. Zero viewpoints (no roads) places nothing.
+// taken, up to maxPois - coverageReserve. Zero viewpoints (no roads) scores nothing, so only the
+// coverage pass can place.
+//
+// Coverage pass (coverageReserve > 0): up to coverageReserve more POIs, each the clear candidate (a
+// land cell with the road and settlement clearance, on a grid of at most 1024 cells) that covers the
+// most samples not yet covered under the landmark validator's own rule and sample grid
+// (landmark_coverage.h, params.coverage and coverageHeightM), so a world is not left with land no
+// landmark can be seen from. The score-placed POIs count as already placed, but only the first
+// kLandmarkMaxLandmarks - coverageReserve of them, because the validator reads only the first
+// kLandmarkMaxLandmarks POIs. The coverage POIs are inserted right after those, ahead of any later
+// score-placed POI, so they are inside the validator's window. Ties by the seed-derived hash, then
+// cell. The pass stops early when no candidate covers a new sample.
 //
 // Output (PoiMap): the grid, the viewpoint count and the placed POIs in placement order (best
 // first), each with its cell, score, and the number of viewpoints that see it.
@@ -73,6 +85,9 @@ struct PoiParams {
     int maxViewpoints = 256;     // road viewpoint cap, in [1, kPoiMaxViewpoints]
     int roadClearance = 2;       // no road within this many cells of a POI, in [0, kPoiMaxClearance]
     int settlementClearance = 6; // no settlement within this many cells of a POI, in [0, kPoiMaxClearance]
+    int coverageReserve = 0;     // of maxPois, how many are placed to widen landmark coverage instead of by score, in [0, maxPois]
+    int coverageHeightM = 24;    // silhouette height the coverage pass gives a POI, in [1, kLandmarkMaxHeightM]
+    LandmarkCoverageParams coverage; // sampling, sight and near ranges the coverage pass optimises, same meaning as the validator's
 };
 
 struct Poi {
@@ -125,7 +140,9 @@ inline bool poiParamsValid(const PoiParams& p)
         && p.minSpacing <= kPoiMaxSpacing && p.minScorePermille >= 0 && p.minScorePermille <= 1000 && p.viewRangeCells >= 1 && p.viewRangeCells <= kPoiMaxViewRangeCells
         && p.eyeHeightM >= 0 && p.eyeHeightM <= kPoiMaxEyeM && p.entranceHeightM >= 1 && p.entranceHeightM <= kPoiMaxEntranceM && p.maxCandidates >= 1
         && p.maxCandidates <= kPoiMaxCandidates && p.maxViewpoints >= 1 && p.maxViewpoints <= kPoiMaxViewpoints && p.roadClearance >= 0
-        && p.roadClearance <= kPoiMaxClearance && p.settlementClearance >= 0 && p.settlementClearance <= kPoiMaxClearance;
+        && p.roadClearance <= kPoiMaxClearance && p.settlementClearance >= 0 && p.settlementClearance <= kPoiMaxClearance && p.coverageReserve >= 0
+        && p.coverageReserve <= p.maxPois && p.coverageReserve <= kLandmarkMaxLandmarks
+        && (p.coverageReserve == 0 || (p.coverageHeightM >= 1 && p.coverageHeightM <= kLandmarkMaxHeightM && landmarkParamsValid(p.coverage)));
 }
 
 struct PoiCandidate {
@@ -148,6 +165,136 @@ inline bool poiClear(const RoadMap& roads, const SettlementMap* settlements, con
     if (settlements == nullptr) return true;
     const int s = p.settlementClearance;
     return std::none_of(settlements->sites.begin(), settlements->sites.end(), [&](const Settlement& site) { return std::abs(site.x - x) <= s && std::abs(site.y - y) <= s; });
+}
+
+struct PoiCoverageSample {
+    int x = 0;
+    int y = 0;
+    std::int64_t ground = 0;
+};
+
+// True when a landmark at (lx, ly) covers the sample under the landmark validator's rule: inside the near range, or inside the view range with a clear line of sight.
+inline bool poiCovers(const LandmarkCoverageInputs& terrain, const LandmarkCoverageParams& cov, int heightM, const PoiCoverageSample& s, int lx, int ly)
+{
+    const std::int64_t dx = lx - s.x;
+    const std::int64_t dy = ly - s.y;
+    const std::int64_t dSq = dx * dx + dy * dy;
+    if (dSq <= static_cast<std::int64_t>(cov.nearRangeCells) * cov.nearRangeCells) return true;
+    if (dSq > static_cast<std::int64_t>(cov.viewRangeCells) * cov.viewRangeCells) return false;
+    return landmarkLineOfSight(terrain, s.x, s.y, s.ground + cov.eyeHeightM, Landmark { lx, ly, heightM });
+}
+
+// Greedy landmark coverage: up to `count` extra POIs, each the clear candidate cell that covers the most still uncovered samples of the
+// validator's own sample grid (ties by the seed hash, then cell). `placed` is every POI already taken (spacing), of which the first
+// `counted` are the landmarks the validator will see. Stops early when no candidate covers a new sample.
+inline std::vector<Poi> placeCoveragePois(const RoadMap& roads, const SettlementMap* settlements, const PoiParams& p, const std::vector<Poi>& placed, std::size_t counted,
+    int count, std::uint64_t tieSeed)
+{
+    constexpr int kMaxCoverageCandidates = 1024;
+    const LandmarkCoverageInputs terrain { roads.width, roads.height, roads.heightM, {} };
+    const LandmarkCoverageParams& cov = p.coverage;
+
+    std::vector<PoiCoverageSample> samples;
+    const int sampleStride = landmarkStride(roads.width, roads.height, cov.maxSamples);
+    for (int y = sampleStride / 2; y < roads.height; y += sampleStride) {
+        for (int x = sampleStride / 2; x < roads.width; x += sampleStride) {
+            const std::int64_t ground = roads.heightM[roads.index(x, y)];
+            if (ground > cov.seaLevelM) samples.push_back({ x, y, ground });
+        }
+    }
+    std::vector<Poi> out;
+    if (samples.empty() || count <= 0) return out;
+
+    const std::size_t words = (samples.size() + 63) / 64;
+    std::vector<std::uint64_t> covered(words, 0);
+    for (std::size_t i = 0; i < samples.size(); ++i) {
+        for (std::size_t k = 0; k < std::min(counted, placed.size()); ++k) {
+            if (poiCovers(terrain, cov, p.coverageHeightM, samples[i], placed[k].x, placed[k].y)) {
+                covered[i / 64] |= std::uint64_t { 1 } << (i % 64);
+                break;
+            }
+        }
+    }
+
+    struct Candidate {
+        int x = 0;
+        int y = 0;
+        std::uint64_t tie = 0;
+        std::size_t row = 0;
+    };
+    const std::int64_t spacingSq = static_cast<std::int64_t>(p.minSpacing) * p.minSpacing;
+    std::vector<Poi> taken = placed;
+    const int baseStride = [&] {
+        int stride = 1;
+        while (static_cast<std::int64_t>((roads.width + stride - 1) / stride) * ((roads.height + stride - 1) / stride) > kMaxCoverageCandidates) ++stride;
+        return stride;
+    }();
+
+    // Strict clearances first; crowded land (thin continents full of settlements) has no clear cell, so the clearances relax in two steps.
+    for (int level = 0; level < 3 && static_cast<int>(out.size()) < count; ++level) {
+        const bool allCovered = std::all_of(samples.begin(), samples.end(), [&, i = std::size_t { 0 }](const PoiCoverageSample&) mutable {
+            const bool bit = (covered[i / 64] >> (i % 64)) & 1;
+            ++i;
+            return bit;
+        });
+        if (allCovered) break;
+        PoiParams q = p;
+        q.roadClearance = p.roadClearance >> level;
+        q.settlementClearance = p.settlementClearance >> level;
+        if (level == 2) {
+            q.roadClearance = 0;
+            q.settlementClearance = std::min(p.settlementClearance, 1);
+        }
+
+        std::vector<Candidate> cands;
+        std::vector<std::uint64_t> rows;
+        for (int stride = baseStride;; stride = (stride + 1) / 2) {
+            for (int y = stride / 2; y < roads.height && static_cast<int>(cands.size()) < kMaxCoverageCandidates; y += stride) {
+                for (int x = stride / 2; x < roads.width && static_cast<int>(cands.size()) < kMaxCoverageCandidates; x += stride) {
+                    if (!poiClear(roads, settlements, q, x, y)) continue;
+                    const std::size_t row = rows.size();
+                    rows.resize(row + words, 0);
+                    bool any = false;
+                    for (std::size_t i = 0; i < samples.size(); ++i) {
+                        if (!poiCovers(terrain, cov, p.coverageHeightM, samples[i], x, y)) continue;
+                        rows[row + i / 64] |= std::uint64_t { 1 } << (i % 64);
+                        any = true;
+                    }
+                    if (!any) {
+                        rows.resize(row);
+                        continue;
+                    }
+                    cands.push_back({ x, y, splitmix64(tieSeed ^ hashCell(x, y)), row });
+                }
+            }
+            if (!cands.empty() || stride == 1) break;
+        }
+
+        while (static_cast<int>(out.size()) < count) {
+            const Candidate* best = nullptr;
+            int bestGain = 0;
+            for (const Candidate& c : cands) {
+                int gain = 0;
+                for (std::size_t w = 0; w < words; ++w) gain += std::popcount(rows[c.row + w] & ~covered[w]);
+                if (gain == 0 || gain < bestGain) continue;
+                if (gain == bestGain && best != nullptr && (c.tie > best->tie || (c.tie == best->tie && (c.y > best->y || (c.y == best->y && c.x > best->x))))) continue;
+                const bool crowded = std::any_of(taken.begin(), taken.end(), [&](const Poi& t) {
+                    const std::int64_t dx = t.x - c.x;
+                    const std::int64_t dy = t.y - c.y;
+                    return dx * dx + dy * dy < spacingSq;
+                });
+                if (crowded) continue;
+                best = &c;
+                bestGain = gain;
+            }
+            if (best == nullptr) break;
+            for (std::size_t w = 0; w < words; ++w) covered[w] |= rows[best->row + w];
+            const Poi poi { static_cast<std::int16_t>(best->x), static_cast<std::int16_t>(best->y), 0, 0 };
+            out.push_back(poi);
+            taken.push_back(poi);
+        }
+    }
+    return out;
 }
 
 }
@@ -210,14 +357,15 @@ inline std::optional<PoiMap> placePois(const RoadMap& roads, const SettlementMap
     out.height = roads.height;
     const std::vector<PoiViewpoint> viewpoints = poiViewpoints(roads, params.maxViewpoints);
     out.viewpointCount = static_cast<int>(viewpoints.size());
-    if (viewpoints.empty() || params.maxPois == 0) return out;
+    if (params.maxPois == 0) return out;
+    const int scoreBudget = params.maxPois - params.coverageReserve;
 
     int stride = 1;
     while (static_cast<std::int64_t>((roads.width + stride - 1) / stride) * ((roads.height + stride - 1) / stride) > params.maxCandidates) ++stride;
 
     const std::uint64_t tieSeed = splitmix64(roads.seed ^ detail::kPoiDomain) ^ detail::kPoiSaltTie;
     std::vector<detail::PoiCandidate> cands;
-    for (int y = stride / 2; y < roads.height; y += stride) {
+    for (int y = stride / 2; y < roads.height && !viewpoints.empty(); y += stride) {
         for (int x = stride / 2; x < roads.width; x += stride) {
             if (!detail::poiClear(roads, settlements, params, x, y)) continue;
             const PoiSightline s = poiSightline(roads, viewpoints, params, x, y);
@@ -242,6 +390,31 @@ inline std::optional<PoiMap> placePois(const RoadMap& roads, const SettlementMap
         if (crowded) continue;
         out.pois.push_back({ static_cast<std::int16_t>(c.x), static_cast<std::int16_t>(c.y), static_cast<std::uint16_t>(c.score), static_cast<std::uint16_t>(c.visible) });
     }
+    if (params.coverageReserve == 0) return out;
+
+    const std::size_t scored = std::min<std::size_t>(out.pois.size(), static_cast<std::size_t>(scoreBudget));
+    const std::size_t counted = std::min<std::size_t>(scored, static_cast<std::size_t>(kLandmarkMaxLandmarks - params.coverageReserve));
+    const std::vector<Poi> scoredPois(out.pois.begin(), out.pois.begin() + static_cast<std::ptrdiff_t>(scored));
+    std::vector<Poi> extra = detail::placeCoveragePois(roads, settlements, params, scoredPois, counted, params.coverageReserve, tieSeed);
+    for (Poi& e : extra) {
+        const PoiSightline s = poiSightline(roads, viewpoints, params, e.x, e.y);
+        e.score = static_cast<std::uint16_t>(s.scorePermille);
+        e.visibleCount = static_cast<std::uint16_t>(s.visibleCount);
+    }
+
+    std::vector<Poi> merged(out.pois.begin(), out.pois.begin() + static_cast<std::ptrdiff_t>(counted));
+    merged.insert(merged.end(), extra.begin(), extra.end());
+    merged.insert(merged.end(), out.pois.begin() + static_cast<std::ptrdiff_t>(counted), out.pois.begin() + static_cast<std::ptrdiff_t>(scored));
+    for (std::size_t i = scored; i < out.pois.size() && static_cast<int>(merged.size()) < params.maxPois; ++i) {
+        const Poi& later = out.pois[i];
+        const bool crowded = std::any_of(extra.begin(), extra.end(), [&](const Poi& e) {
+            const std::int64_t dx = e.x - later.x;
+            const std::int64_t dy = e.y - later.y;
+            return dx * dx + dy * dy < spacingSq;
+        });
+        if (!crowded) merged.push_back(later);
+    }
+    out.pois = std::move(merged);
     return out;
 }
 

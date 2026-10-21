@@ -18,6 +18,8 @@ public:
 
     void requestQuit() override { quit_ = true; }
     void setInput(const InputFrame& input) { input_ = input; }
+    bool overlayKey() const override { return overlayKey_; }
+    void setOverlayKey(bool down) { overlayKey_ = down; }
     unsigned pumpCount() const { return pumps_; }
 
     static constexpr double kTick = 1.0 / 60.0;
@@ -26,6 +28,7 @@ private:
     bool quit_ = false;
     unsigned pumps_ = 0;
     InputFrame input_;
+    bool overlayKey_ = false;
 };
 
 }

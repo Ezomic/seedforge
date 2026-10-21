@@ -375,12 +375,14 @@ void VulkanRenderer::endFrame()
         return;
     }
 
-    ImGui::SetNextWindowPos({12.0f, 12.0f}, ImGuiCond_Always);
-    ImGui::Begin("debug", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
-    for (const auto& line : lines_) {
-        ImGui::TextUnformatted(line.c_str());
+    if (!lines_.empty()) {
+        ImGui::SetNextWindowPos({12.0f, 12.0f}, ImGuiCond_Always);
+        ImGui::Begin("debug", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
+        for (const auto& line : lines_) {
+            ImGui::TextUnformatted(line.c_str());
+        }
+        ImGui::End();
     }
-    ImGui::End();
     if (guiHook_) {
         guiHook_();
     }

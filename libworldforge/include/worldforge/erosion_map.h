@@ -211,6 +211,26 @@ inline bool erosionParamsValid(const ErosionParams& p)
 
 }
 
+constexpr int kErosionReferenceSide = 256;
+
+// Erosion acts per cell, so the same rounds and rates reach further across the ground on a coarse grid:
+// a 64 cell grid (cells four times as wide as at 256) loses up to half of its land and all of a thin
+// continent. Diffusion distance squared goes with rounds * rate * cell size squared, so on grids smaller
+// than the reference both the round count and the thermal rate are scaled with side / kErosionReferenceSide,
+// which keeps the ground reach of erosion (and the land share it leaves) about constant. Rounds stay at
+// least 1 when the input asked for any, and the rate at least 1. At the reference side and above, params
+// are returned unchanged.
+inline ErosionParams scaleErosionToGrid(const ErosionParams& params, int side)
+{
+    ErosionParams out = params;
+    if (side >= kErosionReferenceSide) return out;
+    const std::int64_t clamped = std::max(side, 1);
+    const auto scale = [&](int value) { return static_cast<int>(std::max<std::int64_t>(1, static_cast<std::int64_t>(value) * clamped / kErosionReferenceSide)); };
+    if (params.iterations > 0) out.iterations = scale(params.iterations);
+    if (params.thermalRate > 0) out.thermalRate = scale(params.thermalRate);
+    return out;
+}
+
 // Returns nullopt when the map is malformed (size outside the kTectonics* limits, a height field
 // of the wrong length or with a height outside the allowed range), a parameter is out of range, or
 // the total work exceeds kErosionMaxCellPasses.

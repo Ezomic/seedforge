@@ -89,6 +89,7 @@ struct SeedRecord {
     bool validated = false;
     bool rejected = false;                // set when validated and no attempt passed every gate
     std::vector<std::string> causes;      // failed gates of the last attempt, "gate: cause"
+    std::int64_t landSharePermille = -1;  // the last attempt's land share; -1 when the world could not be scored
 };
 
 struct RunOptions {
