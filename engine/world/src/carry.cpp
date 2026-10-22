@@ -119,7 +119,7 @@ StableId CarrySystem::playerOf(const Scene& scene) const
     for (auto [entity, id, player] : scene.registry().view<const StableId, const Player>().each()) {
         return id;
     }
-    return {};
+    return StableId::of("player"); // not spawned yet: the id the app gives the player
 }
 
 const Carried* CarrySystem::carried(const Scene& scene) const

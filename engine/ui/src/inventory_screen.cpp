@@ -13,7 +13,7 @@ namespace {
 constexpr const char* kInventoryDocument = R"(<rml><head><style>
     body, div { display: block; }
     body { width: 100%; height: 100%; }
-    #card { position: absolute; top: 10%; bottom: 10%; left: 14%; right: 14%; overflow: hidden; padding: 22px 28px 22px 28px; background-color: #14161af0; border: 3px #a08850; }
+    #card { position: absolute; top: 6%; bottom: 6%; left: 14%; right: 14%; overflow: hidden; padding: 22px 28px 22px 28px; background-color: #14161af0; border: 3px #a08850; }
     #close { position: absolute; top: 10px; right: 14px; width: 34px; height: 34px; font-family: Alegreya Sans; font-size: 30px; line-height: 34px; text-align: center; color: #a08850; }
     #close:hover { color: #e8d8a8; background-color: #3a3426; }
     #title { font-family: Cinzel; font-size: 34px; color: #e8d8a8; letter-spacing: 3px; text-align: center; padding-bottom: 8px; }
@@ -25,13 +25,13 @@ constexpr const char* kInventoryDocument = R"(<rml><head><style>
     #fill { height: 12px; }
     #fill.Light { background-color: #7ca860; } #fill.Loaded { background-color: #c8b868; } #fill.Heavy { background-color: #d08840; } #fill.Over { background-color: #e04838; }
     #notice { font-family: Alegreya Sans; font-size: 19px; color: #e8d8a8; padding-top: 6px; height: 24px; }
-    .row { font-family: Alegreya Sans; font-size: 20px; color: #e0d8c0; padding: 4px 0px 4px 0px; border-bottom: 1px #25272b; height: 28px; }
+    .row { font-family: Alegreya Sans; font-size: 18px; color: #e0d8c0; padding: 2px 0px 2px 0px; border-bottom: 1px #25272b; height: 26px; }
     .row.header { color: #a08850; font-family: Cinzel; font-size: 16px; letter-spacing: 2px; }
     .cell { display: inline-block; vertical-align: middle; }
-    .name { width: 38%; } .cls { width: 14%; color: #8c8468; } .qty { width: 8%; } .unit { width: 10%; text-align: right; } .wt { width: 12%; text-align: right; }
-    .act { display: inline-block; vertical-align: middle; width: 8%; margin-left: 1%; text-align: center; color: #a08850; border: 1px #3a3426; font-size: 17px; }
+    .name { width: 34%; } .cls { width: 13%; color: #8c8468; } .qty { width: 7%; } .unit { width: 9%; text-align: right; } .wt { width: 11%; text-align: right; }
+    .act { display: inline-block; vertical-align: middle; width: 8%; margin-left: 1%; text-align: center; color: #a08850; border: 1px #3a3426; font-size: 16px; }
     .act:hover { color: #e8d8a8; background-color: #3a3426; }
-    .act.none { border: 0px; }
+    .act.none { border: 1px #14161a00; }
     .empty { font-family: Alegreya Sans; font-size: 21px; color: #8c8468; text-align: center; padding: 18px 0px 18px 0px; }
     .more { font-size: 16px; color: #8c8468; padding-top: 6px; }
 </style></head><body>
