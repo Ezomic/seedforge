@@ -37,36 +37,48 @@ struct Step {
     float cost;
 };
 
-void relax(Grid& g, std::size_t at, int x, int z, const Step& step, float spacing)
+bool relax(Grid& g, std::size_t at, int x, int z, const Step& step, float spacing)
 {
     const int nx = x + step.dx;
     const int nz = z + step.dz;
-    if (nx < 0 || nz < 0 || nx >= g.width || nz >= g.height) return;
+    if (nx < 0 || nz < 0 || nx >= g.width || nz >= g.height) return false;
     const auto from = static_cast<std::size_t>(nz) * static_cast<std::size_t>(g.width) + static_cast<std::size_t>(nx);
     const float cost = step.cost * spacing;
+    bool changed = false;
     if (g.still[from] + cost < g.still[at]) {
         g.still[at] = g.still[from] + cost;
         g.level[at] = g.level[from];
+        changed = true;
     }
-    g.river[at] = std::min(g.river[at], g.river[from] + cost);
+    if (g.river[from] + cost < g.river[at]) {
+        g.river[at] = g.river[from] + cost;
+        changed = true;
+    }
+    return changed;
 }
 
+// Repeats the two passes until nothing improves, so the distances do not depend on where the window starts and
+// two cells that share an edge agree on it.
 void sweep(Grid& g, float spacing)
 {
     constexpr float kDiagonal = 1.41421356f;
     constexpr std::array<Step, 4> forward{{{-1, 0, 1.0f}, {-1, -1, kDiagonal}, {0, -1, 1.0f}, {1, -1, kDiagonal}}};
     constexpr std::array<Step, 4> backward{{{1, 0, 1.0f}, {1, 1, kDiagonal}, {0, 1, 1.0f}, {-1, 1, kDiagonal}}};
-    for (int z = 0; z < g.height; ++z) {
-        for (int x = 0; x < g.width; ++x) {
-            const auto at = static_cast<std::size_t>(z) * static_cast<std::size_t>(g.width) + static_cast<std::size_t>(x);
-            for (const Step& step : forward) relax(g, at, x, z, step, spacing);
+    for (int pass = 0; pass < 64; ++pass) {
+        bool changed = false;
+        for (int z = 0; z < g.height; ++z) {
+            for (int x = 0; x < g.width; ++x) {
+                const auto at = static_cast<std::size_t>(z) * static_cast<std::size_t>(g.width) + static_cast<std::size_t>(x);
+                for (const Step& step : forward) changed |= relax(g, at, x, z, step, spacing);
+            }
         }
-    }
-    for (int z = g.height - 1; z >= 0; --z) {
-        for (int x = g.width - 1; x >= 0; --x) {
-            const auto at = static_cast<std::size_t>(z) * static_cast<std::size_t>(g.width) + static_cast<std::size_t>(x);
-            for (const Step& step : backward) relax(g, at, x, z, step, spacing);
+        for (int z = g.height - 1; z >= 0; --z) {
+            for (int x = g.width - 1; x >= 0; --x) {
+                const auto at = static_cast<std::size_t>(z) * static_cast<std::size_t>(g.width) + static_cast<std::size_t>(x);
+                for (const Step& step : backward) changed |= relax(g, at, x, z, step, spacing);
+            }
         }
+        if (!changed) break;
     }
 }
 

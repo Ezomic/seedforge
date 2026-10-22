@@ -95,3 +95,36 @@ TEST_CASE("a hydrology of another size or none gives no shore")
     const Hydrology hydrology = computeHydrology(field);
     REQUIRE(terrainShore(field, hydrology, HydrologyParams{}, {5, 5}).empty());
 }
+
+TEST_CASE("neighbouring cells agree on the shore along the edge they share")
+{
+    WorldDesc desc;
+    desc.sizeMetres = kSide - 1;
+    desc.metresPerSample = 1;
+    desc.cellMetres = (kSide - 1) / 2;
+    desc.heightRange = 6553.5f;
+    desc.waterHeight = 5.0f;
+    std::vector<std::uint16_t> samples(static_cast<std::size_t>(kSide) * kSide);
+    for (std::uint32_t z = 0; z < kSide; ++z) {
+        for (std::uint32_t x = 0; x < kSide; ++x) {
+            const std::uint32_t d = (x + 2 * z) / 3;
+            samples[static_cast<std::size_t>(z) * kSide + x] = d < 20 ? 20 : static_cast<std::uint16_t>(50 + (d - 20) * 3);
+        }
+    }
+    const Heightfield field(desc, std::move(samples));
+    const Hydrology hydrology = computeHydrology(field);
+    HydrologyParams rivers;
+    rivers.riverThreshold = 1u << 30;
+    const std::vector<glm::vec2> west = terrainShore(field, hydrology, rivers, {0, 0});
+    const std::vector<glm::vec2> east = terrainShore(field, hydrology, rivers, {1, 0});
+    const std::uint32_t side = desc.samplesPerCellSide();
+    REQUIRE(west.size() == static_cast<std::size_t>(side) * side);
+    float most = 0.0f;
+    for (std::uint32_t z = 0; z < side; ++z) {
+        const glm::vec2 a = west[static_cast<std::size_t>(z) * side + side - 1];
+        const glm::vec2 b = east[static_cast<std::size_t>(z) * side];
+        REQUIRE(a == b);
+        most = a.x > most ? a.x : most;
+    }
+    REQUIRE(most > 0.0f);
+}
