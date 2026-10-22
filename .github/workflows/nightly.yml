@@ -14,12 +14,15 @@ on:
       size:
         description: forge-cli grid size for the sanity report
         default: "128"
+      walk_grids:
+        description: forged walk bot grid sizes, comma separated
+        default: "256,1024"
 
 jobs:
   stress-and-sanity:
     name: ctest-stress + world sanity (linux headless)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 100
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -98,4 +101,71 @@ jobs:
             world-sanity/manifest.json
             world-sanity/validation.json
             engine/build/linux-headless-asan/ctest-stress-fail-*.log
+          if-no-files-found: ignore
+
+  forged-walk:
+    name: forged walk bot 256 and 1024 (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      ICHOR_NIGHTLY_WALK_GRIDS: ${{ inputs.walk_grids || '256,1024' }}
+      ICHOR_NIGHTLY_WALK_BUDGET_S: "1200"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-walk-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-walk-
+            ccache-linux-
+      # Release without sanitizers: the first run of this job under ASan Debug took about 190 s per seed at grid 1024, so 8 seeds
+      # alone overran the budget. Memory errors in the walker are covered by the sanitizer jobs on the PR suite's 129 grid.
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target ichor_tests_world
+        working-directory: engine
+      - name: Forged walk bot (8 seeds per grid)
+        id: walk
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/tests/ichor_tests_world "nightly: the walk bot*" | tee walk.log
+      - name: Summarize walk failures
+        if: ${{ failure() }}
+        run: |
+          {
+            echo "## Forged walk bot"
+            echo '```'
+            grep -E '^(WALK|  )|silently stuck|FAILED' walk.log
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload walk log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-walk-log
+          path: walk.log
           if-no-files-found: ignore

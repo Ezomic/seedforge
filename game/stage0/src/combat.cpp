@@ -73,7 +73,7 @@ Stage0::Stage0(Tuning tuning)
 {
 }
 
-void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
+void Stage0::registerComponents(Scene& scene)
 {
     scene.registerComponent<Combatant>("stage0.combatant");
     scene.registerComponent<SkirmisherBrain>("stage0.skirmisher");
@@ -81,6 +81,39 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
     scene.registerComponent<AnchorBrain>("stage0.anchor");
     scene.registerComponent<ArtilleryBrain>("stage0.artillery");
     scene.registerComponent<ControllerBrain>("stage0.controller");
+}
+
+void Stage0::addSystems(Scene& scene)
+{
+    scene.addSystem("stage0.combat", [this](Scene& s, double dt, const InputFrame& input) { combatSystem(s, dt, input); });
+    scene.addSystem("stage0.skirmisher", [this](Scene& s, double dt, const InputFrame&) { skirmisherSystem(s, dt); });
+    scene.addSystem("stage0.controller", [this](Scene& s, double, const InputFrame&) { controllerSystem(s); });
+}
+
+void Stage0::spawnFoe(Scene& scene)
+{
+    SpawnCommand foe;
+    foe.id = foe_;
+    foe.name.value = "skirmisher";
+    foe.transform.position = foeSpawn_;
+    foe.character = CharacterBody{tuning_.bodyRadius, 0.6f};
+    scene.enqueue(foe);
+}
+
+void Stage0::attach(Scene& scene, StableId player, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
+{
+    registerComponents(scene);
+    arena_ = false;
+    playerSpawn_ = playerSpawn;
+    foeSpawn_ = foeSpawn;
+    player_ = player;
+    foe_ = StableId::of("stage0.foe");
+    addSystems(scene);
+}
+
+void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
+{
+    registerComponents(scene);
     playerSpawn_ = playerSpawn;
     foeSpawn_ = foeSpawn;
     player_ = StableId::of("stage0.player");
@@ -108,16 +141,9 @@ void Stage0::install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
     player.character = CharacterBody{tuning_.bodyRadius, 0.6f};
     scene.enqueue(player);
 
-    SpawnCommand foe;
-    foe.id = foe_;
-    foe.name.value = "skirmisher";
-    foe.transform.position = foeSpawn;
-    foe.character = CharacterBody{tuning_.bodyRadius, 0.6f};
-    scene.enqueue(foe);
+    spawnFoe(scene);
 
-    scene.addSystem("stage0.combat", [this](Scene& s, double dt, const InputFrame& input) { combatSystem(s, dt, input); });
-    scene.addSystem("stage0.skirmisher", [this](Scene& s, double dt, const InputFrame&) { skirmisherSystem(s, dt); });
-    scene.addSystem("stage0.controller", [this](Scene& s, double, const InputFrame&) { controllerSystem(s); });
+    addSystems(scene);
 }
 
 void Stage0::resetFight(Scene& scene)
@@ -303,7 +329,7 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
 
     if (c.health <= 0.0f) {
         const glm::dvec3 at = scene.registry().get<Transform>(victim).position;
-        const bool againstWall = std::max(std::abs(at.x), std::abs(at.z)) > kArenaHalf - tuning_.bodyRadius - 0.6;
+        const bool againstWall = arena_ && std::max(std::abs(at.x), std::abs(at.z)) > kArenaHalf - tuning_.bodyRadius - 0.6;
         DeathFacts facts;
         facts.attackerOnScreen = attackerOnScreen;
         facts.victimRecovering = c.combatState() == CombatState::Recovery;
@@ -340,10 +366,12 @@ CameraPose Stage0::viewPose(const Scene& scene, entt::entity player, entt::entit
 {
     const auto& registry = scene.registry();
     const glm::dvec3 at = registry.get<Transform>(player).position;
-    if (lockedOn()) {
-        return followCamera(at, registry.get<Transform>(foe).position);
-    }
-    return freeLookCamera(at, registry.get<Combatant>(player).yaw);
+    // The framing clamps the eye to the arena's walls, so outside the arena it is worked out around the player and moved back.
+    const glm::dvec3 origin = arena_ ? glm::dvec3(0.0) : glm::dvec3(at.x, 0.0, at.z);
+    CameraPose pose = lockedOn() ? followCamera(at - origin, registry.get<Transform>(foe).position - origin)
+                                 : freeLookCamera(at - origin, registry.get<Combatant>(player).yaw);
+    pose.position += origin;
+    return pose;
 }
 
 void Stage0::attackTrace(Scene& scene, entt::entity attacker, Combatant& c, std::vector<PendingHit>& hits)

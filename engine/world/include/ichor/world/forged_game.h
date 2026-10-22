@@ -149,6 +149,9 @@ SceneryGuard forgedSceneryGuard(const ForgedGame& game);
 // buildings and kit pieces, and aims the view at it. Returns false, leaving the spawn alone, for an index past the end.
 bool spawnAtSettlement(ForgedGame& game, std::size_t index);
 
+// The spawn spawnAtSettlement would pick for settlement `index` (which must be below game.sites.size()), without moving game.spawn.
+ForgedSpawn settlementSpawn(const ForgedGame& game, std::size_t index);
+
 // Moves the spawn to dry, gentle ground inside `biome`, as near the world's middle as such ground is, and faces it
 // north. Returns false, leaving the spawn alone, when the world has no such ground.
 bool spawnInBiome(ForgedGame& game, worldforge::BiomeId biome);

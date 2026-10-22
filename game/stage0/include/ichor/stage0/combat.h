@@ -168,6 +168,20 @@ public:
     // Spawns the arena and both fighters, registers components and systems.
     void install(Scene& scene, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn);
 
+    // For a host that already has a player entity and a world instead of the arena (the combat bridge): registers
+    // the same components and systems as install, spawns neither walls nor fighters, and leaves the arena walls out
+    // of the death classification. The host calls spawnFoe when the foe's ground exists, then resetFight once the
+    // player and foe have been spawned.
+    void attach(Scene& scene, StableId player, glm::dvec3 playerSpawn, glm::dvec3 foeSpawn);
+    void spawnFoe(Scene& scene);
+
+    // Where resetFight puts each fighter from now on.
+    void setSpawns(glm::dvec3 playerSpawn, glm::dvec3 foeSpawn)
+    {
+        playerSpawn_ = playerSpawn;
+        foeSpawn_ = foeSpawn;
+    }
+
     // Both fighters back to spawn with full bars; an unfinished fight is dropped.
     void resetFight(Scene& scene);
 
@@ -203,6 +217,8 @@ public:
     void controllerSystem(Scene& scene);
 
 private:
+    void registerComponents(Scene& scene);
+    void addSystems(Scene& scene);
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
     void skirmisherSystem(Scene& scene, double dt);
     void enterState(Scene& scene, entt::entity who, Combatant& c, CombatState next);
@@ -228,6 +244,7 @@ private:
     StableId foe_{};
     glm::dvec3 playerSpawn_{0.0};
     glm::dvec3 foeSpawn_{0.0};
+    bool arena_ = true; // false after attach: there are no walls to be cornered against
     // Telemetry only, fed by the input stream, so a replay rebuilds it.
     float sinceInput_ = 0.0f;
     bool lockOn_ = false;

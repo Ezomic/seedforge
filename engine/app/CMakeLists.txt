@@ -3,7 +3,7 @@ add_executable(ichor
     src/exile_demo.cpp
 )
 target_link_libraries(ichor PRIVATE
-    ichor_loop ichor_assets ichor_audio ichor_world ichor_script ichor_data ichor_traversal ichor_save ichor_editor_ui ichor_ui ichor_platform_sdl ichor_platform_null ichor_gfx_vulkan ichor_gfx_null ichor_profile
+    ichor_loop ichor_assets ichor_audio ichor_world ichor_script ichor_data ichor_traversal ichor_save ichor_editor_ui ichor_ui ichor_platform_sdl ichor_platform_null ichor_gfx_vulkan ichor_gfx_null ichor_profile ichor_combat_bridge
 )
 get_filename_component(ICHOR_DATA_PATH ../data ABSOLUTE BASE_DIR ${PROJECT_SOURCE_DIR})
 target_compile_definitions(ichor PRIVATE
