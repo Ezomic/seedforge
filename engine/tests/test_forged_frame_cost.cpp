@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -223,6 +222,12 @@ bool overBudget(std::uint64_t actual, std::uint64_t budget)
     return actual * 10 > budget * 11;
 }
 
+// A stage that fell to under half its budget means the feature stopped drawing, which no upper bound would notice.
+bool collapsed(std::uint64_t actual, std::uint64_t budget)
+{
+    return actual * 2 < budget;
+}
+
 std::vector<std::string> overruns(const Counts& actual, const nlohmann::json& budget)
 {
     std::vector<std::string> problems;
@@ -231,8 +236,12 @@ std::vector<std::string> overruns(const Counts& actual, const nlohmann::json& bu
             problems.push_back(std::string(stage) + ": no budget");
             continue;
         }
+        if (!budget.at(stage).is_number_unsigned()) {
+            problems.push_back(std::string(stage) + ": the budget is not a count");
+            continue;
+        }
         const std::uint64_t allowed = budget.at(stage).get<std::uint64_t>();
-        if (overBudget(actual.at(stage), allowed)) {
+        if (overBudget(actual.at(stage), allowed) || collapsed(actual.at(stage), allowed)) {
             problems.push_back(std::string(stage) + ": " + std::to_string(actual.at(stage)) + " against a budget of " + std::to_string(allowed));
         }
     }
@@ -291,6 +300,7 @@ TEST_CASE("the forged frame counts stay inside the budget and a doubled instance
     for (const auto& [seed, run] : runs) {
         INFO("seed " << seed << " " << run.error);
         REQUIRE(run.error.empty());
+        REQUIRE(budget.at("seeds").contains(std::to_string(seed)));
         const nlohmann::json& seedBudget = budget.at("seeds").at(std::to_string(seed));
 
         const std::vector<std::string> problems = overruns(run.normal, seedBudget);
@@ -323,6 +333,8 @@ TEST_CASE("the tolerance is 10 percent and a zero budget allows nothing", "[forg
     CHECK_FALSE(overBudget(0, 0));
     CHECK(overBudget(1, 0));
     CHECK_FALSE(overBudget(0, 5));
+    CHECK(collapsed(49, 100));
+    CHECK_FALSE(collapsed(50, 100));
 }
 
 TEST_CASE("regenerate the forged frame budget", "[.frame_cost_regen]")
