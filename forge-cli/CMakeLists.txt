@@ -9,8 +9,15 @@ target_compile_features(ichor_forgecli PUBLIC cxx_std_20)
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(ichor_forgecli PRIVATE nlohmann_json::nlohmann_json)
 
+# The showcase picker's walk probe needs the engine's walking rules and walk bot, so it is a library of its own
+# (forge-cli/walk) and ichor_forgecli stays free of engine code.
+file(GLOB forgecli_walk_sources CONFIGURE_DEPENDS walk/src/*.cpp)
+add_library(ichor_forgecli_walk ${forgecli_walk_sources})
+target_include_directories(ichor_forgecli_walk PUBLIC walk/include)
+target_link_libraries(ichor_forgecli_walk PUBLIC ichor_forgecli ichor_world)
+
 add_executable(ichor_forge_cli src/main.cpp)
-target_link_libraries(ichor_forge_cli PRIVATE ichor_forgecli)
+target_link_libraries(ichor_forge_cli PRIVATE ichor_forgecli ichor_forgecli_walk)
 
 add_executable(ichor_forge_fuzz fuzz/main.cpp)
 target_link_libraries(ichor_forge_fuzz PRIVATE ichor_forgecli)
