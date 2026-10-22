@@ -153,7 +153,9 @@ struct Rig {
         return 0;
     }
 
-    float speed() const
+    float speed() const { return static_cast<float>(carry.speedFactor(scene)); }
+
+    float walkSpeed() const
     {
         for (auto [entity, player] : scene.registry().view<const Player>().each()) return player.metresPerSecond;
         return 0.0f;
@@ -215,11 +217,11 @@ TEST_CASE("a record with no usable weight or class is left out and named, never 
     REQUIRE(CarryCatalogue::fromTables({}, none).size() == 0);
 }
 
-TEST_CASE("standing on loot and pressing E picks it up and the world shows it gone", "[carry]")
+TEST_CASE("standing on loot and pressing F picks it up and the world shows it gone", "[carry]")
 {
     Rig rig;
     const PlacedLoot& item = target();
-    REQUIRE(rig.carry.prompt(rig.scene).find("E: pick up") == 0);
+    REQUIRE(rig.carry.prompt(rig.scene).find("F: pick up") == 0);
     REQUIRE(rig.held().stacks.empty());
 
     rig.press();
@@ -373,10 +375,10 @@ TEST_CASE("a dropped item lies where it was dropped and can be picked up again, 
 
     rig.scene.enqueue(MoveCommand{StableId::of("player"), {-600.0, 0.0, -600.0}});
     rig.settle();
-    REQUIRE(rig.carry.prompt(rig.scene).find("E: pick up") != 0);
+    REQUIRE(rig.carry.prompt(rig.scene).find("F: pick up") != 0);
     rig.scene.enqueue(MoveCommand{StableId::of("player"), {600.0, 0.0, 600.0}});
     for (int i = 0; i < 300; ++i) rig.tick(); // the notice of the drop runs out
-    REQUIRE(rig.carry.prompt(rig.scene).find("E: pick up Huntress's Hush Tallow") == 0);
+    REQUIRE(rig.carry.prompt(rig.scene).find("F: pick up Huntress's Hush Tallow") == 0);
     rig.press();
     REQUIRE(rig.count("hunters_hush_tallow") == 2);
     REQUIRE(rig.held().dropped.empty());
@@ -589,4 +591,29 @@ TEST_CASE("a hostile number of stacks is cut to a bound", "[carry]")
     }
     rig.tick();
     REQUIRE(rig.held().stacks.size() <= kMaxCarryStacks);
+}
+
+TEST_CASE("the load scales whatever speed another system gave the player and never overwrites it", "[carry]")
+{
+    const auto walked = [](bool loaded) {
+        Rig rig(1000);
+        rig.scene.setSpeedModifier([&rig](const glm::dvec3&) { return rig.carry.speedFactor(rig.scene); });
+        for (auto [entity, player] : rig.scene.registry().view<Player>().each()) player.metresPerSecond = 5.0f; // as the combat bridge does
+        if (loaded) {
+            rig.carry.requestGrant(rig.scene, "ichor_cruet", 1);
+            rig.carry.requestGrant(rig.scene, "hunters_hush_tallow", 1);
+        }
+        rig.settle();
+        REQUIRE(rig.walkSpeed() == 5.0f);
+        const double from = rig.scene.registry().get<Transform>(rig.scene.find(StableId::of("player"))).position.z;
+        for (int i = 0; i < 60; ++i) rig.tick(0, 1.0f);
+        REQUIRE(rig.walkSpeed() == 5.0f);
+        return from - rig.scene.registry().get<Transform>(rig.scene.find(StableId::of("player"))).position.z;
+    };
+    const double free = walked(false);
+    const double heavy = walked(true);
+    REQUIRE(free > 4.5);
+    REQUIRE(heavy > 0.0);
+    REQUIRE(heavy < free * 0.75);
+    REQUIRE(heavy > free * 0.65);
 }

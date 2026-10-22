@@ -162,3 +162,21 @@ TEST_CASE("the controls card does not change the simulation")
     };
     REQUIRE(hashWith(false) == hashWith(true));
 }
+
+TEST_CASE("interact has its own key and bit, so a pickup never toggles lock-on", "[controls]")
+{
+    static_assert((InputFrame::Interact & InputFrame::LockOn) == 0);
+    static_assert((InputFrame::Interact & InputFrame::Confirm) == 0);
+    ControlsOverlay open;
+    open.open = true;
+    const std::vector<std::string> lines = controlsOverlayLines(open);
+    const auto lineFor = [&](const char* key) {
+        for (const std::string& line : lines) {
+            if (line.rfind(key, 0) == 0) return line;
+        }
+        return std::string();
+    };
+    REQUIRE(lineFor("E ").find("lock on") != std::string::npos);
+    REQUIRE(lineFor("F ").find("pick up") != std::string::npos);
+    REQUIRE(lineFor("I ").find("inventory") != std::string::npos);
+}

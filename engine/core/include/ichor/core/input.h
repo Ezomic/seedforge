@@ -27,7 +27,7 @@ struct InputFrame {
         Notes = 1u << 12,
         LockOn = 1u << 13, // toggles the lock-on camera and auto-facing; acts on the press
         Character = 1u << 14,
-        Interact = 1u << 15,  // picks up what lies within reach; acts on the press
+        Interact = 1u << 15,  // picks up what lies within reach (F); acts on the press
         Inventory = 1u << 16, // opens and closes the inventory screen
     };
     std::uint32_t buttons = 0;

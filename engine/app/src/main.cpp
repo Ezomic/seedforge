@@ -804,11 +804,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const ichor::NullRoadField noRoads;
     const ichor::RoadField& roadField = forged ? static_cast<const ichor::RoadField&>(*forged->roads) : noRoads;
     int roadBonusPermille = ichor::kDefaultRoadBonusPermille;
+    std::unique_ptr<ichor::CarrySystem> carry; // made below, once the data is loaded; the speed modifier reads it
     if (waterField) {
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
-            if (ichor::inDungeonPocket(position)) return 1.0; // a dungeon is outside the world: no water or road there
+            const double load = carry ? carry->speedFactor(engine.scene()) : 1.0;
+            if (ichor::inDungeonPocket(position)) return load; // a dungeon is outside the world: no water or road there
             const float depth = waterField->at(position.x, position.z).depth;
-            return static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
+            return load * static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
         });
     }
     // Walking rules for the forged world: ground too steep or water too deep to walk stops the player, and a player
@@ -908,7 +910,6 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
 
     // What the player carries: registered before any slot loads, since its component is part of the snapshot.
-    std::unique_ptr<ichor::CarrySystem> carry;
     if (forged) {
         std::vector<std::string> carryProblems;
         carry = std::make_unique<ichor::CarrySystem>(forged->loot, ichor::CarryCatalogue::fromData(data, carryProblems));

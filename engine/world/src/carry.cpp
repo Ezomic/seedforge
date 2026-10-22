@@ -237,7 +237,7 @@ std::string CarrySystem::prompt(const Scene& scene) const
         }
         const ItemDef* def = catalogue_.items().find(target.itemId);
         const std::uint64_t units = def != nullptr ? def->weightUnits * target.count : 0;
-        return std::format("E: pick up {} ({})", nameOf(target.itemId), formatWeightUnits(units));
+        return std::format("F: pick up {} ({})", nameOf(target.itemId), formatWeightUnits(units));
     }
     return {};
 }
@@ -276,17 +276,24 @@ void CarrySystem::requestGrant(Scene& scene, const std::string& itemId, std::uin
     scene.enqueue(GameCommand{playerOf(scene), kGrant, itemId, count});
 }
 
+double CarrySystem::speedFactor(const Scene& scene) const
+{
+    const Carried* held = carried(scene);
+    if (held == nullptr) {
+        return 1.0;
+    }
+    // The load slows the walk. Sprinting and the stamina cost are not here: there is no stamina in the app yet.
+    return static_cast<double>(encumbrancePenalty(inventoryOf(*held).level()).movePermille) / 1000.0;
+}
+
 void CarrySystem::step(Scene& scene, const InputFrame& input)
 {
     const bool interact = (input.buttons & (InputFrame::Interact | InputFrame::Confirm)) != 0;
     const bool pressed = interact && !interactHeld_;
     interactHeld_ = interact;
-    for (auto [entity, id, player, transform] : scene.registry().view<const StableId, Player, const Transform>().each()) {
+    for (auto [entity, id, player, transform] : scene.registry().view<const StableId, const Player, const Transform>().each()) {
         Carried& held = scene.registry().get_or_emplace<Carried>(entity);
         tidy(held);
-        // The load slows the walk. Sprinting and the stamina cost are not here: there is no stamina in the app yet.
-        const EncumbrancePenalty penalty = encumbrancePenalty(inventoryOf(held).level());
-        player.metresPerSecond = Player{}.metresPerSecond * static_cast<float>(penalty.movePermille) / 1000.0f;
         if (pressed && nearest(&held, transform.position.x, transform.position.z).found) {
             scene.enqueue(GameCommand{id, kPickup, {}, 0});
         }

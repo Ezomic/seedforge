@@ -146,7 +146,12 @@ public:
     const Carried* carried(const Scene& scene) const;
     CarryView view(const Scene& scene) const;
 
-    // The line to show: what happened lately, else what E would pick up, else empty.
+    // The share of its walking speed the player keeps under the load, 1 when unloaded. It is meant to be multiplied
+    // into the scene's speed modifier (Scene::setSpeedModifier), so it scales whatever speed another system gave the
+    // player instead of replacing it. A pure function of the scene.
+    double speedFactor(const Scene& scene) const;
+
+    // The line to show: what happened lately, else what F would pick up, else empty.
     std::string prompt(const Scene& scene) const;
     // What happened lately (picked up, too heavy, used), for as long as it should show; empty after.
     std::string notice(const Scene& scene) const;
