@@ -31,8 +31,9 @@ TEST_CASE("from the spawn toward the nearest settlement on 8 seeds the walker ar
         }
         ++withSettlement;
         const WalkResult& r = walk.result;
-        log += std::format("seed {}: trip {:.0f} m, path {}, outcome {}, walked {:.0f} m in {:.0f} s, {:.0f} m short {}\n", seed, walk.trip, walk.hadPath ? "yes" : "no",
-            r.outcome == WalkOutcome::Arrived ? "arrived" : r.outcome == WalkOutcome::Blocked ? "blocked" : "TIMED OUT", r.metresWalked, r.seconds, r.metresLeft, r.report);
+        log += std::format("seed {}: trip {:.0f} m, outcome {}, walked {:.0f} m in {:.0f} s, {:.0f} m short | {} | {}\n", seed, walk.trip,
+            r.outcome == WalkOutcome::Arrived ? "arrived" : r.outcome == WalkOutcome::Blocked ? "blocked" : "TIMED OUT", r.metresWalked, r.seconds, r.metresLeft,
+            describeRoute(walk), r.report);
         INFO(log);
         // Never silent: a walk that is still moving at the time limit is a failure, and a walk that stopped says why.
         REQUIRE(r.outcome != WalkOutcome::TimedOut);
@@ -51,5 +52,6 @@ TEST_CASE("from the spawn toward the nearest settlement on 8 seeds the walker ar
     REQUIRE(withSettlement == static_cast<int>(kSeeds.size()));
     REQUIRE(arrived + blocked == withSettlement);
     // A walker that stops at every obstacle would still report honestly; the rules must also let it get places.
-    REQUIRE(arrived >= 3);
+    // The rest end in a pocket of a few hundred thousand square metres that cliffs close in; the log above names each.
+    REQUIRE(arrived >= 5);
 }
