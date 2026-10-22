@@ -62,7 +62,14 @@ public:
     glm::vec3 splatAt(double x, double z) const;
     glm::vec3 groundColourAt(double x, double z) const;
 
+    // splatAt interpolated between the four forged cells around a position, instead of the nearest one, so the
+    // terrain fades smoothly across a biome border and not in blocks of a forged cell. Meant for drawing: splatAt
+    // stays the answer for anything the simulation or the audio reads.
+    glm::vec3 smoothSplatAt(double x, double z) const;
+
 private:
+    glm::vec3 cellSplat(std::size_t index) const;
+
     int width_ = 0;
     std::uint32_t sizeMetres_ = 0;
     std::vector<std::uint8_t> biome_;
