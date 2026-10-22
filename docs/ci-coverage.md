@@ -38,7 +38,7 @@ Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/
 
 ## Nightly run (SEED-494)
 
-`.github/workflows/nightly.yml` runs every night at 02:17 UTC (and on demand: Actions, nightly, Run workflow, with optional `rounds` and `size` inputs). It is not a required check and is not path filtered; it runs against the default branch. One Linux job (`linux-headless-asan` preset, 30 minute timeout) builds once, then runs two steps, and the second runs even when the first fails so one night reports both problems:
+`.github/workflows/nightly.yml` runs every night at 02:17 UTC (and on demand: Actions, nightly, Run workflow, with optional `rounds` and `size` inputs). It is not a required check and is not path filtered; it runs against the default branch. One Linux job (`linux-headless-asan` preset, 100 minute timeout, because one sanitizer round of the suite takes about 23 minutes on the hosted runner and the first scheduled run to get past the 126 error was cancelled at 30 minutes in round 2) builds once, then runs two steps, and the second runs even when the first fails so one night reports both problems:
 
 | Step | Command | Catches |
 |---|---|---|
@@ -50,3 +50,23 @@ On failure the job summary lists the flaky tests with their failure count per te
 Run the same commands locally: `bin/build`, then `bin/ctest-stress -n 2` and `python tools/world_sanity.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe`. The seeds are fixed on purpose so a red night means a code change, not luck; change the range in the workflow when the world generator is retuned and the set should widen. `nightly.yml` is in the path filter of `engine.yml`, so editing it runs both required checks.
 
 Why seeds 1-8 at size 128: with the SEED-416 defaults, seeds 3, 4 and 5 forge nothing usable at size 64 (`roads: no settlement sites to connect`, tracked by SEED-497), so the report would be red from day one. At sizes 128 and 256 all eight seeds are accepted, and 128 is the cheaper. Revisit the size when SEED-497 lands.
+
+### Why the first scheduled run failed in the stress step
+
+Run 39387287353 died with exit code 126 in `bin/ctest-stress`: the file was committed with mode 100644, so the Linux runner could not execute it (`.gitattributes` already pinned LF for `bin/*`, which was not the cause). It is now committed as 100755 like the other scripts in `bin/`. A new script under `bin/` needs the executable bit in the index (`git add --chmod=+x`), or the same failure returns on Linux only.
+
+## Forged walk bot at 256 and 1024 (SEED-501)
+
+A second job in `nightly.yml`, `forged-walk`, runs in parallel with the first (own 30 minute timeout, same preset, builds only `ichor_tests_world`). It runs the one test case `nightly: the walk bot on big forged worlds arrives or names what stopped it` (`engine/tests/test_forged_walk_nightly.cpp`, sharing the walk setup of the PR suite's 129-grid test through `engine/tests/forged_walk_support.h`). The test is skipped in every normal `ctest` run and only runs when `ICHOR_NIGHTLY_WALK_GRIDS` is set; the workflow sets it to `256,1024` (the `walk_grids` input of a manual run changes it).
+
+For seeds 1-8 on each grid the bot walks from the spawn toward the nearest other settlement (the SEED-492 walk bot, `forged_walk_bot.h`) and prints one line per seed, for example `WALK grid 1024 seed 2: ok blocked, trip 2744 m, path no, walked 166 m in 124 s sim, 2591 m short, wall 35.2 s | blocker: stuck at ... too steep (needs climbing)`: arrival or blocker reason, and wall time. A blocked walk with a named blocker is honest and does not fail the night; arrival is not required (a third of the seeds are blocked on steep ground, which is the data this run collects).
+
+The night fails when a seed is silently stuck:
+
+- the walk timed out while still moving;
+- it stopped without a blocker and a report, or without having walked;
+- no seed on a grid had a trip to walk, or the 1200 second budget (`ICHOR_NIGHTLY_WALK_BUDGET_S`) ran out before every seed ran (that seed prints as `SILENT not run`).
+
+A seed with no second settlement 60 m or more from the spawn settlement prints `no trip` and does not fail (seeds 5 and 6 at 256 today); it is visible in the log, not a verdict. Local timings on a Release build: all 8 seeds took about 60 s at 256 and about 190 s at 1024. The first CI run used the sanitizer Debug build and took about 190 s per seed at 1024 (the budget ran out after 6 seeds), so this job configures the same preset as Release with sanitizers off. The budget guard stays so a slow night fails loudly instead of timing out.
+
+On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
