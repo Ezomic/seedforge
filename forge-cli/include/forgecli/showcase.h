@@ -100,11 +100,11 @@ struct ShowcaseWeights {
     int landIdealMinPermille = 250;   // land share in [min, max] scores full
     int landIdealMaxPermille = 650;
     int landFalloffPermille = 150;    // and falls to 0 this far outside it
-    int riversForFull = 3;
-    int lakesForFull = 2;
-    int settlementsForFull = 8;
-    int tiersForFull = 3;
-    int biomesForFull = 4;
+    int riversForFull = 12;
+    int lakesForFull = 4;
+    int settlementsForFull = 20;
+    int tiersForFull = 4;
+    int biomesForFull = 6;
 };
 
 inline constexpr ShowcaseWeights kShowcaseWeights{};

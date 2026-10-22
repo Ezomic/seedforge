@@ -20,15 +20,15 @@ Each term turns a measured number into permille (0 to 1000). Points are `weight 
 |---|---|---|---|---|
 | gates | 20 | the sanity gates (SEED-413 and the rest, SEED-500 land share, SEED-554 landmark coverage) on the first attempt, the seed itself with no reroll | every evaluated gate passes | any gate fails |
 | land_share | 15 | share of cells above sea level | 25% to 65% | linear, 15 points outside the band |
-| rivers | 10 | connected river networks of at least 10 cells | 3 | none |
-| lakes | 5 | connected lakes of at least 4 cells | 2 | none |
-| settlements | 10 | settlement count | 8 | none |
-| tier_spread | 5 | distinct settlement tiers (hamlet, village, town, city) | 3 | one tier |
+| rivers | 10 | connected river networks of at least 10 cells | 12 | none |
+| lakes | 5 | connected lakes of at least 4 cells | 4 | none |
+| settlements | 10 | settlement count | 20 | none |
+| tier_spread | 5 | distinct settlement tiers (hamlet, village, town, city) | 4 | none |
 | walk_arrival | 15 | the walk bot, from the spawn to the nearest other settlement, arrives (SEED-492 walking rules) | arrives | blocked, timed out, or no settlement to walk to |
-| biome_variety | 10 | distinct land biomes within 300 m of the spawn | 4 | none |
+| biome_variety | 10 | distinct land biomes within 300 m of the spawn | 6 | none |
 | spawn | 10 | the spawn is found and is not a pocket | open spawn | pocket or none |
 
-Partial credit is linear: rivers 1 of 3 is 333 permille, and so on. Land share is the one term with a band: inside 25% to 65% it is full, and each permille outside costs 1000/150 permille of the term, so a world with 10% land or with 80% land scores 0 on it.
+Partial credit is linear: rivers 6 of 12 is 500 permille, and so on. The full marks are set high enough that a 256 world does not hit them all (a first draft with 3 rivers and 8 settlements gave 14 seeds the same 100.0), so the ranking is decided by the world and not by the seed number tie-break. Land share is the one term with a band: inside 25% to 65% it is full, and each permille outside costs 1000/150 permille of the term, so a world with 10% land or with 80% land scores 0 on it.
 
 ### The spawn, the walk and the pocket
 
