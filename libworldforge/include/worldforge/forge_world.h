@@ -46,7 +46,7 @@
 //  - POIs: the road map (deformed terrain) and the settlements; landmark coverage is then measured
 //    over the POIs as landmarks of ForgeConfig::landmarkHeightM on the roads' terrain. The report
 //    is carried, never used as a gate (validation gates and reroll belong to the caller). Only the
-//    first kLandmarkMaxLandmarks (128) POIs, which are the best scored, are measured.
+//    first kLandmarkMaxLandmarks (128) POIs are measured (see poi_map.h for their order).
 //  - Content: settlements and POIs become PoiInputs with ids "settlement_NNNN" and "poi_NNNN".
 //    A POI is a Dungeon (when dungeonArchetypes is non-empty), a Ruin or a Landmark by a hash of
 //    its cell and the world seed.
@@ -447,7 +447,10 @@ inline ForgedWorld forgeWorld(std::uint64_t seed, int size = kForgeDefaultSize, 
                return hashPoliticsMap(*w.politics);
            })
         && step(ForgePhase::Pois, [&](std::string& err) -> Hash {
-               auto pois = placePois(*w.roads, &*w.settlements, config.pois);
+               PoiParams poiParams = config.pois;
+               poiParams.coverage = config.landmarks;
+               poiParams.coverageHeightM = config.landmarkHeightM;
+               auto pois = placePois(*w.roads, &*w.settlements, poiParams);
                if (!pois) {
                    err = rejected;
                    return std::nullopt;

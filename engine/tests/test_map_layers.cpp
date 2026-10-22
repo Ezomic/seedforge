@@ -173,3 +173,23 @@ TEST_CASE("a world the forge refused gives a stack with no layers")
     }
     REQUIRE(stack.composite(only(MapLayer::Biomes)).rgba == stack.base().rgba);
 }
+
+TEST_CASE("a lake is drawn on the water layer in a lighter blue than a river")
+{
+    const worldforge::ForgedWorld& world = fullWorld();
+    REQUIRE(world.hydrology());
+    bool anyLake = false;
+    for (const std::uint16_t depth : world.hydrology()->lakeDepthM) {
+        anyLake = anyLake || depth != 0;
+    }
+    if (!anyLake) {
+        SKIP("this seed forged no lake");
+    }
+    const MapLayerStack stack(greyImage(kSide), world);
+    const MapImage waters = stack.composite(only(MapLayer::Rivers));
+    std::size_t lakePixels = 0;
+    for (std::size_t i = 0; i + 3 < waters.rgba.size(); i += 4) {
+        lakePixels += waters.rgba[i] == 96 && waters.rgba[i + 1] == 170 && waters.rgba[i + 2] == 255 ? 1 : 0;
+    }
+    REQUIRE(lakePixels > 0);
+}

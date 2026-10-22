@@ -38,13 +38,25 @@
         "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
       },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+    },
+    {
+      "name": "linux-gpu",
+      "inherits": "vcpkg",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "ENGINE_RUNTIME": "ON"
+      },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
     }
   ],
   "buildPresets": [
     { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug" },
     { "name": "windows-release", "configurePreset": "windows", "configuration": "Release" },
     { "name": "windows-ci", "configurePreset": "windows-ci" },
-    { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan" }
+    { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan" },
+    { "name": "linux-gpu", "configurePreset": "linux-gpu", "targets": ["ichor_gfx_tests"] }
   ],
   "testPresets": [
     { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug", "output": { "outputOnFailure": true },
@@ -54,6 +66,8 @@
     { "name": "windows-ci", "configurePreset": "windows-ci", "output": { "outputOnFailure": true },
       "execution": { "jobs": 4 } },
     { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true },
-      "execution": { "jobs": 4 } }
+      "execution": { "jobs": 4 } },
+    { "name": "linux-gpu", "configurePreset": "linux-gpu", "output": { "outputOnFailure": true },
+      "filter": { "include": { "name": "^golden image" } }, "execution": { "jobs": 1 } }
   ]
 }

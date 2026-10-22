@@ -14,5 +14,5 @@ struct PSIn {
 float4 main(PSIn i) : SV_Target
 {
     // The current rides in the tangent: a direction on the ground plane, its strength in w.
-    return shadeWater(i.worldPos, i.clip.xy, i.uv.x, i.tangent.xz * i.tangent.w);
+    return shadeWater(i.worldPos, i.clip.xy, i.uv.x, i.tangent.xz * i.tangent.w, frame.waterParams.y > 0.5, i.uv.y);
 }

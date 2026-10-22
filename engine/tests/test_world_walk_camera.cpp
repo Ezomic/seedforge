@@ -113,3 +113,43 @@ TEST_CASE("without a turn the walking intent is untouched, bit for bit", "[camer
     const glm::vec3 intent(1.25f, 0.5f, -4.0f);
     CHECK(walkRelativeIntent(intent, 0.0f) == intent);
 }
+
+TEST_CASE("the follow camera hangs behind the walker and looks at them, at every yaw", "[camera][direction]")
+{
+    const glm::dvec3 feet(12.0, 30.0, -7.0);
+    for (const float yaw : {0.0f, 0.6f, 1.57f, 3.0f, -2.0f, -1.2f}) {
+        const glm::dvec3 camera = walkFollowPosition(feet, yaw);
+        const glm::vec3 view = walkCameraRotation(yaw) * glm::vec3(0.0f, 0.0f, -1.0f);
+        const glm::dvec3 toWalker = glm::normalize(feet + glm::dvec3(0.0, kFollowAimHeight, 0.0) - camera);
+        INFO("yaw " << yaw);
+        CHECK(glm::dot(toWalker, glm::dvec3(view)) > 0.9999);
+        CHECK(camera.y > feet.y + kFollowAimHeight);
+        CHECK(glm::length(glm::dvec2(camera.x - feet.x, camera.z - feet.z)) > 3.0);
+    }
+}
+
+TEST_CASE("W walks away from the follow camera, never toward it", "[camera][direction]")
+{
+    for (const float yaw : {0.0f, 0.8f, 2.2f, -1.5f}) {
+        const glm::dvec3 start(0.0, 0.0, 0.0);
+        const glm::dvec3 camera = walkFollowPosition(start, yaw);
+        InputFrame w;
+        w.moveY = 1.0f;
+        InputFrame s;
+        s.moveY = -1.0f;
+        const glm::dvec3 forward = walkedRelative(start, w, yaw);
+        const glm::dvec3 back = walkedRelative(start, s, yaw);
+        const glm::dvec2 awayFromCamera = glm::normalize(glm::dvec2(start.x - camera.x, start.z - camera.z));
+        INFO("yaw " << yaw);
+        CHECK(glm::dot(glm::normalize(glm::dvec2(forward.x, forward.z)), awayFromCamera) > 0.99);
+        CHECK(glm::dot(glm::normalize(glm::dvec2(back.x, back.z)), awayFromCamera) < -0.99);
+    }
+}
+
+TEST_CASE("the follow camera keeps clear of the ground and ignores a missing height", "[camera]")
+{
+    CHECK(followClearY(12.0, 3.0) == 12.0);
+    CHECK(followClearY(3.1, 3.0) == 3.0 + kFollowGroundClearance);
+    CHECK(followClearY(-5.0, 3.0) == 3.0 + kFollowGroundClearance);
+    CHECK(followClearY(7.0, std::numeric_limits<double>::quiet_NaN()) == 7.0);
+}

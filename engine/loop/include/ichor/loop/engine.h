@@ -3,6 +3,7 @@
 #include "ichor/core/fixed_step.h"
 #include "ichor/core/frame_stages.h"
 #include "ichor/core/input.h"
+#include "ichor/core/controls_overlay.h"
 #include "ichor/core/overlay_mode.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/sim/scene.h"
@@ -43,6 +44,9 @@ public:
     // F3 steps it round off, compact and full.
     void setOverlayMode(OverlayMode mode) { overlayToggle_.mode = mode; }
     OverlayMode overlayMode() const { return overlayToggle_.mode; }
+    // F1 opens the controls card; the state also carries the first-run hint line.
+    void setControlsOverlay(ControlsOverlay state) { controls_ = state; }
+    const ControlsOverlay& controlsOverlay() const { return controls_; }
 
     // While the gate says no, no simulation tick runs and no time is owed
     // afterwards; rendering continues. Streaming holds the world here until
@@ -61,6 +65,11 @@ public:
     void replayInputs(InputStream stream);
     bool replaying() const { return replaying_; }
     bool replayFinished() const { return replaying_ && replayIndex_ >= replay_.frames.size(); }
+
+    // Feed the frames this function makes from the scene, one per tick, instead of the platform's. A replay still
+    // takes precedence; the frames are recorded like any other.
+    using InputSource = std::function<InputFrame(Scene& scene)>;
+    void setInputSource(InputSource source) { inputSource_ = std::move(source); }
 
     // One real-time frame. Returns false once the platform asks to quit.
     bool frame(double frameSeconds);
@@ -88,9 +97,11 @@ private:
     ViewBuilder viewBuilder_;
     OverlayBuilder overlayBuilder_;
     TickGate tickGate_;
+    InputSource inputSource_;
     bool gated_ = false;
     std::vector<std::string> overlay_;
     OverlayToggle overlayToggle_;
+    ControlsOverlay controls_;
     InputStream recorded_;
     InputStream replay_;
     std::size_t replayIndex_ = 0;

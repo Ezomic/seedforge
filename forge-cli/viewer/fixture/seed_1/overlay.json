@@ -230,12 +230,36 @@
    "id": "poi_0008",
    "items": [],
    "kind": "ruin",
+   "x": 7,
+   "y": 49
+  },
+  {
+   "cast": [],
+   "id": "poi_0009",
+   "items": [],
+   "kind": "ruin",
+   "x": 7,
+   "y": 59
+  },
+  {
+   "cast": [],
+   "id": "poi_0010",
+   "items": [],
+   "kind": "ruin",
+   "x": 7,
+   "y": 41
+  },
+  {
+   "cast": [],
+   "id": "poi_0011",
+   "items": [],
+   "kind": "ruin",
    "x": 35,
    "y": 35
   },
   {
    "cast": [],
-   "id": "poi_0009",
+   "id": "poi_0012",
    "items": [],
    "kind": "ruin",
    "x": 37,
@@ -243,7 +267,7 @@
   },
   {
    "cast": [],
-   "id": "poi_0010",
+   "id": "poi_0013",
    "items": [],
    "kind": "ruin",
    "x": 39,
@@ -251,7 +275,7 @@
   },
   {
    "cast": [],
-   "id": "poi_0011",
+   "id": "poi_0014",
    "items": [],
    "kind": "ruin",
    "x": 19,
@@ -259,35 +283,11 @@
   },
   {
    "cast": [],
-   "id": "poi_0012",
-   "items": [],
-   "kind": "ruin",
-   "x": 15,
-   "y": 61
-  },
-  {
-   "cast": [],
-   "id": "poi_0013",
-   "items": [],
-   "kind": "ruin",
-   "x": 11,
-   "y": 63
-  },
-  {
-   "cast": [],
-   "id": "poi_0014",
-   "items": [],
-   "kind": "ruin",
-   "x": 29,
-   "y": 33
-  },
-  {
-   "cast": [],
    "id": "poi_0015",
    "items": [],
    "kind": "ruin",
    "x": 15,
-   "y": 41
+   "y": 61
   }
  ],
  "size": 64

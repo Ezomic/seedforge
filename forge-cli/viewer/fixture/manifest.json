@@ -26,8 +26,8 @@
       {"name": "height_roads", "phase": "roads", "file": "seed_1/height_roads.png", "width": 64, "height": 64, "channels": 1, "hash": "dbf1c70896c55f04"},
       {"name": "territory", "phase": "politics", "file": "seed_1/territory.png", "width": 64, "height": 64, "channels": 3, "hash": "fc2c073a1d17af5f"},
       {"name": "contested", "phase": "politics", "file": "seed_1/contested.png", "width": 64, "height": 64, "channels": 1, "hash": "0c3b8172e377847c"},
-      {"name": "pois", "phase": "pois", "file": "seed_1/pois.png", "width": 64, "height": 64, "channels": 1, "hash": "4c4243112e435153"},
-      {"name": "content", "phase": "binding", "file": "seed_1/content.png", "width": 64, "height": 64, "channels": 1, "hash": "5f8eba7c60aa6cba"}
+      {"name": "pois", "phase": "pois", "file": "seed_1/pois.png", "width": 64, "height": 64, "channels": 1, "hash": "628f396cc42d738d"},
+      {"name": "content", "phase": "binding", "file": "seed_1/content.png", "width": 64, "height": 64, "channels": 1, "hash": "3c910c723bf35d3a"}
     ]}
   ]
 }

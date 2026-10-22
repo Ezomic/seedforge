@@ -32,14 +32,39 @@ CampaignWorldPlan planCampaignWorld(const std::filesystem::path& root, std::stri
         plan.message = std::format("campaign '{}' stores a world grid of {} cells, which this build cannot forge", campaign, loaded.key.gridSize);
         return plan;
     }
-    plan.action = CampaignWorldAction::Rebuild;
     plan.warn = loaded.olderGenVersion;
     plan.key = loaded.key;
     plan.stored = std::move(loaded.world);
+    if (loaded.forged) {
+        plan.action = CampaignWorldAction::Load;
+        plan.forged = std::move(loaded.forged);
+        plan.message = loaded.olderGenVersion
+            ? std::format("campaign '{}' was made by an older generator (version {}); loading its stored world as it is, without forging", campaign, plan.key.genVersion)
+            : std::format("loading campaign '{}' (seed {}, {} cell grid) from its stored world, without forging", campaign, plan.key.seed, plan.key.gridSize);
+        return plan;
+    }
+    plan.action = CampaignWorldAction::Rebuild;
     plan.message = loaded.olderGenVersion
         ? std::format("campaign '{}' was made by an older generator (version {}); rebuilding it, which is refused if this generator no longer reproduces the stored world", campaign, loaded.key.genVersion)
         : std::format("loading campaign '{}' (seed {}, {} cell grid)", campaign, loaded.key.seed, loaded.key.gridSize);
     return plan;
+}
+
+std::unique_ptr<ForgedGame> buildStoredCampaignGame(const CampaignWorldPlan& plan, const WorldDesc& requested, const ForgedContentInputs& content)
+{
+    if (plan.action != CampaignWorldAction::Load || !plan.forged) {
+        auto game = std::make_unique<ForgedGame>();
+        game->error = "the campaign has no stored phase maps to build from";
+        return game;
+    }
+    ForgeJobResult result;
+    result.world = plan.forged;
+    result.heightfield = plan.stored.heightfield;
+    std::unique_ptr<ForgedGame> game = buildForgedGame(result, requested, content);
+    if (game->ok()) {
+        game->error = verifyRebuiltWorld(plan, *game);
+    }
+    return game;
 }
 
 std::string verifyRebuiltWorld(const CampaignWorldPlan& plan, const ForgedGame& game)
@@ -83,7 +108,7 @@ CampaignStatus saveCampaignWorld(const std::filesystem::path& root, std::string_
     world.worldHash = game.world->worldHash();
     world.heightfield = game.heightfield;
     world.manifest = *game.world->manifest();
-    return saveForgedWorld(root, campaign, forgedWorldKey(requested, gridSize), world);
+    return saveForgedWorld(root, campaign, forgedWorldKey(requested, gridSize), world, game.world.get());
 }
 
 }

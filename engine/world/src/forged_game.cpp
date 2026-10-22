@@ -465,9 +465,44 @@ bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std:
     return true;
 }
 
-bool spawnAtSettlement(ForgedGame& game, std::size_t index)
+SceneryGuard forgedSceneryGuard(const ForgedGame& game)
 {
-    if (index >= game.sites.size()) return false;
+    constexpr double kBucketM = 32.0;
+    constexpr double kBuildingClearM = 6.0;
+    using Bucket = std::pair<int, int>;
+    const auto bucketOf = [](double v) { return static_cast<int>(std::floor(v / kBucketM)); };
+    auto index = std::make_shared<std::map<Bucket, std::vector<PlacedBuilding>>>();
+    if (game.buildings) {
+        for (const PlacedBuilding& b : game.buildings->all()) {
+            (*index)[{bucketOf(b.x), bucketOf(b.z)}].push_back(b);
+        }
+    }
+    const WaterField* water = game.waterField.get();
+    const std::shared_ptr<const ForgedRoads> roads = game.roads;
+    SceneryGuard guard;
+    guard.wet = [water](double x, double z) { return water != nullptr && water->at(x, z).wet(); };
+    guard.blocked = [index, roads, water, bucketOf](double x, double z) {
+        if (!std::isfinite(x) || !std::isfinite(z)) return true;
+        if (roads && roads->query(x, z).coverage > 0.0f) return true;
+        if (water != nullptr && water->at(x, z).wet()) return true;
+        const int bx = bucketOf(x);
+        const int bz = bucketOf(z);
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                const auto found = index->find({bx + dx, bz + dz});
+                if (found == index->end()) continue;
+                for (const PlacedBuilding& b : found->second) {
+                    if (std::abs(x - b.x) < b.halfWidthM + kBuildingClearM && std::abs(z - b.z) < b.halfDepthM + kBuildingClearM) return true;
+                }
+            }
+        }
+        return false;
+    };
+    return guard;
+}
+
+ForgedSpawn settlementSpawn(const ForgedGame& game, std::size_t index)
+{
     const SettlementSite& site = game.sites[index];
     constexpr double kClearM = 4.0;
     const std::vector<PlacedBuilding> buildings = game.buildings ? game.buildings->ofSettlement(site.id) : std::vector<PlacedBuilding>{};
@@ -477,7 +512,7 @@ bool spawnAtSettlement(ForgedGame& game, std::size_t index)
             if (piece.settlementId == site.id) pieces.push_back(piece);
         }
     }
-    game.spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
+    ForgedSpawn spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{site.x, site.z}}, [&](double x, double z) {
         for (const PlacedBuilding& b : buildings) {
             if (std::abs(x - b.x) < b.halfWidthM + kClearM && std::abs(z - b.z) < b.halfDepthM + kClearM) return true;
         }
@@ -486,9 +521,50 @@ bool spawnAtSettlement(ForgedGame& game, std::size_t index)
         }
         return false;
     });
-    game.spawn.faceX = site.x;
-    game.spawn.faceZ = site.z;
+    spawn.faceX = site.x;
+    spawn.faceZ = site.z;
+    return spawn;
+}
+
+bool spawnAtSettlement(ForgedGame& game, std::size_t index)
+{
+    if (index >= game.sites.size()) return false;
+    game.spawn = settlementSpawn(game, index);
     return true;
+}
+
+bool spawnInBiome(ForgedGame& game, worldforge::BiomeId biome)
+{
+    if (!game.biomes || game.biomes->empty() || game.heightfield.empty()) return false;
+    constexpr double kStepM = 24.0;
+    constexpr double kInteriorM = 40.0;
+    constexpr std::size_t kTries = 64;
+    const double size = game.desc.sizeMetres;
+    const double centre = size * 0.5;
+    const ForgedBiomeField& field = *game.biomes;
+    const SceneryGuard guard = forgedSceneryGuard(game);
+    const auto inside = [&](double x, double z) {
+        return !guard.blocked(x, z) && field.biomeAt(x, z) == biome && field.biomeAt(x + kInteriorM, z) == biome && field.biomeAt(x - kInteriorM, z) == biome
+            && field.biomeAt(x, z + kInteriorM) == biome && field.biomeAt(x, z - kInteriorM) == biome;
+    };
+    std::vector<std::pair<double, std::pair<double, double>>> candidates;
+    for (double z = kStepM; z < size - kStepM; z += kStepM) {
+        for (double x = kStepM; x < size - kStepM; x += kStepM) {
+            if (inside(x, z)) candidates.push_back({(x - centre) * (x - centre) + (z - centre) * (z - centre), {x, z}});
+        }
+    }
+    std::sort(candidates.begin(), candidates.end());
+    for (std::size_t i = 0; i < candidates.size() && i < kTries; ++i) {
+        const auto [x, z] = candidates[i].second;
+        const ForgedSpawn spawn = findForgedSpawn(game.heightfield, game.waterField.get(), {{x, z}}, [&](double px, double pz) { return !inside(px, pz); });
+        if (spawn.found) {
+            game.spawn = spawn;
+            game.spawn.faceX = spawn.x;
+            game.spawn.faceZ = spawn.z;
+            return true;
+        }
+    }
+    return false;
 }
 
 }

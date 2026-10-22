@@ -333,6 +333,7 @@ worldforge::ForgeConfig defaultForgeConfig(int size)
     config.pois.maxPois = static_cast<int>(std::min<std::int64_t>(worldforge::kPoiMaxPois, config.pois.maxPois * areaFactor));
     config.pois.viewRangeCells = static_cast<int>(std::min<std::int64_t>(worldforge::kPoiMaxViewRangeCells, config.pois.viewRangeCells * sizeFactorPercent / 100));
     config.landmarks.viewRangeCells = static_cast<int>(std::min<std::int64_t>(worldforge::kLandmarkMaxRangeCells, config.landmarks.viewRangeCells * sizeFactorPercent / 100));
+    config.pois.coverageReserve = std::min(config.pois.maxPois / 2, worldforge::kLandmarkMaxLandmarks / 2);
     worldforge::FactionSpec contiguous;
     worldforge::FactionSpec ore;
     ore.strategy = worldforge::ClaimStrategy::ResourceFollowing;

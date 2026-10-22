@@ -226,3 +226,28 @@ TEST_CASE("play time formats and survives a bad rate")
     REQUIRE(journalPlayTime(5, -1.0) == "0:00:00");
     REQUIRE(journalPlayTime(5, std::nan("")) == "0:00:00");
 }
+
+TEST_CASE("a journal longer than its card keeps the width of its list")
+{
+    for (const std::uint32_t height : {360u, 480u}) {
+        RecordingUiRenderer renderer;
+        UiContext ui{renderer, height / 9 * 16, height};
+        const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+        REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+        REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+        JournalScreen journal(ui);
+        std::vector<JournalRow> rows;
+        for (int i = 0; i < 6; ++i) {
+            rows.push_back({"0:00:01", "Kallias met me at the weir and asked me to carry the ash. In the end, I agreed to go."});
+        }
+        journal.setRows(rows);
+        journal.setVisible(true);
+        frame(ui, renderer, 0.0);
+        frame(ui, renderer, 0.1);
+        Rml::Element* list = ui.context()->GetRootElement()->GetElementById("list");
+        REQUIRE(list != nullptr);
+        CAPTURE(height);
+        REQUIRE(list->GetScrollHeight() > list->GetClientHeight());
+        REQUIRE(list->GetClientWidth() > list->GetBox().GetSize(Rml::BoxArea::Border).x * 0.9f);
+    }
+}

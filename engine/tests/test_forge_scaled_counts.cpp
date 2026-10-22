@@ -78,15 +78,15 @@ std::string gateIds(const Blockers& b)
 
 // Hidden because 16 full forges are too slow for the sanitizer job; run with: ichor_tests_world "[.scaling_sanity]"
 // The expected blockers are the honest ones: a seed listed here fails its gate for a world-shape reason, not a config one.
-TEST_CASE("seeds 1 to 8 at 256 fail only the known landmark gates on the first attempt", "[.scaling_sanity]")
+TEST_CASE("seeds 1 to 8 at 256 fail only the land share gate of the thin seeds on the first attempt", "[.scaling_sanity]")
 {
     const Blockers blockers = firstAttemptBlockers(256);
     INFO(gateIds(blockers));
-    CHECK(blockers.size() == 3);
-    for (const std::uint64_t seed : { 1ull, 5ull, 8ull }) {
+    CHECK(blockers.size() == 2);
+    for (const std::uint64_t seed : { 4ull, 5ull }) {
         REQUIRE(blockers.contains(seed));
-        CHECK(blockers.at(seed).starts_with(" landmark_coverage="));
-        CHECK(blockers.at(seed).find("settlement_density") == std::string::npos);
+        CHECK(blockers.at(seed).starts_with(" land_share="));
+        CHECK(blockers.at(seed).find("landmark_coverage") == std::string::npos);
     }
 }
 

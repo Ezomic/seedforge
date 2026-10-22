@@ -98,3 +98,5 @@ vcpkg_installed/
 
 # Stage 0 launcher output (bin/stage0)
 /stage0-run/
+
+dist/

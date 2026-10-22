@@ -43,6 +43,9 @@ public:
     ForgeJob(const ForgeJob&) = delete;
     ForgeJob& operator=(const ForgeJob&) = delete;
 
+    // How many forges any ForgeJob in this process has started; a load from stored files leaves it where it was.
+    static std::uint64_t forgesStarted();
+
     // Starts the worker. False when the job was started or cancelled already.
     bool start();
     // Stops the run at the next phase boundary and waits for the worker. A job that already finished
