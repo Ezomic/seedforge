@@ -562,3 +562,31 @@ TEST_CASE("a stack past its limit cannot be picked up and is told so", "[carry]"
     REQUIRE(rig.count("hunters_hush_tallow") == 5);
     REQUIRE(rig.carry.notice(rig.scene).find("could not be added") != std::string::npos);
 }
+
+TEST_CASE("a full taken list refuses a pickup rather than letting the item be taken again", "[carry]")
+{
+    Rig rig;
+    rig.tick();
+    for (auto [entity, player] : rig.scene.registry().view<Player>().each()) {
+        Carried padded;
+        padded.taken.assign(kMaxTakenItems, "padding");
+        rig.scene.registry().emplace_or_replace<Carried>(entity, padded);
+    }
+    rig.press();
+    REQUIRE(rig.held().stacks.empty());
+    REQUIRE(rig.held().taken.size() == kMaxTakenItems);
+    REQUIRE(rig.carry.notice(rig.scene).find("cannot take") != std::string::npos);
+}
+
+TEST_CASE("a hostile number of stacks is cut to a bound", "[carry]")
+{
+    Rig rig;
+    rig.tick();
+    for (auto [entity, player] : rig.scene.registry().view<Player>().each()) {
+        Carried many;
+        many.stacks.assign(kMaxCarryStacks * 3, CarryStack{"ichor_cruet", 1});
+        rig.scene.registry().emplace_or_replace<Carried>(entity, many);
+    }
+    rig.tick();
+    REQUIRE(rig.held().stacks.size() <= kMaxCarryStacks);
+}

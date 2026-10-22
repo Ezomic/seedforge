@@ -1550,9 +1550,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (carried != nullptr && sceneryDrawn && !inDungeon) {
             for (const ichor::CarryDrop& drop : carried->dropped) {
+                if (!std::isfinite(drop.x) || !std::isfinite(drop.z)) continue;
                 ichor::RenderInstance instance;
                 instance.mesh = sceneryBase + scenery.lootMesh;
-                instance.position = {drop.x, static_cast<double>(drop.groundY), drop.z};
+                instance.position = {drop.x, static_cast<double>(heightfield.heightAt(drop.x, drop.z)), drop.z};
                 instance.basis = glm::mat3(glm::vec3(0.5f, 0.0f, 0.0f), glm::vec3(0.0f, 0.4f, 0.0f), glm::vec3(0.0f, 0.0f, 0.5f));
                 view.instances.push_back(instance);
             }

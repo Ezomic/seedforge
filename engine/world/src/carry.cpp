@@ -158,6 +158,9 @@ void CarrySystem::tidy(Carried& carried) const
     if (carried.taken.size() > kMaxTakenItems) {
         carried.taken.resize(kMaxTakenItems);
     }
+    if (carried.stacks.size() > kMaxCarryStacks) {
+        carried.stacks.resize(kMaxCarryStacks);
+    }
     std::erase_if(carried.dropped, [&](const CarryDrop& drop) {
         const ItemDef* def = catalogue_.items().find(drop.itemId);
         return def == nullptr || drop.count == 0 || drop.count > def->stackLimit || !finitePoint(drop.x, drop.z, drop.groundY);
@@ -280,6 +283,7 @@ void CarrySystem::step(Scene& scene, const InputFrame& input)
     interactHeld_ = interact;
     for (auto [entity, id, player, transform] : scene.registry().view<const StableId, Player, const Transform>().each()) {
         Carried& held = scene.registry().get_or_emplace<Carried>(entity);
+        tidy(held);
         // The load slows the walk. Sprinting and the stamina cost are not here: there is no stamina in the app yet.
         const EncumbrancePenalty penalty = encumbrancePenalty(inventoryOf(held).level());
         player.metresPerSecond = Player{}.metresPerSecond * static_cast<float>(penalty.movePermille) / 1000.0f;
@@ -303,6 +307,10 @@ void CarrySystem::pickup(Scene& scene, const GameCommand& command)
     if (!target.found) {
         return;
     }
+    if (!target.dropped && held.taken.size() >= kMaxTakenItems) {
+        say(scene, "You cannot take anything more from the world");
+        return;
+    }
     Inventory inventory = inventoryOf(held);
     const std::string name = nameOf(target.itemId);
     const InventoryResult result = inventory.add(target.itemId, target.count);
@@ -324,7 +332,7 @@ void CarrySystem::pickup(Scene& scene, const GameCommand& command)
     store(held, inventory);
     if (target.dropped) {
         held.dropped.erase(held.dropped.begin() + static_cast<std::ptrdiff_t>(target.index));
-    } else if (held.taken.size() < kMaxTakenItems) {
+    } else {
         held.taken.push_back(target.itemId);
     }
     say(scene, std::format("Picked up {}", name));

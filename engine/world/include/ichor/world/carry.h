@@ -34,6 +34,7 @@ constexpr std::uint64_t kStartingCarryUnits = 40 * kWeightUnitsPerWeight; // the
 constexpr double kCarryReachM = 2.5;
 constexpr std::size_t kMaxDroppedItems = 1024;
 constexpr std::size_t kMaxTakenItems = kMaxLootItems;
+constexpr std::size_t kMaxCarryStacks = 4096;
 constexpr double kCarryNoticeSeconds = 4.0;
 
 constexpr const char* kCarriedComponent = "world.carried";
