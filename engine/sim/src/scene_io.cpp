@@ -164,10 +164,15 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
     if (!r.read(rngs)) return bad("truncated generators");
     std::vector<std::string> hookNames;
     if (!r.read(hookNames)) return bad("truncated component list");
-    const auto& hooks = scene.componentHooks();
-    if (hookNames.size() != hooks.size()) return bad("registered components differ from the snapshot");
-    for (std::size_t i = 0; i < hooks.size(); ++i) {
-        if (hookNames[i] != hooks[i].name) return bad("registered components differ from the snapshot");
+    // The snapshot's components must all be registered, in the same order. A component registered since the
+    // snapshot was written is simply absent from its entities, so an older save still loads.
+    const auto& registered = scene.componentHooks();
+    std::vector<const Scene::ComponentHooks*> hooks; // the registered hook for each name in the snapshot
+    std::size_t next = 0;
+    for (const std::string& name : hookNames) {
+        while (next < registered.size() && registered[next].name != name) ++next;
+        if (next == registered.size()) return bad("registered components differ from the snapshot");
+        hooks.push_back(&registered[next++]);
     }
 
     std::uint32_t count = 0;
@@ -226,10 +231,10 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
         montages.push_back(montage);
         // Game components are validated now by skipping, and applied once the entity exists.
         hookOffsets.push_back(total - r.remaining());
-        for (const Scene::ComponentHooks& hook : hooks) {
+        for (const Scene::ComponentHooks* hook : hooks) {
             std::uint8_t has = 0;
             if (!r.read(has)) return bad("truncated component");
-            if (has != 0 && !hook.skip(r)) return bad("truncated component");
+            if (has != 0 && !hook->skip(r)) return bad("truncated component");
         }
     }
     if (!r.atEnd()) return bad("trailing bytes");
@@ -246,10 +251,10 @@ bool loadScene(const std::filesystem::path& path, Scene& scene)
         if (entity == entt::null) {
             return;
         }
-        for (const Scene::ComponentHooks& hook : hooks) {
+        for (const Scene::ComponentHooks* hook : hooks) {
             std::uint8_t has = 0;
             again.read(has);
-            if (has != 0) hook.read(entity, again);
+            if (has != 0) hook->read(entity, again);
         }
     };
     for (std::size_t i = 0; i < spawns.size(); ++i) {
