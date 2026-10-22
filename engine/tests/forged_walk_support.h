@@ -3,6 +3,7 @@
 #include "ichor/world/forged_heightfield.h"
 #include "ichor/world/forged_navmesh.h"
 #include "ichor/world/forged_walk_bot.h"
+#include "ichor/world/forged_walk_route.h"
 #include "ichor/world/forged_water.h"
 #include "ichor/world/placed_settlements.h"
 
@@ -11,9 +12,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ichor::walksupport {
@@ -27,7 +30,34 @@ struct SeedWalk {
     bool hadPath = false;
     WalkResult result;
     double trip = 0.0;
+    // Where the walk would have blocked and why, for the report (SEED-555).
+    double straightBlockMetres = -1.0; // along the straight line from the spawn to the goal; negative when it is all walkable
+    WalkBlock straightBlock = WalkBlock::None;
+    bool usedNavmesh = false;      // the walker followed a navmesh path
+    bool usedGroundRoute = false;  // or a route searched over the ground the walker itself assesses
+    double routeMetres = 0.0;
+    WalkRouteFailure routeFailure = WalkRouteFailure::BadInput;
+    int homeRank = 0;  // 0 spawns at the settlement nearest the middle of the world; higher when its ground is a pocket
+    int goalRank = 0;      // 0 is the nearest settlement; higher when nearer ones are cut off by cliffs or deep water
+    std::string nearerCut; // why the nearer settlements were skipped
+    std::string enclosure; // what bounds the ground the spawn can reach, when the nearest settlement is cut off
 };
+
+inline std::string describeRoute(const SeedWalk& walk)
+{
+    std::string text = walk.straightBlockMetres < 0.0 ? "straight line clear"
+                                                      : std::format("straight line {} at {:.0f} m", walkBlockName(walk.straightBlock), walk.straightBlockMetres);
+    text += walk.usedNavmesh       ? ", navmesh path"
+        : walk.usedGroundRoute     ? std::format(", ground route {:.0f} m", walk.routeMetres)
+                                   : std::format(", no route ({}; {})", walkRouteFailureName(walk.routeFailure), walk.enclosure);
+    if (walk.homeRank > 0) {
+        text += std::format(", spawn moved to the settlement {} from the middle (the nearest is a pocket)", walk.homeRank + 1);
+    }
+    if (walk.goalRank > 0 || !walk.nearerCut.empty()) {
+        text += std::format(", goal rank {} (nearer cut off: {})", walk.goalRank, walk.nearerCut);
+    }
+    return text;
+}
 
 inline SeedWalk walkSeed(std::uint64_t seed, int grid)
 {
@@ -126,37 +156,87 @@ inline SeedWalk walkSeed(std::uint64_t seed, int grid)
             }
         }
     }
-    if (home < goals.size()) {
-        for (int attempt = 0; attempt < 12; ++attempt) {
+    // The settlement nearest the middle is home; when the ground around it is a pocket no other settlement can be reached
+    // from, the next nearest the middle is tried, which is the reachable side the spawn should have picked.
+    std::vector<std::pair<double, std::size_t>> homes;
+    for (std::size_t i = 0; i < goals.size(); ++i) {
+        homes.emplace_back(std::hypot(goals[i].x - middle, goals[i].z - middle), i);
+    }
+    std::sort(homes.begin(), homes.end());
+    constexpr int kGoalRanks = 4;
+    for (std::size_t homeRank = 0; homeRank < homes.size() && !out.usedNavmesh && !out.usedGroundRoute; ++homeRank) {
+        const std::size_t candidateHome = homes[homeRank].second;
+        for (int attempt = 0; attempt < 12 && !out.usedNavmesh && !out.usedGroundRoute; ++attempt) {
             glm::dvec3 candidate;
-            if (!findWalkableSpawn(walking, goals[home].x + attempt * 6.0, goals[home].z, 60.0, candidate)) {
+            if (!findWalkableSpawn(walking, goals[candidateHome].x + attempt * 6.0, goals[candidateHome].z, 60.0, candidate)) {
                 continue;
             }
             candidate.y = forged.field.heightAt(candidate.x, candidate.z);
-            double best = std::numeric_limits<double>::infinity();
-            glm::dvec3 nearest{0.0};
+            std::vector<std::pair<double, std::size_t>> ranked;
             for (std::size_t i = 0; i < goals.size(); ++i) {
                 const double d = std::hypot(goals[i].x - candidate.x, goals[i].z - candidate.z);
-                if (i != home && d >= kMinTrip && d < best) {
-                    best = d;
-                    nearest = goals[i];
+                if (i != candidateHome && d >= kMinTrip) {
+                    ranked.emplace_back(d, i);
                 }
             }
-            if (!std::isfinite(best)) {
+            std::sort(ranked.begin(), ranked.end());
+            if (ranked.empty()) {
                 continue;
             }
-            if (!spawnFound) {
+            std::string cut;
+            bool startBlocked = false;
+            for (int rank = 0; rank < kGoalRanks && rank < static_cast<int>(ranked.size()); ++rank) {
+                const glm::dvec3& target = goals[ranked[static_cast<std::size_t>(rank)].second];
+                const double distance = ranked[static_cast<std::size_t>(rank)].first;
+                if (!spawnFound) {
+                    spawn = candidate;
+                    goal = target;
+                    out.trip = distance;
+                    spawnFound = true;
+                    out.straightBlockMetres = firstBlockOnLine(walking, spawn, goal, out.straightBlock);
+                }
+                std::vector<glm::dvec3> found;
+                bool viaNavmesh = false;
+                WalkRoute route;
+                if (nav.findPath(candidate, target, found)) {
+                    viaNavmesh = true;
+                } else {
+                    WalkRouteParams routeParams;
+                    routeParams.goalRadiusMetres = kSettlementArrive - 2.0;
+                    route = findWalkRoute(walking, candidate, target, routeParams);
+                    if (!route.found) {
+                        if (rank == 0) {
+                            out.routeFailure = route.failure;
+                            out.enclosure = describeEnclosure(route);
+                        }
+                        startBlocked = startBlocked || route.failure == WalkRouteFailure::StartBlocked;
+                        cut += std::format("{}[{:.0f} m: {}]", cut.empty() ? "" : ", ", distance, walkRouteFailureName(route.failure));
+                        continue;
+                    }
+                    found = route.waypoints;
+                }
                 spawn = candidate;
-                goal = nearest;
-                out.trip = best;
-                spawnFound = true;
-            }
-            if (nav.findPath(candidate, nearest, path)) {
-                spawn = candidate;
-                goal = nearest;
-                out.trip = best;
-                out.hadPath = true;
+                goal = target;
+                out.trip = distance;
+                out.goalRank = rank;
+                out.homeRank = static_cast<int>(homeRank);
+                out.nearerCut = cut;
+                out.hadPath = viaNavmesh;
+                out.usedNavmesh = viaNavmesh;
+                out.usedGroundRoute = !viaNavmesh;
+                out.routeMetres = route.metres;
+                out.routeFailure = WalkRouteFailure::None;
+                out.straightBlockMetres = firstBlockOnLine(walking, spawn, goal, out.straightBlock);
+                path = std::move(found);
                 break;
+            }
+            if (!out.usedNavmesh && !out.usedGroundRoute) {
+                if (homeRank == 0 && attempt == 0) {
+                    out.nearerCut = cut;
+                }
+                if (!startBlocked) {
+                    break; // the same pocket whichever dry spot of it the spawn takes
+                }
             }
         }
     }
@@ -164,7 +244,7 @@ inline SeedWalk walkSeed(std::uint64_t seed, int grid)
     if (!spawnFound) {
         return out;
     }
-    if (!out.hadPath) {
+    if (!out.usedNavmesh && !out.usedGroundRoute) {
         path.clear();
     }
 
