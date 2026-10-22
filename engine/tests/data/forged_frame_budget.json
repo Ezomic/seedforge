@@ -1,0 +1,39 @@
+{
+  "frames": 120,
+  "grid": 129,
+  "seeds": {
+    "1": {
+      "cellLoads": 49,
+      "cellsResidentPeak": 35,
+      "instances": 29564,
+      "meshesRebuilt": 192,
+      "plantInstances": 2241578,
+      "terrainDraws": 2961,
+      "terrainIndices": 82494720,
+      "vegetationDraws": 1306,
+      "waterDraws": 524
+    },
+    "2": {
+      "cellLoads": 65,
+      "cellsResidentPeak": 36,
+      "instances": 15318,
+      "meshesRebuilt": 233,
+      "plantInstances": 1653565,
+      "terrainDraws": 3465,
+      "terrainIndices": 90706176,
+      "vegetationDraws": 1002,
+      "waterDraws": 84
+    },
+    "3": {
+      "cellLoads": 61,
+      "cellsResidentPeak": 35,
+      "instances": 1471,
+      "meshesRebuilt": 200,
+      "plantInstances": 69758,
+      "terrainDraws": 2327,
+      "terrainIndices": 62396928,
+      "vegetationDraws": 263,
+      "waterDraws": 0
+    }
+  }
+}
