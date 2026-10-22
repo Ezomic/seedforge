@@ -91,3 +91,39 @@ TEST_CASE("the engine reports a smoothed frame time, ignoring frames that have n
     REQUIRE(engine.frame(std::nan("")));
     REQUIRE(engine.frameMilliseconds() == before);
 }
+
+TEST_CASE("an input source feeds every tick, is recorded, and yields to a replay")
+{
+    NullPlatform platform;
+    NullRenderer renderer;
+    REQUIRE(platform.init({}));
+    REQUIRE(renderer.init());
+    EngineConfig config;
+    config.fixedDt = 0.25;
+    Engine engine(platform, renderer, config);
+
+    int asked = 0;
+    engine.setInputSource([&](Scene&) {
+        ++asked;
+        InputFrame frame;
+        frame.moveX = 0.5f;
+        return frame;
+    });
+    std::vector<float> seen;
+    engine.scene().addSystem("probe", [&](Scene&, double, const InputFrame& input) { seen.push_back(input.moveX); });
+    engine.recordInputs(true);
+
+    REQUIRE(engine.frame(0.75));
+    REQUIRE(asked == 3);
+    REQUIRE(seen == std::vector<float>{0.5f, 0.5f, 0.5f});
+    REQUIRE(engine.recordedInputs().frames.size() == 3);
+    REQUIRE(engine.recordedInputs().frames.back().moveX == 0.5f);
+
+    InputStream stream;
+    stream.frames.push_back(InputFrame{});
+    stream.frames.back().moveX = -1.0f;
+    engine.replayInputs(stream);
+    REQUIRE(engine.frame(0.25));
+    REQUIRE(asked == 3);
+    REQUIRE(seen.back() == -1.0f);
+}

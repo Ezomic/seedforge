@@ -31,6 +31,8 @@ InputFrame Engine::nextInput()
         if (replayIndex_ < replay_.frames.size()) {
             input = replay_.frames[replayIndex_++];
         }
+    } else if (inputSource_) {
+        input = inputSource_(scene_);
     } else {
         input = platform_.input();
     }
