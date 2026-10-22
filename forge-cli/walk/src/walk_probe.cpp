@@ -3,6 +3,7 @@
 #include "ichor/world/forged_game.h"
 #include "ichor/world/forged_heightfield.h"
 #include "ichor/world/forged_walk_bot.h"
+#include "ichor/world/forged_walk_route.h"
 #include "ichor/world/forged_water.h"
 #include "ichor/world/water_field.h"
 #include "ichor/world/world_desc.h"
@@ -11,9 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <exception>
-#include <functional>
 #include <limits>
-#include <queue>
 #include <utility>
 
 namespace forgecli {
@@ -114,64 +113,19 @@ double walkReachMetres(const ichor::ForgedWalking& walking, double x, double z, 
     return std::min(reach, capMetres);
 }
 
-bool routeOnFoot(const ichor::ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& to, double latticeMetres, std::size_t maxExpansions, std::vector<glm::dvec3>& path)
+bool routeOnFoot(const ichor::ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& to, std::vector<glm::dvec3>& path)
 {
     path.clear();
-    if (!std::isfinite(from.x) || !std::isfinite(from.z) || !std::isfinite(to.x) || !std::isfinite(to.z) || !usableStep(latticeMetres)) return false;
-    Lattice lattice(walking, latticeMetres);
-    const int si = lattice.nearest(from.x);
-    const int sj = lattice.nearest(from.z);
-    const double gx = to.x;
-    const double gz = to.z;
-    constexpr double kInf = std::numeric_limits<double>::infinity();
-    std::vector<double> cost(lattice.count(), kInf);
-    std::vector<std::int64_t> parent(lattice.count(), -1);
-    using Entry = std::pair<double, std::uint32_t>;
-    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> open;
-    const std::size_t start = lattice.index(si, sj);
-    cost[start] = 0.0;
-    open.emplace(flat(lattice.x(si), lattice.x(sj), gx, gz), static_cast<std::uint32_t>(start));
-    std::size_t expansions = 0;
-    std::int64_t reached = -1;
-    while (!open.empty() && expansions < maxExpansions) {
-        const auto [f, at] = open.top();
-        open.pop();
-        const int i = static_cast<int>(at % static_cast<std::uint32_t>(lattice.side()));
-        const int j = static_cast<int>(at / static_cast<std::uint32_t>(lattice.side()));
-        if (f - flat(lattice.x(i), lattice.x(j), gx, gz) > cost[at] + 1e-9) continue;
-        ++expansions;
-        if (flat(lattice.x(i), lattice.x(j), gx, gz) <= lattice.step() * 1.5) {
-            reached = at;
-            break;
-        }
-        for (int dir = 0; dir < 8; ++dir) {
-            if (!lattice.canStep(i, j, dir)) continue;
-            const int ni = i + kDx[dir];
-            const int nj = j + kDz[dir];
-            const std::size_t n = lattice.index(ni, nj);
-            const double step = lattice.step() * ((dir & 1) ? 1.4142135623730951 : 1.0);
-            const double next = cost[at] + step / lattice.paceAt(ni, nj);
-            if (next >= cost[n]) continue;
-            cost[n] = next;
-            parent[n] = at;
-            open.emplace(next + flat(lattice.x(ni), lattice.x(nj), gx, gz), static_cast<std::uint32_t>(n));
-        }
-    }
-    if (reached < 0) return false;
-    std::vector<glm::dvec3> reversed;
-    for (std::int64_t at = reached; at >= 0 && at != static_cast<std::int64_t>(start); at = parent[static_cast<std::size_t>(at)]) {
-        const int i = static_cast<int>(at % lattice.side());
-        const int j = static_cast<int>(at / lattice.side());
-        reversed.emplace_back(lattice.x(i), 0.0, lattice.x(j));
-    }
-    path.assign(reversed.rbegin(), reversed.rend());
+    const ichor::WalkRoute route = ichor::findWalkRoute(walking, from, to);
+    if (!route.found) return false;
+    path = route.waypoints;
     return true;
 }
 
 WalkProbeResult probeWalk(const worldforge::ForgedWorld& world, const WalkProbeParams& params)
 {
     WalkProbeResult out;
-    if (!world.ok() || !world.roads() || !world.settlements()) {
+    if (!world.ok() || world.size() < 2 || !world.roads() || !world.settlements()) {
         out.error = "the world has no roads or settlements";
         return out;
     }
@@ -228,7 +182,7 @@ WalkProbeResult probeWalk(const worldforge::ForgedWorld& world, const WalkProbeP
         out.tripMetres = distance;
         glm::dvec3 from{spawn.x, forged.field.heightAt(spawn.x, spawn.z), spawn.z};
         std::vector<glm::dvec3> path;
-        out.routeFound = routeOnFoot(walking, from, goal, params.latticeMetres, params.maxExpansions, path);
+        out.routeFound = routeOnFoot(walking, from, goal, path);
         for (glm::dvec3& p : path) p.y = forged.field.heightAt(p.x, p.z);
         ichor::WalkBotParams bot;
         bot.arriveMetres = params.arriveMetres;

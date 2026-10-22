@@ -36,7 +36,7 @@ The spawn is the one the game uses: `findForgedSpawn` over the settlements in wo
 
 A **pocket spawn** is a spawn from which the walker cannot get 100 m away on foot. The reach search steps over an 8 m lattice with the walking rules (steepness, deep water) and stops at 160 m. A pit ringed by cliffs reaches a few metres and is a pocket.
 
-The **walk** goes to the nearest other settlement at least 60 m from the spawn that has dry, gentle ground within 120 m of its centre. The route is an A* over the same lattice, cheaper where the pace is higher, followed by `walkTo` (the walk bot) with an arrival radius of 12 m. A world with no such settlement scores 0 on the walk term (nothing was shown to work). The bot gives an honest answer: arrived, or what stopped it.
+The **walk** goes to the nearest other settlement at least 60 m from the spawn that has dry, gentle ground within 120 m of its centre. The route is the engine's `findWalkRoute` (SEED-555), a search over the ground the walker itself assesses, followed by `walkTo` (the walk bot) with an arrival radius of 12 m. A world with no such settlement scores 0 on the walk term (nothing was shown to work). The bot gives an honest answer: arrived, or what stopped it.
 
 ### Reasons
 

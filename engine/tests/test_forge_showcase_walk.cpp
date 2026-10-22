@@ -104,8 +104,8 @@ TEST_CASE("the route goes round a ridge the straight walk cannot cross, and ther
     CHECK(straight.blocker == ichor::WalkBlock::TooSteep);
 
     std::vector<glm::dvec3> path;
-    REQUIRE(routeOnFoot(walking, from, to, 2.0, 100000, path));
-    CHECK(path.size() > 20);
+    REQUIRE(routeOnFoot(walking, from, to, path));
+    CHECK(path.size() >= 2);
     CHECK(std::any_of(path.begin(), path.end(), [](const glm::dvec3& p) { return p.z >= 100.0; }));
 
     ichor::WalkBotParams bot;
@@ -116,22 +116,20 @@ TEST_CASE("the route goes round a ridge the straight walk cannot cross, and ther
 
     const ichor::Heightfield whole = ridgeWithGap(10000);
     const ichor::ForgedWalking blocked(whole, nullptr, ichor::CapabilitySet{});
-    CHECK_FALSE(routeOnFoot(blocked, from, to, 2.0, 100000, path));
+    CHECK_FALSE(routeOnFoot(blocked, from, to, path));
     CHECK(path.empty());
 }
 
-TEST_CASE("the route refuses hostile input and a spent search budget", "[forge_cli][showcase][walk]")
+TEST_CASE("the route refuses points that are not numbers or lie off the map", "[forge_cli][showcase][walk]")
 {
     const ichor::Heightfield gapped = ridgeWithGap(100);
     const ichor::ForgedWalking walking(gapped, nullptr, ichor::CapabilitySet{});
     std::vector<glm::dvec3> path;
     const double nan = std::numeric_limits<double>::quiet_NaN();
-    CHECK_FALSE(routeOnFoot(walking, {nan, 0.0, 20.0}, {100.0, 0.0, 20.0}, 2.0, 100000, path));
-    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {100.0, 0.0, nan}, 2.0, 100000, path));
-    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {100.0, 0.0, 20.0}, 0.0, 100000, path));
-    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {100.0, 0.0, 20.0}, 2.0, 5, path));
-    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {100.0, 0.0, 20.0}, 2.0, 0, path));
-    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {1.0e9, 0.0, 20.0}, 2.0, 100000, path));
+    CHECK_FALSE(routeOnFoot(walking, {nan, 0.0, 20.0}, {100.0, 0.0, 20.0}, path));
+    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {100.0, 0.0, nan}, path));
+    CHECK_FALSE(routeOnFoot(walking, {20.0, 0.0, 20.0}, {1.0e9, 0.0, 20.0}, path));
+    CHECK(path.empty());
 }
 
 TEST_CASE("live worlds: the probe finds a spawn, repeats itself, and the walk reaches a settlement on some seed", "[forge_cli][showcase][walk]")

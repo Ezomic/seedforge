@@ -4,6 +4,7 @@
 #include <forgecli/showcase.h>
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <string>
@@ -303,6 +304,13 @@ TEST_CASE("the run rejects an empty range, a bad size and a bad top", "[forge_cl
     CHECK_FALSE(runShowcase(o, {}).error.empty());
     o.seedEnd = 5 + kMaxShowcaseSeeds;
     CHECK_FALSE(runShowcase(o, {}).error.empty());
+    o.seedBegin = std::numeric_limits<std::uint64_t>::max() - 1;
+    o.seedEnd = std::numeric_limits<std::uint64_t>::max();
+    o.size = 64;
+    const ShowcaseResult edge = runShowcase(o, {});
+    CHECK(edge.error.empty());
+    CHECK(edge.metrics.size() == 2);
+    o.seedBegin = 5;
     o.seedEnd = 5;
     o.size = 1;
     CHECK_FALSE(runShowcase(o, {}).error.empty());

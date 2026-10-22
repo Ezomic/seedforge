@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -12,6 +13,8 @@
 namespace forgecli {
 
 namespace {
+
+int wholeMetres(double v) { return std::isfinite(v) ? static_cast<int>(std::clamp(v, 0.0, 1.0e9)) : 0; }
 
 int clampPermille(std::int64_t v) { return static_cast<int>(std::clamp<std::int64_t>(v, 0, 1000)); }
 
@@ -52,6 +55,7 @@ std::string walkNote(const ShowcaseMetrics& m)
 
 std::string spawnNote(const ShowcaseMetrics& m)
 {
+    if (!m.walkError.empty()) return "walk probe failed: " + m.walkError;
     if (!m.spawnFound) return "no spawn";
     return m.pocketSpawn ? "pocket spawn" : "open spawn";
 }
@@ -234,15 +238,16 @@ ShowcaseMetrics measureShowcase(const worldforge::ForgedWorld& world, const worl
     for (const worldforge::Settlement& s : world.settlements()->sites) tiers |= std::uint32_t{1} << (s.tier & 31);
     for (; tiers != 0; tiers &= tiers - 1) ++m.tiersPresent;
 
+    m.walkError = walk.error;
     m.spawnFound = walk.error.empty() && walk.spawnFound;
     m.pocketSpawn = m.spawnFound && walk.pocket;
-    if (m.spawnFound && walk.metresPerCell > 0.0) {
+    if (m.spawnFound && walk.metresPerCell > 0.0 && std::isfinite(walk.spawnX) && std::isfinite(walk.spawnZ)) {
         m.biomesNearSpawn = landBiomesNear(*world.biomes(), walk.spawnX / walk.metresPerCell, walk.spawnZ / walk.metresPerCell, kBiomeRadiusMetres / walk.metresPerCell);
     }
     m.walkMeasured = m.spawnFound && walk.hasTarget;
     m.walkArrived = m.walkMeasured && walk.arrived;
-    m.tripMetres = static_cast<int>(walk.tripMetres);
-    m.walkedMetres = static_cast<int>(walk.walkedMetres);
+    m.tripMetres = wholeMetres(walk.tripMetres);
+    m.walkedMetres = wholeMetres(walk.walkedMetres);
     m.walkBlocker = walk.blocker;
     return m;
 }
@@ -287,7 +292,7 @@ std::string showcaseCsv(const std::vector<ShowcaseScore>& ranked, const std::vec
         out += "," + std::to_string(m->gatesPassed) + "," + std::to_string(m->gatesEvaluated) + "," + csvField(failed) + "," + (m->landSharePermille < 0 ? std::string() : percentNumber(m->landSharePermille));
         out += "," + std::to_string(m->riverSystems) + "," + std::to_string(m->lakes) + "," + std::to_string(m->settlements) + "," + std::to_string(m->tiersPresent);
         out += std::string(",") + (m->walkMeasured ? (m->walkArrived ? "yes" : "no") : "n/a") + "," + std::to_string(m->tripMetres) + "," + std::to_string(m->walkedMetres) + "," + csvField(m->walkBlocker);
-        out += std::string(",") + (m->spawnFound ? "yes" : "no") + "," + (m->pocketSpawn ? "yes" : "no") + "," + std::to_string(m->biomesNearSpawn) + "," + csvField(m->error) + "\n";
+        out += std::string(",") + (m->spawnFound ? "yes" : "no") + "," + (m->pocketSpawn ? "yes" : "no") + "," + std::to_string(m->biomesNearSpawn) + "," + csvField(m->error.empty() ? m->walkError : m->error) + "\n";
     }
     return out;
 }
@@ -384,7 +389,8 @@ ShowcaseResult runShowcase(const ShowcaseOptions& options, const WalkProbe& prob
     const worldforge::ForgeConfig config = defaultForgeConfig(options.size);
     const worldforge::GateThresholds thresholds = sanityThresholds();
     std::vector<ShowcaseScore> scores;
-    for (std::uint64_t seed = options.seedBegin; seed <= options.seedEnd; ++seed) {
+    for (std::uint64_t n = 0; n <= options.seedEnd - options.seedBegin; ++n) {
+        const std::uint64_t seed = options.seedBegin + n;
         ShowcaseMetrics m;
         try {
             const worldforge::ForgedWorld world = worldforge::forgeWorld(seed, options.size, config, worldforge::ForgePhase::Content);

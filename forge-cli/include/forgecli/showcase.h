@@ -64,6 +64,7 @@ struct ShowcaseMetrics {
     int tripMetres = 0;
     int walkedMetres = 0;
     std::string walkBlocker;
+    std::string walkError; // the probe could not run; the walk and spawn terms score 0
 
     bool spawnFound = false;
     bool pocketSpawn = false;
