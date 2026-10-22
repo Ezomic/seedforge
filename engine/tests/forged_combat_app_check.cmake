@@ -1,0 +1,30 @@
+# Runs the app headless with --forged --combat and a scripted player, and checks the fight is deterministic: the same
+# seed gives the same scene state hash twice, another seed gives a different one, and the fight really happened (the
+# enemy wound up at least once). Needs ICHOR (the executable).
+function(combat_run seed out_hash out_text)
+    execute_process(COMMAND "${ICHOR}" --headless --forged --grid 64 --seed ${seed} --combat --combat-duel --combat-bot expert --frames 1500
+        RESULT_VARIABLE code OUTPUT_VARIABLE text ERROR_VARIABLE text)
+    if(NOT code EQUAL 0)
+        message(FATAL_ERROR "ichor --forged --combat --seed ${seed} exited with ${code}:\n${text}")
+    endif()
+    string(REGEX MATCH "exit after [0-9]+ frames, [0-9]+ ticks, state ([0-9a-f]+)" matched "${text}")
+    if(NOT matched)
+        message(FATAL_ERROR "ichor --forged --combat --seed ${seed} logged no state hash:\n${text}")
+    endif()
+    set(${out_hash} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    set(${out_text} "${text}" PARENT_SCOPE)
+endfunction()
+
+combat_run(3 first first_text)
+combat_run(3 second second_text)
+combat_run(2 other other_text)
+if(NOT first STREQUAL second)
+    message(FATAL_ERROR "the same seed gave two scene hashes: ${first} and ${second}")
+endif()
+if(first STREQUAL other)
+    message(FATAL_ERROR "seeds 3 and 2 gave the same scene hash ${first}")
+endif()
+if(NOT first_text MATCHES "the enemy winds up")
+    message(FATAL_ERROR "the enemy never attacked in 1500 frames, so no fight happened:\n${first_text}")
+endif()
+message(STATUS "forged combat runs agree: seed 3 ${first}, seed 2 ${other}")
