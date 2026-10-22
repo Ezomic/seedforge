@@ -258,3 +258,29 @@ TEST_CASE("the blend at a position is the two biomes and the byte the splat uses
     REQUIRE(none.primary == BiomeId::Crag);
     REQUIRE(none.weight == 0.0f);
 }
+
+TEST_CASE("the smooth splat changes gradually across a border where the nearest one jumps")
+{
+    const WorldDesc desc = smallWorld();
+    const ForgedBiomeField biomes(halvesMap(), desc.sizeMetres);
+    const double step = static_cast<double>(desc.sizeMetres) / (kGrid - 1);
+    float smoothJump = 0.0f;
+    float nearestJump = 0.0f;
+    glm::vec3 last = biomes.smoothSplatAt(0.0, 4 * step);
+    glm::vec3 lastNearest = biomes.splatAt(0.0, 4 * step);
+    for (double x = 1.0; x <= desc.sizeMetres; x += 1.0) {
+        const glm::vec3 now = biomes.smoothSplatAt(x, 4 * step);
+        const glm::vec3 nearest = biomes.splatAt(x, 4 * step);
+        smoothJump = std::max(smoothJump, std::abs(now.y - last.y));
+        nearestJump = std::max(nearestJump, std::abs(nearest.y - lastNearest.y));
+        REQUIRE(std::abs(now.x + now.y + now.z - 1.0f) < 1e-4f);
+        last = now;
+        lastNearest = nearest;
+    }
+    REQUIRE(nearestJump > 0.5f);
+    REQUIRE(smoothJump < 0.05f);
+    REQUIRE(biomes.smoothSplatAt(2 * step, 4 * step) == biomeSurface(BiomeId::Forest).splat);
+    REQUIRE(biomes.smoothSplatAt((kGrid - 2) * step, 4 * step) == biomeSurface(BiomeId::Desert).splat);
+    REQUIRE(ForgedBiomeField{}.smoothSplatAt(1.0, 1.0) == biomeSurface(BiomeId::Crag).splat);
+    REQUIRE(biomes.smoothSplatAt(std::numeric_limits<double>::quiet_NaN(), -5.0) == biomes.smoothSplatAt(0.0, 0.0));
+}

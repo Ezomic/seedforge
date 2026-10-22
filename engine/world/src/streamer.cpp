@@ -1,6 +1,7 @@
 #include "ichor/world/streamer.h"
 
 #include "ichor/core/log.h"
+#include "ichor/world/terrain_shore.h"
 
 #include <glm/geometric.hpp>
 
@@ -20,7 +21,7 @@ std::int32_t chebyshev(CellId a, CellId b)
 
 // One grid at a given sample stride, with a skirt dropped around the edge so
 // a coarser neighbour never shows a crack.
-Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std::uint32_t stride, const ForgedBiomeField* biomes)
+Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std::uint32_t stride, const ForgedBiomeField* biomes, const std::vector<glm::vec2>& shore)
 {
     const WorldDesc& desc = heightfield.desc();
     const std::uint32_t side = cell.samplesPerSide;
@@ -44,10 +45,15 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
         v.normal = heightfield.normalAt(originX + v.position.x, originZ + v.position.z);
         v.tangent = {1.0f, 0.0f, 0.0f, 1.0f};
         if (biomes != nullptr) {
-            const glm::vec3 splat = biomes->splatAt(originX + v.position.x, originZ + v.position.z);
+            const glm::vec3 splat = biomes->smoothSplatAt(originX + v.position.x, originZ + v.position.z);
             v.tangent = {splat, -1.0f};
+            // The forged shader tiles its textures by world position, so a forged vertex's uv carries how much
+            // sand and how much wet bank the ground has there.
+            const std::size_t at = static_cast<std::size_t>(sz) * side + sx;
+            v.uv = at < shore.size() ? shore[at] : glm::vec2(0.0f);
+        } else {
+            v.uv = {static_cast<float>(originX + v.position.x) / 8.0f, static_cast<float>(originZ + v.position.z) / 8.0f};
         }
-        v.uv = {static_cast<float>(originX + v.position.x) / 8.0f, static_cast<float>(originZ + v.position.z) / 8.0f};
         v.weights[0] = 65535;
         mesh.boundsMin = glm::min(mesh.boundsMin, v.position);
         mesh.boundsMax = glm::max(mesh.boundsMax, v.position);
@@ -139,7 +145,11 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
     out.cast = config.cast ? config.cast->inCell(id) : std::vector<NpcSpawn>{};
     out.loot = config.loot ? config.loot->inCell(id) : std::vector<PlacedLoot>{};
     if (lodCount > 0) {
-        out.lods.push_back(buildLod(heightfield, out.cell, 1, config.biomes.get()));
+        std::vector<glm::vec2> shore;
+        if (config.biomes && config.water && hydrology != nullptr) {
+            shore = terrainShore(heightfield, *hydrology, config.rivers, id);
+        }
+        out.lods.push_back(buildLod(heightfield, out.cell, 1, config.biomes.get(), shore));
     }
     std::size_t reduction = 1;
     for (std::uint32_t lod = 1; lod < lodCount; ++lod) {
