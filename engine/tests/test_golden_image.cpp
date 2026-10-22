@@ -21,12 +21,15 @@
 #include "ichor/world/world_io.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/interfaces/catch_interfaces_capture.hpp>
 
 #include <RmlUi/Core/ElementDocument.h>
 
 #include <cstdlib>
 #include <filesystem>
 #include <format>
+#include <fstream>
+#include <string>
 
 using namespace ichor;
 
@@ -40,19 +43,73 @@ const std::filesystem::path kContent = std::filesystem::path(ICHOR_CONTENT_DIR) 
 const std::filesystem::path kArmContent = std::filesystem::path(ICHOR_CONTENT_DIR) / "arm.iscene";
 const std::filesystem::path kOutDir = std::filesystem::path(ICHOR_TEST_OUTPUT);
 
+bool envFlag(const char* name)
+{
+    const char* value = std::getenv(name);
+    return value != nullptr && value[0] == '1';
+}
+
+// CI runs these on a software Vulkan device (lavapipe). A case a real GPU draws differently has its own picture under
+// golden/software, and the rest compare against the GPU golden with the wider software tolerance.
+bool softwareDevice()
+{
+    return envFlag("ICHOR_GOLDEN_SOFTWARE");
+}
+
+std::filesystem::path goldenFile(const std::string& name)
+{
+    if (softwareDevice()) {
+        const std::filesystem::path software = kGoldenDir / "software" / name;
+        if (envFlag("ICHOR_UPDATE_GOLDEN")) {
+            std::filesystem::create_directories(software.parent_path());
+            return software;
+        }
+        if (std::filesystem::exists(software)) {
+            return software;
+        }
+    }
+    return kGoldenDir / name;
+}
+
+// Without this a runner that lost its Vulkan device would report every case as skipped, which is the gap SEED-471 closed.
+#define NO_VULKAN_DEVICE() \
+    do { \
+        if (envFlag("ICHOR_REQUIRE_GPU")) { \
+            FAIL("no Vulkan 1.3 device available, and ICHOR_REQUIRE_GPU=1"); \
+        } \
+        SKIP("no Vulkan 1.3 device available"); \
+    } while (false)
+
+struct Tolerance {
+    double meanAbs;
+    double fractionBad;
+    std::uint32_t tileBad;
+};
+
+// A tile is 16x16 pixels. Driver noise spreads thinly along edges; a missing draw call piles up in a few tiles, so the
+// tile count catches a small missing element that the whole-picture fraction cannot see.
+constexpr int kTile = 16;
+constexpr int kBadThreshold = 16;
+
 struct Diff {
     double meanAbs = 0.0;
     double fractionBad = 0.0; // pixels with any channel off by more than the threshold
+    int maxChannelDiff = 0;
+    std::uint32_t tileBad = 0; // the most over-threshold pixels in any one tile
     std::vector<std::uint8_t> image;
 };
 
-Diff compare(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>& b, int threshold)
+Diff compare(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>& b, int threshold, std::uint32_t width = kWidth)
 {
     Diff diff;
     diff.image.resize(a.size());
     std::uint64_t sum = 0;
     std::uint64_t bad = 0;
     const std::size_t pixels = a.size() / 4;
+    const std::uint32_t height = static_cast<std::uint32_t>(pixels / width);
+    const std::uint32_t tilesX = (width + kTile - 1) / kTile;
+    const std::uint32_t tilesY = (height + kTile - 1) / kTile;
+    std::vector<std::uint32_t> tileCounts(static_cast<std::size_t>(tilesX) * tilesY, 0);
     for (std::size_t p = 0; p < pixels; ++p) {
         int worst = 0;
         for (int c = 0; c < 3; ++c) {
@@ -60,7 +117,12 @@ Diff compare(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>
             sum += static_cast<std::uint64_t>(d);
             worst = std::max(worst, d);
         }
-        bad += worst > threshold ? 1 : 0;
+        diff.maxChannelDiff = std::max(diff.maxChannelDiff, worst);
+        if (worst > threshold) {
+            ++bad;
+            const std::size_t tile = (p / width / kTile) * tilesX + (p % width) / kTile;
+            diff.tileBad = std::max(diff.tileBad, ++tileCounts[tile]);
+        }
         const auto v = static_cast<std::uint8_t>(std::min(255, worst * 8));
         diff.image[p * 4] = v;
         diff.image[p * 4 + 1] = v;
@@ -72,13 +134,44 @@ Diff compare(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>
     return diff;
 }
 
+Tolerance toleranceFor(bool software)
+{
+    if (software) {
+        return {2.0, 0.002, 40};
+    }
+    return {1.5, 0.005, 256};
+}
+
+bool within(const Diff& diff, const Tolerance& limit)
+{
+    return diff.meanAbs < limit.meanAbs && diff.fractionBad < limit.fractionBad && diff.tileBad < limit.tileBad;
+}
+
+// Every case ends here: the numbers go to golden-metrics.csv when ICHOR_GOLDEN_REPORT=1 (the tolerance study), then
+// the picture must sit inside the tolerance of the device it was drawn on.
+void checkAgainstGolden(const std::vector<std::uint8_t>& actual, const std::vector<std::uint8_t>& expected, const std::filesystem::path& goldenPath)
+{
+    const std::string name = goldenPath.stem().string();
+    const Diff diff = compare(actual, expected, kBadThreshold);
+    writePng(kOutDir / (name + ".diff.png"), kWidth, kHeight, diff.image.data());
+    if (envFlag("ICHOR_GOLDEN_REPORT")) {
+        std::ofstream csv(kOutDir / "golden-metrics.csv", std::ios::app);
+        csv << name << ',' << diff.meanAbs << ',' << diff.fractionBad << ',' << diff.maxChannelDiff << ',' << diff.tileBad << "\n";
+    }
+    const Tolerance limit = toleranceFor(softwareDevice());
+    INFO(std::format("{}: mean abs diff {:.3f}, {:.4f}% pixels over threshold, worst tile {}, worst channel {}", name, diff.meanAbs, diff.fractionBad * 100.0, diff.tileBad, diff.maxChannelDiff));
+    CHECK(diff.meanAbs < limit.meanAbs);
+    CHECK(diff.fractionBad < limit.fractionBad);
+    CHECK(diff.tileBad < limit.tileBad);
+}
+
 }
 
 TEST_CASE("golden image: the hoplite kit")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     INFO("device: " << renderer.deviceName());
 
@@ -94,7 +187,7 @@ TEST_CASE("golden image: the hoplite kit")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "kit.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "kit.png";
+    const std::filesystem::path goldenPath = goldenFile("kit.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         std::filesystem::create_directories(kGoldenDir);
@@ -113,18 +206,14 @@ TEST_CASE("golden image: the hoplite kit")
     REQUIRE(h == kHeight);
 
     // Driver differences move a few edge pixels; a real regression moves many.
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "kit.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the skinned arm mid-wave")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     SceneBundle bundle;
     REQUIRE(readBundle(kArmContent, bundle));
@@ -155,7 +244,7 @@ TEST_CASE("golden image: the skinned arm mid-wave")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "arm.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "arm.png";
+    const std::filesystem::path goldenPath = goldenFile("arm.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -168,18 +257,14 @@ TEST_CASE("golden image: the skinned arm mid-wave")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect arm.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "arm.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the forged terrain at the world's centre")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
     Heightfield heightfield;
@@ -214,7 +299,7 @@ TEST_CASE("golden image: the forged terrain at the world's centre")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "terrain.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "terrain.png";
+    const std::filesystem::path goldenPath = goldenFile("terrain.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -227,11 +312,7 @@ TEST_CASE("golden image: the forged terrain at the world's centre")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect terrain.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "terrain.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 namespace {
@@ -261,7 +342,7 @@ TEST_CASE("golden image: the game UI drawn with Vulkan")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -294,7 +375,7 @@ TEST_CASE("golden image: the game UI drawn with Vulkan")
 
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui.actual.png", kWidth, kHeight, actual.data()));
-    const std::filesystem::path goldenPath = kGoldenDir / "ui.png";
+    const std::filesystem::path goldenPath = goldenFile("ui.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -307,11 +388,7 @@ TEST_CASE("golden image: the game UI drawn with Vulkan")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 namespace {
@@ -322,7 +399,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
     Heightfield heightfield;
@@ -389,7 +466,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / (std::string(name) + ".actual.png"), kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / (std::string(name) + ".png");
+    const std::filesystem::path goldenPath = goldenFile(std::string(name) + ".png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -402,11 +479,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect " << name << ".actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / (std::string(name) + ".diff.png"), kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 }
@@ -484,7 +557,7 @@ TEST_CASE("golden image: UI text in the game fonts")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -510,7 +583,7 @@ TEST_CASE("golden image: UI text in the game fonts")
     }));
     REQUIRE(writePng(kOutDir / "ui_text.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_text.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_text.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -523,18 +596,14 @@ TEST_CASE("golden image: UI text in the game fonts")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_text.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_text.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the HUD over the sky")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -561,7 +630,7 @@ TEST_CASE("golden image: the HUD over the sky")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_hud.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_hud.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_hud.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -574,18 +643,14 @@ TEST_CASE("golden image: the HUD over the sky")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_hud.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the HUD pointing at a target")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -613,7 +678,7 @@ TEST_CASE("golden image: the HUD pointing at a target")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_hud_target.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_hud_target.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_hud_target.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -626,18 +691,14 @@ TEST_CASE("golden image: the HUD pointing at a target")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud_target.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_hud_target.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the HUD with only the compass and health")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -666,7 +727,7 @@ TEST_CASE("golden image: the HUD with only the compass and health")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_hud_compass_health.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_hud_compass_health.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_hud_compass_health.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -679,18 +740,14 @@ TEST_CASE("golden image: the HUD with only the compass and health")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud_compass_health.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_hud_compass_health.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the ledger over the world")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -723,7 +780,7 @@ TEST_CASE("golden image: the ledger over the world")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_ledger.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_ledger.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_ledger.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -736,18 +793,14 @@ TEST_CASE("golden image: the ledger over the world")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_ledger.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_ledger.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the map over the world")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     Heightfield heightfield;
     REQUIRE(readWorld(std::filesystem::path(ICHOR_CONTENT_DIR) / "world", heightfield));
@@ -777,7 +830,7 @@ TEST_CASE("golden image: the map over the world")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_map.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_map.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_map.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -790,11 +843,7 @@ TEST_CASE("golden image: the map over the world")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_map.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_map.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the default palette over the forest")
@@ -806,7 +855,7 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
     Heightfield heightfield;
@@ -853,7 +902,7 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "props_grounded.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "props_grounded.png";
+    const std::filesystem::path goldenPath = goldenFile("props_grounded.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -866,11 +915,7 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect props_grounded.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "props_grounded.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 // The biggest river of the forged world seen from `eyeOffset` metres (x, z) from its wettest sample and
@@ -879,7 +924,7 @@ static void checkRiver(const char* name, glm::dvec2 eyeOffset, double eyeHeight)
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     const std::filesystem::path worldDir = std::filesystem::path(ICHOR_CONTENT_DIR) / "world";
     Heightfield heightfield;
@@ -940,7 +985,7 @@ static void checkRiver(const char* name, glm::dvec2 eyeOffset, double eyeHeight)
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / std::format("{}.actual.png", name), kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / std::format("{}.png", name);
+    const std::filesystem::path goldenPath = goldenFile(std::format("{}.png", name));
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -953,11 +998,7 @@ static void checkRiver(const char* name, glm::dvec2 eyeOffset, double eyeHeight)
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect " << name << ".actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / std::format("{}.diff.png", name), kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the biggest river of the forged world")
@@ -974,7 +1015,7 @@ TEST_CASE("golden image: the pause menu over the world")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -1000,7 +1041,7 @@ TEST_CASE("golden image: the pause menu over the world")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_pause.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_pause.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_pause.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -1013,18 +1054,14 @@ TEST_CASE("golden image: the pause menu over the world")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_pause.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_pause.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the night sky looking up")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     RenderView view;
     applyAtmosphere(atmosphereAt(1.0f), view);
@@ -1035,7 +1072,7 @@ TEST_CASE("golden image: the night sky looking up")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "sky_night.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "sky_night.png";
+    const std::filesystem::path goldenPath = goldenFile("sky_night.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -1048,18 +1085,14 @@ TEST_CASE("golden image: the night sky looking up")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect sky_night.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "sky_night.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the noon sky with clouds")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     RenderView view;
     applyAtmosphere(atmosphereAt(12.0f), view);
@@ -1070,7 +1103,7 @@ TEST_CASE("golden image: the noon sky with clouds")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "sky_noon.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "sky_noon.png";
+    const std::filesystem::path goldenPath = goldenFile("sky_noon.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -1083,18 +1116,14 @@ TEST_CASE("golden image: the noon sky with clouds")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect sky_noon.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "sky_noon.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
 }
 
 TEST_CASE("golden image: the journal over the world")
 {
     OffscreenRenderer renderer;
     if (!renderer.init(kWidth, kHeight, false)) {
-        SKIP("no Vulkan 1.3 device available");
+        NO_VULKAN_DEVICE();
     }
     VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
     REQUIRE(vkUi.init());
@@ -1125,7 +1154,7 @@ TEST_CASE("golden image: the journal over the world")
     std::filesystem::create_directories(kOutDir);
     REQUIRE(writePng(kOutDir / "ui_journal.actual.png", kWidth, kHeight, actual.data()));
 
-    const std::filesystem::path goldenPath = kGoldenDir / "ui_journal.png";
+    const std::filesystem::path goldenPath = goldenFile("ui_journal.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
@@ -1138,9 +1167,81 @@ TEST_CASE("golden image: the journal over the world")
     if (!readPng(goldenPath, w, h, expected)) {
         FAIL("no golden image at " << goldenPath.string() << "; inspect ui_journal.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
     }
-    const Diff diff = compare(actual, expected, 16);
-    writePng(kOutDir / "ui_journal.diff.png", kWidth, kHeight, diff.image.data());
-    INFO(std::format("mean abs diff {:.3f}, {:.4f}% pixels over threshold", diff.meanAbs, diff.fractionBad * 100.0));
-    CHECK(diff.meanAbs < 1.5);
-    CHECK(diff.fractionBad < 0.005);
+    checkAgainstGolden(actual, expected, goldenPath);
+}
+
+TEST_CASE("golden image tolerance: driver noise passes, a missing element does not")
+{
+    // No GPU needed: this pins the metric itself, on the committed goldens, so loosening a bound until a
+    // removed draw call slips through turns this red.
+    for (const char* name : {"ui_hud", "ui_pause", "ui_ledger", "kit", "terrain_graded"}) {
+        std::uint32_t w = 0;
+        std::uint32_t h = 0;
+        std::vector<std::uint8_t> golden;
+        REQUIRE(readPng(kGoldenDir / (std::string(name) + ".png"), w, h, golden));
+        REQUIRE(w == kWidth);
+        INFO(name);
+
+        std::uint32_t seed = 12345;
+        const auto next = [&seed] {
+            seed = seed * 1664525u + 1013904223u;
+            return static_cast<int>(seed >> 24);
+        };
+
+        std::vector<std::uint8_t> noisy = golden;
+        for (std::size_t i = 0; i < noisy.size(); ++i) {
+            if (i % 4 != 3) {
+                noisy[i] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(noisy[i]) + next() % 5 - 2, 0, 255));
+            }
+        }
+        for (int i = 0; i < 120; ++i) { // stray edge pixels a rasteriser draws one pixel off
+            const std::size_t pixel = static_cast<std::size_t>(next()) * 2000 % (noisy.size() / 4);
+            noisy[pixel * 4] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(noisy[pixel * 4]) + 60, 0, 255));
+        }
+        CHECK(within(compare(noisy, golden, kBadThreshold), toleranceFor(true)));
+
+        // Remove one element the size of a label or an icon (64x32): the block with the most content goes flat, as if the
+        // draw call that made it was gone.
+        constexpr std::size_t kBlockW = 64;
+        constexpr std::size_t kBlockH = 32;
+        const auto spread = [&](std::size_t x0, std::size_t y0) {
+            int count = 0;
+            for (std::size_t y = y0; y < y0 + kBlockH; ++y) {
+                for (std::size_t x = x0; x < x0 + kBlockW; ++x) {
+                    const std::size_t at = (y * kWidth + x) * 4;
+                    const std::size_t base = (y0 * kWidth + x0) * 4;
+                    int worst = 0;
+                    for (std::size_t c = 0; c < 3; ++c) {
+                        worst = std::max(worst, std::abs(static_cast<int>(golden[at + c]) - static_cast<int>(golden[base + c])));
+                    }
+                    count += worst > kBadThreshold ? 1 : 0;
+                }
+            }
+            return count;
+        };
+        std::size_t bestX = 0;
+        std::size_t bestY = 0;
+        int bestSpread = -1;
+        for (std::size_t y = 0; y + kBlockH <= kHeight; y += 16) {
+            for (std::size_t x = 0; x + kBlockW <= kWidth; x += 16) {
+                const int v = spread(x, y);
+                if (v > bestSpread) {
+                    bestSpread = v;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+        std::vector<std::uint8_t> removed = golden;
+        for (std::size_t y = bestY; y < bestY + kBlockH; ++y) {
+            for (std::size_t x = bestX; x < bestX + kBlockW; ++x) {
+                for (int c = 0; c < 3; ++c) {
+                    removed[(y * kWidth + x) * 4 + c] = golden[(bestY * kWidth + bestX) * 4 + c];
+                }
+            }
+        }
+        const Diff gone = compare(removed, golden, kBadThreshold);
+        INFO(std::format("most content in a block {}, worst tile {}, fraction {}", bestSpread, gone.tileBad, gone.fractionBad));
+        CHECK_FALSE(within(gone, toleranceFor(true)));
+    }
 }

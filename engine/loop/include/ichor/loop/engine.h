@@ -66,6 +66,11 @@ public:
     bool replaying() const { return replaying_; }
     bool replayFinished() const { return replaying_ && replayIndex_ >= replay_.frames.size(); }
 
+    // Feed the frames this function makes from the scene, one per tick, instead of the platform's. A replay still
+    // takes precedence; the frames are recorded like any other.
+    using InputSource = std::function<InputFrame(Scene& scene)>;
+    void setInputSource(InputSource source) { inputSource_ = std::move(source); }
+
     // One real-time frame. Returns false once the platform asks to quit.
     bool frame(double frameSeconds);
 
@@ -92,6 +97,7 @@ private:
     ViewBuilder viewBuilder_;
     OverlayBuilder overlayBuilder_;
     TickGate tickGate_;
+    InputSource inputSource_;
     bool gated_ = false;
     std::vector<std::string> overlay_;
     OverlayToggle overlayToggle_;
