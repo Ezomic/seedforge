@@ -125,6 +125,34 @@ glm::vec3 ForgedBiomeField::splatAt(double x, double z) const
     return a * (1.0f - w) + b * w;
 }
 
+glm::vec3 ForgedBiomeField::cellSplat(std::size_t index) const
+{
+    const float w = static_cast<float>(blend_[index]) / 255.0f;
+    const glm::vec3 a = biomeSurface(static_cast<BiomeId>(clampedId(biome_[index]))).splat;
+    const glm::vec3 b = biomeSurface(static_cast<BiomeId>(clampedId(secondary_[index]))).splat;
+    return a * (1.0f - w) + b * w;
+}
+
+glm::vec3 ForgedBiomeField::smoothSplatAt(double x, double z) const
+{
+    if (empty()) return biomeSurface(BiomeId::Crag).splat;
+    const auto last = static_cast<double>(width_ - 1);
+    const auto place = [&](double metres) {
+        const double t = std::isfinite(metres) ? std::clamp(metres / static_cast<double>(sizeMetres_), 0.0, 1.0) : 0.0;
+        return t * last;
+    };
+    const double fx = place(x);
+    const double fz = place(z);
+    const int x0 = std::min(static_cast<int>(fx), width_ - 2);
+    const int z0 = std::min(static_cast<int>(fz), width_ - 2);
+    const auto tx = static_cast<float>(fx - x0);
+    const auto tz = static_cast<float>(fz - z0);
+    const auto at = [&](int cx, int cz) { return cellSplat(static_cast<std::size_t>(cz) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(cx)); };
+    const glm::vec3 top = at(x0, z0) * (1.0f - tx) + at(x0 + 1, z0) * tx;
+    const glm::vec3 bottom = at(x0, z0 + 1) * (1.0f - tx) + at(x0 + 1, z0 + 1) * tx;
+    return top * (1.0f - tz) + bottom * tz;
+}
+
 BiomeBlend ForgedBiomeField::blendAt(double x, double z) const
 {
     if (empty()) return {};
