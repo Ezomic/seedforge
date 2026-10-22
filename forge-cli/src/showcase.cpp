@@ -333,7 +333,7 @@ std::string showcaseSeedsJson(const std::vector<ShowcaseScore>& ranked, int top)
     int rank = 0;
     for (const ShowcaseScore& s : ranked) {
         if (++rank > top) break;
-        out += std::string(rank > 1 ? "," : "") + "\n  {\"id\": \"showcase_" + std::to_string(s.seed) + "\", \"rank\": " + std::to_string(rank) + ", \"seed\": " + std::to_string(s.seed)
+        out += std::string(rank > 1 ? "," : "") + "\n  {\"id\": \"seed_" + std::to_string(s.seed) + "_size_" + std::to_string(s.size) + "_top\",\"rank\": " + std::to_string(rank) + ", \"seed\": " + std::to_string(s.seed)
             + ", \"size\": " + std::to_string(s.size) + ", \"score\": " + pointsText(s.totalMilli) + ", \"reasons\": [";
         const std::vector<std::string> reasons = showcaseReasons(s);
         for (std::size_t i = 0; i < reasons.size(); ++i) out += std::string(i ? ", " : "") + "\"" + jsonEscape(reasons[i]) + "\"";
@@ -443,7 +443,7 @@ int showcaseMain(int argc, char** argv, const WalkProbe& probe)
                    "  --size   grid size per world (default 256)\n"
                    "  --top    how many best seeds to keep (default 5)\n"
                    "  --out    write ranking.csv, ranking.md and top/ thumbnails here (no window is opened)\n"
-                   "  --json   write the top seeds as a data file (data/showcase_seeds.json)\n",
+                   "  --json   write the top seeds as a data file (data/showcase/seeds.json)\n",
             stderr);
         return 2;
     };

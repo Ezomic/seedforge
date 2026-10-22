@@ -214,7 +214,7 @@ TEST_CASE("a showcase run ranks the seeds, writes the tables, thumbnails and the
     std::ifstream written(json);
     const std::string text((std::istreambuf_iterator<char>(written)), std::istreambuf_iterator<char>());
     CHECK(text == first.json);
-    CHECK(text.find("showcase_" + std::to_string(first.ranked.front().seed)) != std::string::npos);
+    CHECK(text.find("seed_" + std::to_string(first.ranked.front().seed) + "_size_128_top") != std::string::npos);
 
     const ShowcaseResult second = runShowcase(options, makeWalkProbe());
     CHECK(second.csv == first.csv);

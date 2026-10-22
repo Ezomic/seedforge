@@ -146,7 +146,7 @@ std::vector<std::string> showcaseReasons(const ShowcaseScore& score);
 std::string showcaseCsv(const std::vector<ShowcaseScore>& ranked, const std::vector<ShowcaseMetrics>& metrics);
 std::string showcaseMarkdown(const std::vector<ShowcaseScore>& ranked, const std::vector<ShowcaseMetrics>& metrics, int top);
 
-// The top records as data/showcase_seeds.json: an array of {id, rank, seed, size, score, reasons}.
+// The top records as data/showcase/seeds.json: an array of {id, rank, seed, size, score, reasons}.
 std::string showcaseSeedsJson(const std::vector<ShowcaseScore>& ranked, int top);
 
 struct ShowcaseOptions {

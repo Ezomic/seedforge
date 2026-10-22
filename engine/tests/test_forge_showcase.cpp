@@ -208,11 +208,11 @@ TEST_CASE("the tables carry one row per seed and the top records are a data file
     CHECK(md.find("seed 2, ") == std::string::npos);
 
     const std::string json = showcaseSeedsJson(ranked, 1);
-    CHECK(json.find("\"id\": \"showcase_1\"") != std::string::npos);
+    CHECK(json.find("\"id\": \"seed_1_size_256_top\"") != std::string::npos);
     CHECK(json.find("\"seed\": 1,") != std::string::npos);
     CHECK(json.find("\"size\": 256") != std::string::npos);
     CHECK(json.find("\"score\": 100.0") != std::string::npos);
-    CHECK(json.find("showcase_2") == std::string::npos);
+    CHECK(json.find("seed_2_size") == std::string::npos);
     CHECK(showcaseSeedsJson({}, 5) == "[]\n");
     CHECK(showcaseCsv({}, {}).find('\n') != std::string::npos);
 }
