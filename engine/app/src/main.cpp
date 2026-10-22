@@ -6,6 +6,7 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
+#include "ichor/combat_bridge/combat_bridge.h"
 #include "ichor/audio/music_player.h"
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
@@ -129,6 +130,9 @@ struct Options {
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
     bool noExilePlayer = false; // --forged walks as the Exile unless this is set, and then as the wire capsule from inside
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
+    bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
+    bool combatDuel = false;  // --combat: begin a few metres from the enemy instead of at the spawn
+    std::string combatBot;    // --combat: a scripted player of this skill (novice, regular, expert) instead of the keyboard
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
     ichor::CampaignWorldPlan campaignPlan; // what main() decided for `campaign` before run()
@@ -254,6 +258,13 @@ bool parse(int argc, char** argv, Options& options)
             options.noExilePlayer = true;
         } else if (arg == "--forged") {
             options.forged = true;
+        } else if (arg == "--combat") {
+            options.combat = true;
+        } else if (arg == "--combat-duel") {
+            options.combatDuel = true;
+        } else if (arg == "--combat-bot" && hasValue) {
+            options.combatBot = argv[++i];
+            if (!ichor::stage0::findBotSkill(options.combatBot)) return false;
         } else if (arg == "--grid" && hasValue) {
             if (!parseNumber(argv[++i], options.forgedGrid) || options.forgedGrid < 16 || options.forgedGrid > 1024) return false;
         } else if (arg == "--campaign" && hasValue) {
@@ -660,6 +671,31 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         anchor = {centre, plateau + 0.5, centre};
     }
+    // SEED-643: the stage0 fight inside the forged world. Nothing below runs without --combat.
+    std::unique_ptr<ichor::CombatBridge> combat;
+    const bool restoring = !options.load.empty() || !options.loadSlot.empty();
+    if (options.combat && forged && restoring) {
+        ichor::log(ichor::LogLevel::Warn, "--combat starts a fresh fight and is ignored with --load and --load-slot");
+    } else if (options.combat && forged) {
+        const ichor::CombatSite site = ichor::findCombatSite(*forged);
+        if (!site.found) {
+            ichor::log(ichor::LogLevel::Error, "--combat: no clear ground was found beside a settlement for the enemy");
+            return 1;
+        }
+        ichor::CombatBridgeConfig combatConfig;
+        combatConfig.tuning.lightWindupCue = audio.findSound("A_WindupLight");
+        combatConfig.tuning.heavyWindupCue = audio.findSound("A_WindupHeavy");
+        combatConfig.tuning.tellCue = audio.findSound("A_Tell");
+        combatConfig.legacyControls = !options.combatBot.empty();
+        combat = std::make_unique<ichor::CombatBridge>(*forged, site, combatConfig);
+        if (!combat->loadVisuals(renderer, std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art")) {
+            ichor::log(ichor::LogLevel::Warn, "--combat: the fighters' art did not load, so some of them are not drawn");
+        }
+        if (options.combatDuel) {
+            anchor = site.duelStart + glm::dvec3(0.0, 0.5, 0.0);
+        }
+        ichor::logf(ichor::LogLevel::Info, "combat: enemy at {:.0f}, {:.0f} m beside settlement {}", site.enemyPost.x, site.enemyPost.z, site.settlement);
+    }
     const ichor::Heightfield& heightfield = forged ? forged->heightfield : standInHeightfield;
     // The roads, points of interest and buildings are grey-box meshes uploaded once; the view draws the ones in resident cells.
     ichor::ForgedScenery scenery;
@@ -865,6 +901,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
     } else if (forged) {
         populateForged(engine.scene(), anchor);
+        if (combat) {
+            combat->install(engine.scene(), ichor::StableId::of("player"), anchor);
+            if (!options.combatBot.empty()) {
+                combat->enableBot(*ichor::stage0::findBotSkill(options.combatBot), options.seed);
+                engine.setInputSource([&combat](ichor::Scene& scene) { return combat->botInput(scene); });
+            }
+        }
     } else {
         populate(engine.scene(), bundle, armMesh, armClip, anchor);
         if (!options.exile.empty()) {
@@ -884,6 +927,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         std::vector<ichor::NpcSpawn> cast;
     };
     std::map<ichor::CellId, ResidentCell> cells;
+    if (combat) {
+        combat->setGroundCheck([&](glm::dvec3 where) { return cells.contains(heightfield.cellAt(where.x, where.z)); });
+    }
     streamer.onLoaded([&](const ichor::CellPayload& payload) {
         ResidentCell cell;
         cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
@@ -1024,6 +1070,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             const float hour = ichor::hourOfDay(scene.tickCount(), config.fixedDt, options.daySeconds, options.startHour);
             lines.push_back(std::format("time {:02}:{:02}", static_cast<int>(hour), static_cast<int>((hour - std::floor(hour)) * 60.0f)));
+            if (combat) {
+                combat->overlay(scene, lines);
+            }
         });
     }
     if (!options.replay.empty()) {
@@ -1135,9 +1184,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     float hudHour = options.startHour;
     float hudWater = 0.0f;
     std::string hudGuide;
-    // The app has no combatants yet, so the bar shows full health until the sim supplies one.
+    // Without --combat the app has no combatants, so the bars show full until the sim supplies one.
     float hudHealth = 100.0f;
     float hudMaxHealth = 100.0f;
+    float hudStamina = 100.0f;
+    float hudMaxStamina = 100.0f;
     if (!options.headless && renderer.uiRenderInterface() != nullptr) {
         const ichor::Extent size = platform.drawableSize();
         ui = std::make_unique<ichor::UiContext>(*renderer.uiRenderInterface(), static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height));
@@ -1231,7 +1282,14 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     const glm::dvec3 feet = playerPosition(engine.scene());
                     ichor::bindLandmarkCompass(*landmarkCompass, {static_cast<float>(feet.x), static_cast<float>(-feet.z)}, {std::sin(hudHeading), std::cos(hudHeading)}, marks);
                 }
-                combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = 100.0f, .maxStamina = 100.0f}));
+                if (combat) {
+                    const ichor::CombatHudState fighter = combat->hud(engine.scene());
+                    hudHealth = fighter.health;
+                    hudMaxHealth = fighter.maxHealth;
+                    hudStamina = fighter.stamina;
+                    hudMaxStamina = fighter.maxStamina;
+                }
+                combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = hudStamina, .maxStamina = hudMaxStamina}));
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -1280,6 +1338,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
     exileAvatar.face(viewYaw);
     engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
+        if (combat && combat->live()) return; // the fight steers and aims the camera itself
         viewYaw = ichor::nextWalkYaw(viewYaw, input.lookX, dt);
         for (auto [entity, player, body] : scene.registry().view<const ichor::Player, ichor::CharacterBody>().each()) {
             body.intent = ichor::walkRelativeIntent(body.intent, viewYaw);
@@ -1339,7 +1398,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
             glm::dvec3 feet = blend(previous, transform).first;
             glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
-            if (exileAvatar.loaded()) {
+            if (exileAvatar.loaded() && !(combat && combat->live())) {
                 // The Exile walks in front of a camera behind it; the avatar is drawn only, so the sim never sees it.
                 feet = exileAvatar.appendPlayer(previous.position, transform.position, alpha, config.fixedDt, scene.time() + alpha * config.fixedDt, heightfield.heightAt(feet.x, feet.z), view);
                 eye = ichor::walkFollowPosition(feet, viewYaw);
@@ -1364,6 +1423,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 view.camera.position = centre + glm::dvec3(0.0, options.overlook, options.overlook * 2.0);
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
+        }
+        if (combat && !inDungeon) {
+            combat->buildView(scene, alpha, view);
         }
         const double cellMetres = heightfield.desc().cellMetres;
         for (const auto& [id, cell] : cells) {
@@ -1766,7 +1828,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert]]] [--overlay [off|compact|full]] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
@@ -1775,6 +1837,12 @@ int main(int argc, char** argv)
     }
     if (!options.forged && !options.campaign.empty()) {
         ichor::log(ichor::LogLevel::Warn, "--campaign only applies with --forged and is ignored");
+    }
+    if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty())) {
+        ichor::log(ichor::LogLevel::Warn, "--combat only applies with --forged and is ignored");
+    }
+    if (!options.combat && (options.combatDuel || !options.combatBot.empty())) {
+        ichor::log(ichor::LogLevel::Warn, "--combat-duel and --combat-bot only apply with --combat and are ignored");
     }
     if (options.forged && !options.campaign.empty() && !planCampaign(options)) {
         return 1;
