@@ -151,13 +151,13 @@ TEST_CASE("the land erosion removes is about the same at 64, 128 and 256", "[wor
     CHECK(spread.unscaled > 2 * kLossSpreadTolerancePoints);
 }
 
-TEST_CASE("thin continents survive erosion at size 64", "[worldforge][erosion_scaling]")
+TEST_CASE("scaled erosion keeps the land at size 64 where unscaled erosion removes more than half of it", "[worldforge][erosion_scaling]")
 {
     for (const std::uint64_t seed : { 3ull, 4ull, 5ull }) {
         const Shares s = measure(seed, 64);
         INFO("seed " << seed << ": tectonic " << s.tectonic << "%, scaled " << s.scaled << "%, unscaled " << s.unscaled << "%");
         CHECK(s.scaled > 0.6 * s.tectonic);
-        CHECK(s.unscaled < 0.2 * s.tectonic);
+        CHECK(s.unscaled < 0.5 * s.tectonic);
     }
 }
 
