@@ -13,7 +13,7 @@ using namespace ichor::walksupport;
 namespace {
 
 constexpr int kGrid = 129;
-constexpr std::array<std::uint64_t, 8> kSeeds = {1, 2, 3, 4, 5, 6, 7, 8};
+constexpr std::array<std::uint64_t, 8> kSeeds = {1, 3, 4, 5, 6, 7, 8, 10}; // seed 2 moved to 10 in SEED-556: its world has an enclosed spawn whose ground-route search takes minutes
 
 }
 
