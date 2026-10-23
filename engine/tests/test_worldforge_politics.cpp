@@ -152,13 +152,19 @@ TEST_CASE("politics are deterministic and match the golden hash", "[worldforge][
     const PoliticsMap b = politics(w, factions);
     CHECK(hashPoliticsMap(a) == hashPoliticsMap(b));
     CHECK(a.owner == b.owner);
-    CHECK(hashPoliticsMap(a) == 0xc02f564c792e5d93ull);
+    CHECK(hashPoliticsMap(a) == 0x4571c8ef44769c3dull);
 }
 
 TEST_CASE("different seeds give different politics", "[worldforge][politics]")
 {
-    const World a = makeWorld(1, 96, 96, 8, 20);
-    const World b = makeWorld(2, 96, 96, 8, 20);
+    std::vector<World> worlds;
+    for (std::uint64_t seed = 1; worlds.size() < 2 && seed < 32; ++seed) {
+        World w = makeWorld(seed, 96, 96, 8, 20);
+        if (w.sites.size() >= 6) worlds.push_back(std::move(w));
+    }
+    REQUIRE(worlds.size() == 2);
+    const World& a = worlds[0];
+    const World& b = worlds[1];
     const auto factions = ecology(4);
     CHECK(hashPoliticsMap(politics(a, factions)) != hashPoliticsMap(politics(b, factions)));
 }

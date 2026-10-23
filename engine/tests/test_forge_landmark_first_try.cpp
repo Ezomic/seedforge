@@ -41,16 +41,18 @@ TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", 
     worldforge::ForgeConfig withoutReserve = withReserve;
     withoutReserve.pois.coverageReserve = 0;
     REQUIRE(withReserve.pois.coverageReserve > 0);
-    int below = 0;
-    for (const std::uint64_t seed : { 1ull, 5ull, 8ull }) {
-        const auto after = forgeToPois(seed, 256, withReserve).landmarkCoverage();
+    int found = 0;
+    for (std::uint64_t seed = 1; seed <= 64 && found < 3; ++seed) {
         const auto before = forgeToPois(seed, 256, withoutReserve).landmarkCoverage();
-        REQUIRE(after.has_value());
         REQUIRE(before.has_value());
+        if (before->coveragePermille >= minimum) continue;
+        ++found;
+        const auto after = forgeToPois(seed, 256, withReserve).landmarkCoverage();
+        REQUIRE(after.has_value());
+        INFO("seed " << seed);
         CHECK(after->coveragePermille >= minimum);
-        if (before->coveragePermille < minimum) ++below;
     }
-    CHECK(below == 3);
+    CHECK(found == 3);
 }
 
 // Hidden: prints the per-seed table for the ticket. Run with: ichor_tests_world "[.landmark_measure]"

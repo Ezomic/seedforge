@@ -90,6 +90,8 @@ void SdlPlatform::pumpEvents()
     if (keys[SDL_SCANCODE_M]) frame.buttons |= InputFrame::Map;
     if (keys[SDL_SCANCODE_N]) frame.buttons |= InputFrame::Notes;
     if (keys[SDL_SCANCODE_C]) frame.buttons |= InputFrame::Character;
+    if (keys[SDL_SCANCODE_F]) frame.buttons |= InputFrame::Interact;
+    if (keys[SDL_SCANCODE_I]) frame.buttons |= InputFrame::Inventory;
     if (lookEnabled_) {
         if (keys[SDL_SCANCODE_E]) frame.buttons |= InputFrame::LockOn;
         const float mouse = mouseLook_.step(elapsed);

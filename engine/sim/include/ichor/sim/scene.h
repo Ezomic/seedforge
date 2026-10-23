@@ -69,6 +69,12 @@ public:
     using System = std::function<void(Scene& scene, double dt, const InputFrame& input)>;
     void addSystem(std::string name, System system);
 
+    // The handler for GameCommands of one kind. It runs where commands apply, at the start of a tick,
+    // and may change the registry but must not enqueue commands. A second handler for a kind replaces the first; the handlers are
+    // configuration, not state, so a restore keeps them.
+    using GameCommandHandler = std::function<void(Scene& scene, const GameCommand& command)>;
+    void registerGameCommand(std::string kind, GameCommandHandler handler) { gameHandlers_.insert_or_assign(std::move(kind), std::move(handler)); }
+
     // How much of its speed the player keeps where they stand: one loses nothing, zero is held
     // still. It scales the player's walking and sprinting only: other entities and the travel a
     // committed action takes from its animation (a lunge, a dodge) are not slowed. The caller supplies it (wading through water, say), the scene stays ignorant of the
@@ -163,6 +169,7 @@ private:
     std::vector<SoundEvent> soundEvents_;
     std::vector<std::pair<std::string, System>> systems_;
     std::vector<ComponentHooks> hooks_;
+    std::map<std::string, GameCommandHandler, std::less<>> gameHandlers_;
     CommandLog log_;
     std::uint64_t tickCount_ = 0;
     double time_ = 0.0;
