@@ -117,6 +117,10 @@ void Scene::apply(const Command& command)
             if (c.windupSound != kNoSound) {
                 soundEvents_.push_back({c.id, c.windupSound, registry_.get<Transform>(entity).position});
             }
+        } else if constexpr (std::is_same_v<T, GameCommand>) {
+            if (const auto handler = gameHandlers_.find(c.kind); handler != gameHandlers_.end()) {
+                handler->second(*this, c);
+            }
         } else if constexpr (std::is_same_v<T, DestroyCommand>) {
             const entt::entity entity = find(c.id);
             if (entity != entt::null) {

@@ -55,7 +55,17 @@ struct PlayMontageCommand {
     std::uint32_t activeSound = kNoSound;
 };
 
-using Command = std::variant<SpawnCommand, DestroyCommand, MoveCommand, SetTransformCommand, PlayMontageCommand>;
+// A game's own state change, routed by `kind` to the handler the game registered on the scene
+// (Scene::registerGameCommand). It is logged and applied like every other command, so a log replayed
+// into a scene with the same handlers reproduces the same state hash. A kind nobody registered is dropped.
+struct GameCommand {
+    StableId actor;
+    std::string kind;
+    std::string subject;
+    std::uint32_t count = 0;
+};
+
+using Command = std::variant<SpawnCommand, DestroyCommand, MoveCommand, SetTransformCommand, PlayMontageCommand, GameCommand>;
 
 struct CommandLog {
     struct Entry {

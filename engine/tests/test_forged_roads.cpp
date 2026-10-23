@@ -175,26 +175,37 @@ TEST_CASE("coverage falls off across the shoulder and never leaves 0 to 1")
     const Fixture f = withRoads();
     const worldforge::RoadMap& map = *f.world.roads();
     const ForgedRoads roads(f.world, f.desc);
-    const worldforge::RoadEdge& edge = map.edges.front();
-    const Point a = cellPoint(map, f.desc, map.pathCells[edge.pathBegin]);
-    const Point b = cellPoint(map, f.desc, map.pathCells[edge.pathBegin + 1]);
-    const double length = std::hypot(b.x - a.x, b.z - a.z);
-    const double sideX = -(b.z - a.z) / length;
-    const double sideZ = (b.x - a.x) / length;
 
-    // Across the road from the middle of its first segment: 2 m of surface each side, then a 2 m shoulder.
-    const double midX = (a.x + b.x) * 0.5;
-    const double midZ = (a.z + b.z) * 0.5;
-    float last = 1.0f;
-    for (double d = 0.0; d <= 4.0; d += 0.25) {
-        const float c = roads.coverageAt(midX + sideX * d, midZ + sideZ * d);
-        CHECK(c >= 0.0f);
-        CHECK(c <= last + 1e-6f);
-        if (d <= 2.0) CHECK(c == Catch::Approx(1.0f));
-        last = c;
+    // A segment with no other road within 8 m of its middle, so the profile across it is the shoulder alone.
+    bool checked = false;
+    for (const worldforge::RoadEdge& edge : map.edges) {
+        for (std::uint32_t i = 0; i + 1 < edge.pathCount && !checked; ++i) {
+            const Point a = cellPoint(map, f.desc, map.pathCells[edge.pathBegin + i]);
+            const Point b = cellPoint(map, f.desc, map.pathCells[edge.pathBegin + i + 1]);
+            const double length = std::hypot(b.x - a.x, b.z - a.z);
+            const double sideX = -(b.z - a.z) / length;
+            const double sideZ = (b.x - a.x) / length;
+            const double midX = (a.x + b.x) * 0.5;
+            const double midZ = (a.z + b.z) * 0.5;
+            bool alone = true;
+            for (const double d : { 4.0, 5.0, 6.0, 8.0, -4.0, -6.0 }) alone = alone && roads.coverageAt(midX + sideX * d, midZ + sideZ * d) == 0.0f;
+            if (!alone) continue;
+            checked = true;
+
+            // Across the road from the middle of the segment: 2 m of surface each side, then a 2 m shoulder.
+            float last = 1.0f;
+            for (double d = 0.0; d <= 4.0; d += 0.25) {
+                const float c = roads.coverageAt(midX + sideX * d, midZ + sideZ * d);
+                CHECK(c >= 0.0f);
+                CHECK(c <= last + 1e-6f);
+                if (d <= 2.0) CHECK(c == Catch::Approx(1.0f));
+                last = c;
+            }
+            CHECK(roads.coverageAt(midX + sideX * 3.0, midZ + sideZ * 3.0) == Catch::Approx(0.5f).margin(0.01));
+            CHECK(last == 0.0f);
+        }
     }
-    CHECK(roads.coverageAt(midX + sideX * 3.0, midZ + sideZ * 3.0) == Catch::Approx(0.5f).margin(0.01));
-    CHECK(last == 0.0f);
+    REQUIRE(checked);
 }
 
 TEST_CASE("the road query reports each edge with a length")
