@@ -1,3 +1,5 @@
+#include "forged_world_fixture.h"
+
 #include "ichor/data/data_set.h"
 #include "ichor/save/campaign.h"
 #include "ichor/save/save_slots.h"
@@ -70,14 +72,8 @@ Content contentFor(std::uint64_t seed)
     REQUIRE(data.loadDirectory(ICHOR_GAME_DATA_DIR));
     Content out;
     out.setup = loadForgedContentSetup(data, ICHOR_GAME_DATA_DIR);
-    ForgeJob job(descFor(seed), kGrid, {}, out.setup.config);
-    REQUIRE(job.start());
-    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    INFO(job.error());
-    REQUIRE(job.state() == ForgeJobState::Done);
-    out.game = buildForgedGame(*job.result(), descFor(seed), out.setup.inputs);
+    const ForgeJobResult forged = test::forgedWorldFixture(descFor(seed), kGrid, test::variantOfContentLists(out.setup.config));
+    out.game = buildForgedGame(forged, descFor(seed), out.setup.inputs);
     INFO(out.game->error);
     REQUIRE(out.game->ok());
     return out;
