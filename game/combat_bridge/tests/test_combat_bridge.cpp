@@ -352,7 +352,7 @@ TEST_CASE("a lost fight writes a fights.csv row with the world seed and the site
     REQUIRE(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::PlayerDied);
 
     std::string text = slurp(config.fightsCsv);
-    std::erase(text, '');
+    std::erase(text, '\r');
     const std::string siteId = game.sites[setup.site.settlement].id;
     CHECK(text.starts_with("fight,seconds,gap_to_retry,loser,cause,"));
     CHECK(text.find(",kill_onscreen,world_seed,site\n") != std::string::npos);
