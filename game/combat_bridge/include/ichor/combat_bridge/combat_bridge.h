@@ -29,6 +29,9 @@ struct CombatBridgeConfig {
     // World-axis steering with the player always facing the foe: what a scripted player (FightBot) needs.
     // Off is the free look a person plays with.
     bool legacyControls = false;
+    // Where every finished fight is written as a Stage 0 fights.csv row (plus world_seed and site columns), so
+    // stage0_report reads it. Empty records nothing to disk.
+    std::filesystem::path fightsCsv;
 };
 
 struct CombatHudState {
@@ -78,6 +81,7 @@ private:
 
     void step(Scene& scene, double dt);
     void logTransitions(const Scene& scene);
+    void openFightLog();
     void setSpawnsForLastSettlement();
     glm::dvec3 respawnFor(std::size_t settlement);
 

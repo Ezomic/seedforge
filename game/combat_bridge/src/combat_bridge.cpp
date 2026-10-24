@@ -1,9 +1,11 @@
 #include "ichor/combat_bridge/combat_bridge.h"
 
 #include "ichor/core/log.h"
+#include "ichor/stage0/session_ledger.h"
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 
 namespace ichor {
 
@@ -39,8 +41,21 @@ void CombatBridge::install(Scene& scene, StableId player, glm::dvec3 start)
     start_ = start;
     lastSettlement_ = site_.settlement;
     stage_.setLegacyControls(config_.legacyControls);
+    openFightLog();
     stage_.attach(scene, player, start, site_.enemyPost + kSettleLift);
     scene.addSystem("combat_bridge", [this](Scene& s, double dt, const InputFrame&) { step(s, dt); });
+}
+
+void CombatBridge::openFightLog()
+{
+    if (config_.fightsCsv.empty()) {
+        return;
+    }
+    const std::string site = stage0::cleanField(game_.sites[site_.settlement].id);
+    auto& recorder = stage_.recorder();
+    recorder.setContext("world_seed,site", std::format("{},{}", game_.desc.seed, site));
+    recorder.open(config_.fightsCsv);
+    recorder.setSession({std::format("forged-{}", game_.desc.seed), "combat"});
 }
 
 glm::dvec3 CombatBridge::respawnFor(std::size_t settlement)

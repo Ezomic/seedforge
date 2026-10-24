@@ -26,6 +26,15 @@ const char* causeName(DeathCause cause)
     }
 }
 
+std::string withContext(std::string base, const std::string& context)
+{
+    if (context.empty()) {
+        return base;
+    }
+    base.insert(base.size() - 1, "," + context);
+    return base;
+}
+
 std::filesystem::path ledgerPath(const std::filesystem::path& csv)
 {
     std::filesystem::path path = csv;
@@ -33,6 +42,22 @@ std::filesystem::path ledgerPath(const std::filesystem::path& csv)
     return path;
 }
 
+}
+
+std::string FightRecorder::header() const
+{
+    return withContext(
+        "fight,seconds,gap_to_retry,loser,cause,"
+        "p_hp,p_attacks,p_hits,p_whiffs,p_blocked,p_dodges,p_staggers,p_dealt,p_taken,"
+        "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken,"
+        "kill_attack,kill_victim_recovering,kill_stamina,kill_since_input,kill_onscreen\n",
+        contextHeader_);
+}
+
+void FightRecorder::setContext(std::string_view header, std::string_view values)
+{
+    contextHeader_ = std::string(header);
+    contextValues_ = std::string(values);
 }
 
 GateProgress FightRecorder::gateProgress() const
@@ -54,10 +79,7 @@ void FightRecorder::open(const std::filesystem::path& csv)
     recordDir_ = fightRecordDirectory(csv_);
     if (!std::filesystem::exists(csv_)) {
         std::ofstream out(csv_);
-        out << "fight,seconds,gap_to_retry,loser,cause,"
-               "p_hp,p_attacks,p_hits,p_whiffs,p_blocked,p_dodges,p_staggers,p_dealt,p_taken,"
-               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken,"
-               "kill_attack,kill_victim_recovering,kill_stamina,kill_since_input,kill_onscreen\n";
+        out << header();
         return;
     }
     // Carry the count across sessions so rows stay numbered in order.
@@ -69,10 +91,7 @@ void FightRecorder::open(const std::filesystem::path& csv)
     }
     if (lines == 0) {
         std::ofstream out(csv_, std::ios::app);
-        out << "fight,seconds,gap_to_retry,loser,cause,"
-               "p_hp,p_attacks,p_hits,p_whiffs,p_blocked,p_dodges,p_staggers,p_dealt,p_taken,"
-               "f_hp,f_attacks,f_hits,f_whiffs,f_blocked,f_dodges,f_staggers,f_dealt,f_taken,"
-               "kill_attack,kill_victim_recovering,kill_stamina,kill_since_input,kill_onscreen\n";
+        out << header();
     }
     fights_ = std::max(0, lines - 1);
     logf(LogLevel::Info, "fight log has {} fights already; next is #{}", fights_, fights_ + 1);
@@ -175,6 +194,7 @@ void FightRecorder::noteDeath(bool playerDied, DeathCause cause, float playerHea
         player_.healthLeft, player_.attacks, player_.hits, player_.whiffs, player_.blocked, player_.dodges, player_.staggers, player_.damageDealt, player_.damageTaken,
         foe_.healthLeft, foe_.attacks, foe_.hits, foe_.whiffs, foe_.blocked, foe_.dodges, foe_.staggers, foe_.damageDealt, foe_.damageTaken,
         name(facts.attack), facts.victimRecovering ? 1 : 0, facts.staminaAtImpact, facts.secondsSinceInput, facts.attackerOnScreen ? 1 : 0);
+    lastRow_ = withContext(std::move(lastRow_), contextValues_);
     if (!csv_.empty()) {
         std::ofstream out(csv_, std::ios::app);
         out << lastRow_;
