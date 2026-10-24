@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -139,6 +140,10 @@ public:
     // The scene must not outlive this.
     void install(Scene& scene);
 
+    // Loot that lies somewhere the placed set does not reach (inside a dungeon, in its own space): asked for each time
+    // something is looked for, so it may change. A null answer means none. Taken the same way, by item id.
+    void setInteriorLoot(std::function<const std::vector<PlacedLoot>*()> source) { interior_ = std::move(source); }
+
     const CarryCatalogue& catalogue() const { return catalogue_; }
     std::uint64_t capacityUnits() const { return capacity_; }
 
@@ -179,7 +184,7 @@ private:
     void drop(Scene& scene, const GameCommand& command);
     void grant(Scene& scene, const GameCommand& command);
 
-    Target nearest(const Carried* carried, double x, double z) const;
+    Target nearest(const Carried* carried, double x, double z, double y) const;
     Inventory inventoryOf(const Carried& carried) const;
     void store(Carried& carried, const Inventory& inventory) const;
     void tidy(Carried& carried) const;
@@ -188,6 +193,7 @@ private:
     StableId playerOf(const Scene& scene) const;
 
     std::shared_ptr<const PlacedLootSet> loot_;
+    std::function<const std::vector<PlacedLoot>*()> interior_;
     CarryCatalogue catalogue_;
     std::uint64_t capacity_;
     bool interactHeld_ = false;
