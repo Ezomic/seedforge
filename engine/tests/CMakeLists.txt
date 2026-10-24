@@ -37,7 +37,7 @@ foreach(group IN LISTS ichor_test_groups)
     endif()
     add_executable(${target} ${ichor_test_sources_${group}})
     target_link_libraries(${target} PRIVATE
-        ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_ledger ichor_net ichor_save ichor_platform_null ichor_gfx_null ichor_forgecli ichor_lint Catch2::Catch2WithMain nlohmann_json::nlohmann_json worldforge
+        ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_ledger ichor_net ichor_save ichor_platform_null ichor_gfx_null ichor_forgecli ichor_forgecli_walk ichor_lint Catch2::Catch2WithMain nlohmann_json::nlohmann_json worldforge
     )
     target_compile_definitions(${target} PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
     catch_discover_tests(${target})
