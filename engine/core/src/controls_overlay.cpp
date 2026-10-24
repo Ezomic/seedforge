@@ -43,7 +43,7 @@ std::vector<std::string> controlsOverlayLines(const ControlsOverlay& state)
             "L              block",
             "Space          dodge",
             "E              lock on",
-            "F              interact: pick up what lies in reach",
+            "F              interact: pick up, or talk to someone",
             "Enter          interact / confirm (also picks up)",
             "I              inventory",
             "M              map",

@@ -449,8 +449,10 @@ inline std::uint64_t hashPoliticsMap(const PoliticsMap& map)
     mix(static_cast<std::uint64_t>(map.width));
     mix(static_cast<std::uint64_t>(map.height));
     mix(static_cast<std::uint64_t>(map.factionCount));
-    for (std::size_t c = 0; c < map.owner.size(); ++c) mix((static_cast<std::uint64_t>(map.owner[c]) << 8) | map.rival[c]);
-    for (std::size_t f = 0; f < map.homes.size(); ++f) {
+    const std::size_t cells = std::min(map.owner.size(), map.rival.size());
+    for (std::size_t c = 0; c < cells; ++c) mix((static_cast<std::uint64_t>(map.owner[c]) << 8) | map.rival[c]);
+    const std::size_t factions = std::min({ map.homes.size(), map.homeSite.size(), map.territory.size() });
+    for (std::size_t f = 0; f < factions; ++f) {
         mix((static_cast<std::uint64_t>(static_cast<std::uint16_t>(map.homes[f].x)) << 32) | (static_cast<std::uint64_t>(static_cast<std::uint16_t>(map.homes[f].y)) << 16)
             | static_cast<std::uint64_t>(static_cast<std::uint32_t>(map.homeSite[f]) & 0xFFFFu));
         mix(map.territory[f]);

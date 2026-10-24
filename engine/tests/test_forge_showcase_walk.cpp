@@ -132,42 +132,80 @@ TEST_CASE("the route refuses points that are not numbers or lie off the map", "[
     CHECK(path.empty());
 }
 
-TEST_CASE("live worlds: the probe finds a spawn, repeats itself, and the walk reaches a settlement on some seed", "[forge_cli][showcase][walk]")
+namespace {
+
+struct LiveWalk {
+    int visited = 0;
+    int spawned = 0;
+    int withTarget = 0;
+    int arrived = 0;
+    int routed = 0;
+    std::string log;
+};
+
+// Probes seeds 1 to lastSeed on a 128 grid. Every probe is a forge, a heightfield bake and a route search, so the
+// PR suite visits as few seeds as show the walk working and stops once `enough` is met; the repeat check (a second
+// probe of the same world) runs on the first seed only. The route search is the expensive part, hence `params`.
+LiveWalk probeLiveSeeds(std::uint64_t lastSeed, const WalkProbeParams& params, bool stopWhenEnough)
 {
     constexpr int kSize = 128;
     const worldforge::ForgeConfig config = defaultForgeConfig(kSize);
-    int spawned = 0;
-    int arrived = 0;
-    int withTarget = 0;
-    std::string log;
-    for (std::uint64_t seed = 1; seed <= 8; ++seed) {
+    LiveWalk live;
+    for (std::uint64_t seed = 1; seed <= lastSeed; ++seed) {
         const worldforge::ForgedWorld world = worldforge::forgeWorld(seed, kSize, config, worldforge::ForgePhase::Content);
         REQUIRE(world.ok());
-        const WalkProbeResult a = probeWalk(world);
-        const WalkProbeResult b = probeWalk(world);
+        const WalkProbeResult a = probeWalk(world, params);
+        ++live.visited;
+        if (seed == 1 || !stopWhenEnough) {
+            const WalkProbeResult b = probeWalk(world, params);
+            CHECK(a.spawnFound == b.spawnFound);
+            CHECK(a.spawnX == b.spawnX);
+            CHECK(a.spawnZ == b.spawnZ);
+            CHECK(a.arrived == b.arrived);
+            CHECK(a.walkedMetres == b.walkedMetres);
+        }
         CHECK(a.error.empty());
-        CHECK(a.spawnFound == b.spawnFound);
-        CHECK(a.spawnX == b.spawnX);
-        CHECK(a.spawnZ == b.spawnZ);
-        CHECK(a.arrived == b.arrived);
-        CHECK(a.walkedMetres == b.walkedMetres);
-        log += "seed " + std::to_string(seed) + " spawn " + (a.spawnFound ? "yes" : "no") + " reach " + std::to_string(a.reachMetres) + " target " + (a.hasTarget ? "yes" : "no") + " trip " + std::to_string(a.tripMetres)
-            + " route " + (a.routeFound ? "yes" : "no") + " arrived " + (a.arrived ? "yes" : "no") + " " + a.blocker + "\n";
+        live.log += "seed " + std::to_string(seed) + " spawn " + (a.spawnFound ? "yes" : "no") + " reach " + std::to_string(a.reachMetres) + " target " + (a.hasTarget ? "yes" : "no")
+            + " trip " + std::to_string(a.tripMetres) + " route " + (a.routeFound ? "yes" : "no") + " arrived " + (a.arrived ? "yes" : "no") + " " + a.blocker + '\n';
         if (!a.spawnFound) continue;
-        ++spawned;
+        ++live.spawned;
         CHECK(a.metresPerCell > 0.0);
         if (a.hasTarget) {
-            ++withTarget;
+            ++live.withTarget;
             CHECK(a.tripMetres >= WalkProbeParams{}.minTripMetres);
             CHECK(a.walkedMetres > 0.0);
             CHECK((a.arrived || !a.blocker.empty()));
         }
-        if (a.arrived) ++arrived;
+        if (a.routeFound) ++live.routed;
+        if (a.arrived) ++live.arrived;
+        if (stopWhenEnough && live.spawned >= 3 && live.arrived >= 2) break;
     }
-    INFO(log);
-    CHECK(spawned >= 6);
-    CHECK(withTarget >= 4);
-    CHECK(arrived >= 1);
+    return live;
+}
+
+}
+
+TEST_CASE("live worlds: the probe finds a spawn, repeats itself, and the walk reaches a settlement on some seed", "[forge_cli][showcase][walk]")
+{
+    WalkProbeParams cheap;
+    cheap.route.stepMetres = 8.0;
+    const LiveWalk live = probeLiveSeeds(6, cheap, true);
+    INFO(live.log);
+    // Every visited seed must have a spawn, and the walk must get somewhere on two of them: the metric goes red
+    // if the spawn search, the route or the walk bot stops working.
+    CHECK(live.spawned == live.visited);
+    CHECK(live.withTarget >= 3);
+    CHECK(live.routed >= 2);
+    CHECK(live.arrived >= 2);
+}
+
+TEST_CASE("live worlds, all eight seeds at the default route step", "[.showcase_heavy]")
+{
+    const LiveWalk live = probeLiveSeeds(8, WalkProbeParams{}, false);
+    INFO(live.log);
+    CHECK(live.spawned >= 6);
+    CHECK(live.withTarget >= 4);
+    CHECK(live.arrived >= 1);
 }
 
 TEST_CASE("the probe says why it could not run on a world that stopped early", "[forge_cli][showcase][walk]")
@@ -179,7 +217,12 @@ TEST_CASE("the probe says why it could not run on a world that stopped early", "
     CHECK(makeWalkProbe()(early).error == r.error);
 }
 
-TEST_CASE("a showcase run ranks the seeds, writes the tables, thumbnails and the data file, and is repeatable", "[forge_cli][showcase][walk]")
+namespace {
+
+// A run forges, probes and ranks every seed, then draws a gallery cell per top seed, and the test runs it twice: the PR
+// suite runs it with a stand-in probe (the real probe is covered by the live worlds test above) so it stays cheap under
+// the sanitizers; the hidden variant runs the real probe over six seeds.
+void checkShowcaseRun(std::uint64_t lastSeed, int top, const WalkProbe& probe)
 {
     const std::filesystem::path dir = ichor::test::tempPath("showcase_run");
     const std::filesystem::path json = ichor::test::tempPath("showcase_seeds.json");
@@ -187,16 +230,16 @@ TEST_CASE("a showcase run ranks the seeds, writes the tables, thumbnails and the
 
     ShowcaseOptions options;
     options.seedBegin = 1;
-    options.seedEnd = 6;
+    options.seedEnd = lastSeed;
     options.size = 128;
-    options.top = 3;
+    options.top = top;
     options.outDir = dir.string();
     options.seedsJson = json.string();
 
-    const ShowcaseResult first = runShowcase(options, makeWalkProbe());
+    const ShowcaseResult first = runShowcase(options, probe);
     REQUIRE(first.error.empty());
-    REQUIRE(first.metrics.size() == 6);
-    REQUIRE(first.ranked.size() == 6);
+    REQUIRE(first.metrics.size() == lastSeed);
+    REQUIRE(first.ranked.size() == lastSeed);
     for (std::size_t i = 1; i < first.ranked.size(); ++i) CHECK(first.ranked[i - 1].totalMilli >= first.ranked[i].totalMilli);
 
     std::size_t thumbnails = 0;
@@ -207,7 +250,7 @@ TEST_CASE("a showcase run ranks the seeds, writes the tables, thumbnails and the
         CHECK(std::string(magic + 1, 3) == "PNG");
         ++thumbnails;
     }
-    CHECK(thumbnails == 3);
+    CHECK(thumbnails == static_cast<std::size_t>(top));
     CHECK(std::filesystem::exists(dir / "ranking.csv"));
     CHECK(std::filesystem::exists(dir / "ranking.md"));
 
@@ -216,13 +259,40 @@ TEST_CASE("a showcase run ranks the seeds, writes the tables, thumbnails and the
     CHECK(text == first.json);
     CHECK(text.find("seed_" + std::to_string(first.ranked.front().seed) + "_size_128_top") != std::string::npos);
 
-    const ShowcaseResult second = runShowcase(options, makeWalkProbe());
+    const ShowcaseResult second = runShowcase(options, probe);
     CHECK(second.csv == first.csv);
     CHECK(second.json == first.json);
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
     std::filesystem::remove(json, ec);
+}
+
+
+}
+
+TEST_CASE("a showcase run ranks the seeds, writes the tables, thumbnails and the data file, and is repeatable", "[forge_cli][showcase][walk]")
+{
+    // A probe that answers from the world alone: it differs per seed, so the ranking has something to order.
+    const WalkProbe standIn = [](const worldforge::ForgedWorld& world) {
+        WalkProbeResult r;
+        r.spawnFound = true;
+        r.metresPerCell = 4096.0 / (world.size() - 1);
+        r.spawnX = 2048.0;
+        r.spawnZ = 2048.0 + static_cast<double>(world.seed()) * 100.0;
+        r.hasTarget = true;
+        r.tripMetres = 300.0;
+        r.arrived = world.seed() % 2 == 1;
+        r.walkedMetres = 300.0;
+        r.reachMetres = 160.0;
+        return r;
+    };
+    checkShowcaseRun(3, 2, standIn);
+}
+
+TEST_CASE("a showcase run over six seeds at the default route step", "[.showcase_heavy]")
+{
+    checkShowcaseRun(6, 3, makeWalkProbe());
 }
 
 TEST_CASE("with no probe the walk and spawn terms score nothing and the run still ranks", "[forge_cli][showcase][walk]")

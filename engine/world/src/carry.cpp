@@ -14,6 +14,7 @@ constexpr const char* kPickup = "carry.pickup";
 constexpr const char* kUse = "carry.use";
 constexpr const char* kDrop = "carry.drop";
 constexpr const char* kGrant = "carry.grant";
+constexpr double kInteriorStoreyM = 2.0; // loot inside a dungeon is out of reach from the storey above or below
 
 std::string textOf(const DataRecord& record, const char* key)
 {
@@ -37,7 +38,8 @@ bool finitePoint(double x, double z, float y)
 CarryCatalogue CarryCatalogue::fromData(const DataSet& data, std::vector<std::string>& problems)
 {
     std::vector<const DataTable*> tables;
-    for (const char* tableName : {"notable_items", "catalogue"}) {
+    // provisions are what merchants sell: carried like the rest, but never placed in the world.
+    for (const char* tableName : {"notable_items", "catalogue", "provisions"}) {
         if (const DataTable* table = data.table(tableName)) {
             tables.push_back(table);
         } else {
@@ -182,7 +184,7 @@ void CarrySystem::say(const Scene& scene, std::string text)
     noticeAt_ = scene.time();
 }
 
-CarrySystem::Target CarrySystem::nearest(const Carried* carried, double x, double z) const
+CarrySystem::Target CarrySystem::nearest(const Carried* carried, double x, double z, double y) const
 {
     Target best;
     double bestSquared = kCarryReachM * kCarryReachM;
@@ -197,8 +199,11 @@ CarrySystem::Target CarrySystem::nearest(const Carried* carried, double x, doubl
             bestSquared = squared;
         }
     };
-    if (loot_) {
-        for (const PlacedLoot& item : loot_->all()) {
+    const auto considerLoot = [&](const std::vector<PlacedLoot>& items, bool sameStorey) {
+        for (const PlacedLoot& item : items) {
+            if (sameStorey && std::abs(static_cast<double>(item.groundY) - y) > kInteriorStoreyM) {
+                continue;
+            }
             consider(item.x, item.z, [&] {
                 if (isTaken(carried, item.itemId)) {
                     return false;
@@ -206,6 +211,14 @@ CarrySystem::Target CarrySystem::nearest(const Carried* carried, double x, doubl
                 best = {true, false, 0, item.itemId, 1};
                 return true;
             });
+        }
+    };
+    if (loot_) {
+        considerLoot(loot_->all(), false);
+    }
+    if (interior_) {
+        if (const std::vector<PlacedLoot>* inside = interior_()) {
+            considerLoot(*inside, true);
         }
     }
     if (carried != nullptr) {
@@ -231,7 +244,7 @@ std::string CarrySystem::prompt(const Scene& scene) const
         return recent;
     }
     for (auto [entity, player, transform] : scene.registry().view<const Player, const Transform>().each()) {
-        const Target target = nearest(carried(scene), transform.position.x, transform.position.z);
+        const Target target = nearest(carried(scene), transform.position.x, transform.position.z, transform.position.y);
         if (!target.found) {
             return {};
         }
@@ -259,6 +272,48 @@ CarryView CarrySystem::view(const Scene& scene) const
             row.unitWeightUnits, info != nullptr && info->itemClass == "consumable"});
     }
     return out;
+}
+
+bool CarrySystem::itemWithinReach(const Scene& scene) const
+{
+    for (auto [entity, player, transform] : scene.registry().view<const Player, const Transform>().each()) {
+        return nearest(carried(scene), transform.position.x, transform.position.z, transform.position.y).found;
+    }
+    return false;
+}
+
+std::uint32_t CarrySystem::countOf(const Scene& scene, std::string_view itemId) const
+{
+    const Carried* held = carried(scene);
+    return held == nullptr ? 0 : inventoryOf(*held).count(itemId);
+}
+
+InventoryStatus CarrySystem::addHeld(Scene& scene, std::string_view itemId, std::uint32_t count, bool force) const
+{
+    for (auto [entity, player] : scene.registry().view<const Player>().each()) {
+        Carried& held = scene.registry().get_or_emplace<Carried>(entity);
+        Inventory inventory = inventoryOf(held);
+        const InventoryResult result = force ? inventory.addForced(itemId, count) : inventory.add(itemId, count);
+        if (result.status == InventoryStatus::Ok) {
+            store(held, inventory);
+        }
+        return result.status;
+    }
+    return InventoryStatus::NotHeld;
+}
+
+InventoryStatus CarrySystem::removeHeld(Scene& scene, std::string_view itemId, std::uint32_t count) const
+{
+    for (auto [entity, player] : scene.registry().view<const Player>().each()) {
+        Carried& held = scene.registry().get_or_emplace<Carried>(entity);
+        Inventory inventory = inventoryOf(held);
+        const InventoryResult result = inventory.remove(itemId, count);
+        if (result.status == InventoryStatus::Ok) {
+            store(held, inventory);
+        }
+        return result.status;
+    }
+    return InventoryStatus::NotHeld;
 }
 
 void CarrySystem::requestUse(Scene& scene, const std::string& itemId) const
@@ -294,7 +349,7 @@ void CarrySystem::step(Scene& scene, const InputFrame& input)
     for (auto [entity, id, player, transform] : scene.registry().view<const StableId, const Player, const Transform>().each()) {
         Carried& held = scene.registry().get_or_emplace<Carried>(entity);
         tidy(held);
-        if (pressed && nearest(&held, transform.position.x, transform.position.z).found) {
+        if (pressed && nearest(&held, transform.position.x, transform.position.z, transform.position.y).found) {
             scene.enqueue(GameCommand{id, kPickup, {}, 0});
         }
         break;
@@ -310,7 +365,7 @@ void CarrySystem::pickup(Scene& scene, const GameCommand& command)
     }
     Carried& held = scene.registry().get_or_emplace<Carried>(entity);
     tidy(held);
-    const Target target = nearest(&held, transform->position.x, transform->position.z);
+    const Target target = nearest(&held, transform->position.x, transform->position.z, transform->position.y);
     if (!target.found) {
         return;
     }

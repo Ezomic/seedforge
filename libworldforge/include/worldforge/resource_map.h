@@ -263,7 +263,8 @@ inline std::uint64_t hashResourceMap(const ResourceMap& map)
     const auto mix = [&](std::uint64_t v) { h = splitmix64(h ^ v); };
     mix(static_cast<std::uint64_t>(map.width));
     mix(static_cast<std::uint64_t>(map.height));
-    for (std::size_t c = 0; c < map.oreGrade.size(); ++c) {
+    const std::size_t cells = std::min({ map.oreGrade.size(), map.oreKind.size(), map.arable.size() });
+    for (std::size_t c = 0; c < cells; ++c) {
         mix((static_cast<std::uint64_t>(map.oreKind[c]) << 16) | (static_cast<std::uint64_t>(map.oreGrade[c]) << 8) | map.arable[c]);
     }
     mix(map.leyNodes.size());

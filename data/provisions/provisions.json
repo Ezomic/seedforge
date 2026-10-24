@@ -1,0 +1,18 @@
+[
+  {"id": "barley_loaf", "name": "Barley Loaf", "tier": "common", "class": "consumable", "slot": "food", "weight": 0.3,
+   "description": "A flat dark loaf, still warm from the settlement oven.",
+   "benefit": "Feeds one traveller for a day.",
+   "cost": "It goes stale in three days.", "cost_kinds": ["time"], "price": 4, "stock": 12},
+  {"id": "lamp_oil_flask", "name": "Flask of Lamp Oil", "tier": "common", "class": "consumable", "slot": "vessel", "weight": 0.5,
+   "description": "Olive oil in a sealed clay flask.",
+   "benefit": "Keeps a lamp burning through one night.",
+   "cost": "The flask is fragile and the oil is heavy for its worth.", "cost_kinds": ["weight"], "price": 6, "stock": 8},
+  {"id": "linen_bandage", "name": "Linen Bandage", "tier": "common", "class": "consumable", "slot": "kit", "weight": 0.1,
+   "description": "A strip of boiled linen rolled tight.",
+   "benefit": "Binds a wound and stops the bleeding.",
+   "cost": "It does nothing for a wound that is already deep.", "cost_kinds": ["risk"], "price": 9, "stock": 6},
+  {"id": "pitch_torch", "name": "Pitch Torch", "tier": "common", "class": "consumable", "slot": "kit", "weight": 0.6,
+   "description": "A reed bundle soaked in pitch.",
+   "benefit": "Lights a tunnel for an hour.",
+   "cost": "It smokes and every guard in the tunnel can see it.", "cost_kinds": ["sight"], "price": 5, "stock": 6}
+]
