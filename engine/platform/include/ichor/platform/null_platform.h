@@ -20,6 +20,10 @@ public:
     void setInput(const InputFrame& input) { input_ = input; }
     bool overlayKey() const override { return overlayKey_; }
     bool helpKey() const override { return helpKey_; }
+    bool soundLegendKey() const override { return soundLegendKey_; }
+    bool captionKey() const override { return captionKey_; }
+    void setSoundLegendKey(bool down) { soundLegendKey_ = down; }
+    void setCaptionKey(bool down) { captionKey_ = down; }
     void setHelpKey(bool down) { helpKey_ = down; }
     void setOverlayKey(bool down) { overlayKey_ = down; }
     unsigned pumpCount() const { return pumps_; }
@@ -32,6 +36,8 @@ private:
     InputFrame input_;
     bool overlayKey_ = false;
     bool helpKey_ = false;
+    bool soundLegendKey_ = false;
+    bool captionKey_ = false;
 };
 
 }

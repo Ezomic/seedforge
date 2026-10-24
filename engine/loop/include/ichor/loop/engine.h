@@ -34,6 +34,7 @@ public:
     using ViewBuilder = std::function<void(const Scene& scene, double alpha, RenderView& view)>;
     using OverlayBuilder = std::function<void(const Scene& scene, std::vector<std::string>& lines)>;
     using TickGate = std::function<bool(const Scene& scene)>;
+    using CardLinesBuilder = std::function<void(std::vector<std::string>& lines)>;
 
     Engine(Platform& platform, Renderer& renderer, const EngineConfig& config);
 
@@ -41,6 +42,8 @@ public:
     // the interpolation alpha for rendering between two fixed steps.
     void setViewBuilder(ViewBuilder builder) { viewBuilder_ = std::move(builder); }
     void setOverlayBuilder(OverlayBuilder builder) { overlayBuilder_ = std::move(builder); }
+    // Lines drawn every frame under the controls card whatever the F3 mode, such as the sound legend card.
+    void setCardLinesBuilder(CardLinesBuilder builder) { cardLinesBuilder_ = std::move(builder); }
     // F3 steps it round off, compact and full.
     void setOverlayMode(OverlayMode mode) { overlayToggle_.mode = mode; }
     OverlayMode overlayMode() const { return overlayToggle_.mode; }
@@ -96,6 +99,7 @@ private:
     RenderView view_;
     ViewBuilder viewBuilder_;
     OverlayBuilder overlayBuilder_;
+    CardLinesBuilder cardLinesBuilder_;
     TickGate tickGate_;
     InputSource inputSource_;
     bool gated_ = false;

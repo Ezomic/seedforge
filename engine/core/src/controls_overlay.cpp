@@ -50,7 +50,9 @@ std::vector<std::string> controlsOverlayLines(const ControlsOverlay& state)
             "Tab            journal",
             "N              notes",
             "C              character",
+            "F2             sound legend: what each sound means",
             "F3             debug overlay: compact, full, off",
+            "F4             sound captions on or off (on by default)",
             "F5 / F9        quick save / quick load",
             "Esc            menu",
         };

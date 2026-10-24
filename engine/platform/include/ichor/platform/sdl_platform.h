@@ -27,6 +27,8 @@ public:
     NavKeys navKeys() const override { return navKeys_; }
     bool overlayKey() const override { return overlayKey_; }
     bool helpKey() const override { return helpKey_; }
+    bool soundLegendKey() const override { return soundLegendKey_; }
+    bool captionKey() const override { return captionKey_; }
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
     void enableLook(bool enabled) override;
     void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
@@ -45,6 +47,8 @@ private:
     NavKeys navKeys_;
     bool overlayKey_ = false;
     bool helpKey_ = false;
+    bool soundLegendKey_ = false;
+    bool captionKey_ = false;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
     MouseLook mouseLook_;

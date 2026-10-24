@@ -60,6 +60,9 @@ public:
     virtual bool overlayKey() const { return false; }
     // Whether F1, the controls card key, is down as of the last pump.
     virtual bool helpKey() const { return false; }
+    // Whether F2, the sound legend key, and F4, the captions key, are down as of the last pump.
+    virtual bool soundLegendKey() const { return false; }
+    virtual bool captionKey() const { return false; }
     // While set, the arrow keys are not the player's movement (the editor nudges with them).
     virtual void reserveArrowKeys(bool reserved) { (void)reserved; }
     // While set, the mouse (captured while the right button is held) and the left and right arrows turn the player (InputFrame::lookX) instead of moving.
