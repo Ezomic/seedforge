@@ -70,3 +70,35 @@ The night fails when a seed is silently stuck:
 A seed with no second settlement 60 m or more from the spawn settlement prints `no trip` and does not fail (seeds 5 and 6 at 256 today); it is visible in the log, not a verdict. Local timings on a Release build: all 8 seeds took about 60 s at 256 and about 190 s at 1024. The first CI run used the sanitizer Debug build and took about 190 s per seed at 1024 (the budget ran out after 6 seeds), so this job configures the same preset as Release with sanitizers off. The budget guard stays so a slow night fails loudly instead of timing out.
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
+
+## Test-time budget (SEED-658)
+
+Main went red twice because one test ran too close to the sanitizer timeout (the SEED-492 walk test on the SEED-556 worlds, and the SEED-650 live-worlds probe, which timed out at 1500 s). `tools/test_times.py` reads the per-test durations of a ctest run, prints the 20 slowest cases, and fails when a case exceeds its budget:
+
+| Profile | Where | Default budget per case |
+|---|---|---|
+| `sanitizer` | `linux headless + sanitizers` | 120 s |
+| `release` | `windows runtime + tests`, local runs | 30 s |
+
+A case may run longer only when `tools/test_time_allowlist.json` lists it under that profile with its own cap in seconds and a reason. Going over the cap fails too, so an allowlisted test cannot quietly double. A ctest timeout is always over the cap.
+
+Run it locally after any ctest run: `bin/test-times` (preset `windows-ci`, profile `release`; `-p linux-headless-asan` picks `sanitizer`). It reads `Testing/Temporary/LastTest.log` of the build tree. The script also accepts a JUnit file (`ctest --output-junit ctest.xml`) and captured ctest console output, so a CI log can be checked offline.
+
+Two ctest cases run in both required jobs and need no timing data: `test_time_allowlist` (the file parses, has no duplicate keys, is sorted, every cap is above the default budget and at most the 1500 s ctest timeout, every entry has a reason, and every name appears in a test source so a renamed test cannot leave a dead entry) and `test_time_budget_selftest` (a synthetic slow case turns the check red, an allowlisted one stays green, one over its own cap is red again, and the three input formats parse).
+
+Regenerate the allowlist after an intended slowdown: run the suite, then `python tools/test_times.py <input> --profile <profile> --update --reason "why it is slow"`. This adds every case over budget with a cap of 1.5 x the observed time rounded up to 30 s (never above the 1500 s ctest timeout), raises a cap that was exceeded, and drops entries that now run within the default budget. Edit the reason of a new entry in the file if the shared one does not fit, and commit it. When a slow test is made fast, delete its entry; the script prints a note for each entry that is no longer needed.
+
+The first allowlist was seeded from the CI logs of runs 40052978212 and 40054121237. It includes `live worlds: the probe finds a spawn, ...` and `a showcase run ranks the seeds, ...`, which time out or come close on the Linux job today; remove those entries when their fix lands.
+
+### Workflow step for the owner to add
+
+The token that merges PRs cannot change `.github/workflows`, so the CI step is not in this PR. Add this to the `linux headless + sanitizers` job in `.github/workflows/engine.yml`, directly after the `Test` step (and, if wanted, the same line with `windows-ci` and `--profile release` after the Windows `ctest` step):
+
+```yaml
+      - name: Test time budget
+        if: always()
+        run: python3 ../tools/test_times.py build/linux-headless-asan/Testing/Temporary/LastTest.log --profile sanitizer
+        working-directory: engine
+```
+
+`tools/` is not in the path filter of `engine.yml`, so a PR that only edits `tools/test_times.py` or the allowlist runs neither required check; the two ctest cases above run whenever `engine/` changes.
