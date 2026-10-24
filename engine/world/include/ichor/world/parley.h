@@ -249,7 +249,6 @@ private:
 
     const NpcSpawn* find(const std::string& npcId) const;
     const NpcSpawn* merchantInReach(const Scene& scene) const;
-    bool atGiver(const Scene& scene) const;
     bool isMerchant(const NpcSpawn& npc) const;
     std::vector<MerchantOffer> offersFor(const Parley& parley, std::string_view extra) const;
     std::string greeting(const Scene& scene, const NpcSpawn& npc) const;

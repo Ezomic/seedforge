@@ -377,12 +377,7 @@ std::string ParleySystem::nameOf(std::string_view npcId) const
 
 const NpcSpawn* ParleySystem::find(const std::string& npcId) const
 {
-    if (!world_.cast) {
-        return nullptr;
-    }
-    const auto& all = world_.cast->all();
-    const auto it = std::ranges::lower_bound(all, npcId, std::less<>{}, &NpcSpawn::npcId);
-    return it != all.end() && it->npcId == npcId ? &*it : nullptr;
+    return world_.cast ? world_.cast->find(npcId) : nullptr;
 }
 
 const NpcSpawn* ParleySystem::npcInReach(const Scene& scene, double reachM) const
@@ -416,12 +411,6 @@ const NpcSpawn* ParleySystem::merchantInReach(const Scene& scene) const
     return npc != nullptr && isMerchant(*npc) ? npc : nullptr;
 }
 
-bool ParleySystem::atGiver(const Scene& scene) const
-{
-    const NpcSpawn* npc = npcInReach(scene, kTradeReachM);
-    return binding_.bound && npc != nullptr && npc->npcId == binding_.giverNpc;
-}
-
 std::string ParleySystem::prompt(const Scene& scene) const
 {
     if (carry_.itemWithinReach(scene)) {
@@ -439,7 +428,7 @@ void ParleySystem::say(const Scene& scene, std::string text)
 
 std::string ParleySystem::noticeText(const Scene& scene) const
 {
-    return scene.time() - noticeAt_ < kParleyNoticeSeconds ? notice_ : std::string();
+    return scene.time() >= noticeAt_ && scene.time() - noticeAt_ < kParleyNoticeSeconds ? notice_ : std::string();
 }
 
 void ParleySystem::tidy(Parley& parley) const
@@ -497,7 +486,7 @@ void ParleySystem::step(Scene& scene, const InputFrame& input)
         }
         if (!speaking_.empty()) {
             const NpcSpawn* npc = find(speaking_);
-            if (npc == nullptr || squaredDistance(npc->x, npc->z, transform.position.x, transform.position.z) > kTradeReachM * kTradeReachM) {
+            if (npc == nullptr || !(squaredDistance(npc->x, npc->z, transform.position.x, transform.position.z) <= kTradeReachM * kTradeReachM)) {
                 speaking_.clear();
             }
         }
@@ -553,7 +542,7 @@ void ParleySystem::talk(Scene& scene, const GameCommand& command)
     const NpcSpawn* npc = find(command.subject);
     const Transform* transform = transformOf(scene, command.actor);
     if (entity == entt::null || npc == nullptr || transform == nullptr ||
-        squaredDistance(npc->x, npc->z, transform->position.x, transform->position.z) > kTradeReachM * kTradeReachM) {
+        !(squaredDistance(npc->x, npc->z, transform->position.x, transform->position.z) <= kTradeReachM * kTradeReachM)) {
         return;
     }
     Parley& parley = scene.registry().get_or_emplace<Parley>(entity);
@@ -577,7 +566,7 @@ void ParleySystem::accept(Scene& scene, const GameCommand& command)
         return;
     }
     const NpcSpawn* giver = find(binding_.giverNpc);
-    if (giver == nullptr || squaredDistance(giver->x, giver->z, transform->position.x, transform->position.z) > kTradeReachM * kTradeReachM) {
+    if (giver == nullptr || !(squaredDistance(giver->x, giver->z, transform->position.x, transform->position.z) <= kTradeReachM * kTradeReachM)) {
         return;
     }
     Parley& parley = scene.registry().get_or_emplace<Parley>(entity);
@@ -597,7 +586,7 @@ void ParleySystem::turnIn(Scene& scene, const GameCommand& command)
         return;
     }
     const NpcSpawn* giver = find(binding_.giverNpc);
-    if (giver == nullptr || squaredDistance(giver->x, giver->z, transform->position.x, transform->position.z) > kTradeReachM * kTradeReachM) {
+    if (giver == nullptr || !(squaredDistance(giver->x, giver->z, transform->position.x, transform->position.z) <= kTradeReachM * kTradeReachM)) {
         return;
     }
     Parley& parley = scene.registry().get_or_emplace<Parley>(entity);
@@ -613,13 +602,9 @@ void ParleySystem::turnIn(Scene& scene, const GameCommand& command)
     if (carry_.removeHeld(scene, binding_.itemId, 1) != InventoryStatus::Ok) {
         return;
     }
-    if (currency_) {
-        Wallet wallet = walletOf(*currency_, parley.coin);
-        (void)wallet.earn(*currency_, CurrencySlot::Coin, quest_->rewardCoin, "quest");
-        parley.coin = wallet.balance(CurrencySlot::Coin);
-    }
-    if (quest_->rewardCount > 0) {
-        (void)carry_.addHeld(scene, quest_->rewardItem, quest_->rewardCount, true);
+    parley.coin = std::min(parley.coin + quest_->rewardCoin, kCoinCap);
+    if (quest_->rewardCount > 0 && carry_.addHeld(scene, quest_->rewardItem, quest_->rewardCount, true) != InventoryStatus::Ok) {
+        say(scene, std::format("{} could not be carried", quest_->rewardItem));
     }
     it->stage = static_cast<std::uint8_t>(QuestStage::Done);
     say(scene, std::format("Quest done: {}", quest_->title));
@@ -808,12 +793,6 @@ ParleyView ParleySystem::view(const Scene& scene) const
     const bool merchant = isMerchant(*npc);
     if (page_ == ParleyView::Page::Trade && merchant) {
         out.text = tradePrompt_.empty() ? "What will it be?" : tradePrompt_;
-        std::vector<std::string> held;
-        for (const CarryViewRow& row : carry_.view(scene).rows) {
-            if (row.count > 0) {
-                held.push_back(row.id);
-            }
-        }
         const Parley empty;
         const Parley& source = parley != nullptr ? *parley : empty;
         const std::vector<MerchantOffer> stock = offersFor(source, {});
