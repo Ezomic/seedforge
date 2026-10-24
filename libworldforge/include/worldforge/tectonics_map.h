@@ -413,7 +413,8 @@ inline std::uint64_t hashTectonicMap(const TectonicMap& map)
         mix(static_cast<std::uint64_t>(static_cast<std::int64_t>(p.driftY)));
         mix(static_cast<std::uint64_t>(static_cast<std::int64_t>(p.baseHeightM)));
     }
-    for (std::size_t c = 0; c < map.plateId.size(); ++c) {
+    const std::size_t cells = std::min({ map.plateId.size(), map.boundary.size(), map.heightM.size() });
+    for (std::size_t c = 0; c < cells; ++c) {
         mix(static_cast<std::uint64_t>(map.plateId[c]) | static_cast<std::uint64_t>(map.boundary[c]) << 8 | static_cast<std::uint64_t>(static_cast<std::uint16_t>(map.heightM[c])) << 16);
     }
     return h;
