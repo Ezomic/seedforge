@@ -15,7 +15,9 @@
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ichor::stage0 {
@@ -73,7 +75,7 @@ struct SkirmisherBrain {
     BrainState brainState() const { return static_cast<BrainState>(state); }
 };
 
-enum class FoeRole : std::uint8_t { Skirmisher, Controller };
+enum class FoeRole : std::uint8_t { Skirmisher, Controller, Anchor, Artillery };
 
 enum class ControllerState : std::uint8_t { Unaware, Reposition, Cast };
 const char* name(ControllerState state);
@@ -192,6 +194,24 @@ public:
     void setFoeRole(FoeRole role) { role_ = role; }
     FoeRole foeRole() const { return role_; }
 
+    // The Anchor and Artillery roles run the pure brains of anchor.h and artillery.h; these are their numbers.
+    void setAnchorTuning(const AnchorTuning& tuning) { anchorTuning_ = tuning; }
+    void setArtilleryTuning(const ArtilleryTuning& tuning) { artilleryTuning_ = tuning; }
+    const AnchorTuning& anchorTuning() const { return anchorTuning_; }
+    const ArtilleryTuning& artilleryTuning() const { return artilleryTuning_; }
+
+    // What the Anchor and Artillery ask of the ground they stand on. Without these the ground is flat and open: every
+    // shot has line of sight, a marker sits at its foe's own height and nothing slows or stops a step. A host with real
+    // terrain supplies them, so the foes obey the walking rules the player does.
+    struct Ground {
+        std::function<bool(glm::dvec3 from, glm::dvec3 to)> lineOfSight;
+        std::function<double(double x, double z)> height;
+        std::function<double(glm::dvec3 position)> pace; // the share of its speed a body keeps there, in [0, 1]
+        std::function<glm::dvec3(glm::dvec3 position, glm::dvec3 velocity)> filter; // the velocity it may keep
+    };
+    void setGround(Ground ground) { ground_ = std::move(ground); }
+    const Ground& ground() const { return ground_; }
+
     const Tuning& tuning() const { return tuning_; }
     FightRecorder& recorder() { return recorder_; }
     StableId playerId() const { return player_; }
@@ -215,8 +235,13 @@ public:
     float allowedTurnRate(const Combatant& c) const;
     // Public so a test can drive the role without a physics step, which asserts on a non-finite body position.
     void controllerSystem(Scene& scene);
+    void anchorSystem(Scene& scene);
+    void artillerySystem(Scene& scene);
 
 private:
+    float poiseCap(const entt::registry& registry, entt::entity who) const;
+    double groundHeight(double x, double z, double fallback) const;
+    glm::vec3 bodyIntent(glm::dvec3 at, glm::vec2 move, float scale) const;
     void registerComponents(Scene& scene);
     void addSystems(Scene& scene);
     void combatSystem(Scene& scene, double dt, const InputFrame& input);
@@ -238,6 +263,9 @@ private:
 
     Tuning tuning_;
     FoeRole role_ = FoeRole::Skirmisher;
+    AnchorTuning anchorTuning_;
+    ArtilleryTuning artilleryTuning_;
+    Ground ground_;
     WeaponProfile weapons_[2];
     FightRecorder recorder_;
     StableId player_{};

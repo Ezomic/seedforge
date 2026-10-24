@@ -1,5 +1,6 @@
 #include "ichor/combat_bridge/combat_bridge.h"
 
+#include "ichor/combat_bridge/role_view.h"
 #include "ichor/core/log.h"
 
 #include <algorithm>
@@ -13,6 +14,24 @@ namespace {
 constexpr glm::dvec3 kSettleLift{0.0, 0.5, 0.0};
 constexpr double kCameraGroundClearM = 0.6;
 constexpr double kCameraJumpM = 5.0;
+constexpr double kSightStepM = 1.5;
+constexpr int kSightMaxSteps = 200;
+
+// A shot is blocked when the ground rises above the straight line between the two eyes. Trees are not solid in the
+// engine yet, so they do not block it either.
+bool terrainClear(const Heightfield& heightfield, glm::dvec3 from, glm::dvec3 to)
+{
+    if (heightfield.empty()) return true;
+    const glm::dvec3 span = to - from;
+    const double length = glm::length(span);
+    if (!std::isfinite(length)) return false;
+    const int steps = std::clamp(static_cast<int>(length / kSightStepM), 1, kSightMaxSteps);
+    for (int i = 1; i < steps; ++i) {
+        const glm::dvec3 at = from + span * (static_cast<double>(i) / steps);
+        if (static_cast<double>(heightfield.heightAt(at.x, at.z)) > at.y) return false;
+    }
+    return true;
+}
 
 }
 
@@ -28,6 +47,17 @@ CombatBridge::CombatBridge(const ForgedGame& game, const CombatSite& site, Comba
     if (!std::isfinite(config_.fixedDt) || config_.fixedDt <= 0.0) {
         config_.fixedDt = CombatBridgeConfig{}.fixedDt;
     }
+    stage_.setFoeRole(config_.role);
+    stage_.setAnchorTuning(config_.anchor);
+    stage_.setArtilleryTuning(config_.artillery);
+    if (!game_.heightfield.empty()) {
+        walking_ = std::make_unique<ForgedWalking>(game_.heightfield, game_.waterField.get(), CapabilitySet{});
+    }
+    // The Anchor and the Artillery walk by the rules the player does: wading slows them and ground too steep stops them.
+    stage_.setGround({[this](glm::dvec3 from, glm::dvec3 to) { return terrainClear(game_.heightfield, from, to); },
+        [this](double x, double z) { return game_.heightfield.empty() ? 0.0 : static_cast<double>(game_.heightfield.heightAt(x, z)); },
+        [this](glm::dvec3 at) { return game_.waterField ? static_cast<double>(wadingSpeedFactor(game_.waterField->at(at.x, at.z).depth)) : 1.0; },
+        [this](glm::dvec3 at, glm::dvec3 velocity) { return walking_ ? walking_->filterVelocity(at, velocity) : velocity; }});
 }
 
 void CombatBridge::install(Scene& scene, StableId player, glm::dvec3 start)
@@ -129,6 +159,17 @@ void CombatBridge::logTransitions(const Scene& scene)
     }
     if (fighter.alive() != lastPlayerAlive_ && !fighter.alive()) {
         logf(LogLevel::Info, "combat: tick {} the player is dead ({})", scene.tickCount(), stage0::name(static_cast<stage0::DeathCause>(fighter.deathCause)));
+    }
+    if (const auto* anchor = registry.try_get<stage0::AnchorBrain>(foe)) {
+        if (anchor->state != lastRoleState_ && anchor->anchorState() == stage0::AnchorState::Windup) {
+            logf(LogLevel::Info, "combat: tick {} the anchor plants and winds up a slam", scene.tickCount());
+        }
+        lastRoleState_ = anchor->state;
+    } else if (const auto* artillery = registry.try_get<stage0::ArtilleryBrain>(foe)) {
+        if (artillery->state != lastRoleState_ && artillery->artilleryState() == stage0::ArtilleryState::Aim) {
+            logf(LogLevel::Info, "combat: tick {} the artillery marks a point at {:.1f}, {:.1f}", scene.tickCount(), artillery->aimX, artillery->aimY);
+        }
+        lastRoleState_ = artillery->state;
     }
     lastEnemyState_ = enemy.state;
     lastEnemyAlive_ = enemy.alive();
@@ -250,7 +291,7 @@ void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view)
 
     exile_.append(scene, alpha, frameSeconds, static_cast<float>(config_.fixedDt), stage_.tuning(), view);
     if (bullWarden_) {
-        stage0::appendBullWarden(scene, stage_.foeId(), alpha, stage_.tuning(), *bullWarden_, view);
+        appendRoleFoe(scene, stage_, alpha, *bullWarden_, view);
     }
     std::vector<LineSegment> lines;
     stage_.debugLines(scene, lines);

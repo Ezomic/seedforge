@@ -11,6 +11,7 @@
 #include "ichor/stage0/exile_player.h"
 #include "ichor/stage0/fight_bot.h"
 #include "ichor/stage0/run_prompt.h"
+#include "ichor/world/forged_walking.h"
 
 #include <filesystem>
 #include <functional>
@@ -24,6 +25,10 @@ namespace ichor {
 
 struct CombatBridgeConfig {
     stage0::Tuning tuning;
+    // Which role the foe plays (SEED-661). Anchor and Artillery are drawn with the Bull-Warden at another size.
+    stage0::FoeRole role = stage0::FoeRole::Skirmisher;
+    stage0::AnchorTuning anchor;
+    stage0::ArtilleryTuning artillery;
     double fixedDt = 1.0 / 60.0;
     double respawnDelaySeconds = 3.0; // from the player's death to standing at the last settlement again
     // World-axis steering with the player always facing the foe: what a scripted player (FightBot) needs.
@@ -85,6 +90,7 @@ private:
     CombatSite site_;
     CombatBridgeConfig config_;
     stage0::Stage0 stage_;
+    std::unique_ptr<ForgedWalking> walking_; // the foe's walking rules; null on a world with no ground
     StableId player_{};
     glm::dvec3 start_{0.0};
     Phase phase_ = Phase::WaitingForGround;
@@ -94,6 +100,7 @@ private:
     double deadSeconds_ = 0.0;
     int respawns_ = 0;
     std::uint8_t lastEnemyState_ = 0;
+    std::uint8_t lastRoleState_ = 0;
     bool lastEnemyAlive_ = true;
     bool lastPlayerAlive_ = true;
 
