@@ -37,7 +37,8 @@ bool finitePoint(double x, double z, float y)
 CarryCatalogue CarryCatalogue::fromData(const DataSet& data, std::vector<std::string>& problems)
 {
     std::vector<const DataTable*> tables;
-    for (const char* tableName : {"notable_items", "catalogue"}) {
+    // provisions are what merchants sell: carried like the rest, but never placed in the world.
+    for (const char* tableName : {"notable_items", "catalogue", "provisions"}) {
         if (const DataTable* table = data.table(tableName)) {
             tables.push_back(table);
         } else {
@@ -259,6 +260,48 @@ CarryView CarrySystem::view(const Scene& scene) const
             row.unitWeightUnits, info != nullptr && info->itemClass == "consumable"});
     }
     return out;
+}
+
+bool CarrySystem::itemWithinReach(const Scene& scene) const
+{
+    for (auto [entity, player, transform] : scene.registry().view<const Player, const Transform>().each()) {
+        return nearest(carried(scene), transform.position.x, transform.position.z).found;
+    }
+    return false;
+}
+
+std::uint32_t CarrySystem::countOf(const Scene& scene, std::string_view itemId) const
+{
+    const Carried* held = carried(scene);
+    return held == nullptr ? 0 : inventoryOf(*held).count(itemId);
+}
+
+InventoryStatus CarrySystem::addHeld(Scene& scene, std::string_view itemId, std::uint32_t count, bool force) const
+{
+    for (auto [entity, player] : scene.registry().view<const Player>().each()) {
+        Carried& held = scene.registry().get_or_emplace<Carried>(entity);
+        Inventory inventory = inventoryOf(held);
+        const InventoryResult result = force ? inventory.addForced(itemId, count) : inventory.add(itemId, count);
+        if (result.status == InventoryStatus::Ok) {
+            store(held, inventory);
+        }
+        return result.status;
+    }
+    return InventoryStatus::NotHeld;
+}
+
+InventoryStatus CarrySystem::removeHeld(Scene& scene, std::string_view itemId, std::uint32_t count) const
+{
+    for (auto [entity, player] : scene.registry().view<const Player>().each()) {
+        Carried& held = scene.registry().get_or_emplace<Carried>(entity);
+        Inventory inventory = inventoryOf(held);
+        const InventoryResult result = inventory.remove(itemId, count);
+        if (result.status == InventoryStatus::Ok) {
+            store(held, inventory);
+        }
+        return result.status;
+    }
+    return InventoryStatus::NotHeld;
 }
 
 void CarrySystem::requestUse(Scene& scene, const std::string& itemId) const
