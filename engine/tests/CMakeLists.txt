@@ -102,6 +102,7 @@ if(ENGINE_RUNTIME)
     set_tests_properties(forged_combat_app PROPERTIES TIMEOUT 600)
     add_test(NAME forged_campaign_app COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_campaign_app_check.cmake)
     set_tests_properties(forged_campaign_app PROPERTIES TIMEOUT 300)
+    set_tests_properties(forged_app_determinism forged_combat_app forged_campaign_app PROPERTIES LABELS medium)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp
     )

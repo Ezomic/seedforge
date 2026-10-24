@@ -90,15 +90,47 @@ Regenerate the allowlist after an intended slowdown: run the suite, then `python
 
 The first allowlist was seeded from the CI logs of runs 40052978212 and 40054121237. It includes `live worlds: the probe finds a spawn, ...` and `a showcase run ranks the seeds, ...`, which time out or come close on the Linux job today; remove those entries when their fix lands.
 
-### Workflow step for the owner to add
+The step now lives in the workflows: the Windows job and every Linux shard run `tools/test_times.py` after ctest (SEED-664). It also checks the tiers: a case that is in no tier list (so it is fast) and runs over 5 s in Release or 60 s under the sanitizers fails and names `engine/tests/test_tiers.json` as the place to move it.
 
-The token that merges PRs cannot change `.github/workflows`, so the CI step is not in this PR. Add this to the `linux headless + sanitizers` job in `.github/workflows/engine.yml`, directly after the `Test` step (and, if wanted, the same line with `windows-ci` and `--profile release` after the Windows `ctest` step):
+## Test tiers and the 15 minute PR budget (SEED-664, 666, 670, 671, 672)
 
-```yaml
-      - name: Test time budget
-        if: always()
-        run: python3 ../tools/test_times.py build/linux-headless-asan/Testing/Temporary/LastTest.log --profile sanitizer
-        working-directory: engine
-```
+Each required check has a hard 15 minute `timeout-minutes`. `docs/ci-time-baseline.md` has the measurements behind the design. Every ctest case is in exactly one tier, listed in `engine/tests/test_tiers.json` and applied as a ctest label when ctest loads the tests (`engine/tests/apply_test_tiers.cmake`; the three app tests that are not Catch2 cases are labelled in `engine/tests/CMakeLists.txt`). A case in no list is fast and has no label.
 
-`tools/` is not in the path filter of `engine.yml`, so a PR that only edits `tools/test_times.py` or the allowlist runs neither required check; the two ctest cases above run whenever `engine/` changes.
+| Tier | Rule | Runs on a PR | Runs on main and nightly |
+|---|---|---|---|
+| fast | under about 1 s in Release | Windows Release, and the Linux sanitizer shards | everywhere |
+| medium | about 1 s to 10 s in Release | Windows Release only | also the Linux sanitizer shards |
+| soak | the full variant of a heavy test | never | `linux soak tests` job after every merge to main, and the nightly `soak` job |
+
+A heavy test has a small PR variant in the fast or medium tier that fails for the same breakage (fewer seeds, smaller grid), and the original case, unchanged, is listed under soak. The four converted so far:
+
+| Soak (full) | Small PR variant |
+|---|---|
+| the coverage reserve is what lifts the weakest seeds over the gate (3 weak seeds) | the coverage reserve lifts the first weak seed over the gate |
+| from the spawn toward the nearest settlement on 8 seeds ... | ... on 3 seeds ... (2 must arrive, 5 of 8 in the full one) |
+| fuzz: a modest seed range over every phase has no violations (64 seeds) | fuzz: a small seed range ... (8 seeds) |
+| tectonics: seeds 1 to 64 land between 20 and 70 percent ... at 128, 256 and 1024 | tectonics: seeds 1 to 16 ... at 128 and 256 |
+
+Each required check and where its time goes:
+
+| Check name (unchanged) | How it is built | Preset |
+|---|---|---|
+| `windows runtime + tests` | one job, 15 min | `windows-ci`: everything except soak |
+| `linux headless + sanitizers` | four jobs `linux sanitizers shard N of 4` (each takes every fourth ctest index, `-I N,,4`), plus `linux gpu goldens`; a final job with the required name passes only when all five passed | PR: `linux-headless-asan-fast` (no medium, no soak). Push to main: `linux-headless-asan` (no soak) |
+
+Because the required name belongs to the last job, branch protection needs no change. A cancelled or skipped shard fails it.
+
+Nothing stops being tested: medium runs under the sanitizers on every merge to main, soak runs under the sanitizers after every merge to main and in the nightly (`soak` job in `nightly.yml`, presets `linux-headless-asan-soak` and `windows-ci-soak`), and the nightly stress job still runs every other test three times in random order (`bin/ctest-stress` leaves soak out unless `-S` is given, since the soak job covers it). The Windows job runs the medium tier on every PR.
+
+### Adding or moving a test
+
+- A new test is fast by default. If it takes over about 1 s in Release, add its name to `medium` in `engine/tests/test_tiers.json` (the time guard says so when it is over 5 s). `python tools/ci_tiers.py write-tiers <ctest log>` rewrites the medium list from a Release run and keeps the soak list.
+- A new heavy test needs a small PR variant and a full variant under `soak`. `ctest --preset windows-ci-soak` runs the soak tests locally, `ctest --preset windows-ci -L medium` the medium ones.
+- `test_tiers_consistent` fails when a name in the file is in two tiers, unsorted, contains a `;`, or is in no test source.
+
+### Cache and cancel changes (SEED-671)
+
+- vcpkg is checked out at the `builtin-baseline` commit (`VCPKG_COMMIT` in `engine.yml`; change it together with the baseline in `engine/vcpkg.json`) so the binary cache can hit. Cache keys carry `v2` to leave the stale entries behind.
+- The Linux GPU golden steps are their own job and share nothing with the sanitizer shards, so they overlap them.
+- The forged world test cache (SEED-665, `<build>/forged-world-cache`) is restored by `actions/cache`, keyed on the sources its generator digest hashes. A cold run is slower for the tests that use it (the cache stores whole forges), so the first run after a generator change is the slow one.
+- A new push to a pull request cancels the run of the previous commit (`cancel-in-progress` was already set for PRs and stays); runs on main queue.
