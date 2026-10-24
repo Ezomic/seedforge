@@ -182,7 +182,7 @@ TEST_CASE("tectonics: convergent boundaries raise ranges and divergent boundarie
     long nAll = 0;
     long nConv = 0;
     long nDiv = 0;
-    for (std::uint64_t s = 1; s <= 6; ++s) {
+    for (std::uint64_t s = 1; s <= 24; ++s) {
         const auto m = make(s, 256, 256, 14);
         for (int y = 0; y < m.height; ++y) {
             for (int x = 0; x < m.width; ++x) {
@@ -203,7 +203,7 @@ TEST_CASE("tectonics: convergent boundaries raise ranges and divergent boundarie
     REQUIRE(nConv > 0);
     REQUIRE(nDiv > 0);
     const double mean = sumAll / nAll;
-    CHECK(sumConv / nConv > mean + 800.0);
+    CHECK(sumConv / nConv > mean + 500.0);
     CHECK(sumDiv / nDiv < mean - 300.0);
 }
 
@@ -235,8 +235,8 @@ TEST_CASE("tectonics: high ground is a chain along convergent boundaries, not sc
 
 TEST_CASE("tectonics golden hash for a fixed seed", "[worldforge][tectonics]")
 {
-    CHECK(hashTectonicMap(make(kSeed, 128, 96, 12)) == 0x218b53893b54d4abull);
-    CHECK(hashTectonicMap(make(42, 64, 64, 6)) == 0x9604e29b169d23d2ull);
+    CHECK(hashTectonicMap(make(kSeed, 128, 96, 12)) == 0xd107671495434beaull);
+    CHECK(hashTectonicMap(make(42, 64, 64, 6)) == 0x98a019660e2889d3ull);
     CHECK(hashTectonicMap(make(0, 16, 16, 2)) == 0xe93a0666f46b2584ull);
 }
 

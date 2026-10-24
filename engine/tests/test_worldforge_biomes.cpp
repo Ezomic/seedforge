@@ -322,7 +322,7 @@ TEST_CASE("biome golden hash is stable", "[worldforge][biomes]")
     p.injections.push_back({ BiomeId::SaltBlight, 96, 0, 400, 6, 4 });
     p.suppressMask = biomeBit(BiomeId::LowlandFarm);
     const BiomeMap out = *generateBiomes(pipe.inputs(), p);
-    CHECK(hashBiomeMap(out) == 0xb002edecf6393e6bull);
+    CHECK(hashBiomeMap(out) == 0x86b050db4e0ebf7dull);
 }
 
 TEST_CASE("biome generation is deterministic and seed dependent", "[worldforge][biomes]")

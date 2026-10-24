@@ -38,12 +38,12 @@ void writeText(const std::filesystem::path& path, const std::string& text)
 
 TEST_CASE("the four original phases keep their layer hashes", "[forge_cli][forge_shared]")
 {
-    // Seed 1, size 64. Recorded from the stand-alone per-phase code that forgeWorld replaced; the erosion dependent layers were re-recorded when SEED-499 scaled erosion to the grid.
+    // Seed 1, size 64. Recorded from the stand-alone per-phase code that forgeWorld replaced; the erosion dependent layers were re-recorded when SEED-499 scaled erosion to the grid and every layer again when SEED-556 chose plate types by area.
     const std::map<std::string, std::string> golden = {
-        {"plates", "4c69858509baee99"}, {"boundary", "b9e886218c2b7fea"}, {"height", "051d5cdacf4b7b9a"},
-        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "b1da0e32792d8c6c"}, {"rivers", "6fc883deacaac4af"},
-        {"lakes", "82d72a57feb055e9"}, {"height_carved", "507a4437b2c949a2"}, {"biome", "216c77811b59150a"},
-        {"biome_blend", "0ebe08b0c49f5fdb"},
+        {"plates", "4c69858509baee99"}, {"boundary", "b9e886218c2b7fea"}, {"height", "7b3c2cb7e01228c5"},
+        {"region_tier", "4e0bc1c607a035a7"}, {"flow", "0ac59685390458f7"}, {"rivers", "dcc236880feb5319"},
+        {"lakes", "82d72a57feb055e9"}, {"height_carved", "5efaedf69251066e"}, {"biome", "0004144aa5e6349c"},
+        {"biome_blend", "70323d502af92c27"},
     };
     const auto result = forgecli::runForge(oneSeed(1));
     REQUIRE(result.error.empty());
