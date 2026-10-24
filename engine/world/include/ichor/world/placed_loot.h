@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -63,6 +64,8 @@ public:
     // The loot lying in `id`, sorted by item id; empty for a cell with none or outside the world.
     std::vector<PlacedLoot> inCell(CellId id) const;
     const PlacedLoot* find(const std::string& itemId) const;
+    // The same set without the items `drop` says yes to, in the same order and cells.
+    PlacedLootSet without(const std::function<bool(const PlacedLoot&)>& drop) const;
 
 private:
     friend struct PlacedLootBuilder;

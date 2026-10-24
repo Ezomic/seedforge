@@ -81,6 +81,17 @@ const PlacedLoot* PlacedLootSet::find(const std::string& itemId) const
     return it != loot_.end() && it->itemId == itemId ? &*it : nullptr;
 }
 
+PlacedLootSet PlacedLootSet::without(const std::function<bool(const PlacedLoot&)>& drop) const
+{
+    PlacedLootSet out;
+    for (const PlacedLoot& item : loot_) {
+        if (drop(item)) continue;
+        out.byCell_[item.cell].push_back(out.loot_.size());
+        out.loot_.push_back(item);
+    }
+    return out;
+}
+
 PlacedLootResult placeManifestLoot(const worldforge::ContentManifest& manifest, const PlacedPoiSet& pois, const std::vector<LootItemInfo>& catalogue,
     const Heightfield& heightfield, const PlacedLootParams& params)
 {

@@ -19,8 +19,8 @@ namespace ichor {
 // "unlocks" and "shortcut" links are logical and get no geometry. A pure function of the layout, so one dungeon is the
 // same boxes every time, and it holds only collision and look: nothing here is simulation state.
 
-enum class GreyBoxKind : std::uint8_t { Wall, Floor, Ceiling, Marker };
-inline constexpr std::size_t kGreyBoxKindCount = 4;
+enum class GreyBoxKind : std::uint8_t { Wall, Floor, Ceiling, Marker, Loot, Boss };
+inline constexpr std::size_t kGreyBoxKindCount = 6;
 
 struct GreyBoxPiece {
     GreyBoxKind kind = GreyBoxKind::Wall;
@@ -43,8 +43,19 @@ inline constexpr std::int32_t kMaxFloor = 16;  // |floor| of a cell
 inline constexpr std::size_t kMaxPieces = 8192;
 }
 
+// Where a room stands, for what is put in it. `centre` is the middle of the floor; `doors` are the open walls in the order
+// north (-z), east (+x), south (+z), west (-x).
+struct GreyBoxRoom {
+    graph::NodeId id = 0;
+    glm::dvec3 centre{0.0};
+    bool doors[4] = {false, false, false, false};
+    bool ramp = false; // a ramp up to the room above, along one side
+    bool hole = false; // a hole in the floor, over the ramp of the room below
+};
+
 struct DungeonGreyBox {
     std::vector<GreyBoxPiece> pieces;
+    std::vector<GreyBoxRoom> rooms; // by node id
     glm::dvec3 spawn{0.0};      // feet, in the entry room
     double spawnYaw = 0.0;      // radians, the walking view's yaw that faces into the dungeon
     glm::dvec3 exitPoint{0.0};  // foot of the exit marker

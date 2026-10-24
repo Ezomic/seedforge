@@ -196,7 +196,15 @@ DungeonGreyBox buildDungeonGreyBox(const BakedDungeon& dungeon, glm::dvec3 origi
             b.box(GreyBoxKind::Ceiling, c, -gb::kRoomHalfM, gb::kRoomHalfM, fy + gb::kStoreyM - gb::kSlabM, fy + gb::kStoreyM, -gb::kRoomHalfM, gb::kRoomHalfM);
         }
         if (b.tooMany) return fail("the dungeon needs more boxes than the grey-box limit");
+        GreyBoxRoom placed;
+        placed.id = room.id;
+        placed.centre = glm::dvec3(c.x, fy, c.z);
+        for (int side = 0; side < 4; ++side) placed.doors[side] = room.door[side];
+        placed.ramp = room.ramp;
+        placed.hole = room.hole;
+        b.out.rooms.push_back(placed);
     }
+    std::sort(b.out.rooms.begin(), b.out.rooms.end(), [](const GreyBoxRoom& a, const GreyBoxRoom& other) { return a.id < other.id; });
 
     double fy = 0.0;
     const glm::dvec3 c = centreOf(home, fy);
@@ -269,6 +277,8 @@ SceneBundle buildDungeonKit()
         {"dungeon_floor", {0.34f, 0.32f, 0.30f}},
         {"dungeon_ceiling", {0.26f, 0.25f, 0.26f}},
         {"dungeon_exit", {0.92f, 0.66f, 0.22f}},
+        {"dungeon_loot", {0.95f, 0.80f, 0.20f}},
+        {"dungeon_boss", {0.72f, 0.10f, 0.08f}},
     }};
     for (std::size_t i = 0; i < kGreyBoxKindCount; ++i) {
         Material material;
