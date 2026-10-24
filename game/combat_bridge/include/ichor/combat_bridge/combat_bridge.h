@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/combat_bridge/combat_presentation.h"
 #include "ichor/combat_bridge/combat_site.h"
 #include "ichor/core/input.h"
 #include "ichor/gfx/render_view.h"
@@ -67,8 +68,9 @@ public:
 
     // The bodies, drawn from the art folder. False when either did not load; the fight then runs without them.
     bool loadVisuals(Renderer& renderer, const std::filesystem::path& artDir);
-    // The third person camera, the bodies and the telegraph lines. Frame time is taken from the scene's own clock.
-    void buildView(const Scene& scene, double alpha, RenderView& view);
+    // The third person camera, the bodies and the enemy's ground telegraph. The Stage 0 debug lines are added only when
+    // `aids.stageLines` is set. Frame time is taken from the scene's own clock.
+    void buildView(const Scene& scene, double alpha, RenderView& view, CombatDebugAids aids = {});
     void overlay(const Scene& scene, std::vector<std::string>& lines) const;
 
 private:

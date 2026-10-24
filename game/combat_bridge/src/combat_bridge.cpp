@@ -208,7 +208,7 @@ bool CombatBridge::loadVisuals(Renderer& renderer, const std::filesystem::path& 
     return loaded;
 }
 
-void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view)
+void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view, CombatDebugAids aids)
 {
     if (!live()) {
         return;
@@ -253,7 +253,13 @@ void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view)
         stage0::appendBullWarden(scene, stage_.foeId(), alpha, stage_.tuning(), *bullWarden_, view);
     }
     std::vector<LineSegment> lines;
-    stage_.debugLines(scene, lines);
+    if (const auto* foeFighter = registry.try_get<stage0::Combatant>(foe)) {
+        appendEnemyTelegraph(enemyTelegraph(*foeFighter, stage_.tuning()), foeAt->position, stage0::forwardFromYaw(foeFighter->yaw), stage_.tuning(),
+            [this](double x, double z) { return static_cast<double>(game_.heightfield.heightAt(x, z)); }, lines);
+    }
+    if (aids.stageLines) {
+        stage_.debugLines(scene, lines);
+    }
     for (const LineSegment& line : lines) {
         view.lines.push_back({line.a, line.b, line.color});
     }
