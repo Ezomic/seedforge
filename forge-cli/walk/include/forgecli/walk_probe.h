@@ -2,6 +2,7 @@
 
 #include <forgecli/showcase.h>
 
+#include "ichor/world/forged_walk_route.h"
 #include "ichor/world/forged_walking.h"
 
 #include <glm/vec3.hpp>
@@ -21,6 +22,7 @@ struct WalkProbeParams {
     double minTripMetres = 60.0;      // a settlement closer than this to the spawn is not a trip
     double arriveMetres = 12.0;       // the bot has arrived this close to the settlement's walkable point
     double goalSearchMetres = 120.0;  // how far from a settlement's centre its walkable point is searched
+    ichor::WalkRouteParams route;     // a coarser stepMetres makes the route search cheaper (the PR tests use that)
 };
 
 // How far from (x, z) a walker can get on foot, straight-line metres, up to capMetres. A start on ground
@@ -29,7 +31,7 @@ double walkReachMetres(const ichor::ForgedWalking& walking, double x, double z, 
 
 // The engine's ground route (findWalkRoute, SEED-555) as plain waypoints between the two points. False when there
 // is none or an input is not a number.
-bool routeOnFoot(const ichor::ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& to, std::vector<glm::dvec3>& path);
+bool routeOnFoot(const ichor::ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& to, std::vector<glm::dvec3>& path, const ichor::WalkRouteParams& params = {});
 
 WalkProbeResult probeWalk(const worldforge::ForgedWorld& world, const WalkProbeParams& params = {});
 
