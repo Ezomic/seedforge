@@ -62,6 +62,7 @@ private:
     DungeonFightConfig config_;
     StableId player_{};
     bool here_ = false;
+    std::string poi_;
     std::optional<Key> engaged_;
     double wakeAt_ = 0.0;
 };

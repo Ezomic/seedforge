@@ -67,7 +67,10 @@ const DungeonRoom* DungeonContent::roomAt(const glm::dvec3& point) const
     if (!finite(point)) return nullptr;
     for (const DungeonRoom& candidate : rooms) {
         const double dy = point.y - candidate.centre.y;
-        if (std::abs(point.x - candidate.centre.x) <= dc::kHallHalfM && std::abs(point.z - candidate.centre.z) <= dc::kHallHalfM && dy >= -1.0 && dy < greybox::kStoreyM - 1.0) {
+        const double dx = point.x - candidate.centre.x;
+        const double dz = point.z - candidate.centre.z;
+        // Half open, so a point on the line between two halls is in exactly one of them.
+        if (dx >= -dc::kHallHalfM && dx < dc::kHallHalfM && dz >= -dc::kHallHalfM && dz < dc::kHallHalfM && dy >= -1.0 && dy < greybox::kStoreyM - 1.0) {
             return &candidate;
         }
     }
@@ -164,8 +167,14 @@ std::vector<PlacedLoot> lootAtPoi(const PlacedLootSet& loot, const std::string& 
 std::shared_ptr<const PlacedLootSet> outdoorLoot(const ForgedGame& game)
 {
     if (!game.loot || !game.pois || !game.dungeons) return game.loot;
-    const std::vector<std::string> ids = game.dungeons->poiIds();
-    const std::set<std::string> enterable(ids.begin(), ids.end());
+    // Only a dungeon that really builds takes its loot in: an item is never left in neither place.
+    std::set<std::string> enterable;
+    for (const std::string& id : game.dungeons->poiIds()) {
+        const DungeonLayoutResult layout = game.dungeons->layout(id);
+        if (!layout.ok()) continue;
+        const DungeonGreyBox box = buildDungeonGreyBox(*layout.dungeon, glm::dvec3(0.0));
+        if (box.ok() && !buildDungeonContent(*layout.dungeon, box, lootAtPoi(*game.loot, id)).empty()) enterable.insert(id);
+    }
     PlacedLootSet outdoors = game.loot->without([&](const PlacedLoot& item) {
         const PlacedPoi* poi = game.pois->find(item.poiId);
         return poi != nullptr && poi->kind == PlacedPoiKind::Dungeon && enterable.contains(item.poiId);

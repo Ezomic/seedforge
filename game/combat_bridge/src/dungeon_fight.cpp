@@ -72,6 +72,7 @@ std::optional<std::size_t> DungeonFight::engaged() const
 void DungeonFight::arrive(Scene& scene)
 {
     here_ = true;
+    poi_ = entry_.content().poiId;
     engaged_.reset();
     wakeAt_ = scene.time();
     bridge_.parkFoe(scene, parkingSpot());
@@ -122,6 +123,10 @@ void DungeonFight::step(Scene& scene)
     }
     if (!bridge_.live()) {
         return;
+    }
+    // A load can swap one dungeon for another without a step outside.
+    if (here_ && content.poiId != poi_) {
+        here_ = false;
     }
     if (!here_) {
         arrive(scene);
