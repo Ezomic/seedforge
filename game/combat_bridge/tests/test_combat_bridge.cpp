@@ -4,6 +4,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <map>
@@ -310,4 +311,33 @@ TEST_CASE("a nonsense respawn delay or step falls back to a usable one", "[comba
     setup.bridge->stage().receiveHit(setup.scene, setup.player(), setup.scene.find(setup.bridge->stage().foeId()), 500.0f, 0.0f, true);
     setup.tick(static_cast<int>(5.0 / kDt));
     CHECK(setup.bridge->respawns() == 1);
+}
+
+TEST_CASE("the forged view hides the Stage 0 debug lines by default and still shows the enemy telegraph", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    Setup setup(game, 1);
+    setup.bridge->setGroundCheck([](glm::dvec3) { return true; });
+    setup.tick(4);
+    REQUIRE(setup.bridge->live());
+    auto& foe = setup.scene.registry().get<stage0::Combatant>(setup.scene.find(setup.bridge->stage().foeId()));
+    foe.state = static_cast<std::uint8_t>(stage0::CombatState::Windup);
+    foe.stateTime = setup.bridge->stage().tuning().lightWindup;
+    const auto hasColour = [](const RenderView& view, glm::vec3 colour) {
+        return std::any_of(view.lines.begin(), view.lines.end(), [&](const DebugLine& line) { return line.color == colour; });
+    };
+    const glm::vec3 spacingRing(0.2f, 0.9f, 0.9f);
+    const glm::vec3 windup(1.0f, 0.7f, 0.15f);
+
+    RenderView quiet;
+    setup.bridge->buildView(setup.scene, 1.0, quiet);
+    CHECK_FALSE(hasColour(quiet, spacingRing));
+    CHECK_FALSE(hasColour(quiet, glm::vec3(0.9f)));
+    CHECK(quiet.lines.size() > 10);
+
+    RenderView debug;
+    setup.bridge->buildView(setup.scene, 1.0, debug, combatDebugAids(OverlayMode::Full, false));
+    CHECK(hasColour(debug, spacingRing));
+    CHECK(debug.lines.size() > quiet.lines.size());
+    CHECK(hasColour(quiet, windup));
 }

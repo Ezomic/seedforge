@@ -144,6 +144,7 @@ struct Options {
     bool acceptQuest = false;   // --forged: the errand is taken at the start
     bool showJournal = false;   // --journal: start with the journal open
     bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
+    bool combatDebug = false; // --combat: keep the Stage 0 debug rings, lines and collider lines (F3 full shows them too)
     bool combatDuel = false;  // --combat: begin a few metres from the enemy instead of at the spawn
     std::string combatBot;    // --combat: a scripted player of this skill (novice, regular, expert) instead of the keyboard
     int forgedGrid = ichor::kForgedDefaultGridSize;
@@ -291,6 +292,8 @@ bool parse(int argc, char** argv, Options& options)
             options.forged = true;
         } else if (arg == "--combat") {
             options.combat = true;
+        } else if (arg == "--combat-debug") {
+            options.combatDebug = true;
         } else if (arg == "--combat-duel") {
             options.combatDuel = true;
         } else if (arg == "--combat-bot" && hasValue) {
@@ -1539,8 +1542,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
         }
+        const ichor::CombatDebugAids combatAids = ichor::combatDebugAids(engine.overlayMode(), options.combatDebug);
         if (combat) {
-            combat->buildView(scene, alpha, view);
+            combat->buildView(scene, alpha, view, combatAids);
         }
         const double cellMetres = heightfield.desc().cellMetres;
         const ichor::Carried* carried = carry ? carry->carried(scene) : nullptr;
@@ -1610,7 +1614,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         pickCamera = {view.camera.position, view.camera.rotation, view.camera.fovY};
         std::vector<ichor::LineSegment> colliders;
-        if (!inDungeon && !exileAvatar.loaded()) {
+        if (!inDungeon && !exileAvatar.loaded() && (!combat || !combat->live() || combatAids.colliders)) {
             scene.physics().debugLines(colliders);
         }
         for (const ichor::LineSegment& line : colliders) {
@@ -1986,7 +1990,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert] [--combat-debug]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
