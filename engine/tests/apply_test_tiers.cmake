@@ -1,0 +1,16 @@
+# Included by ctest when it loads the tests of this directory, after every catch_discover_tests file:
+# turns test_tiers.json into the ctest labels `medium` and `soak`. A test without a label is fast (SEED-664).
+cmake_policy(SET CMP0064 NEW)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/test_tiers.json" ichor_tiers_json)
+foreach(ichor_tier medium soak)
+    string(JSON ichor_tier_count LENGTH "${ichor_tiers_json}" ${ichor_tier})
+    math(EXPR ichor_tier_last "${ichor_tier_count} - 1")
+    if(ichor_tier_count GREATER 0)
+        foreach(ichor_tier_index RANGE ${ichor_tier_last})
+            string(JSON ichor_tier_name GET "${ichor_tiers_json}" ${ichor_tier} ${ichor_tier_index})
+            if(TEST "${ichor_tier_name}")
+                set_tests_properties("${ichor_tier_name}" PROPERTIES LABELS ${ichor_tier})
+            endif()
+        endforeach()
+    endif()
+endforeach()

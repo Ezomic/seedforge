@@ -34,7 +34,9 @@ TEST_CASE("landmark coverage passes on the first attempt at 128 and 256 for seed
     }
 }
 
-TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", "[forge_cli][landmark]")
+namespace {
+
+void reserveLiftsWeakSeeds(int wantedWeakSeeds)
 {
     const int minimum = forgecli::sanityThresholds().minLandmarkCoveragePermille;
     worldforge::ForgeConfig withReserve = forgecli::defaultForgeConfig(256);
@@ -42,7 +44,7 @@ TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", 
     withoutReserve.pois.coverageReserve = 0;
     REQUIRE(withReserve.pois.coverageReserve > 0);
     int found = 0;
-    for (std::uint64_t seed = 1; seed <= 64 && found < 3; ++seed) {
+    for (std::uint64_t seed = 1; seed <= 64 && found < wantedWeakSeeds; ++seed) {
         const auto before = forgeToPois(seed, 256, withoutReserve).landmarkCoverage();
         REQUIRE(before.has_value());
         if (before->coveragePermille >= minimum) continue;
@@ -52,7 +54,19 @@ TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", 
         INFO("seed " << seed);
         CHECK(after->coveragePermille >= minimum);
     }
-    CHECK(found == 3);
+    CHECK(found == wantedWeakSeeds);
+}
+
+}
+
+TEST_CASE("the coverage reserve lifts the first weak seed over the gate", "[forge_cli][landmark]")
+{
+    reserveLiftsWeakSeeds(1);
+}
+
+TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", "[forge_cli][landmark]")
+{
+    reserveLiftsWeakSeeds(3);
 }
 
 // Hidden: prints the per-seed table for the ticket. Run with: ichor_tests_world "[.landmark_measure]"

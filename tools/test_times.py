@@ -38,6 +38,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PROFILES = {"sanitizer": 120.0, "release": 30.0}
+FAST_CAPS = {"sanitizer": 60.0, "release": 5.0}
+TIERS = "engine/tests/test_tiers.json"
 CTEST_TIMEOUT = 1500.0
 CAP_STEP = 30.0
 ALLOWLIST = "tools/test_time_allowlist.json"
@@ -206,6 +208,24 @@ def evaluate(times, entries, budget):
     return over
 
 
+def tier_lists(path):
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return set(data.get("medium", [])) | set(data.get("soak", []))
+
+
+def evaluate_tiers(times, slow_tiers, profile, entries):
+    """A case in no tier list is fast: over the fast cap it belongs in engine/tests/test_tiers.json (SEED-664)."""
+    cap = FAST_CAPS[profile]
+    over = []
+    for name, sec in times.items():
+        if name not in slow_tiers and name not in entries and sec > cap:
+            over.append((name, sec, cap, f"fast tier cap, add it to the medium list in {TIERS}"))
+    return over
+
+
 def cap_for(observed):
     return min(CTEST_TIMEOUT, math.ceil(observed * 1.5 / CAP_STEP) * CAP_STEP)
 
@@ -253,6 +273,7 @@ def run(argv, out=sys.stdout):
     ap.add_argument("--top", type=int, default=20)
     ap.add_argument("--root", default=str(Path(__file__).resolve().parent.parent))
     ap.add_argument("--allowlist")
+    ap.add_argument("--tiers", help=f"tier lists (default {TIERS} under --root when present)")
     ap.add_argument("--update", action="store_true")
     ap.add_argument("--reason")
     ap.add_argument("--check-allowlist", action="store_true")
@@ -291,6 +312,11 @@ def run(argv, out=sys.stdout):
             print(f"test-times: wrote {len(data[args.profile])} {args.profile} entries to {allowlist}", file=out)
             return 0
         over = evaluate(times, entries, budget)
+        slow_tiers = tier_lists(args.tiers or str(Path(args.root) / TIERS))
+        if slow_tiers is not None and args.budget is None:
+            seen = {o[0] for o in over}
+            over += [o for o in evaluate_tiers(times, slow_tiers, args.profile, entries) if o[0] not in seen]
+            over.sort(key=lambda o: -o[1])
         report(times, over, budget, args.top, out)
         stale = sorted(n for n in entries if n in times and times[n] <= budget)
         for n in stale:
@@ -336,6 +362,9 @@ def self_test(out):
     expect("a case exactly at the budget is green", evaluate({"x": 120.0}, {}, 120.0), [])
     expect("release budget is tighter", [o[0] for o in evaluate({"x": 31.0}, {}, PROFILES["release"])], ["x"])
 
+    expect("a fast case over the fast cap is red", [o[0] for o in evaluate_tiers({"x": 6.0}, set(), "release", {})], ["x"])
+    expect("a medium case over the fast cap is green", evaluate_tiers({"x": 6.0}, {"x"}, "release", {}), [])
+    expect("a fast case within the cap is green", evaluate_tiers({"x": 4.0}, set(), "release", {}), [])
     expect("cap rounds 1.5x up to 30 s", cap_for(100.0), 150.0)
     expect("cap never passes the ctest timeout", cap_for(1500.0), CTEST_TIMEOUT)
     updated = update_entries({"slow case": 200.0, "allowed case": 100.0, "fast case": 1.0}, entries, 120.0, "why")
