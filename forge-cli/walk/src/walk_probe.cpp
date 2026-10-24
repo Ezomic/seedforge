@@ -113,10 +113,10 @@ double walkReachMetres(const ichor::ForgedWalking& walking, double x, double z, 
     return std::min(reach, capMetres);
 }
 
-bool routeOnFoot(const ichor::ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& to, std::vector<glm::dvec3>& path)
+bool routeOnFoot(const ichor::ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& to, std::vector<glm::dvec3>& path, const ichor::WalkRouteParams& params)
 {
     path.clear();
-    const ichor::WalkRoute route = ichor::findWalkRoute(walking, from, to);
+    const ichor::WalkRoute route = ichor::findWalkRoute(walking, from, to, params);
     if (!route.found) return false;
     path = route.waypoints;
     return true;
@@ -182,7 +182,7 @@ WalkProbeResult probeWalk(const worldforge::ForgedWorld& world, const WalkProbeP
         out.tripMetres = distance;
         glm::dvec3 from{spawn.x, forged.field.heightAt(spawn.x, spawn.z), spawn.z};
         std::vector<glm::dvec3> path;
-        out.routeFound = routeOnFoot(walking, from, goal, path);
+        out.routeFound = routeOnFoot(walking, from, goal, path, params.route);
         for (glm::dvec3& p : path) p.y = forged.field.heightAt(p.x, p.z);
         ichor::WalkBotParams bot;
         bot.arriveMetres = params.arriveMetres;
