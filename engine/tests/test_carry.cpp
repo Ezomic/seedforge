@@ -28,6 +28,20 @@ struct Shared {
     std::vector<std::string> problems;
 };
 
+// A weighty item with no other loot within reach, so standing on it picks up exactly that one.
+const PlacedLoot* isolatedTarget(const PlacedLootSet& set, const CarryCatalogue& c)
+{
+    for (const PlacedLoot& item : set.all()) {
+        const ItemDef* def = c.items().find(item.itemId);
+        if (def == nullptr || def->weightUnits < 100) continue;
+        const bool alone = std::ranges::none_of(set.all(), [&](const PlacedLoot& other) {
+            return &other != &item && std::hypot(other.x - item.x, other.z - item.z) <= 2.0 * kCarryReachM;
+        });
+        if (alone) return &item;
+    }
+    return nullptr;
+}
+
 const Shared& shared()
 {
     static const Shared s = [] {
@@ -60,7 +74,7 @@ const Shared& shared()
             PlacedPois pois = placeForgedPois(world, adapted.field);
             if (!pois.ok()) continue;
             PlacedLootResult placed = placeForgedLoot(world, pois.set, infos, adapted.field);
-            if (placed.ok() && !placed.set.empty()) {
+            if (placed.ok() && !placed.set.empty() && isolatedTarget(placed.set, catalogue)) {
                 out.loot = std::make_shared<const PlacedLootSet>(std::move(placed.set));
                 return out;
             }
@@ -79,15 +93,8 @@ CarryCatalogue catalogue()
 
 const PlacedLoot& target()
 {
-    static const PlacedLoot* const found = [] {
-        const CarryCatalogue c = catalogue();
-        for (const PlacedLoot& item : shared().loot->all()) {
-            const ItemDef* def = c.items().find(item.itemId);
-            if (def != nullptr && def->weightUnits >= 100) return &item;
-        }
-        FAIL("no placed item with a weight");
-        return &shared().loot->all().front();
-    }();
+    static const PlacedLoot* const found = isolatedTarget(*shared().loot, catalogue());
+    REQUIRE(found != nullptr);
     return *found;
 }
 
