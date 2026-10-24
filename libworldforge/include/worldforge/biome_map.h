@@ -424,9 +424,9 @@ inline std::uint64_t hashBiomeMap(const BiomeMap& map)
     const auto mix = [&](std::uint64_t v) { h = splitmix64(h ^ v); };
     mix(static_cast<std::uint64_t>(map.width));
     mix(static_cast<std::uint64_t>(map.height));
-    const auto at = [](const std::vector<std::uint8_t>& layer, std::size_t c) -> std::uint64_t { return c < layer.size() ? layer[c] : 0; };
-    for (std::size_t c = 0; c < map.biome.size(); ++c) {
-        mix((static_cast<std::uint64_t>(map.biome[c]) << 16) | (at(map.secondary, c) << 8) | at(map.blend, c));
+    const std::size_t cells = std::min({ map.biome.size(), map.secondary.size(), map.blend.size() });
+    for (std::size_t c = 0; c < cells; ++c) {
+        mix((static_cast<std::uint64_t>(map.biome[c]) << 16) | (static_cast<std::uint64_t>(map.secondary[c]) << 8) | map.blend[c]);
     }
     return h;
 }
