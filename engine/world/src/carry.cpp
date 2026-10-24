@@ -277,7 +277,7 @@ CarryView CarrySystem::view(const Scene& scene) const
 bool CarrySystem::itemWithinReach(const Scene& scene) const
 {
     for (auto [entity, player, transform] : scene.registry().view<const Player, const Transform>().each()) {
-        return nearest(carried(scene), transform.position.x, transform.position.z).found;
+        return nearest(carried(scene), transform.position.x, transform.position.z, transform.position.y).found;
     }
     return false;
 }
