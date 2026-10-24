@@ -411,9 +411,10 @@ TEST_CASE("selling pays the buyback share, tier prices stand in for goods with n
     REQUIRE(resold->stock == 1);
     REQUIRE(resold->price == 120);
 
+    // Bought back at the full price, which the purse cannot yet meet.
     rig.choose("buy:" + gear.id);
-    REQUIRE(rig.count(gear.id) == 1);
-    REQUIRE(rig.state().coin == coin + 60 - 120);
+    REQUIRE(rig.count(gear.id) == 0);
+    REQUIRE(rig.state().coin == coin + 60);
 }
 
 TEST_CASE("a merchant will not buy a key, and sells nothing it was never stocked with", "[parley][trade]")
@@ -443,7 +444,7 @@ TEST_CASE("the trade page lists what the player may sell with the buyback price"
     const ParleyView page = rig.parley.view(rig.scene);
     REQUIRE(page.selling.size() == 1);
     REQUIRE(page.selling.front().key == "sell:pitch_torch");
-    REQUIRE(page.selling.front().price == "2 c"); // 5 coin, half of it, rounded down
+    REQUIRE(page.selling.front().price == "3 c"); // 5 coin, half of it, rounded up
     REQUIRE(page.selling.front().detail == "you hold 2");
     REQUIRE(page.choices.size() == 1);
     REQUIRE(page.choices.front().key == "back");
