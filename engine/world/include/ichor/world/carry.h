@@ -169,6 +169,15 @@ public:
 
     static bool isTaken(const Carried* carried, std::string_view itemId);
 
+    // True when F would pick something up where the player stands.
+    bool itemWithinReach(const Scene& scene) const;
+    // How many of an item the player holds.
+    std::uint32_t countOf(const Scene& scene, std::string_view itemId) const;
+    // For another system's command handler (a trade, a handed-in quest item): change what is held at once, all or nothing.
+    // `force` lets a reward take the load past capacity. Neither says anything on screen.
+    InventoryStatus addHeld(Scene& scene, std::string_view itemId, std::uint32_t count, bool force) const;
+    InventoryStatus removeHeld(Scene& scene, std::string_view itemId, std::uint32_t count) const;
+
 private:
     struct Target {
         bool found = false;

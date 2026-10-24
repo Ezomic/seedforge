@@ -29,7 +29,9 @@
 #include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/character_screen.h"
+#include "ichor/ui/dialogue_screen.h"
 #include "ichor/ui/inventory_screen.h"
+#include "ichor/ui/quest_journal.h"
 #include "ichor/ui/journal_screen.h"
 #include "ichor/ui/landmark_compass_screen.h"
 #include "ichor/ui/journal_screen_bind.h"
@@ -67,6 +69,7 @@
 #include "ichor/world/forged_campaign_hook.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/world/carry.h"
+#include "ichor/world/parley.h"
 #include "ichor/world/forged_water_view.h"
 #include "ichor/npc/schedule.h"
 #include "ichor/ui/journal_screen_model.h"
@@ -137,6 +140,9 @@ struct Options {
     int lootIndex = -1;       // --forged: start beside this placed item (an index in the loot set's order)
     std::vector<std::string> give; // --forged: items granted at the start, as a reward would be (--give id,id)
     bool showInventory = false; // --inventory: start with the inventory screen open
+    bool talk = false;          // --forged: start in conversation with the merchant who asks the errand
+    bool acceptQuest = false;   // --forged: the errand is taken at the start
+    bool showJournal = false;   // --journal: start with the journal open
     bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
     bool combatDebug = false; // --combat: keep the Stage 0 debug rings, lines and collider lines (F3 full shows them too)
     bool combatDuel = false;  // --combat: begin a few metres from the enemy instead of at the spawn
@@ -210,6 +216,12 @@ bool parse(int argc, char** argv, Options& options)
             }
         } else if (arg == "--inventory") {
             options.showInventory = true;
+        } else if (arg == "--talk") {
+            options.talk = true;
+        } else if (arg == "--accept-quest") {
+            options.acceptQuest = true;
+        } else if (arg == "--journal") {
+            options.showJournal = true;
         } else if (arg == "--dungeon" && hasValue) {
             if (!parseNumber(argv[++i], options.dungeon) || options.dungeon < 0) return false;
         } else if (arg == "--enter-dungeon") {
@@ -815,6 +827,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const ichor::RoadField& roadField = forged ? static_cast<const ichor::RoadField&>(*forged->roads) : noRoads;
     int roadBonusPermille = ichor::kDefaultRoadBonusPermille;
     std::unique_ptr<ichor::CarrySystem> carry; // made below, once the data is loaded; the speed modifier reads it
+    std::unique_ptr<ichor::ParleySystem> parley;
     if (waterField) {
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
             const double load = carry ? carry->speedFactor(engine.scene()) : 1.0;
@@ -930,6 +943,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             carry->setInteriorLoot([&dungeonEntry] { return &dungeonEntry->content().loot; });
         }
         carry->install(engine.scene());
+        parley = std::make_unique<ichor::ParleySystem>(ichor::ParleyWorld{forged->cast, forged->pois, forged->loot, forged->spawn.x, forged->spawn.z, forged->desc.seed}, data, *carry);
+        for (const std::string& problem : parley->problems()) {
+            ichor::logf(ichor::LogLevel::Warn, "{}", problem);
+        }
+        parley->install(engine.scene());
     }
 
     if (!options.loadSlot.empty()) {
@@ -949,9 +967,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return 1;
         }
     } else if (forged) {
+        const ichor::NpcSpawn* errandGiver = parley->binding().bound ? forged->cast->find(parley->binding().giverNpc) : nullptr;
+        if ((options.talk || options.acceptQuest) && errandGiver != nullptr) {
+            anchor = {errandGiver->x + 1.5, errandGiver->groundY + 0.5, errandGiver->z};
+        }
         populateForged(engine.scene(), anchor);
         for (const std::string& item : options.give) {
             carry->requestGrant(engine.scene(), item, 1);
+        }
+        if (errandGiver != nullptr && options.talk) {
+            parley->begin(engine.scene(), errandGiver->npcId);
+        }
+        if (errandGiver != nullptr && options.acceptQuest) {
+            parley->choose(engine.scene(), "accept");
         }
         if (combat) {
             combat->install(engine.scene(), ichor::StableId::of("player"), anchor);
@@ -1230,6 +1258,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::CharacterScreen> characterScreen;
     std::unique_ptr<ichor::InventoryScreen> inventoryScreen;
+    std::unique_ptr<ichor::DialogueScreen> dialogueScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::MapScreenBinding> mapBinding;
@@ -1267,6 +1296,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
             characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             inventoryScreen = std::make_unique<ichor::InventoryScreen>(*ui);
+            dialogueScreen = std::make_unique<ichor::DialogueScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui);
             if (forged) {
@@ -1290,7 +1320,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             combatHud.reset();
             newGameScreen.reset();
@@ -1298,6 +1328,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             landmarkCompass.reset();
             mapBinding.reset();
             mapScreen.reset();
+            dialogueScreen.reset();
             inventoryScreen.reset();
             characterScreen.reset();
             journalScreen.reset();
@@ -1312,6 +1343,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         platform.setMouseSensitivity(options.mouseSensitivity);
         if (options.showInventory && carry && !editing) {
             inventoryScreen->setVisible(true);
+        }
+        if (options.showJournal && !editing) {
+            journalScreen->setVisible(true);
         }
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
@@ -1372,9 +1406,21 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                                 static_cast<std::uint8_t>(quest.intensity)});
                         }
                     }
+                    if (parley) {
+                        for (ichor::JournalModelEntry& line : ichor::questJournalEntries(parley->questLog(engine.scene()), engine.scene().tickCount())) {
+                            entries.push_back(std::move(line));
+                        }
+                    }
                     ichor::bindJournalModel(*journalScreen, entries);
                 }
                 mapBinding->setVisible(mapScreen->visible());
+                if (parley) {
+                    const ichor::ParleyView talking = parley->view(engine.scene());
+                    dialogueScreen->setVisible(talking.open);
+                    if (talking.open) {
+                        dialogueScreen->bind(talking);
+                    }
+                }
                 if (inventoryScreen->visible() && carry) {
                     inventoryScreen->bind(ichor::buildInventoryScreen(carry->view(engine.scene()), carry->notice(engine.scene())));
                 }
@@ -1598,6 +1644,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (carry && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
             if (const std::string prompt = carry->prompt(scene); !prompt.empty()) {
                 hudGuide = prompt;
+            } else if (const std::string talk = parley ? parley->prompt(scene) : std::string(); !talk.empty()) {
+                hudGuide = talk;
             }
         }
     });
@@ -1638,7 +1686,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // The journal is only a view, so it works in a replay too.
         const bool menu = (buttons & ichor::InputFrame::Menu) != 0;
         if (menu && !menuHeld && pauseMenu) {
-            if (inventoryScreen && inventoryScreen->visible()) {
+            if (parley && parley->open()) {
+                parley->close();
+            } else if (inventoryScreen && inventoryScreen->visible()) {
                 inventoryScreen->setVisible(false);
             } else if (mapScreen && mapScreen->visible()) {
                 mapScreen->setVisible(false); // Esc first puts the map away
@@ -1703,6 +1753,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (journalScreen->takeCloseRequest()) {
                 journalScreen->setVisible(false);
+            }
+            for (const std::string& key : dialogueScreen->takeChoices()) {
+                if (parley) parley->choose(engine.scene(), key);
             }
             if (inventoryScreen->takeCloseRequest()) {
                 inventoryScreen->setVisible(false);
@@ -1937,7 +1990,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert] [--combat-debug]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert] [--combat-debug]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
