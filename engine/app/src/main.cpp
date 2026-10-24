@@ -7,6 +7,7 @@
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
 #include "ichor/combat_bridge/combat_bridge.h"
+#include "ichor/combat_bridge/dungeon_fight.h"
 #include "ichor/audio/music_player.h"
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
@@ -122,6 +123,7 @@ struct Options {
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
     bool enterDungeon = false; // --forged: go in as soon as an entrance is in reach, as if Enter were pressed
+    int dungeonRoom = -1;      // --enter-dungeon: come in standing in this room (an index in the dungeon's rooms) instead of the entry room
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
@@ -223,6 +225,8 @@ bool parse(int argc, char** argv, Options& options)
             if (!parseNumber(argv[++i], options.dungeon) || options.dungeon < 0) return false;
         } else if (arg == "--enter-dungeon") {
             options.enterDungeon = true;
+        } else if (arg == "--dungeon-room" && hasValue) {
+            if (!parseNumber(argv[++i], options.dungeonRoom) || options.dungeonRoom < 0) return false;
         } else if (arg == "--settlement" && hasValue) {
             if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0 || options.biome) return false;
         } else if (arg == "--world" && hasValue) {
@@ -737,6 +741,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::ForgedScenery scenery;
     std::set<std::string> bakedDungeons;
     std::unique_ptr<ichor::DungeonEntry> dungeonEntry;
+    std::unique_ptr<ichor::DungeonFight> dungeonFight; // SEED-648: the enemies in the dungeons, with --combat
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
     if (forged) {
@@ -751,11 +756,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         const std::uint32_t dungeonKitBase = renderer.meshCount();
         if (renderer.uploadBundle(ichor::buildDungeonKit())) {
-            dungeonEntry = std::make_unique<ichor::DungeonEntry>(*forged, dungeonKitBase, ichor::DungeonEntryParams{.autoEnter = options.enterDungeon});
+            dungeonEntry = std::make_unique<ichor::DungeonEntry>(*forged, dungeonKitBase, ichor::DungeonEntryParams{.autoEnter = options.enterDungeon, .startRoom = options.dungeonRoom});
         } else {
             ichor::log(ichor::LogLevel::Warn, "the dungeon kit could not be uploaded; dungeons cannot be entered");
         }
     }
+    // The loot that lies inside a dungeon is not also outside its door.
+    const std::shared_ptr<const ichor::PlacedLootSet> outdoorSet = forged ? ichor::outdoorLoot(*forged) : nullptr;
     ichor::StreamerConfig streaming;
     streaming.synchronous = options.headless || !options.screenshot.empty(); // a replay or an unthrottled screenshot must see the same cells on the same frames
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
@@ -776,7 +783,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
-        streaming.loot = forged->loot;
+        streaming.loot = outdoorSet;
         streaming.cast = forged->cast;
         waterField = forged->waterField.get();
     } else if (!heightfield.empty()) {
@@ -925,9 +932,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     // What the player carries: registered before any slot loads, since its component is part of the snapshot.
     if (forged) {
         std::vector<std::string> carryProblems;
-        carry = std::make_unique<ichor::CarrySystem>(forged->loot, ichor::CarryCatalogue::fromData(data, carryProblems));
+        carry = std::make_unique<ichor::CarrySystem>(outdoorSet, ichor::CarryCatalogue::fromData(data, carryProblems));
         for (const std::string& problem : carryProblems) {
             ichor::logf(ichor::LogLevel::Warn, "carry: {}", problem);
+        }
+        if (dungeonEntry) {
+            carry->setInteriorLoot([&dungeonEntry] { return &dungeonEntry->content().loot; });
         }
         carry->install(engine.scene());
         parley = std::make_unique<ichor::ParleySystem>(ichor::ParleyWorld{forged->cast, forged->pois, forged->loot, forged->spawn.x, forged->spawn.z, forged->desc.seed}, data, *carry);
@@ -1091,6 +1101,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // the streamer itself until the required ring is in.
         if (dungeonEntry) {
             dungeonEntry->install(engine.scene());
+            if (combat) {
+                dungeonFight = std::make_unique<ichor::DungeonFight>(*combat, *dungeonEntry);
+                dungeonFight->install(engine.scene(), ichor::StableId::of("player"));
+            }
         }
         // Inside a dungeon the player is outside the world: the cells around the entrance stay as they were.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
@@ -1139,6 +1153,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             lines.push_back(std::format("time {:02}:{:02}", static_cast<int>(hour), static_cast<int>((hour - std::floor(hour)) * 60.0f)));
             if (combat) {
                 combat->overlay(scene, lines);
+            }
+            if (dungeonFight) {
+                dungeonFight->overlay(scene, lines);
             }
         });
     }
@@ -1471,6 +1488,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (inDungeon) {
             ichor::applyDungeonInterior(view);
             dungeonEntry->appendInstances(view);
+            dungeonEntry->appendContentInstances(scene, view);
+            if (dungeonFight) {
+                dungeonFight->appendView(scene, view);
+            }
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -1518,7 +1539,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
         }
-        if (combat && !inDungeon) {
+        if (combat) {
             combat->buildView(scene, alpha, view);
         }
         const double cellMetres = heightfield.desc().cellMetres;
@@ -1616,7 +1637,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 viewYaw = static_cast<float>(*yaw);
             }
         }
-        if (carry && !inDungeon && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
+        if (carry && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
             if (const std::string prompt = carry->prompt(scene); !prompt.empty()) {
                 hudGuide = prompt;
             } else if (const std::string talk = parley ? parley->prompt(scene) : std::string(); !talk.empty()) {
@@ -1965,7 +1986,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 

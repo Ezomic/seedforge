@@ -1,6 +1,7 @@
 #include "ichor/world/dungeon_entry.h"
 
 #include "ichor/core/log.h"
+#include "ichor/world/carry.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -168,6 +169,7 @@ bool DungeonEntry::buildGeometry(Scene& scene, const std::string& poiId)
     }
     boxes_ = box.pieces.size();
     current_ = std::move(box);
+    content_ = buildDungeonContent(*layout.dungeon, current_, game_.loot ? lootAtPoi(*game_.loot, poiId) : std::vector<PlacedLoot>{});
     return true;
 }
 
@@ -178,6 +180,29 @@ void DungeonEntry::removeGeometry(Scene& scene)
     }
     boxes_ = 0;
     current_ = DungeonGreyBox{};
+    content_ = DungeonContent{};
+}
+
+void DungeonEntry::appendContentInstances(const Scene& scene, RenderView& view) const
+{
+    const Carried* carried = nullptr;
+    for (auto [entity, player, held] : scene.registry().view<const Player, const Carried>().each()) {
+        carried = &held;
+        break;
+    }
+    const auto add = [&](GreyBoxKind kind, const glm::dvec3& feet, float width, float height) {
+        RenderInstance instance;
+        instance.mesh = kitFirstMesh_ + static_cast<std::uint32_t>(kind);
+        instance.position = feet + glm::dvec3(0.0, height * 0.5f, 0.0);
+        instance.basis = glm::mat3(glm::vec3(width, 0.0f, 0.0f), glm::vec3(0.0f, height, 0.0f), glm::vec3(0.0f, 0.0f, width));
+        view.instances.push_back(instance);
+    };
+    for (const PlacedLoot& item : content_.loot) {
+        if (!CarrySystem::isTaken(carried, item.itemId)) add(GreyBoxKind::Loot, {item.x, static_cast<double>(item.groundY), item.z}, 0.45f, 0.45f);
+    }
+    if (content_.bossRoom != 0) {
+        add(GreyBoxKind::Boss, content_.bossMarker, 0.5f, roomCleared(scene, content_, content_.bossRoom) ? 0.6f : 3.2f);
+    }
 }
 
 void DungeonEntry::enter(Scene& scene, const PlacedPoi& poi)
@@ -193,7 +218,8 @@ void DungeonEntry::enter(Scene& scene, const PlacedPoi& poi)
     marker.transform.position = player.position;
     scene.enqueue(marker);
     Transform moved = scene.registry().get<Transform>(player.entity);
-    moved.position = current_.spawn;
+    const bool startInRoom = params_.startRoom >= 0 && static_cast<std::size_t>(params_.startRoom) < content_.rooms.size();
+    moved.position = startInRoom ? content_.rooms[static_cast<std::size_t>(params_.startRoom)].centre + glm::dvec3(0.0, 0.5, 0.0) : current_.spawn;
     scene.enqueue(SetTransformCommand{playerId(), moved});
     viewYaw_ = current_.spawnYaw;
     logf(LogLevel::Info, "entered dungeon {} ({}) at tick {}", poi.id, poi.archetype, scene.tickCount());
