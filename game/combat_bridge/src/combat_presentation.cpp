@@ -12,6 +12,7 @@ namespace {
 constexpr double kLiftM = 0.06;       // above the terrain, so the lines do not z-fight with it
 constexpr double kRowSpacingM = 0.06; // between the fill's cross lines
 constexpr double kSegmentM = 0.25;    // the longest straight piece, so a line follows the ground's slope
+constexpr double kMaxReachM = 50.0;   // a cone longer than this is a broken tuning, not an attack
 
 glm::vec3 colourOf(TelegraphPhase phase)
 {
@@ -56,9 +57,9 @@ EnemyTelegraph enemyTelegraph(const stage0::Combatant& enemy, const stage0::Tuni
 {
     const bool heavy = enemy.attack == static_cast<std::uint8_t>(stage0::AttackKind::Heavy);
     switch (enemy.combatState()) {
-    case stage0::CombatState::Windup: return {TelegraphPhase::Windup, heavy, fraction(enemy.stateTime, heavy ? tuning.heavyWindup : tuning.lightWindup)};
-    case stage0::CombatState::Active: return {TelegraphPhase::Active, heavy, 1.0f};
-    case stage0::CombatState::Recovery: return {TelegraphPhase::Recovery, heavy, 1.0f - fraction(enemy.stateTime, heavy ? tuning.heavyRecovery : tuning.lightRecovery)};
+    case stage0::CombatState::Windup: return {TelegraphPhase::Windup, fraction(enemy.stateTime, heavy ? tuning.heavyWindup : tuning.lightWindup)};
+    case stage0::CombatState::Active: return {TelegraphPhase::Active, 1.0f};
+    case stage0::CombatState::Recovery: return {TelegraphPhase::Recovery, 1.0f - fraction(enemy.stateTime, heavy ? tuning.heavyRecovery : tuning.lightRecovery)};
     default: break;
     }
     return {};
@@ -82,6 +83,7 @@ void appendEnemyTelegraph(const EnemyTelegraph& telegraph, glm::dvec3 feet, glm:
     const double reach = static_cast<double>(tuning.attackRange) + tuning.attackRadius;
     const double baseHalf = tuning.bodyRadius;
     const double endHalf = tuning.attackRadius;
+    if (!std::isfinite(reach + baseHalf + endHalf) || reach < 0.0 || reach > kMaxReachM || baseHalf < 0.0 || endHalf < 0.0 || baseHalf > kMaxReachM || endHalf > kMaxReachM) return;
     const auto halfAt = [&](double u) { return baseHalf + (endHalf - baseHalf) * (reach > 0.0 ? u / reach : 0.0); };
     const auto at = [&](double u, double v) { return feet + f * u + r * v; };
 

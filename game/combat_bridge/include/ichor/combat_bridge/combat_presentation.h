@@ -20,7 +20,6 @@ enum class TelegraphPhase : std::uint8_t { None, Windup, Active, Recovery };
 // The enemy's attack as the eye should read it, a pure function of its combat state and the tuning's timings.
 struct EnemyTelegraph {
     TelegraphPhase phase = TelegraphPhase::None;
-    bool heavy = false;
     float progress = 0.0f; // Windup: charge 0..1. Active: 1. Recovery: what is left of it, 1..0.
 };
 

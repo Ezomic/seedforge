@@ -51,12 +51,10 @@ TEST_CASE("the telegraph phase follows the combat state and the tuning's timings
         CHECK(start.progress == 0.0f);
         CHECK(half.progress == Catch::Approx(0.5f));
         CHECK(done.progress == 1.0f);
-        CHECK_FALSE(half.heavy);
     }
     SECTION("a heavy wind-up takes the heavy timing")
     {
         const EnemyTelegraph half = enemyTelegraph(enemyIn(stage0::CombatState::Windup, tuning.lightWindup, stage0::AttackKind::Heavy), tuning);
-        CHECK(half.heavy);
         CHECK(half.progress == Catch::Approx(tuning.lightWindup / tuning.heavyWindup));
     }
     SECTION("the live blow is full and the recovery drains")
@@ -101,14 +99,14 @@ TEST_CASE("the debug aids are off unless F3 is at full or --combat-debug asks", 
 
 TEST_CASE("the ground cone grows through the wind-up, is solid while live and drains in the recovery", "[combat_presentation]")
 {
-    const double early = totalLength(cone({TelegraphPhase::Windup, false, 0.1f}));
-    const double late = totalLength(cone({TelegraphPhase::Windup, false, 1.0f}));
-    const double live = totalLength(cone({TelegraphPhase::Active, false, 1.0f}));
-    const double spent = totalLength(cone({TelegraphPhase::Recovery, false, 0.1f}));
+    const double early = totalLength(cone({TelegraphPhase::Windup, 0.1f}));
+    const double late = totalLength(cone({TelegraphPhase::Windup, 1.0f}));
+    const double live = totalLength(cone({TelegraphPhase::Active, 1.0f}));
+    const double spent = totalLength(cone({TelegraphPhase::Recovery, 0.1f}));
     CHECK(late > early * 2.0);
     CHECK(live == Catch::Approx(late));
     CHECK(spent < late * 0.5);
-    CHECK(cone({TelegraphPhase::Windup, false, 1.0f}).size() > 40);
+    CHECK(cone({TelegraphPhase::Windup, 1.0f}).size() > 40);
 }
 
 TEST_CASE("the ground cone shows nothing for no attack, and rejects hostile input", "[combat_presentation]")
@@ -117,20 +115,35 @@ TEST_CASE("the ground cone shows nothing for no attack, and rejects hostile inpu
     std::vector<LineSegment> lines;
     const stage0::Tuning tuning;
     const float nan = std::numeric_limits<float>::quiet_NaN();
-    appendEnemyTelegraph({TelegraphPhase::Windup, false, 1.0f}, {0.0, 0.0, 0.0}, {0.0f, 0.0f, 0.0f}, tuning, {}, lines);
-    appendEnemyTelegraph({TelegraphPhase::Windup, false, 1.0f}, {0.0, 0.0, 0.0}, {nan, 0.0f, 1.0f}, tuning, {}, lines);
-    appendEnemyTelegraph({TelegraphPhase::Windup, false, 1.0f}, {nan, 0.0, 0.0}, {0.0f, 0.0f, 1.0f}, tuning, {}, lines);
+    appendEnemyTelegraph({TelegraphPhase::Windup, 1.0f}, {0.0, 0.0, 0.0}, {0.0f, 0.0f, 0.0f}, tuning, {}, lines);
+    appendEnemyTelegraph({TelegraphPhase::Windup, 1.0f}, {0.0, 0.0, 0.0}, {nan, 0.0f, 1.0f}, tuning, {}, lines);
+    appendEnemyTelegraph({TelegraphPhase::Windup, 1.0f}, {nan, 0.0, 0.0}, {0.0f, 0.0f, 1.0f}, tuning, {}, lines);
     CHECK(lines.empty());
-    appendEnemyTelegraph({TelegraphPhase::Windup, false, nan}, {0.0, 0.0, 0.0}, {0.0f, 0.0f, 1.0f}, tuning, {}, lines);
+    appendEnemyTelegraph({TelegraphPhase::Windup, nan}, {0.0, 0.0, 0.0}, {0.0f, 0.0f, 1.0f}, tuning, {}, lines);
     for (const LineSegment& line : lines) {
         CHECK(std::isfinite(line.a.x + line.a.y + line.a.z + line.b.x + line.b.y + line.b.z));
+    }
+}
+
+TEST_CASE("a broken tuning draws no cone and cannot run away", "[combat_presentation]")
+{
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float inf = std::numeric_limits<float>::infinity();
+    for (const float bad : {nan, inf, -inf, 1.0e9f, -1.0f}) {
+        for (int field = 0; field < 3; ++field) {
+            stage0::Tuning tuning;
+            (field == 0 ? tuning.attackRange : field == 1 ? tuning.attackRadius : tuning.bodyRadius) = bad;
+            std::vector<LineSegment> lines;
+            appendEnemyTelegraph({TelegraphPhase::Active, 1.0f}, {0.0, 0.0, 0.0}, {0.0f, 0.0f, 1.0f}, tuning, {}, lines);
+            CHECK(lines.empty());
+        }
     }
 }
 
 TEST_CASE("the ground cone lies on a sloped ground and starts at the enemy's feet", "[combat_presentation]")
 {
     const auto slope = [](double x, double) { return 0.5 * x; };
-    const std::vector<LineSegment> lines = cone({TelegraphPhase::Active, false, 1.0f}, slope);
+    const std::vector<LineSegment> lines = cone({TelegraphPhase::Active, 1.0f}, slope);
     REQUIRE_FALSE(lines.empty());
     double nearest = 1e9;
     for (const LineSegment& line : lines) {
@@ -141,6 +154,6 @@ TEST_CASE("the ground cone lies on a sloped ground and starts at the enemy's fee
     }
     CHECK(nearest < 0.5);
 
-    const std::vector<LineSegment> flat = cone({TelegraphPhase::Active, false, 1.0f});
+    const std::vector<LineSegment> flat = cone({TelegraphPhase::Active, 1.0f});
     for (const LineSegment& line : flat) CHECK(line.a.y == Catch::Approx(2.06));
 }
