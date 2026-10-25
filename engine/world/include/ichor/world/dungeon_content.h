@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,7 @@ struct DungeonRoom {
     graph::NodeId id = 0;
     std::string type;          // the mission graph's room type: entry, challenge, key, climax, ...
     glm::dvec3 centre{0.0};    // the middle of the floor
+    bool reachable = true;     // the player can walk here from the entry room through doorways and ramps
 };
 
 struct DungeonEnemy {
@@ -54,6 +56,20 @@ inline constexpr std::size_t kPosts = 4;
 inline constexpr std::size_t kMaxLoot = 4096;
 inline constexpr double kHallHalfM = greybox::kRoomHalfM + greybox::kWallM; // a room owns its hall and the wall around it
 }
+
+// How the player gets from one room to the next: through a doorway on the same floor, or up or down a ramp.
+enum class RoomLink : std::uint8_t { Door, RampUp, RampDown };
+
+struct RoomStep {
+    graph::NodeId room = 0; // the room the step arrives in
+    RoomLink link = RoomLink::Door;
+};
+
+// The shortest walk, by rooms, from one room to another over the grey-box's doorways and ramps (what the player's body can
+// pass, not the mission graph's logical links). A doorway in the wall a ramp or its hole runs along is not passable: the ramp
+// fills the strip in front of it in the lower room and the hole does in the upper one. Empty for the same room, nullopt when
+// `to` cannot be reached. Pure; of equal routes the one that tries north, east, south, west, up, down in that order first wins.
+std::optional<std::vector<RoomStep>> routeBetweenRooms(const DungeonGreyBox& box, graph::NodeId from, graph::NodeId to);
 
 struct DungeonContent {
     std::string poiId;
@@ -76,6 +92,18 @@ DungeonContent buildDungeonContent(const BakedDungeon& dungeon, const DungeonGre
 
 // The loot the manifest places at a dungeon POI, in the world set's order.
 std::vector<PlacedLoot> lootAtPoi(const PlacedLootSet& loot, const std::string& poiId);
+
+// Where one placed item ends up, for a system that wants to send the player to it (the errand). `inside` is false for an item
+// that stays outdoors at the dungeon's mouth (a dungeon that cannot be baked) or that the dungeon does not hold.
+struct ItemSite {
+    bool inside = false;
+    bool reachable = false;  // the room can be walked to from the entry room
+    bool guarded = false;    // the room holds enemies
+    bool crowded = false;    // another item lies on the very same spot (a room holds more items than it has spots), so F takes one per press
+    graph::NodeId room = 0;
+    std::string roomType;
+};
+ItemSite itemSite(const ForgedGame& game, const std::string& poiId, const std::string& itemId);
 
 // The world's loot without the items that now lie inside a dungeon that can be entered (one with a usable slot): an
 // item is never in two places. The same set when there is nothing to move, null for a game without loot.

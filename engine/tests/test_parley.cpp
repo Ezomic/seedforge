@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <limits>
 #include <map>
 #include <memory>
@@ -248,6 +249,74 @@ TEST_CASE("a world with no merchant, or no dungeon loot, has no errand and nobod
     REQUIRE_FALSE(empty.binding().bound);
     REQUIRE(empty.npcInReach(noCast.scene) == nullptr);
     REQUIRE(empty.prompt(noCast.scene).empty());
+}
+
+TEST_CASE("the errand prefers an item in a room the player can walk to and nobody guards, skips a sealed one, and says why when there is none", "[parley]")
+{
+    const ForgedGame& game = *shared().game;
+    Rig plain;
+    const std::string nearest = plain.parley.binding().itemId;
+    REQUIRE(game.loot->all().size() > 1);
+
+    const auto bindWith = [&](std::function<ItemSite(const PlacedLoot&)> siteOf) {
+        ParleyWorld world = worldOf(game);
+        world.siteOf = std::move(siteOf);
+        ParleySystem parley(world, shared().data, plain.carry);
+        return parley.binding();
+    };
+    const auto safe = [] {
+        ItemSite site;
+        site.inside = true;
+        site.reachable = true;
+        site.roomType = "reward";
+        return site;
+    };
+
+    // The nearest item stands guarded: any other item in a safe room beats it, wherever it lies.
+    const QuestBinding guarded = bindWith([&](const PlacedLoot& item) {
+        ItemSite site = safe();
+        site.guarded = item.itemId == nearest;
+        return site;
+    });
+    REQUIRE(guarded.bound);
+    CHECK(guarded.itemId != nearest);
+    CHECK(guarded.inside);
+    CHECK(guarded.roomType == "reward");
+
+    // An item in a room that cannot be walked to is never chosen.
+    const QuestBinding sealed = bindWith([&](const PlacedLoot& item) {
+        ItemSite site = safe();
+        site.reachable = item.itemId != nearest;
+        return site;
+    });
+    REQUIRE(sealed.bound);
+    CHECK(sealed.itemId != nearest);
+
+    // A dungeon that cannot be entered leaves its items at the mouth: a last resort, behind every interior.
+    const QuestBinding outdoors = bindWith([&](const PlacedLoot& item) {
+        ItemSite site = item.itemId == nearest ? ItemSite{} : safe();
+        return site;
+    });
+    CHECK(outdoors.inside);
+    CHECK(outdoors.itemId != nearest);
+    const QuestBinding atMouth = bindWith([](const PlacedLoot&) { return ItemSite{}; });
+    REQUIRE(atMouth.bound);
+    CHECK_FALSE(atMouth.inside);
+    CHECK(atMouth.itemId == nearest);
+
+    // Nothing the player can reach, or nobody to ask: no errand, with the reason.
+    const QuestBinding none = bindWith([](const PlacedLoot&) {
+        ItemSite site;
+        site.inside = true;
+        return site;
+    });
+    CHECK_FALSE(none.bound);
+    CHECK_FALSE(none.reason.empty());
+    ParleyWorld nobody = worldOf(game);
+    nobody.cast = std::make_shared<const PlacedCastSet>();
+    ParleySystem noGiver(nobody, shared().data, plain.carry);
+    CHECK_FALSE(noGiver.binding().bound);
+    CHECK(noGiver.binding().reason.find("merchant") != std::string::npos);
 }
 
 TEST_CASE("the shipped parley data loads without a problem", "[parley]")
