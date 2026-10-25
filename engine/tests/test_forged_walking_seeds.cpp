@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <format>
+#include <span>
 #include <string>
 
 using namespace ichor;
@@ -17,13 +18,15 @@ constexpr std::array<std::uint64_t, 8> kSeeds = {1, 3, 4, 5, 6, 7, 8, 10}; // se
 
 }
 
-TEST_CASE("from the spawn toward the nearest settlement on 8 seeds the walker arrives or names what stopped it", "[walking][bake]")
+namespace {
+
+void walkSeedsAndCheck(std::span<const std::uint64_t> seeds, int minimumArrived)
 {
     int arrived = 0;
     int blocked = 0;
     int withSettlement = 0;
     std::string log;
-    for (const std::uint64_t seed : kSeeds) {
+    for (const std::uint64_t seed : seeds) {
         const SeedWalk walk = walkSeed(seed, kGrid);
         if (!walk.hadSettlement) {
             log += std::format("seed {}: no settlement in range\n", seed);
@@ -49,9 +52,21 @@ TEST_CASE("from the spawn toward the nearest settlement on 8 seeds the walker ar
         REQUIRE(r.metresWalked > 1.0);
     }
     INFO(log);
-    REQUIRE(withSettlement == static_cast<int>(kSeeds.size()));
+    REQUIRE(withSettlement == static_cast<int>(seeds.size()));
     REQUIRE(arrived + blocked == withSettlement);
     // A walker that stops at every obstacle would still report honestly; the rules must also let it get places.
     // The rest end in a pocket of a few hundred thousand square metres that cliffs close in; the log above names each.
-    REQUIRE(arrived >= 5);
+    REQUIRE(arrived >= minimumArrived);
+}
+
+}
+
+TEST_CASE("from the spawn toward the nearest settlement on 3 seeds the walker arrives or names what stopped it", "[walking][bake]")
+{
+    walkSeedsAndCheck(std::span<const std::uint64_t>(kSeeds).first(3), 2);
+}
+
+TEST_CASE("from the spawn toward the nearest settlement on 8 seeds the walker arrives or names what stopped it", "[walking][bake]")
+{
+    walkSeedsAndCheck(kSeeds, 5);
 }

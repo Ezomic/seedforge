@@ -1,3 +1,5 @@
+#include "forged_world_fixture.h"
+
 #include "ichor/world/forged_heightfield.h"
 #include "ichor/world/forged_water.h"
 #include "ichor/world/water_field.h"
@@ -17,7 +19,7 @@ constexpr std::uint32_t kStride = 2;
 
 struct Fixture {
     WorldDesc desc;
-    worldforge::ForgedWorld world;
+    std::shared_ptr<const worldforge::ForgedWorld> world;
     Heightfield field;
     ForgedWater water;
 };
@@ -30,22 +32,19 @@ Fixture makeFixture(std::uint64_t seed)
     base.metresPerSample = 8;
     base.cellMetres = 512;
     const WorldDesc desc = forgedWorldDesc(base);
-    worldforge::ForgeConfig config;
-    config.hydrology.riverThreshold = 48;
-    worldforge::ForgedWorld world = worldforge::forgeWorld(desc.seed, kGrid, config, worldforge::ForgePhase::Hydrology);
-    REQUIRE(world.ok());
-    ForgedHeightfield forged = heightfieldFromForgedWorld(world, desc);
-    REQUIRE(forged.ok());
-    ForgedWater water = waterFromForgedWorld(world, forged.field);
+    test::ForgedVariant lowRiverThreshold;
+    lowRiverThreshold.riverThreshold = 48;
+    ForgeJobResult forged = test::forgedWorldFixture(base, kGrid, lowRiverThreshold);
+    ForgedWater water = waterFromForgedWorld(*forged.world, forged.heightfield);
     REQUIRE(water.ok());
-    return Fixture{desc, std::move(world), std::move(forged.field), std::move(water)};
+    return Fixture{desc, std::move(forged.world), std::move(forged.heightfield), std::move(water)};
 }
 
 // How many of the forged cells that pass `pick` have water at the sample on top of them, and how many pass.
 template <typename Pick>
 std::pair<int, int> wetCells(const Fixture& f, const WaterField& waterField, Pick pick)
 {
-    const worldforge::HydrologyMap& map = *f.world.hydrology();
+    const worldforge::HydrologyMap& map = *f.world->hydrology();
     int wet = 0;
     int seen = 0;
     for (int z = 1; z < kGrid - 1; ++z) {
@@ -132,7 +131,7 @@ TEST_CASE("forged lakes stand at the forged level, flat, and over their ground")
 TEST_CASE("the forged water draws: a river cell's mesh has vertices and a dry cell's has none")
 {
     const Fixture f = makeFixture(16);
-    const worldforge::HydrologyMap& map = *f.world.hydrology();
+    const worldforge::HydrologyMap& map = *f.world->hydrology();
     bool anyWet = false;
     bool anyDry = false;
     const std::uint32_t cellsPerSide = static_cast<std::uint32_t>(f.desc.sizeMetres / f.desc.cellMetres);
@@ -150,7 +149,7 @@ TEST_CASE("the forged water draws: a river cell's mesh has vertices and a dry ce
 TEST_CASE("bad input comes back as an error and nothing throws")
 {
     const Fixture f = makeFixture(16);
-    CHECK(!waterFromForgedWorld(f.world, Heightfield()).ok());
+    CHECK(!waterFromForgedWorld(*f.world, Heightfield()).ok());
 
     const worldforge::ForgedWorld early = worldforge::forgeWorld(23, kGrid, {}, worldforge::ForgePhase::Tectonics);
     CHECK(!waterFromForgedWorld(early, f.field).ok());
