@@ -1,3 +1,5 @@
+#include "forged_world_fixture.h"
+
 #include "ichor/world/forged_heightfield.h"
 #include "ichor/world/forged_navmesh.h"
 #include "ichor/world/forged_water.h"
@@ -15,11 +17,11 @@ using namespace ichor;
 
 namespace {
 
-worldforge::ForgeConfig lowRiverThreshold()
+test::ForgedVariant lowRiverThreshold()
 {
-    worldforge::ForgeConfig config;
-    config.hydrology.riverThreshold = 48;
-    return config;
+    test::ForgedVariant variant;
+    variant.riverThreshold = 48;
+    return variant;
 }
 
 constexpr int kGrid = 257;
@@ -51,13 +53,14 @@ private:
 };
 
 struct Fixture {
-    Fixture(const WorldDesc& d, worldforge::ForgedWorld w)
+    Fixture(const WorldDesc& d, ForgeJobResult forged)
         : desc(d)
-        , world(std::move(w))
+        , world(std::move(forged.world))
+        , field(std::move(forged.heightfield))
     {
     }
     WorldDesc desc;
-    worldforge::ForgedWorld world;
+    std::shared_ptr<const worldforge::ForgedWorld> world;
     Heightfield field;
     ForgedWater water;
     std::unique_ptr<WaterField> waterField;
@@ -72,13 +75,9 @@ std::unique_ptr<Fixture> makeFixtureOwned(std::uint64_t seed)
     base.metresPerSample = 8;
     base.cellMetres = 512;
     const WorldDesc desc = forgedWorldDesc(base);
-    auto owned = std::make_unique<Fixture>(desc, worldforge::forgeWorld(desc.seed, kGrid, lowRiverThreshold(), worldforge::ForgePhase::Hydrology));
+    auto owned = std::make_unique<Fixture>(desc, test::forgedWorldFixture(base, kGrid, lowRiverThreshold()));
     Fixture& f = *owned;
-    REQUIRE(f.world.ok());
-    ForgedHeightfield forged = heightfieldFromForgedWorld(f.world, f.desc);
-    REQUIRE(forged.ok());
-    f.field = std::move(forged.field);
-    f.water = waterFromForgedWorld(f.world, f.field);
+    f.water = waterFromForgedWorld(*f.world, f.field);
     REQUIRE(f.water.ok());
     f.waterField = std::make_unique<WaterField>(f.field, f.water.hydrology, f.water.rivers);
 

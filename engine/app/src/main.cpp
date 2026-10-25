@@ -836,6 +836,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return load * static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
         });
     }
+    // A forged world starts facing the place the spawn was searched around.
+    float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
     // Walking rules for the forged world: ground too steep or water too deep to walk stops the player, and a player
     // who keeps trying to move without getting anywhere is reported. The report only reads the scene: a teleport out
     // of it would be state the replay and the snapshots cannot see.
@@ -849,7 +851,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 if (ichor::inDungeonPocket(feet)) continue;
                 const bool wantsToMove = input.moveX != 0.0f || input.moveY != 0.0f;
                 const double probe = walking->params().probeMetres;
-                const ichor::WalkAssessment ahead = walking->assess(feet.x + input.moveX * probe, feet.z - input.moveY * probe);
+                const float yaw = combat && combat->live() ? combat->moveYaw(scene) : viewYaw;
+                const glm::vec3 step = ichor::walkRelativeIntent(glm::vec3(input.moveX, 0.0f, -input.moveY), yaw);
+                const ichor::WalkAssessment ahead = walking->assess(feet.x + step.x * probe, feet.z + step.z * probe);
                 const ichor::StuckReport stuck = detector.step(feet, wantsToMove, walking->assess(feet.x, feet.z), ahead.block, dt);
                 if (stuck.stuck) {
                     ichor::logf(ichor::LogLevel::Warn, "walking: {}", ichor::describeStuck(stuck));
@@ -1448,8 +1452,6 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::PickCamera pickCamera;
     ichor::SurfaceWetness surfaceWetness;
-    // A forged world starts facing the place the spawn was searched around.
-    float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
     exileAvatar.face(viewYaw);
     engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
         if (combat && combat->live()) return; // the fight steers and aims the camera itself

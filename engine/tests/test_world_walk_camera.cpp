@@ -1,3 +1,4 @@
+#include "ichor/anim/exile_avatar.h"
 #include "ichor/gfx/walk_camera.h"
 #include "ichor/sim/scene.h"
 
@@ -7,6 +8,7 @@
 
 #include <cmath>
 #include <limits>
+#include <utility>
 
 using namespace ichor;
 using Catch::Approx;
@@ -15,9 +17,10 @@ namespace {
 
 constexpr double kDt = 1.0 / 60.0;
 
-glm::dvec3 walked(glm::dvec3 start, InputFrame input, int ticks, float yaw = 0.0f)
+glm::dvec3 walked(glm::dvec3 start, InputFrame input, int ticks, float yaw = 0.0f, Scene::VelocityFilter filter = {})
 {
     Scene scene(1);
+    if (filter) scene.setVelocityFilter(std::move(filter));
     SpawnCommand spawn;
     spawn.id = StableId::of("player");
     spawn.name.value = "player";
@@ -152,4 +155,56 @@ TEST_CASE("the follow camera keeps clear of the ground and ignores a missing hei
     CHECK(followClearY(3.1, 3.0) == 3.0 + kFollowGroundClearance);
     CHECK(followClearY(-5.0, 3.0) == 3.0 + kFollowGroundClearance);
     CHECK(followClearY(7.0, std::numeric_limits<double>::quiet_NaN()) == 7.0);
+}
+
+TEST_CASE("the walking guard blocks the way the camera-relative step goes, not the way the keys point", "[camera][direction]")
+{
+    // Nothing may move toward +Z (south), as a cliff or deep water there would.
+    const auto southWall = [](const glm::dvec3&, const glm::dvec3& velocity) {
+        return velocity.z > 0.0 ? glm::dvec3(velocity.x, velocity.y, 0.0) : velocity;
+    };
+    const float east = 1.5707963f;
+    InputFrame right;
+    right.moveX = 1.0f;
+    InputFrame ahead;
+    ahead.moveY = 1.0f;
+    InputFrame back;
+    back.moveY = -1.0f;
+    const glm::dvec3 start(0.0, 0.0, 0.0);
+
+    // Facing east, D is south: the wall stops it. W is east: the wall does not matter.
+    CHECK(walked(start, right, 30, east, southWall).z < 0.01);
+    CHECK(walked(start, ahead, 30, east, southWall).x > 1.0);
+    // Facing west (yaw -90), S is east and A is south.
+    InputFrame left;
+    left.moveX = -1.0f;
+    CHECK(walked(start, left, 30, -east, southWall).z < 0.01);
+    CHECK(walked(start, back, 30, -east, southWall).x > 1.0);
+    // Facing south, W is south.
+    CHECK(walked(start, ahead, 30, 2.0f * east, southWall).z < 0.01);
+}
+
+TEST_CASE("all eight keys walk the camera-relative way and the avatar faces it, at three camera yaws", "[camera][direction]")
+{
+    constexpr float kSqrtHalf = 0.70710678f;
+    const float stick[8][2] = {{0, 1}, {kSqrtHalf, kSqrtHalf}, {1, 0}, {kSqrtHalf, -kSqrtHalf}, {0, -1}, {-kSqrtHalf, -kSqrtHalf}, {-1, 0}, {-kSqrtHalf, kSqrtHalf}};
+    for (const float yaw : {0.0f, 1.0f, -2.2f}) {
+        const glm::vec3 view = walkCameraRotation(yaw) * glm::vec3(0.0f, 0.0f, -1.0f);
+        const glm::vec3 side = walkCameraRotation(yaw) * glm::vec3(1.0f, 0.0f, 0.0f);
+        const glm::dvec2 ahead = glm::normalize(glm::dvec2(view.x, view.z));
+        const glm::dvec2 right = glm::normalize(glm::dvec2(side.x, side.z));
+        for (const auto& key : stick) {
+            InputFrame input;
+            input.moveX = key[0];
+            input.moveY = key[1];
+            const glm::dvec3 moved = walked(glm::dvec3(0.0), input, 30, yaw);
+            const glm::dvec2 wanted = glm::normalize(ahead * static_cast<double>(key[1]) + right * static_cast<double>(key[0]));
+            const glm::dvec2 got = glm::normalize(glm::dvec2(moved.x, moved.z));
+            INFO("yaw " << yaw << " stick " << key[0] << ", " << key[1]);
+            CHECK(glm::dot(got, wanted) > 0.999);
+            const float faced = yawOfMotion(moved.x, moved.z);
+            const glm::dvec2 facing(std::sin(faced), -std::cos(faced));
+            CHECK(glm::dot(facing, wanted) > 0.999);
+        }
+    }
 }

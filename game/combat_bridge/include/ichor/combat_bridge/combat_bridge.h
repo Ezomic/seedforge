@@ -58,6 +58,9 @@ public:
     InputFrame botInput(Scene& scene);
 
     bool live() const { return phase_ == Phase::Live; }
+    // The yaw the live fight turns the stick by (the player's facing, or the way to the enemy under lock-on): what
+    // forward means for the keys right now. Zero while there is no fight.
+    float moveYaw(const Scene& scene) const;
     // Still waiting for the enemy's post to have ground: the one state startAt applies to.
     bool waiting() const { return phase_ == Phase::WaitingForGround; }
     // For a player who began somewhere else than the world (inside a dungeon): the fight is set up at once, with the
