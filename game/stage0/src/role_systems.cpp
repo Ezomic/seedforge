@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace ichor::stage0 {
 
@@ -12,9 +13,17 @@ namespace {
 // Standing eyes for the line of sight check; the controller bodies stand at their feet.
 constexpr double kEyeHeightM = 1.5;
 
+// Beyond this the brains ignore the target anyway; clamping first keeps the cast to float defined.
+constexpr double kMaxCoordM = 1.0e9;
+
+float narrow(double v)
+{
+    return std::isfinite(v) ? static_cast<float>(std::clamp(v, -kMaxCoordM, kMaxCoordM)) : std::numeric_limits<float>::quiet_NaN();
+}
+
 glm::vec2 flatOf(const Transform& transform)
 {
-    return {static_cast<float>(transform.position.x), static_cast<float>(transform.position.z)};
+    return {narrow(transform.position.x), narrow(transform.position.z)};
 }
 
 }

@@ -2016,7 +2016,7 @@ int main(int argc, char** argv)
     if (!options.forged && !options.campaign.empty()) {
         ichor::log(ichor::LogLevel::Warn, "--campaign only applies with --forged and is ignored");
     }
-    if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty())) {
+    if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty() || !options.combatRole.empty())) {
         ichor::log(ichor::LogLevel::Warn, "--combat only applies with --forged and is ignored");
     }
     if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatFights.empty() || !options.combatRole.empty())) {

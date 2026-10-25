@@ -59,7 +59,10 @@ InputFrame roleBotInput(Scene& scene, const stage0::Stage0& stage)
     const stage0::Tuning& tuning = stage.tuning();
     const glm::dvec3 here = registry.get<Transform>(meEntity).position;
     const glm::dvec3 there = registry.get<Transform>(foeEntity).position;
-    const glm::vec2 toFoe(static_cast<float>(there.x - here.x), static_cast<float>(there.z - here.z));
+    const double dx = there.x - here.x;
+    const double dz = there.z - here.z;
+    if (!(std::abs(dx) < 1.0e6 && std::abs(dz) < 1.0e6)) return frame;
+    const glm::vec2 toFoe(static_cast<float>(dx), static_cast<float>(dz));
     const float distance = glm::length(toFoe);
     if (!std::isfinite(distance)) return frame;
     const glm::vec2 heading = distance > 1e-4f ? toFoe / distance : glm::vec2(0.0f, -1.0f);
@@ -79,7 +82,7 @@ InputFrame roleBotInput(Scene& scene, const stage0::Stage0& stage)
         const stage0::AnchorTuning& t = stage.anchorTuning();
         const float clear = t.slamRadius + kSlamMargin;
         const float commit = static_cast<float>((tuning.lightWindup + tuning.lightActive + tuning.lightRecovery) * kTicksPerSecond);
-        const int needed = static_cast<int>(commit + kRetreatMetres / tuning.moveSpeed * kTicksPerSecond) + kSpareTicks;
+        const int needed = static_cast<int>(commit + kRetreatMetres / std::max(tuning.moveSpeed, 0.1f) * kTicksPerSecond) + kSpareTicks;
         const bool slamming = anchor->anchorState() == stage0::AnchorState::Windup;
         if (!slamming && ticksToSlam(*anchor, foe, tuning, t) >= needed) {
             return strikeOrClose(false);

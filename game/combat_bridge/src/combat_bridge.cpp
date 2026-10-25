@@ -30,7 +30,7 @@ bool terrainClear(const Heightfield& heightfield, glm::dvec3 from, glm::dvec3 to
     const glm::dvec3 span = to - from;
     const double length = glm::length(span);
     if (!std::isfinite(length)) return false;
-    const int steps = std::clamp(static_cast<int>(length / kSightStepM), 1, kSightMaxSteps);
+    const int steps = static_cast<int>(std::clamp(length / kSightStepM, 1.0, static_cast<double>(kSightMaxSteps)));
     for (int i = 1; i < steps; ++i) {
         const glm::dvec3 at = from + span * (static_cast<double>(i) / steps);
         if (static_cast<double>(heightfield.heightAt(at.x, at.z)) > at.y) return false;
@@ -173,6 +173,7 @@ void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive, stage0::Foe
     moved.position = feet + kSettleLift;
     scene.enqueue(SetTransformCommand{stage_.foeId(), moved});
     foeParked_ = !alive;
+    lastRoleState_ = 0;
     lastEnemyAlive_ = alive;
     lastEnemyState_ = combatant.state;
 }
