@@ -276,9 +276,8 @@ void enterDungeon(Rig& rig, const Leg& toDungeon, const PlacedPoi& poi)
     for (int i = 0; i < 60; ++i) rig.tick();
 }
 
-// Plays the whole errand in one world and returns how many ramps the way to the item climbs. Every step that can fail has its own check,
-// so a red run names the step.
-std::size_t playthrough(std::uint64_t seed)
+// Plays the whole errand in one world. Every step that can fail has its own check, so a red run names the step.
+void playthrough(std::uint64_t seed)
 {
     INFO("seed " << seed);
     const std::unique_ptr<World> world = worldOf(seed);
@@ -329,8 +328,6 @@ std::size_t playthrough(std::uint64_t seed)
     const graph::NodeId entryRoom = rig->entryRoom();
     REQUIRE(entryRoom != 0);
     const graph::NodeId itemRoom = site.room;
-    std::size_t ramps = 0;
-    for (const RoomStep& step : *routeBetweenRooms(rig->entry.greyBox(), entryRoom, itemRoom)) ramps += step.link == RoomLink::Door ? 0 : 1;
     const bool inRoom = rig->walkRooms(entryRoom, itemRoom);
     INFO(rig->stuck);
     REQUIRE(inRoom);
@@ -414,7 +411,6 @@ std::size_t playthrough(std::uint64_t seed)
     CHECK(after.parley.stageOf(after.scene) == QuestStage::Done);
     CHECK(CarrySystem::isTaken(after.carry.carried(after.scene), binding.itemId));
     std::filesystem::remove_all(dir);
-    return ramps;
 }
 
 }
