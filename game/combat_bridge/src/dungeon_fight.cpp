@@ -14,6 +14,16 @@ namespace {
 // The entry room's far corner: clear of the arrival point, the exit marker and every doorway.
 constexpr glm::dvec3 kParkingOffset{-4.0, 0.0, -4.0};
 
+stage0::FoeRole foeRoleOf(DungeonEnemyRole role)
+{
+    switch (role) {
+    case DungeonEnemyRole::Anchor: return stage0::FoeRole::Anchor;
+    case DungeonEnemyRole::Artillery: return stage0::FoeRole::Artillery;
+    case DungeonEnemyRole::Skirmisher: break;
+    }
+    return stage0::FoeRole::Skirmisher;
+}
+
 }
 
 DungeonFight::DungeonFight(CombatBridge& bridge, const DungeonEntry& entry, DungeonFightConfig config)
@@ -97,7 +107,7 @@ void DungeonFight::leave()
 
 void DungeonFight::engage(Scene& scene, const DungeonEnemy& enemy)
 {
-    bridge_.placeFoe(scene, enemy.post);
+    bridge_.placeFoe(scene, enemy.post, foeRoleOf(enemy.role));
     bridge_.setFightSpawns(entryCentre(), enemy.post);
     engaged_ = Key{enemy.room, enemy.slot};
 }

@@ -1,5 +1,6 @@
 #include "ichor/combat_bridge/combat_bridge.h"
 
+#include "ichor/combat_bridge/role_bot.h"
 #include "ichor/combat_bridge/role_view.h"
 #include "ichor/core/log.h"
 #include "ichor/stage0/session_ledger.h"
@@ -58,10 +59,11 @@ CombatBridge::CombatBridge(const ForgedGame& game, const CombatSite& site, Comba
         walking_ = std::make_unique<ForgedWalking>(game_.heightfield, game_.waterField.get(), CapabilitySet{});
     }
     // The Anchor and the Artillery walk by the rules the player does: wading slows them and ground too steep stops them.
-    stage_.setGround({[this](glm::dvec3 from, glm::dvec3 to) { return terrainClear(game_.heightfield, from, to); },
+    // A dungeon is outside the world: its halls are flat, have no water, and the world's ground says nothing about them.
+    stage_.setGround({[this](glm::dvec3 from, glm::dvec3 to) { return inDungeonPocket(from) || terrainClear(game_.heightfield, from, to); },
         [this](double x, double z) { return game_.heightfield.empty() ? 0.0 : static_cast<double>(game_.heightfield.heightAt(x, z)); },
-        [this](glm::dvec3 at) { return game_.waterField ? static_cast<double>(wadingSpeedFactor(game_.waterField->at(at.x, at.z).depth)) : 1.0; },
-        [this](glm::dvec3 at, glm::dvec3 velocity) { return walking_ ? walking_->filterVelocity(at, velocity) : velocity; }});
+        [this](glm::dvec3 at) { return game_.waterField && !inDungeonPocket(at) ? static_cast<double>(wadingSpeedFactor(game_.waterField->at(at.x, at.z).depth)) : 1.0; },
+        [this](glm::dvec3 at, glm::dvec3 velocity) { return walking_ && !inDungeonPocket(at) ? walking_->filterVelocity(at, velocity) : velocity; }});
 }
 
 void CombatBridge::install(Scene& scene, StableId player, glm::dvec3 start)
@@ -126,7 +128,7 @@ void CombatBridge::setFightSpawns(glm::dvec3 playerFeet, glm::dvec3 foeFeet)
 }
 
 // The same reset the stage gives the foe, for the foe alone: resetFight would also move the player.
-void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive)
+void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive, stage0::FoeRole role)
 {
     auto& registry = scene.registry();
     const entt::entity foe = scene.find(stage_.foeId());
@@ -134,12 +136,20 @@ void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive)
         return;
     }
     const stage0::Tuning& tuning = stage_.tuning();
+    stage_.setFoeRole(role);
     stage0::Combatant combatant;
     combatant.side = 1;
     if (alive) {
         combatant.health = tuning.maxHealth;
         combatant.stamina = tuning.maxStamina;
         combatant.poise = tuning.maxPoise;
+        if (role == stage0::FoeRole::Anchor) {
+            combatant.health = stage_.anchorTuning().maxHealth;
+            combatant.poise = stage_.anchorTuning().maxPoise;
+        } else if (role == stage0::FoeRole::Artillery) {
+            combatant.health = stage_.artilleryTuning().maxHealth;
+            combatant.poise = stage_.artilleryTuning().maxPoise;
+        }
         const entt::entity player = scene.find(player_);
         combatant.yaw = stage0::yawTowards(feet, player != entt::null ? registry.get<Transform>(player).position : feet);
     } else {
@@ -149,7 +159,13 @@ void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive)
     registry.emplace_or_replace<stage0::Combatant>(foe, combatant);
     registry.remove<stage0::SkirmisherBrain>(foe);
     registry.remove<stage0::ControllerBrain>(foe);
-    if (alive) {
+    registry.remove<stage0::AnchorBrain>(foe);
+    registry.remove<stage0::ArtilleryBrain>(foe);
+    if (alive && role == stage0::FoeRole::Anchor) {
+        registry.emplace<stage0::AnchorBrain>(foe);
+    } else if (alive && role == stage0::FoeRole::Artillery) {
+        registry.emplace<stage0::ArtilleryBrain>(foe);
+    } else if (alive) {
         registry.emplace<stage0::SkirmisherBrain>(foe);
     }
     registry.get<CharacterBody>(foe).intent = glm::vec3(0.0f);
@@ -161,9 +177,9 @@ void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive)
     lastEnemyState_ = combatant.state;
 }
 
-void CombatBridge::placeFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, true); }
+void CombatBridge::placeFoe(Scene& scene, glm::dvec3 feet, std::optional<stage0::FoeRole> role) { setFoe(scene, feet, true, role.value_or(config_.role)); }
 
-void CombatBridge::parkFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, false); }
+void CombatBridge::parkFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, false, config_.role); }
 
 void CombatBridge::returnToWorld()
 {
@@ -293,6 +309,11 @@ InputFrame CombatBridge::botInput(Scene& scene)
         bot_->reset();
         botFights_ = stage_.recorder().fightsWritten();
         botRespawns_ = respawns_;
+    }
+    // The skirmisher's bot reads the foe's combat state, which the Anchor and the Artillery never change: they have their own.
+    const entt::entity foe = scene.find(stage_.foeId());
+    if (foe != entt::null && (scene.registry().all_of<stage0::AnchorBrain>(foe) || scene.registry().all_of<stage0::ArtilleryBrain>(foe))) {
+        return roleBotInput(scene, stage_);
     }
     return bot_->next(scene, stage_);
 }

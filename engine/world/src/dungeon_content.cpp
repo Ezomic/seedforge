@@ -86,6 +86,14 @@ std::vector<std::size_t> DungeonContent::enemiesIn(graph::NodeId roomId) const
     return out;
 }
 
+DungeonEnemyRole roleForRoom(const std::string& roomType, std::size_t ordinal)
+{
+    if (roomType == graph::mission::kKey) return DungeonEnemyRole::Anchor;
+    if (roomType == graph::mission::kClimax) return ordinal == 0 ? DungeonEnemyRole::Anchor : DungeonEnemyRole::Artillery;
+    if (roomType == graph::mission::kChallenge && ordinal == 1) return DungeonEnemyRole::Artillery;
+    return DungeonEnemyRole::Skirmisher;
+}
+
 DungeonContent buildDungeonContent(const BakedDungeon& dungeon, const DungeonGreyBox& box, const std::vector<PlacedLoot>& items)
 {
     DungeonContent out;
@@ -111,10 +119,12 @@ DungeonContent buildDungeonContent(const BakedDungeon& dungeon, const DungeonGre
         const std::size_t count = enemyCount(room.type, rng);
         std::vector<std::uint32_t> chosen(posts.begin(), posts.begin() + static_cast<std::ptrdiff_t>(std::min(count, dc::kPosts)));
         std::sort(chosen.begin(), chosen.end());
-        for (const std::uint32_t slot : chosen) {
+        for (std::size_t ordinal = 0; ordinal < chosen.size(); ++ordinal) {
+            const std::uint32_t slot = chosen[ordinal];
             DungeonEnemy enemy;
             enemy.room = room.id;
             enemy.slot = slot;
+            enemy.role = roleForRoom(room.type, ordinal);
             enemy.post = room.centre + glm::dvec3(kPostOffsets[slot].x, 0.0, kPostOffsets[slot].z);
             out.enemies.push_back(enemy);
         }

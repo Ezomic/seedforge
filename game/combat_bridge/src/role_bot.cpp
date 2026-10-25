@@ -17,6 +17,7 @@ constexpr float kSlamMargin = 0.4f;     // metres outside the slam radius that c
 constexpr float kRetreatMetres = 1.1f;  // from striking distance to clear of the slam
 constexpr int kSpareTicks = 6;
 constexpr int kFarTicks = 1 << 20;
+constexpr float kBandSlackM = 3.0f; // how far inside the artillery's range the bot waits
 
 InputFrame steer(InputFrame frame, glm::vec2 worldXz)
 {
@@ -87,8 +88,14 @@ InputFrame roleBotInput(Scene& scene, const stage0::Stage0& stage)
         return frame;
     }
 
-    if (registry.all_of<stage0::ArtilleryBrain>(foeEntity)) {
-        return strikeOrClose(true);
+    if (const auto* artillery = registry.try_get<stage0::ArtilleryBrain>(foeEntity)) {
+        // It only stands still to aim and to recover, and it backs away from anyone closer than its minimum range, so
+        // chasing it never lands a blow. Waiting inside its band makes it aim; then the player runs in off the mark.
+        const stage0::ArtilleryState state = artillery->artilleryState();
+        const bool exposed = state == stage0::ArtilleryState::Aim || state == stage0::ArtilleryState::Recover || state == stage0::ArtilleryState::Staggered;
+        if (exposed || distance <= reach) return strikeOrClose(true);
+        if (distance > stage.artilleryTuning().maxRange - kBandSlackM) return steer(frame, heading);
+        return frame;
     }
     return strikeOrClose(false);
 }

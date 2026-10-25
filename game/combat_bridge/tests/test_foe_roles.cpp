@@ -25,6 +25,8 @@ constexpr int kMaxFightTicks = 60 * 90;
 constexpr int kPassiveTicks = 60 * 25;
 constexpr int kStuckTicks = 90; // longest run of a foe trying to move and not getting anywhere, as the stage0 harness allows
 constexpr float kStuckProgress = 0.25f;
+constexpr double kAnchorGap = 2.2;     // inside the slam radius: the anchor never walks closer than its slam range, so a still player outside it is never hit
+constexpr double kArtilleryGap = 12.0; // inside its firing band
 constexpr std::uint64_t kSeeds[] = {1, 2, 3, 4, 5, 6};
 
 const ForgedGame& gameFor(std::uint64_t seed)
@@ -244,62 +246,54 @@ TEST_CASE("the trial search refuses nonsense and an empty world", "[combat_bridg
     CHECK_FALSE(findTrial(game, FieldCondition::OpenField, false, {1.0e9}).has_value());
 }
 
+// One role on one piece of ground: it acts, it is never stuck, a bot beats it, and the same bot beats it the same way twice.
+void validate(stage0::FoeRole role, const Scenario& s)
+{
+    INFO(s.label);
+    const auto found = locate(s.condition, s.foeHigher, role == stage0::FoeRole::Anchor ? kAnchorGap : kArtilleryGap);
+    REQUIRE(found.has_value());
+    const ForgedGame& game = gameFor(found->seed);
+
+    const Result passive = play(game, found->seed, role, found->trial, false, kPassiveTicks);
+    CHECK(passive.finite);
+    CHECK(passive.actions >= 1);
+    CHECK(passive.playerHealth < stage0::Tuning{}.maxHealth);
+    CHECK(passive.longestBlocked <= kStuckTicks);
+
+    const Result first = play(game, found->seed, role, found->trial, true, kMaxFightTicks);
+    const Result second = play(game, found->seed, role, found->trial, true, kMaxFightTicks);
+    CHECK(first.finite);
+    CHECK(first.outcome == stage0::FightOutcome::FoeDied);
+    CHECK(first.actions >= 1);
+    CHECK(first.longestBlocked <= kStuckTicks);
+    CHECK(first.hash == second.hash);
+    CHECK(first.ticks == second.ticks);
+}
+
 TEST_CASE("the anchor works on all five terrain conditions and a bot can beat it", "[combat_bridge][roles]")
 {
-    for (const Scenario& s : kScenarios) {
-        INFO(s.label);
-        const auto found = locate(s.condition, s.foeHigher, 6.0);
-        REQUIRE(found.has_value());
-        const ForgedGame& game = gameFor(found->seed);
-
-        const Result passive = play(game, found->seed, stage0::FoeRole::Anchor, found->trial, false, kPassiveTicks);
-        CHECK(passive.finite);
-        CHECK(passive.actions >= 1);
-        CHECK(passive.playerHealth < stage0::Tuning{}.maxHealth);
-        CHECK(passive.longestBlocked <= kStuckTicks);
-
-        const Result first = play(game, found->seed, stage0::FoeRole::Anchor, found->trial, true, kMaxFightTicks);
-        const Result second = play(game, found->seed, stage0::FoeRole::Anchor, found->trial, true, kMaxFightTicks);
-        CHECK(first.finite);
-        CHECK(first.outcome == stage0::FightOutcome::FoeDied);
-        CHECK(first.actions >= 1);
-        CHECK(first.longestBlocked <= kStuckTicks);
-        CHECK(first.hash == second.hash);
-        CHECK(first.ticks == second.ticks);
-    }
+    for (const Scenario& s : kScenarios) validate(stage0::FoeRole::Anchor, s);
 }
 
 TEST_CASE("the artillery works on all five terrain conditions and a bot can beat it", "[combat_bridge][roles]")
 {
-    for (const Scenario& s : kScenarios) {
-        INFO(s.label);
-        const auto found = locate(s.condition, s.foeHigher, 12.0);
-        REQUIRE(found.has_value());
-        const ForgedGame& game = gameFor(found->seed);
+    for (const Scenario& s : kScenarios) validate(stage0::FoeRole::Artillery, s);
+}
 
-        const Result passive = play(game, found->seed, stage0::FoeRole::Artillery, found->trial, false, kPassiveTicks);
-        CHECK(passive.finite);
-        CHECK(passive.actions >= 1);
-        CHECK(passive.playerHealth < stage0::Tuning{}.maxHealth);
-        CHECK(passive.longestBlocked <= kStuckTicks);
-
-        const Result first = play(game, found->seed, stage0::FoeRole::Artillery, found->trial, true, kMaxFightTicks);
-        const Result second = play(game, found->seed, stage0::FoeRole::Artillery, found->trial, true, kMaxFightTicks);
-        CHECK(first.finite);
-        CHECK(first.outcome == stage0::FightOutcome::FoeDied);
-        CHECK(first.actions >= 1);
-        CHECK(first.longestBlocked <= kStuckTicks);
-        CHECK(first.hash == second.hash);
-        CHECK(first.ticks == second.ticks);
+TEST_CASE("each role works in the open field and on a steep slope, the pull request variant of the five conditions", "[combat_bridge][roles]")
+{
+    for (const stage0::FoeRole role : {stage0::FoeRole::Anchor, stage0::FoeRole::Artillery}) {
+        validate(role, kScenarios[0]);
+        validate(role, kScenarios[3]);
     }
 }
 
 TEST_CASE("a player who stands still loses to each role and the scripted player wins, so the bot tells the roles from nothing", "[combat_bridge][roles]")
 {
-    const auto open = locate(FieldCondition::OpenField, false, 12.0);
-    REQUIRE(open.has_value());
-    const ForgedGame& game = gameFor(open->seed);
     for (const stage0::FoeRole role : {stage0::FoeRole::Anchor, stage0::FoeRole::Artillery}) {
+        const auto open = locate(FieldCondition::OpenField, false, role == stage0::FoeRole::Anchor ? kAnchorGap : kArtilleryGap);
+        REQUIRE(open.has_value());
+        const ForgedGame& game = gameFor(open->seed);
         const Result passive = play(game, open->seed, role, open->trial, false, kMaxFightTicks);
         const Result bot = play(game, open->seed, role, open->trial, true, kMaxFightTicks);
         CHECK(passive.outcome == stage0::FightOutcome::PlayerDied);
@@ -332,4 +326,35 @@ TEST_CASE("the artillery cannot aim through a hill, and the hill is real terrain
     const glm::dvec3 under = low + glm::dvec3(40.0, -400.0, 0.0);
     CHECK_FALSE(ground.lineOfSight(under, under + glm::dvec3(30.0, 0.0, 0.0)));
     CHECK_FALSE(ground.lineOfSight(low, glm::dvec3(std::nan(""), 0.0, 0.0)));
+}
+
+TEST_CASE("placeFoe swaps the live foe to the asked role and back to the configured one, and a parked foe has no brain", "[combat_bridge][roles]")
+{
+    const ForgedGame& game = gameFor(1);
+    const CombatSite post = findCombatSite(game);
+    REQUIRE(post.found);
+    Fight fight(game, 1, stage0::FoeRole::Skirmisher, post.enemyPost, post.duelStart);
+    for (int i = 0; i < 6; ++i) fight.scene.tick(kDt);
+    REQUIRE(fight.bridge->live());
+    const auto& registry = fight.scene.registry();
+
+    fight.bridge->placeFoe(fight.scene, post.enemyPost, stage0::FoeRole::Anchor);
+    CHECK(registry.all_of<stage0::AnchorBrain>(fight.foeEntity()));
+    CHECK_FALSE(registry.all_of<stage0::SkirmisherBrain>(fight.foeEntity()));
+    CHECK(fight.bridge->stage().foeRole() == stage0::FoeRole::Anchor);
+    CHECK(fight.foe().health == Catch::Approx(fight.bridge->stage().anchorTuning().maxHealth));
+    CHECK(fight.foe().poise == Catch::Approx(fight.bridge->stage().anchorTuning().maxPoise));
+
+    fight.bridge->placeFoe(fight.scene, post.enemyPost, stage0::FoeRole::Artillery);
+    CHECK(registry.all_of<stage0::ArtilleryBrain>(fight.foeEntity()));
+    CHECK_FALSE(registry.all_of<stage0::AnchorBrain>(fight.foeEntity()));
+    CHECK(fight.foe().health == Catch::Approx(fight.bridge->stage().artilleryTuning().maxHealth));
+
+    fight.bridge->parkFoe(fight.scene, post.enemyPost);
+    CHECK_FALSE(registry.all_of<stage0::ArtilleryBrain>(fight.foeEntity()));
+    CHECK_FALSE(fight.foe().alive());
+
+    fight.bridge->placeFoe(fight.scene, post.enemyPost);
+    CHECK(registry.all_of<stage0::SkirmisherBrain>(fight.foeEntity()));
+    CHECK(fight.foe().health == Catch::Approx(stage0::Tuning{}.maxHealth));
 }

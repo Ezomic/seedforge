@@ -161,6 +161,30 @@ TEST_CASE("each room type holds the enemies its role says, and the climax room t
     CHECK(roomsWithEnemies(built.content) == 3);
 }
 
+TEST_CASE("an enemy's role follows its room: a key guard is an anchor, a climax holds an anchor and an artillery, a challenge room an artillery second", "[dungeon_content]")
+{
+    std::set<DungeonEnemyRole> challengeSecond;
+    for (std::uint64_t seed = 1; seed <= 64; ++seed) {
+        const Built built = build(row(seed));
+        for (const DungeonRoom& room : built.content.rooms) {
+            const std::vector<std::size_t> in = built.content.enemiesIn(room.id);
+            for (std::size_t ordinal = 0; ordinal < in.size(); ++ordinal) {
+                INFO(room.type << " seed " << seed << " ordinal " << ordinal);
+                const DungeonEnemyRole role = built.content.enemies[in[ordinal]].role;
+                CHECK(role == roleForRoom(room.type, ordinal));
+                if (room.type == "key") CHECK(role == DungeonEnemyRole::Anchor);
+                if (room.type == "climax") CHECK(role == (ordinal == 0 ? DungeonEnemyRole::Anchor : DungeonEnemyRole::Artillery));
+                if (room.type == "challenge" && ordinal == 0) CHECK(role == DungeonEnemyRole::Skirmisher);
+                if (room.type == "challenge" && ordinal == 1) challengeSecond.insert(role);
+            }
+        }
+    }
+    CHECK(challengeSecond == std::set<DungeonEnemyRole>{DungeonEnemyRole::Artillery});
+    CHECK(roleForRoom("entry", 0) == DungeonEnemyRole::Skirmisher);
+    CHECK(roleForRoom("nonsense", 7) == DungeonEnemyRole::Skirmisher);
+    CHECK(roleForRoom("", 0) == DungeonEnemyRole::Skirmisher);
+}
+
 TEST_CASE("the same dungeon holds the same content every time, and another seed holds another", "[dungeon_content]")
 {
     const std::vector<PlacedLoot> loot = items(6);

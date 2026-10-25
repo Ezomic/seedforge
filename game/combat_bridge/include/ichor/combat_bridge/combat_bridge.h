@@ -79,7 +79,8 @@ public:
     // The enemy stands at `feet` with full bars and a fresh brain (the fight is not reset: the player is left alone), or
     // is parked there, dead and not drawn, out of the fight until it is placed again. A host that moves the enemy to a
     // new post calls these (the dungeon fight); the world fight never does.
-    void placeFoe(Scene& scene, glm::dvec3 feet);
+    // A live foe at `feet`, of the configured role unless one is given (a dungeon room picks its own).
+    void placeFoe(Scene& scene, glm::dvec3 feet, std::optional<stage0::FoeRole> role = std::nullopt);
     void parkFoe(Scene& scene, glm::dvec3 feet);
     bool foeParked() const { return foeParked_; }
     // Where both fighters stand after a death or a retry, until the host says otherwise.
@@ -110,7 +111,7 @@ private:
     enum class Phase : std::uint8_t { WaitingForGround, FoeQueued, Live };
 
     void step(Scene& scene, double dt);
-    void setFoe(Scene& scene, glm::dvec3 feet, bool alive);
+    void setFoe(Scene& scene, glm::dvec3 feet, bool alive, stage0::FoeRole role);
     void logTransitions(const Scene& scene);
     void openFightLog();
     void stampFightLog(std::string_view site);
