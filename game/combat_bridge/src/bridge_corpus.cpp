@@ -280,7 +280,7 @@ std::optional<Entry> decodeEntry(std::string_view text)
         || !parseNumber(*pick, entry.pick)) {
         return std::nullopt;
     }
-    if (entry.pick < 0 || entry.pick >= static_cast<int>(kSearchSeeds) || entry.grid < 1 || entry.grid > kMaxGrid || skill->empty() || !stage0::findBotSkill(*skill)) return std::nullopt;
+    if (entry.pick < 0 || entry.pick >= static_cast<int>(kSearchSeeds) || entry.grid != kGridSize || entry.worldHash == 0 || skill->empty() || !stage0::findBotSkill(*skill)) return std::nullopt;
     entry.skill = std::string(*skill);
 
     const std::optional<stage0::CorpusEntry> body = stage0::decodeCorpusEntry(text);

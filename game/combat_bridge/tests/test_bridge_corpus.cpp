@@ -123,7 +123,7 @@ TEST_CASE("the corpus is the plan: skills, worlds and both winners", "[bridge_co
     CHECK(losses >= 5);
 }
 
-TEST_CASE("the corpus goes red when a damage value changes", "[bridge_corpus]")
+TEST_CASE("the bridge corpus goes red when a damage value changes", "[bridge_corpus]")
 {
     const std::vector<Entry> corpus = loadCorpus();
     REQUIRE(!corpus.empty());
@@ -239,6 +239,9 @@ TEST_CASE("malformed corpus text is refused", "[bridge_corpus]")
     CHECK_FALSE(decodeEntry(replaced("skill novice", "skill ")).has_value());
     CHECK_FALSE(decodeEntry(replaced("world_seed 9", "world_seed -1")).has_value());
     CHECK_FALSE(decodeEntry(replaced("grid 64", "grid 0")).has_value());
+    CHECK_FALSE(decodeEntry(replaced("grid 64", "grid 4096")).has_value());
+    CHECK_FALSE(decodeEntry(replaced("grid 64", "grid 128")).has_value());
+    CHECK_FALSE(decodeEntry(replaced("world_hash abcdef0123456789", "world_hash 0000000000000000")).has_value());
     CHECK_FALSE(decodeEntry(replaced("pick 2", "pick -1")).has_value());
     CHECK_FALSE(decodeEntry(replaced("pick 2", "pick 64")).has_value());
     CHECK_FALSE(decodeEntry(replaced("grid 64", "grid 99999999")).has_value());
