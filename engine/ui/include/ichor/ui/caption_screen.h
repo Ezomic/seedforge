@@ -31,6 +31,7 @@ private:
     UiContext& ui_;
     Rml::ElementDocument* document_ = nullptr;
     Rml::Element* strip_ = nullptr;
+    std::vector<std::string> shown_;
 };
 
 }

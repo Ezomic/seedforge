@@ -1425,6 +1425,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 }
                 combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = hudStamina, .maxStamina = hudMaxStamina}));
                 if (captionScreen) {
+                    captionFeed.prune(engine.scene().tickCount());
                     captionScreen->bind(soundHelp.captionsOn ? captionFeed.visible(engine.scene().tickCount()) : std::vector<std::string>{});
                 }
                 if (ledger->visible()) {

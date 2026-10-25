@@ -162,6 +162,11 @@ void CaptionFeed::push(const SoundCue& cue, std::uint64_t tick)
     entries_.push_back({&cue, tick});
 }
 
+void CaptionFeed::prune(std::uint64_t tick)
+{
+    std::erase_if(entries_, [&](const Entry& e) { return e.tick > tick || tick - e.tick >= kCaptionTicks; });
+}
+
 std::vector<std::string> CaptionFeed::visible(std::uint64_t tick) const
 {
     std::vector<std::string> out;

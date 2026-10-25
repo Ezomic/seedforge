@@ -45,9 +45,10 @@ CaptionScreen::~CaptionScreen()
 
 void CaptionScreen::bind(const std::vector<std::string>& lines)
 {
-    if (strip_ == nullptr) {
+    if (strip_ == nullptr || lines == shown_) {
         return;
     }
+    shown_ = lines;
     std::string rml;
     for (const std::string& line : lines) {
         rml += "<div class=\"caption\">" + escapeRml(line) + "</div>";

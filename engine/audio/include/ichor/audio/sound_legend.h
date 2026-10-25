@@ -71,6 +71,8 @@ class CaptionFeed {
 public:
     void push(const SoundCue& cue, std::uint64_t tick);
     std::vector<std::string> visible(std::uint64_t tick) const;
+    // Drops captions that have expired or lie in the future (the tick went back after a load).
+    void prune(std::uint64_t tick);
 
 private:
     struct Entry {

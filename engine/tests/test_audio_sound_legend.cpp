@@ -159,6 +159,17 @@ TEST_CASE("captions last a fixed number of ticks, renew rather than stack, and n
     REQUIRE(feed.visible(116).size() == kMaxCaptions);
 }
 
+TEST_CASE("a caption from before a load does not come back when the tick climbs again")
+{
+    CaptionFeed feed;
+    feed.push(*findCue("combat.tell"), 1000);
+    feed.prune(5);
+    REQUIRE(feed.visible(1001).empty());
+    feed.push(*findCue("combat.tell"), 10);
+    feed.prune(200);
+    REQUIRE(feed.visible(200).empty());
+}
+
 TEST_CASE("captions are on by default and F4 flips them once per press, F2 does the same for the legend")
 {
     SoundHelp help;
