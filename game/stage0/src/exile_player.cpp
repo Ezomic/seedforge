@@ -1,5 +1,6 @@
 #include "ichor/stage0/exile_player.h"
 
+#include "ichor/anim/exile_avatar.h"
 #include "ichor/core/log.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -10,6 +11,8 @@
 namespace ichor::stage0 {
 
 namespace {
+
+constexpr float kPiTurn = 3.14159265f; // a step this big always reaches the target, so the turn is a snap wrapped to (-pi, pi]
 
 float fraction(float part, float whole)
 {
@@ -69,7 +72,7 @@ ExileClipChoice chooseExileClip(const Combatant& c, const Tuning& tuning, float 
     }
     if (c.blocking) {
         out.clip = ExileClip::Block;
-        out.progress = fraction(static_cast<float>(std::max(c.blockTicks, 0)) * fixedDt, kExileGuardRaiseSeconds);
+        out.progress = fraction(static_cast<float>(std::max(c.blockTicks, 0)) * fixedDt, kExileGuardRaiseSeconds) * kExileGuardPhase;
         return out;
     }
     out.locomotion = true;
@@ -81,7 +84,39 @@ ExileClipChoice chooseExileClip(const Combatant& c, const Tuning& tuning, float 
 float exileLocomotionRate(float speed, float clipTravelSpeed)
 {
     if (!std::isfinite(speed) || !std::isfinite(clipTravelSpeed) || clipTravelSpeed < 0.05f) return 1.0f;
-    return std::clamp(speed / clipTravelSpeed, 0.4f, 1.6f);
+    return std::clamp(speed / clipTravelSpeed, kExileMinRate, kExileMaxRate);
+}
+
+void blendSkin(const std::vector<glm::mat4>& from, const std::vector<glm::mat4>& to, float t, std::vector<glm::mat4>& out)
+{
+    const auto split = [](const glm::mat4& m, glm::vec3& scale, glm::quat& rotation) {
+        glm::mat3 basis(m);
+        scale = {glm::length(basis[0]), glm::length(basis[1]), glm::length(basis[2])};
+        for (int k = 0; k < 3; ++k) {
+            if (scale[k] > 1e-6f) basis[k] /= scale[k];
+        }
+        rotation = glm::quat_cast(basis);
+    };
+    const float w = std::clamp(t, 0.0f, 1.0f);
+    out.resize(to.size());
+    for (std::size_t i = 0; i < to.size(); ++i) {
+        if (i >= from.size()) {
+            out[i] = to[i];
+            continue;
+        }
+        glm::vec3 scaleA;
+        glm::vec3 scaleB;
+        glm::quat rotationA;
+        glm::quat rotationB;
+        split(from[i], scaleA, rotationA);
+        split(to[i], scaleB, rotationB);
+        const glm::mat3 rotation = glm::mat3_cast(glm::slerp(rotationA, rotationB, w));
+        const glm::vec3 scale = glm::mix(scaleA, scaleB, w);
+        glm::mat4 m(1.0f);
+        for (int k = 0; k < 3; ++k) m[k] = glm::vec4(rotation[k] * scale[k], 0.0f);
+        m[3] = glm::vec4(glm::mix(glm::vec3(from[i][3]), glm::vec3(to[i][3]), w), 1.0f);
+        out[i] = m;
+    }
 }
 
 bool ExilePlayer::load(const std::filesystem::path& folder, Renderer& renderer)
@@ -118,6 +153,21 @@ bool ExilePlayer::prepare(const std::filesystem::path& folder, std::uint32_t mes
             travelSpeed_[i] = std::hypot(end.x - start.x, end.z - start.z) / duration;
         }
     }
+    const std::uint32_t dodge = clips_[static_cast<std::size_t>(ExileClip::Dodge)];
+    glm::vec3 dodgeStart;
+    glm::vec3 dodgeEnd;
+    dodgeTravelYaw_ = 0.0f;
+    if (animations_.rootTranslation(dodge, 0.0f, dodgeStart) && animations_.rootTranslation(dodge, animations_.clipDuration(dodge), dodgeEnd) &&
+        std::hypot(dodgeEnd.x - dodgeStart.x, dodgeEnd.z - dodgeStart.z) > 0.05f) {
+        dodgeTravelYaw_ = yawOfMotion(dodgeEnd.x - dodgeStart.x, dodgeEnd.z - dodgeStart.z);
+    }
+    bodyYaw_ = 0.0f;
+    hasBodyYaw_ = false;
+    locomotionPhase_ = 0.0f;
+    lastClip_ = ExileClip::Idle;
+    lastSkin_.clear();
+    fadeFrom_.clear();
+    fadeSeconds_ = kExileFadeSeconds;
     loaded_ = true;
     return true;
 }
@@ -161,11 +211,31 @@ void ExilePlayer::appendPosed(const std::vector<glm::mat4>& skin, glm::dvec3 fee
     }
 }
 
+float ExilePlayer::bodyYaw(const Combatant& c, const ExileClipChoice& choice, glm::dvec3 step, float speed, float seconds)
+{
+    if (!hasBodyYaw_ || !std::isfinite(bodyYaw_)) {
+        bodyYaw_ = std::isfinite(c.yaw) ? c.yaw : 0.0f;
+        hasBodyYaw_ = true;
+    }
+    if (choice.clip == ExileClip::Dodge && glm::dot(c.dodgeDirection, c.dodgeDirection) > 1e-6f) {
+        // The clip only steps one way, so the body is turned until that step lies along the dodge.
+        bodyYaw_ = turnToward(bodyYaw_, yawOfMotion(c.dodgeDirection.x, c.dodgeDirection.z) - dodgeTravelYaw_, 2.0f * kPiTurn);
+        return bodyYaw_;
+    }
+    // The clips only run forwards: a body that walks backwards or sideways while facing the aim would moonwalk.
+    const bool travelling = choice.locomotion && speed >= kExileStandBelow;
+    const float wanted = travelling ? yawOfMotion(step.x, step.z) : c.yaw;
+    bodyYaw_ = turnToward(bodyYaw_, wanted, (travelling ? kExileTurnPerSecond : kExileActionTurnPerSecond) * seconds);
+    return bodyYaw_;
+}
+
 void ExilePlayer::append(const Scene& scene, double alpha, double frameSeconds, float fixedDt, const Tuning& tuning, RenderView& view)
 {
     if (!loaded_) return;
+    bool seen = false;
     for (auto [entity, transform, previous, c] : scene.registry().view<const Transform, const PreviousTransform, const Combatant>().each()) {
         if (c.side != 0) continue;
+        seen = true;
         const glm::dvec3 feet = glm::mix(previous.position, transform.position, alpha);
         const glm::dvec3 step = transform.position - previous.position;
         const float speed = fixedDt > 0.0f ? static_cast<float>(std::hypot(step.x, step.z)) / fixedDt : 0.0f;
@@ -179,8 +249,24 @@ void ExilePlayer::append(const Scene& scene, double alpha, double frameSeconds, 
                 locomotionPhase_ -= std::floor(locomotionPhase_);
             }
         }
+        const float seconds = std::isfinite(frameSeconds) ? static_cast<float>(std::max(frameSeconds, 0.0)) : 0.0f;
         std::vector<glm::mat4> skin;
-        if (pose(choice, locomotionPhase_, skin)) appendPosed(skin, feet, c.yaw, view);
+        if (!pose(choice, locomotionPhase_, skin)) continue;
+        if (!lastSkin_.empty() && choice.clip != lastClip_) {
+            fadeFrom_ = lastSkin_;
+            fadeSeconds_ = 0.0f;
+        }
+        lastClip_ = choice.clip;
+        if (fadeSeconds_ < kExileFadeSeconds && !fadeFrom_.empty()) {
+            blendSkin(fadeFrom_, skin, fadeSeconds_ / kExileFadeSeconds, skin);
+            fadeSeconds_ += seconds;
+        }
+        lastSkin_ = skin;
+        appendPosed(skin, feet, bodyYaw(c, choice, step, speed, seconds), view);
+    }
+    if (!seen) {
+        lastSkin_.clear();
+        hasBodyYaw_ = false;
     }
 }
 

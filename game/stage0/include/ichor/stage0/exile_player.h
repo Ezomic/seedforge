@@ -29,9 +29,17 @@ struct ExileClipChoice {
 };
 
 constexpr float kExileStandBelow = 0.3f; // m/s
-constexpr float kExileWalkBelow = 1.7f;  // below this the Walk clip, above it Run
+constexpr float kExileWalkBelow = 1.75f; // below this the Walk clip, above it Run
+constexpr float kExileMinRate = 0.25f;   // Walk covers 0.3 to 1.05 * 1.8 m/s and Run from 5.2 * 0.25 m/s, so the two overlap at the switch and neither slides
+constexpr float kExileMaxRate = 1.8f;
 constexpr float kExileDeathSeconds = 1.2f;
 constexpr float kExileGuardRaiseSeconds = 0.25f;
+// The block clip raises the shield and then lowers it again. This is how far through it the guard is
+// square in front of the body (the left hand is at its highest and furthest forward), and it holds there.
+constexpr float kExileGuardPhase = 0.38f;
+constexpr float kExileFadeSeconds = 0.12f; // render time over which one clip's pose gives way to the next
+constexpr float kExileTurnPerSecond = 12.0f;       // radians: how fast the body swings to face the way it travels
+constexpr float kExileActionTurnPerSecond = 30.0f; // and back to the aim when it stops travelling
 
 // Which clip plays for a combatant and how far into it. Swings and dodges are stretched to the
 // state's length, so the strike lands in the Active window whatever the clip's own duration.
@@ -40,6 +48,10 @@ ExileClipChoice chooseExileClip(const Combatant& combatant, const Tuning& tuning
 // Playback rate of a looping clip so its feet keep pace with the ground: `speed` over the clip's
 // own root travel, held to a range where the stride still looks like one.
 float exileLocomotionRate(float speed, float clipTravelSpeed);
+
+// Skinning matrices `from` to `to` at `t` in [0, 1]: each joint's translation and scale mixed linearly and its
+// rotation spherically, so a crossfade keeps limb lengths and the props on the hands stay attached.
+void blendSkin(const std::vector<glm::mat4>& from, const std::vector<glm::mat4>& to, float t, std::vector<glm::mat4>& out);
 
 class ExilePlayer {
 public:
@@ -63,6 +75,9 @@ public:
     void appendPosed(const std::vector<glm::mat4>& skin, glm::dvec3 feet, float yaw, RenderView& view) const;
 
 private:
+    // The yaw the body is drawn at: the aim while it fights, the way it travels while it moves, the dodge's own way in a dodge.
+    float bodyYaw(const Combatant& combatant, const ExileClipChoice& choice, glm::dvec3 step, float speed, float seconds);
+
     bool loaded_ = false;
     std::uint32_t meshBase_ = 0;
     ExileKit kit_;
@@ -70,6 +85,13 @@ private:
     std::array<std::uint32_t, kExileClipCount> clips_{};
     std::array<float, kExileClipCount> travelSpeed_{};
     float locomotionPhase_ = 0.0f;
+    float dodgeTravelYaw_ = 0.0f; // the way the Dodge clip's root travels, as a yaw from the way the body faces
+    float bodyYaw_ = 0.0f;
+    bool hasBodyYaw_ = false;
+    ExileClip lastClip_ = ExileClip::Idle;
+    std::vector<glm::mat4> lastSkin_;
+    std::vector<glm::mat4> fadeFrom_;
+    float fadeSeconds_ = kExileFadeSeconds;
 };
 
 }
