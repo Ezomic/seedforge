@@ -120,7 +120,7 @@ Each required check and where its time goes:
 
 Because the required name belongs to the last job, branch protection needs no change. A cancelled or skipped shard fails it.
 
-Nothing stops being tested: medium runs under the sanitizers on every merge to main, soak runs under the sanitizers after every merge to main and in the nightly (`soak` job in `nightly.yml`, presets `linux-headless-asan-soak` and `windows-ci-soak`), and the nightly stress job still runs every other test three times in random order (`bin/ctest-stress` leaves soak out unless `-S` is given, since the soak job covers it). The Windows job runs the medium tier on every PR.
+Nothing stops being tested: medium runs under the sanitizers on every merge to main, soak runs under the sanitizers after every merge to main and in the nightly (`soak` job in `nightly.yml`, preset `linux-headless-asan-soak`; `windows-ci-soak` runs the same tests in Release locally), and the nightly stress job still runs every other test three times in random order (`bin/ctest-stress` leaves soak out unless `-S` is given, since the soak job covers it). The Windows job runs the medium tier on every PR.
 
 ### Adding or moving a test
 
@@ -132,5 +132,5 @@ Nothing stops being tested: medium runs under the sanitizers on every merge to m
 
 - vcpkg is checked out at the `builtin-baseline` commit (`VCPKG_COMMIT` in `engine.yml`; change it together with the baseline in `engine/vcpkg.json`) so the binary cache can hit. Cache keys carry `v2` to leave the stale entries behind.
 - The Linux GPU golden steps are their own job and share nothing with the sanitizer shards, so they overlap them.
-- The forged world test cache (SEED-665, `<build>/forged-world-cache`) is restored by `actions/cache`, keyed on the sources its generator digest hashes. A cold run is slower for the tests that use it (the cache stores whole forges), so the first run after a generator change is the slow one.
+- The forged world test cache (SEED-665, `<build>/forged-world-cache`) is restored by `actions/cache`, keyed on the sources its generator digest hashes (and on the shard number, since each shard forges different worlds and a cache key is written once). A cold run is slower for the tests that use it (the cache stores whole forges), so the first run after a generator change is the slow one.
 - A new push to a pull request cancels the run of the previous commit (`cancel-in-progress` was already set for PRs and stays); runs on main queue.

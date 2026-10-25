@@ -209,11 +209,13 @@ def evaluate(times, entries, budget):
 
 
 def tier_lists(path):
+    if not Path(path).exists():
+        return None
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return set(data.get("medium", [])) | set(data.get("soak", []))
+        return set(data["medium"]) | set(data["soak"])
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise InputError(f"{path}: {e}")
 
 
 def evaluate_tiers(times, slow_tiers, profile, entries):

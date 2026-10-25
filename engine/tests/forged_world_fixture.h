@@ -268,7 +268,9 @@ inline std::filesystem::path forgedFixtureDirectory()
         std::error_code ec;
         if (!std::filesystem::exists(current, ec)) {
             for (const auto& entry : std::filesystem::directory_iterator(base, ec)) {
-                if (entry.is_directory(ec) && entry.path() != current) {
+                const std::string name = entry.path().filename().string();
+                const bool isDigestFolder = name.size() == 16 && name.find_first_not_of("0123456789abcdef") == std::string::npos;
+                if (isDigestFolder && entry.is_directory(ec) && entry.path() != current) {
                     std::filesystem::remove_all(entry.path(), ec);
                 }
             }
