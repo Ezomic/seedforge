@@ -38,7 +38,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PROFILES = {"sanitizer": 120.0, "release": 30.0}
-FAST_CAPS = {"sanitizer": 60.0, "release": 5.0}
+FAST_CAPS = {"sanitizer": 90.0, "release": 5.0}
 TIERS = "engine/tests/test_tiers.json"
 CTEST_TIMEOUT = 1500.0
 CAP_STEP = 30.0

@@ -25,6 +25,7 @@
     "forged_campaign_app",
     "forged_combat_app",
     "from the spawn toward the nearest settlement on 3 seeds the walker arrives or names what stopped it",
+    "fuzz: a small seed range over every phase has no violations",
     "higher scores never get a smaller tier and the best sites come first",
     "hostile combat times give finite poses inside the clip",
     "hostile: hydrology cache",

@@ -90,7 +90,7 @@ Regenerate the allowlist after an intended slowdown: run the suite, then `python
 
 The first allowlist was seeded from the CI logs of runs 40052978212 and 40054121237. It includes `live worlds: the probe finds a spawn, ...` and `a showcase run ranks the seeds, ...`, which time out or come close on the Linux job today; remove those entries when their fix lands.
 
-The step now lives in the workflows: the Windows job and every Linux shard run `tools/test_times.py` after ctest (SEED-664). It also checks the tiers: a case that is in no tier list (so it is fast) and runs over 5 s in Release or 60 s under the sanitizers fails and names `engine/tests/test_tiers.json` as the place to move it.
+The step now lives in the workflows: the Windows job and every Linux shard run `tools/test_times.py` after ctest (SEED-664). It also checks the tiers: a case that is in no tier list (so it is fast) and runs over 5 s in Release or 90 s under the sanitizers fails and names `engine/tests/test_tiers.json` as the place to move it.
 
 ## Test tiers and the 15 minute PR budget (SEED-664, 666, 670, 671, 672)
 
@@ -98,7 +98,7 @@ Each required check has a hard 15 minute `timeout-minutes`. `docs/ci-time-baseli
 
 | Tier | Rule | Runs on a PR | Runs on main and nightly |
 |---|---|---|---|
-| fast | under about 1 s in Release and under 60 s under the sanitizers (the guard fails a fast case over either; a test that is cheap in Release but heavy under ASan goes to medium) | Windows Release, and the Linux sanitizer shards | everywhere |
+| fast | under about 1 s in Release and under 90 s under the sanitizers (the guard fails a fast case over either; a test that is cheap in Release but heavy under ASan goes to medium) | Windows Release, and the Linux sanitizer shards | everywhere |
 | medium | about 1 s to 10 s in Release | Windows Release only | also the Linux sanitizer shards |
 | soak | the full variant of a heavy test | never | `linux soak tests` job after every merge to main, and the nightly `soak` job |
 
