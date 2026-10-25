@@ -12,6 +12,8 @@ namespace ichor::stage0 {
 
 namespace {
 
+constexpr float kPiTurn = 3.14159265f; // a step this big always reaches the target, so the turn is a snap wrapped to (-pi, pi]
+
 float fraction(float part, float whole)
 {
     if (std::isnan(part)) return 0.0f;
@@ -155,12 +157,17 @@ bool ExilePlayer::prepare(const std::filesystem::path& folder, std::uint32_t mes
     glm::vec3 dodgeStart;
     glm::vec3 dodgeEnd;
     dodgeTravelYaw_ = 0.0f;
-    if (animations_.rootTranslation(dodge, 0.0f, dodgeStart) && animations_.rootTranslation(dodge, animations_.clipDuration(dodge), dodgeEnd)) {
+    if (animations_.rootTranslation(dodge, 0.0f, dodgeStart) && animations_.rootTranslation(dodge, animations_.clipDuration(dodge), dodgeEnd) &&
+        std::hypot(dodgeEnd.x - dodgeStart.x, dodgeEnd.z - dodgeStart.z) > 0.05f) {
         dodgeTravelYaw_ = yawOfMotion(dodgeEnd.x - dodgeStart.x, dodgeEnd.z - dodgeStart.z);
     }
     bodyYaw_ = 0.0f;
     hasBodyYaw_ = false;
+    locomotionPhase_ = 0.0f;
+    lastClip_ = ExileClip::Idle;
     lastSkin_.clear();
+    fadeFrom_.clear();
+    fadeSeconds_ = kExileFadeSeconds;
     loaded_ = true;
     return true;
 }
@@ -210,9 +217,9 @@ float ExilePlayer::bodyYaw(const Combatant& c, const ExileClipChoice& choice, gl
         bodyYaw_ = std::isfinite(c.yaw) ? c.yaw : 0.0f;
         hasBodyYaw_ = true;
     }
-    if (choice.clip == ExileClip::Dodge) {
+    if (choice.clip == ExileClip::Dodge && glm::dot(c.dodgeDirection, c.dodgeDirection) > 1e-6f) {
         // The clip only steps one way, so the body is turned until that step lies along the dodge.
-        bodyYaw_ = yawOfMotion(c.dodgeDirection.x, c.dodgeDirection.z) - dodgeTravelYaw_;
+        bodyYaw_ = turnToward(bodyYaw_, yawOfMotion(c.dodgeDirection.x, c.dodgeDirection.z) - dodgeTravelYaw_, 2.0f * kPiTurn);
         return bodyYaw_;
     }
     // The clips only run forwards: a body that walks backwards or sideways while facing the aim would moonwalk.
@@ -225,8 +232,10 @@ float ExilePlayer::bodyYaw(const Combatant& c, const ExileClipChoice& choice, gl
 void ExilePlayer::append(const Scene& scene, double alpha, double frameSeconds, float fixedDt, const Tuning& tuning, RenderView& view)
 {
     if (!loaded_) return;
+    bool seen = false;
     for (auto [entity, transform, previous, c] : scene.registry().view<const Transform, const PreviousTransform, const Combatant>().each()) {
         if (c.side != 0) continue;
+        seen = true;
         const glm::dvec3 feet = glm::mix(previous.position, transform.position, alpha);
         const glm::dvec3 step = transform.position - previous.position;
         const float speed = fixedDt > 0.0f ? static_cast<float>(std::hypot(step.x, step.z)) / fixedDt : 0.0f;
@@ -254,6 +263,10 @@ void ExilePlayer::append(const Scene& scene, double alpha, double frameSeconds, 
         }
         lastSkin_ = skin;
         appendPosed(skin, feet, bodyYaw(c, choice, step, speed, seconds), view);
+    }
+    if (!seen) {
+        lastSkin_.clear();
+        hasBodyYaw_ = false;
     }
 }
 
