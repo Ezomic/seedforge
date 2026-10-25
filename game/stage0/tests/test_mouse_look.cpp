@@ -1,6 +1,8 @@
+#include "ichor/platform/mouse_attack.h"
 #include "ichor/platform/mouse_look.h"
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/combat.h"
+#include "ichor/stage0/exile_player.h"
 #include "ichor/stage0/free_look.h"
 
 #include <catch2/catch_approx.hpp>
@@ -115,4 +117,105 @@ TEST_CASE("sensitivity scales the turn, left is negative, hostile values are ign
     hostile.addMotion(std::numeric_limits<float>::infinity());
     CHECK(hostile.step(kDt) == 0.0f);
     CHECK(hostile.step(std::numeric_limits<double>::quiet_NaN()) == 0.0f);
+}
+
+namespace {
+
+// Rising edges of one button bit across a scripted run of pumps at 60 Hz; clicks[i] says whether a click lands before pump i.
+int risingEdges(MouseAttack& mouse, const std::vector<bool>& clicks, std::uint32_t bit, bool heavy = false)
+{
+    int edges = 0;
+    bool previous = false;
+    for (const bool click : clicks) {
+        if (click) mouse.click(heavy);
+        const bool now = (mouse.step(static_cast<float>(kDt)) & bit) != 0;
+        if (now && !previous) ++edges;
+        previous = now;
+    }
+    return edges;
+}
+
+}
+
+TEST_CASE("a left click gives the Attack bit once, however long the frames run", "[mouseattack]")
+{
+    MouseAttack mouse;
+    mouse.setEnabled(true);
+    std::vector<bool> one(120, false);
+    one[10] = true;
+    CHECK(risingEdges(mouse, one, InputFrame::Attack) == 1);
+
+    std::vector<bool> three(240, false);
+    three[10] = three[100] = three[200] = true;
+    CHECK(risingEdges(mouse, three, InputFrame::Attack) == 3);
+}
+
+TEST_CASE("a click survives a frame that runs no tick", "[mouseattack]")
+{
+    MouseAttack mouse;
+    mouse.setEnabled(true);
+    mouse.click(false);
+    CHECK((mouse.step(0.004f) & InputFrame::Attack) != 0);
+    CHECK((mouse.step(0.004f) & InputFrame::Attack) != 0);
+    for (int i = 0; i < 10; ++i) mouse.step(0.01f);
+    CHECK(mouse.step(0.01f) == 0u);
+}
+
+TEST_CASE("Ctrl click is the heavy attack and the middle button blocks while held", "[mouseattack]")
+{
+    MouseAttack mouse;
+    mouse.setEnabled(true);
+    mouse.click(true);
+    const std::uint32_t bits = mouse.step(static_cast<float>(kDt));
+    CHECK((bits & InputFrame::Heavy) != 0);
+    CHECK((bits & InputFrame::Attack) == 0);
+    mouse.setBlockHeld(true);
+    CHECK((mouse.step(static_cast<float>(kDt)) & InputFrame::Block) != 0);
+    mouse.setBlockHeld(false);
+    CHECK((mouse.step(0.5f) & InputFrame::Block) == 0);
+}
+
+TEST_CASE("a click while a screen has focus is swallowed and does not wait for the screen to close", "[mouseattack]")
+{
+    MouseAttack mouse;
+    mouse.setEnabled(false);
+    mouse.click(false);
+    mouse.setBlockHeld(true);
+    CHECK(mouse.step(static_cast<float>(kDt)) == 0u);
+    mouse.setEnabled(true);
+    CHECK(mouse.step(static_cast<float>(kDt)) == 0u);
+
+    mouse.click(false);
+    mouse.setEnabled(false);
+    CHECK(mouse.step(static_cast<float>(kDt)) == 0u);
+}
+
+TEST_CASE("a click swings the spear in the air with no enemy near, and the swing cannot be restarted", "[mouseattack]")
+{
+    const Tuning tuning;
+    Scene scene{7};
+    Stage0 stage(tuning);
+    stage.install(scene, {0.0, 0.0, 3.0}, {0.0, 0.0, -60.0});
+    scene.tick(kDt);
+    stage.resetFight(scene);
+    for (int i = 0; i < 30; ++i) scene.tick(kDt);
+    const auto player = [&]() -> const Combatant& { return scene.registry().get<Combatant>(scene.find(stage.playerId())); };
+    const float staminaBefore = player().stamina;
+
+    MouseAttack mouse;
+    mouse.setEnabled(true);
+    mouse.click(false);
+    InputFrame frame;
+    frame.buttons = mouse.step(static_cast<float>(kDt));
+    scene.tick(kDt, frame);
+    CHECK(player().combatState() == CombatState::Windup);
+    CHECK(chooseExileClip(player(), tuning, 0.0f, static_cast<float>(kDt)).clip == ExileClip::Thrust);
+    const float staminaAfter = player().stamina;
+    CHECK(staminaAfter == Approx(staminaBefore - tuning.lightStaminaCost).margin(1.0f));
+
+    mouse.click(false);
+    frame.buttons = mouse.step(static_cast<float>(kDt));
+    scene.tick(kDt, frame);
+    CHECK(player().stamina > staminaBefore - 1.5f * tuning.lightStaminaCost);
+    CHECK(player().combatState() != CombatState::Idle);
 }

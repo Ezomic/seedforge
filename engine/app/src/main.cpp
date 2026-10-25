@@ -1854,6 +1854,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 ichor::logf(ichor::LogLevel::Warn, "autosave failed: {}", slots.lastError());
             }
         }
+        // The mouse fights only in a live --combat fight, and only while nothing on screen wants the click.
+        const auto shown = [](const auto& screen) { return screen && screen->visible(); };
+        const bool uiFocus = editing || paused || engine.controlsOverlay().open || shown(inventoryScreen) || shown(mapScreen) || shown(newGameScreen) || shown(ledger) || shown(journalScreen) || shown(characterScreen) || shown(dialogueScreen);
+        platform.enableMouseAttack(combat && combat->live() && !uiFocus);
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
         const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;

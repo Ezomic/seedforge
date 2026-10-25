@@ -180,3 +180,12 @@ TEST_CASE("interact has its own key and bit, so a pickup never toggles lock-on",
     REQUIRE(lineFor("F ").find("pick up") != std::string::npos);
     REQUIRE(lineFor("I ").find("inventory") != std::string::npos);
 }
+
+TEST_CASE("the card lists the mouse bindings for attack, heavy attack and block")
+{
+    const std::vector<std::string> lines = controlsOverlayLines(startControlsOverlay(false, true));
+    REQUIRE(anyLineContains(lines, "Left click"));
+    REQUIRE(anyLineContains(lines, "Ctrl+click"));
+    REQUIRE(anyLineContains(lines, "Middle btn"));
+    REQUIRE(anyLineContains(lines, "Right mouse"));
+}
