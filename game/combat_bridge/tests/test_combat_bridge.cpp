@@ -393,7 +393,7 @@ TEST_CASE("fights across a respawn are numbered in order and a second session ap
     CHECK(stage0::summarise(rows).playerLosses == 2);
 }
 
-TEST_CASE("without a fights path nothing is written and the fight is the same", "[combat_bridge]")
+TEST_CASE("logging the fights does not change the fight", "[combat_bridge]")
 {
     const ForgedGame& game = gameFor(1);
     TempDir dir;
@@ -454,6 +454,9 @@ TEST_CASE("a fight in a dungeon is logged with the dungeon as its site and the n
     setup.tick(static_cast<int>(4.0 / kDt));
     REQUIRE(setup.bridge->respawns() == 1);
     setup.bridge->returnToWorld();
+    setup.tick(4);
+    setup.scene.enqueue(MoveCommand{StableId::of("player"), setup.site.duelStart + glm::dvec3(0.0, 0.5, 0.0) - setup.playerAt()});
+    setup.tick(4);
     dieOnce();
 
     std::string text = slurp(config.fightsCsv);

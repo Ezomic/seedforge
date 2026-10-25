@@ -56,6 +56,9 @@ void CombatBridge::openFightLog()
     stampFightLog(game_.sites[site_.settlement].id);
     auto& recorder = stage_.recorder();
     recorder.open(config_.fightsCsv);
+    if (!std::filesystem::exists(config_.fightsCsv)) {
+        logf(LogLevel::Warn, "combat: {} could not be created, so no fights are recorded", config_.fightsCsv.string());
+    }
     recorder.setSession({std::format("forged-{}", game_.desc.seed), "combat"});
 }
 
