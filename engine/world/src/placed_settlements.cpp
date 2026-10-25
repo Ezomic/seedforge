@@ -1,5 +1,7 @@
 #include "ichor/world/placed_settlements.h"
 
+#include "ichor/world/settlement_streets.h"
+
 #include <worldforge/forge_world.h>
 #include <worldforge/subseed.h>
 
@@ -162,6 +164,36 @@ void placeCluster(const SettlementSite& site, const Heightfield& field, const Ro
     for (PlacedBuilding& b : placed) PlacedBuildingBuilder::add(set, std::move(b));
 }
 
+// The street-fronting cluster: the layout's lots in its priority order, each kept where the ground is good and nothing stands.
+void placeStreetCluster(const SettlementSite& site, const SettlementLayout& layout, const Heightfield& field, const RoadField* roads, const WaterField* water,
+    const PlacedSettlementParams& p, PlacedBuildingSet& set)
+{
+    const std::uint8_t tier = std::min<std::uint8_t>(site.tier, kSettlementTierCount - 1);
+    const SettlementTierParams& t = p.tiers[tier];
+    Stream rng{worldforge::splitmix64(worldforge::splitmix64(field.desc().seed ^ kSettlementBuildDomain) ^ worldforge::hashText(site.id))};
+    std::vector<PlacedBuilding> placed;
+    for (const StreetLot& lot : layout.lots) {
+        if (static_cast<int>(placed.size()) >= t.buildings) break;
+        const Footprint f{lot.x, lot.z, lot.halfWidthM, lot.halfDepthM};
+        if (std::any_of(placed.begin(), placed.end(), [&](const PlacedBuilding& b) { return overlaps(f, b, p.buildingGapM); })) continue;
+        float lowest = 0.0f;
+        if (!standableImpl(f, field, roads, water, p, lowest)) continue;
+        PlacedBuilding b;
+        b.id = std::format("{}_b{:03}", site.id, placed.size());
+        b.settlementId = site.id;
+        b.tier = tier;
+        b.x = f.x;
+        b.z = f.z;
+        b.groundY = lowest;
+        b.halfWidthM = static_cast<float>(f.hw);
+        b.halfDepthM = static_cast<float>(f.hd);
+        b.heightM = static_cast<float>(rng.between(t.minHeightM, t.maxHeightM));
+        b.facing = static_cast<std::int8_t>(lot.facing);
+        placed.push_back(std::move(b));
+    }
+    for (PlacedBuilding& b : placed) PlacedBuildingBuilder::add(set, std::move(b));
+}
+
 double metresOf(int cell, int gridSize, double sizeMetres)
 {
     return static_cast<double>(cell) * sizeMetres / static_cast<double>(gridSize - 1);
@@ -188,7 +220,7 @@ std::vector<PlacedBuilding> PlacedBuildingSet::ofSettlement(const std::string& s
 }
 
 PlacedSettlements placeSettlementBuildings(const std::vector<SettlementSite>& sites, const Heightfield& heightfield, const RoadField* roads,
-    const WaterField* water, const PlacedSettlementParams& params)
+    const WaterField* water, const PlacedSettlementParams& params, const SettlementStreetSet* streets)
 {
     if (heightfield.empty() || !heightfield.desc().valid()) return failure("the heightfield is empty");
     if (!paramsValid(params)) return failure("a settlement placement parameter is out of range or not finite");
@@ -201,7 +233,14 @@ PlacedSettlements placeSettlementBuildings(const std::vector<SettlementSite>& si
         if (!std::isfinite(site.x) || !std::isfinite(site.z)) return failure(std::format("{} has a position that is not finite", site.id));
     }
     PlacedSettlements out;
-    for (const SettlementSite& site : sites) placeCluster(site, heightfield, roads, water, params, out.set);
+    for (const SettlementSite& site : sites) {
+        const SettlementLayout* layout = streets != nullptr ? streets->of(site.id) : nullptr;
+        if (layout != nullptr) {
+            placeStreetCluster(site, *layout, heightfield, roads, water, params, out.set);
+        } else {
+            placeCluster(site, heightfield, roads, water, params, out.set);
+        }
+    }
     PlacedBuildingBuilder::index(out.set, heightfield);
     return out;
 }
@@ -241,12 +280,12 @@ bool footprintStandable(double x, double z, double halfWidthM, double halfDepthM
 }
 
 PlacedSettlements placeForgedSettlements(const worldforge::ForgedWorld& world, const Heightfield& heightfield, const RoadField* roads,
-    const WaterField* water, const PlacedSettlementParams& params)
+    const WaterField* water, const PlacedSettlementParams& params, const SettlementStreetSet* streets)
 {
     std::vector<SettlementSite> sites;
     std::string error;
     if (!forgedSettlementSites(world, heightfield, sites, error)) return failure(std::move(error));
-    return placeSettlementBuildings(sites, heightfield, roads, water, params);
+    return placeSettlementBuildings(sites, heightfield, roads, water, params, streets);
 }
 
 Mesh placedBuildingMesh(float halfWidthM, float halfDepthM, float heightM, float foundationM)

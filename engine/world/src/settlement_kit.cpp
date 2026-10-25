@@ -2,6 +2,7 @@
 
 #include "ichor/assets/cooker.h"
 #include "ichor/core/log.h"
+#include "ichor/world/settlement_streets.h"
 
 #include <worldforge/subseed.h>
 
@@ -85,6 +86,13 @@ void tryWallPiece(const Context& c, KitPiece piece, double x, double z, std::uin
     SettlementKitBuilder::add(c.out, {piece, c.site.id, x, z, lowest - c.params.sinkM, quarter, {}});
 }
 
+// Where a facing (quarter turns, the kit's convention) looks, as a unit step in x and z.
+void facingStep(std::uint8_t quarter, double& dx, double& dz)
+{
+    dx = quarter == 1 ? 1.0 : quarter == 3 ? -1.0 : 0.0;
+    dz = quarter == 0 ? 1.0 : quarter == 2 ? -1.0 : 0.0;
+}
+
 void placeBuildings(const Context& c)
 {
     const std::uint64_t seed = worldforge::splitmix64(c.field.desc().seed ^ kKitDomain);
@@ -94,32 +102,46 @@ void placeBuildings(const Context& c)
         const double dx = c.site.x - b->x;
         const double dz = c.site.z - b->z;
         const bool alongX = std::abs(dx) > std::abs(dz);
+        // A house on a street lot looks at its street; a scattered one looks at the settlement's centre.
+        const bool onStreet = b->facing >= 0;
+        const auto facing = static_cast<std::uint8_t>(onStreet ? b->facing : alongX ? (dx > 0 ? 1 : 3) : (dz > 0 ? 0 : 2));
+        const bool facesX = (facing & 1u) != 0;
+        const float acrossHalf = facesX ? b->halfWidthM : b->halfDepthM; // the lot's depth, away from the street
+        const float alongHalf = facesX ? b->halfDepthM : b->halfWidthM;  // its frontage
         const float smaller = std::min(b->halfWidthM, b->halfDepthM);
-        const float larger = std::max(b->halfWidthM, b->halfDepthM);
+        const float larger = onStreet ? alongHalf : std::max(b->halfWidthM, b->halfDepthM);
         const float ground = b->groundY - c.params.sinkM;
+        double stepX = 0.0;
+        double stepZ = 0.0;
+        facingStep(facing, stepX, stepZ);
+        // A piece smaller than its lot stands at the lot's front, so its door is on the street and not behind a yard.
+        const auto atFront = [&](KitPiece piece, double x, double z, std::uint8_t quarter) {
+            const double back = onStreet ? std::max(0.0, static_cast<double>(acrossHalf) - static_cast<double>(kitPieceInfo(piece).halfDepthM)) : 0.0;
+            SettlementKitBuilder::add(c.out, {piece, c.site.id, x + stepX * back, z + stepZ * back, ground, quarter, {}});
+        };
         if (b->tier >= kVillage && !templePlaced && smaller >= c.params.minTempleHalfM) {
             templePlaced = true;
-            SettlementKitBuilder::add(c.out, {KitPiece::TempleFront, c.site.id, b->x, b->z, ground, static_cast<std::uint8_t>(alongX ? (dx > 0 ? 1 : 3) : (dz > 0 ? 0 : 2)), {}});
+            atFront(KitPiece::TempleFront, b->x, b->z, facing);
             continue;
         }
         if (b->tier >= kTown && larger >= c.params.minColonnadeHalfM && pick % 3 == 0) {
             const KitPieceInfo& bay = kitPieceInfo(KitPiece::ColonnadeBay);
-            const bool runsAlongX = b->halfWidthM >= b->halfDepthM;
-            const std::uint8_t quarter = runsAlongX ? (dz > 0 ? 0 : 2) : (dx > 0 ? 1 : 3);
+            const bool runsAlongX = onStreet ? !facesX : b->halfWidthM >= b->halfDepthM;
+            const std::uint8_t quarter = onStreet ? facing : runsAlongX ? (dz > 0 ? 0 : 2) : (dx > 0 ? 1 : 3);
             for (const double side : {-1.0, 1.0}) {
                 const double along = side * bay.halfWidthM;
-                SettlementKitBuilder::add(c.out, {KitPiece::ColonnadeBay, c.site.id, b->x + (runsAlongX ? along : 0.0), b->z + (runsAlongX ? 0.0 : along), ground, quarter, {}});
+                atFront(KitPiece::ColonnadeBay, b->x + (runsAlongX ? along : 0.0), b->z + (runsAlongX ? 0.0 : along), quarter);
             }
             continue;
         }
-        SettlementKitBuilder::add(c.out, {KitPiece::SmallHouse, c.site.id, b->x, b->z, ground, static_cast<std::uint8_t>(alongX ? (dx > 0 ? 1 : 3) : (dz > 0 ? 0 : 2)), {}});
+        atFront(KitPiece::SmallHouse, b->x, b->z, facing);
     }
 }
 
 void placePerimeter(const Context& c, std::uint8_t tier)
 {
     const SettlementTierParams& t = c.params.ground.tiers[tier];
-    const double half = std::ceil((static_cast<double>(t.radiusM) + c.params.wallMarginM) / kKitGridM) * kKitGridM;
+    const double half = settlementHalfM(t, c.params.wallMarginM);
     if (!(half >= kKitGridM) || half > kMaxWallHalfM) return;
     const bool stone = tier >= kTown;
     const KitPiece run = stone ? KitPiece::WallSegmentGrid : KitPiece::PalisadeRunGrid;
