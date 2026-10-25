@@ -134,7 +134,9 @@ jobs:
   linux-shard:
     name: linux sanitizers shard ${{ matrix.shard }} of 4
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in about 15 to 25 minutes on 4 cores, and a job
+    # killed by this limit saves nothing, so the limit is 30 until the caches exist on main; then set it back to 15.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -167,7 +169,8 @@ jobs:
           key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
           restore-keys: vcpkg-linux-v2-
       - name: Restore ccache
-        uses: actions/cache@v4
+        id: ccache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
           key: ccache-linux-${{ github.sha }}
@@ -184,6 +187,13 @@ jobs:
       - name: Build
         run: cmake --build --preset linux-headless-asan
         working-directory: engine
+      - name: Save ccache
+        # Right after the build, so a test failure or timeout does not throw away a cold compile.
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-${{ github.sha }}
       - name: Test (shard ${{ matrix.shard }} of 4)
         run: ctest --preset "$TEST_PRESET" -I ${{ matrix.shard }},,4
         working-directory: engine
@@ -239,7 +249,8 @@ jobs:
             vcpkg-linux-gpu-v2-
             vcpkg-linux-v2-
       - name: Restore ccache
-        uses: actions/cache@v4
+        id: ccache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
           key: ccache-linux-gpu-${{ github.sha }}
@@ -250,6 +261,13 @@ jobs:
       - name: Build GPU goldens
         run: cmake --build --preset linux-gpu
         working-directory: engine
+      - name: Save ccache
+        # Right after the build, so a test failure or timeout does not throw away a cold compile.
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-gpu-${{ github.sha }}
       - name: GPU goldens on lavapipe
         # Software Vulkan (lavapipe), so the 28 golden image cases compare here instead of skipping. The software
         # set under tests/data/golden/software overrides a golden that a real GPU draws differently.
@@ -321,7 +339,8 @@ jobs:
           key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
           restore-keys: vcpkg-linux-v2-
       - name: Restore ccache
-        uses: actions/cache@v4
+        id: ccache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
           key: ccache-linux-${{ github.sha }}
@@ -332,6 +351,13 @@ jobs:
       - name: Build
         run: cmake --build --preset linux-headless-asan
         working-directory: engine
+      - name: Save ccache
+        # Right after the build, so a test failure or timeout does not throw away a cold compile.
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-${{ github.sha }}
       - name: Soak tests
         run: ctest --preset linux-headless-asan-soak
         working-directory: engine
