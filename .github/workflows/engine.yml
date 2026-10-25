@@ -159,7 +159,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: engine/build/linux-headless-asan/forged-world-cache
-          key: forged-cache-linux-asan-${{ hashFiles('libworldforge/include/**', 'libworldforge/src/**', 'engine/world/include/ichor/world/forged_heightfield.h', 'engine/world/src/forged_heightfield.cpp', 'engine/world/include/ichor/world/forged_world_cache.h', 'engine/world/src/forged_world_cache.cpp', 'engine/world/include/ichor/world/forged_phase_maps.h', 'engine/world/src/forged_phase_maps.cpp', 'engine/world/include/ichor/world/heightfield.h', 'engine/world/src/heightfield.cpp', 'engine/world/include/ichor/world/world_desc.h', 'engine/core/include/ichor/core/binary.h', 'engine/core/include/ichor/core/hash.h') }}
+          key: forged-cache-linux-asan-${{ matrix.shard }}-${{ hashFiles('libworldforge/include/**', 'libworldforge/src/**', 'engine/world/include/ichor/world/forged_heightfield.h', 'engine/world/src/forged_heightfield.cpp', 'engine/world/include/ichor/world/forged_world_cache.h', 'engine/world/src/forged_world_cache.cpp', 'engine/world/include/ichor/world/forged_phase_maps.h', 'engine/world/src/forged_phase_maps.cpp', 'engine/world/include/ichor/world/heightfield.h', 'engine/world/src/heightfield.cpp', 'engine/world/include/ichor/world/world_desc.h', 'engine/core/include/ichor/core/binary.h', 'engine/core/include/ichor/core/hash.h') }}
       - name: Configure
         run: cmake --preset linux-headless-asan
         working-directory: engine
