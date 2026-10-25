@@ -98,7 +98,7 @@ Each required check has a hard 15 minute `timeout-minutes`. `docs/ci-time-baseli
 
 | Tier | Rule | Runs on a PR | Runs on main and nightly |
 |---|---|---|---|
-| fast | under about 1 s in Release | Windows Release, and the Linux sanitizer shards | everywhere |
+| fast | under about 1 s in Release and under 60 s under the sanitizers (the guard fails a fast case over either; a test that is cheap in Release but heavy under ASan goes to medium) | Windows Release, and the Linux sanitizer shards | everywhere |
 | medium | about 1 s to 10 s in Release | Windows Release only | also the Linux sanitizer shards |
 | soak | the full variant of a heavy test | never | `linux soak tests` job after every merge to main, and the nightly `soak` job |
 

@@ -72,7 +72,7 @@ def tiers_problems(root, path):
     if not problems:
         text = test_times.source_text(root)
         for n in sorted(seen):
-            if f'TEST_CASE("{n.replace(chr(34), chr(92) + chr(34))}"' not in text:
+            if f'TEST_CASE("{n.replace(chr(34), chr(92) + chr(34))}"' not in text and f"add_test(NAME {n} " not in text:
                 problems.append(f"{n!r} is not in any test source: renamed or deleted, update {TIERS}")
     return problems
 
