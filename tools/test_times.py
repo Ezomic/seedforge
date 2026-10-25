@@ -38,6 +38,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PROFILES = {"sanitizer": 120.0, "release": 30.0}
+FAST_CAPS = {"sanitizer": 90.0, "release": 5.0}
+TIERS = "engine/tests/test_tiers.json"
+# A medium or soak case without an allowlist entry may run up to these, so the full suite under the sanitizers (main, nightly) does not
+# trip the default budget on the cases that are long on purpose. A fast case keeps the fast cap above.
+TIER_BUDGETS = {"sanitizer": {"medium": 300.0, "soak": 600.0}, "release": {"medium": 30.0, "soak": 60.0}}
 CTEST_TIMEOUT = 1500.0
 CAP_STEP = 30.0
 ALLOWLIST = "tools/test_time_allowlist.json"
@@ -206,6 +211,38 @@ def evaluate(times, entries, budget):
     return over
 
 
+def tier_lists(path):
+    """{test name: "medium" or "soak"}, or None when the file is absent."""
+    if not Path(path).exists():
+        return None
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return {**{n: "medium" for n in data["medium"]}, **{n: "soak" for n in data["soak"]}}
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise InputError(f"{path}: {e}")
+
+
+def apply_tier_budgets(over, tiers, profile, entries):
+    """Drops the cases that broke the default budget but are within the budget of their tier (an allowlist entry keeps its own cap)."""
+    kept = []
+    for name, sec, limit, reason in over:
+        tier = tiers.get(name)
+        if tier and name not in entries and sec <= TIER_BUDGETS[profile][tier]:
+            continue
+        kept.append((name, sec, limit if not tier or name in entries else TIER_BUDGETS[profile][tier], reason))
+    return kept
+
+
+def evaluate_tiers(times, slow_tiers, profile, entries):
+    """A case in no tier list is fast: over the fast cap it belongs in engine/tests/test_tiers.json (SEED-664)."""
+    cap = FAST_CAPS[profile]
+    over = []
+    for name, sec in times.items():
+        if name not in slow_tiers and name not in entries and sec > cap:
+            over.append((name, sec, cap, f"fast tier cap, add it to the medium list in {TIERS}"))
+    return over
+
+
 def cap_for(observed):
     return min(CTEST_TIMEOUT, math.ceil(observed * 1.5 / CAP_STEP) * CAP_STEP)
 
@@ -253,6 +290,7 @@ def run(argv, out=sys.stdout):
     ap.add_argument("--top", type=int, default=20)
     ap.add_argument("--root", default=str(Path(__file__).resolve().parent.parent))
     ap.add_argument("--allowlist")
+    ap.add_argument("--tiers", help=f"tier lists (default {TIERS} under --root when present)")
     ap.add_argument("--update", action="store_true")
     ap.add_argument("--reason")
     ap.add_argument("--check-allowlist", action="store_true")
@@ -291,6 +329,12 @@ def run(argv, out=sys.stdout):
             print(f"test-times: wrote {len(data[args.profile])} {args.profile} entries to {allowlist}", file=out)
             return 0
         over = evaluate(times, entries, budget)
+        slow_tiers = tier_lists(args.tiers or str(Path(args.root) / TIERS))
+        if slow_tiers is not None and args.budget is None:
+            over = apply_tier_budgets(over, slow_tiers, args.profile, entries)
+            seen = {o[0] for o in over}
+            over += [o for o in evaluate_tiers(times, slow_tiers, args.profile, entries) if o[0] not in seen]
+            over.sort(key=lambda o: -o[1])
         report(times, over, budget, args.top, out)
         stale = sorted(n for n in entries if n in times and times[n] <= budget)
         for n in stale:
@@ -336,6 +380,15 @@ def self_test(out):
     expect("a case exactly at the budget is green", evaluate({"x": 120.0}, {}, 120.0), [])
     expect("release budget is tighter", [o[0] for o in evaluate({"x": 31.0}, {}, PROFILES["release"])], ["x"])
 
+    expect("a fast case over the fast cap is red", [o[0] for o in evaluate_tiers({"x": 6.0}, set(), "release", {})], ["x"])
+    expect("a medium case over the fast cap is green", evaluate_tiers({"x": 6.0}, {"x"}, "release", {}), [])
+    tiers = {"m": "medium", "k": "soak"}
+    over_default = [("m", 200.0, 120.0, None), ("k", 500.0, 120.0, None), ("f", 200.0, 120.0, None)]
+    expect("a medium and a soak case within their tier budget are green, a fast one is red",
+           [o[0] for o in apply_tier_budgets(over_default, tiers, "sanitizer", {})], ["f"])
+    expect("a medium case over its tier budget is red", [o[0] for o in apply_tier_budgets([("m", 301.0, 120.0, None)], tiers, "sanitizer", {})], ["m"])
+    expect("an allowlisted medium case keeps its own cap", [o[0] for o in apply_tier_budgets([("m", 200.0, 150.0, "r")], tiers, "sanitizer", {"m": {}})], ["m"])
+    expect("a fast case within the cap is green", evaluate_tiers({"x": 4.0}, set(), "release", {}), [])
     expect("cap rounds 1.5x up to 30 s", cap_for(100.0), 150.0)
     expect("cap never passes the ctest timeout", cap_for(1500.0), CTEST_TIMEOUT)
     updated = update_entries({"slow case": 200.0, "allowed case": 100.0, "fast case": 1.0}, entries, 120.0, "why")

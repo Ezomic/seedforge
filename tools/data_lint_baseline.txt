@@ -1,0 +1,4 @@
+# Known data lint debt (SEED-662). Shrink this file, never grow it.
+orphan-ref data/heralds/mapping.json granary_reckoners pressure pressure.famine
+orphan-ref data/heralds/mapping.json kerykes pressure pressure.return
+orphan-ref data/heralds/mapping.json chasm_cult pressure pressure.opening

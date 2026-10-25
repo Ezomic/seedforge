@@ -30,18 +30,34 @@ foreach(source IN LISTS ichor_test_sources)
     list(APPEND ichor_test_sources_${source_group} ${source})
 endforeach()
 
+# The forged world cache the tests share (forged_world_fixture.h) lives in the build directory, in a folder per generator digest.
+file(GLOB_RECURSE forged_cache_inputs CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/../libworldforge/include/*)
+set(forged_cache_digest_header ${CMAKE_BINARY_DIR}/generated/forged_cache_digest.h)
+add_custom_command(OUTPUT ${forged_cache_digest_header}
+    COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}/.. -DOUT=${forged_cache_digest_header} -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_cache_digest.cmake
+    DEPENDS ${forged_cache_inputs} ${CMAKE_CURRENT_SOURCE_DIR}/forged_cache_digest.cmake
+        ${CMAKE_SOURCE_DIR}/world/include/ichor/world/forged_heightfield.h ${CMAKE_SOURCE_DIR}/world/src/forged_heightfield.cpp
+        ${CMAKE_SOURCE_DIR}/world/include/ichor/world/forged_world_cache.h ${CMAKE_SOURCE_DIR}/world/src/forged_world_cache.cpp
+        ${CMAKE_SOURCE_DIR}/world/include/ichor/world/forged_phase_maps.h ${CMAKE_SOURCE_DIR}/world/src/forged_phase_maps.cpp
+        ${CMAKE_SOURCE_DIR}/world/include/ichor/world/heightfield.h ${CMAKE_SOURCE_DIR}/world/src/heightfield.cpp
+        ${CMAKE_SOURCE_DIR}/world/include/ichor/world/world_desc.h
+        ${CMAKE_SOURCE_DIR}/core/include/ichor/core/binary.h ${CMAKE_SOURCE_DIR}/core/include/ichor/core/hash.h
+    COMMENT "Hashing the forged world generator")
+add_custom_target(ichor_forged_cache_digest DEPENDS ${forged_cache_digest_header})
+
 foreach(group IN LISTS ichor_test_groups)
     set(target ichor_tests_${group})
     if(NOT ichor_test_sources_${group})
         message(FATAL_ERROR "ichor_test_group_${group} matches no test file")
     endif()
     add_executable(${target} ${ichor_test_sources_${group}})
+    target_include_directories(${target} PRIVATE ${CMAKE_BINARY_DIR}/generated)
     target_link_libraries(${target} PRIVATE
         ichor_loop ichor_assets ichor_anim ichor_audio ichor_world ichor_script ichor_editor ichor_ui ichor_data ichor_traversal ichor_npc ichor_factions ichor_economy ichor_graph ichor_progression ichor_ledger ichor_net ichor_save ichor_platform_null ichor_gfx_null ichor_forgecli ichor_forgecli_walk ichor_lint Catch2::Catch2WithMain nlohmann_json::nlohmann_json worldforge
     )
-    target_compile_definitions(${target} PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
+    target_compile_definitions(${target} PRIVATE ICHOR_GAME_DATA_DIR="${CMAKE_SOURCE_DIR}/../data" ICHOR_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data" ICHOR_TEST_OUTPUT="${CMAKE_BINARY_DIR}/test-output" ICHOR_FORGED_CACHE_DIR="${CMAKE_BINARY_DIR}/forged-world-cache" ICHOR_ART_DIR="${ICHOR_ART_DIR}" ICHOR_REPO_DATA="${CMAKE_CURRENT_SOURCE_DIR}/../../data" _CRT_SECURE_NO_WARNINGS)
     catch_discover_tests(${target})
-    add_dependencies(${target} ichor_forge ichor_seed_harness ichor_lint_cli)
+    add_dependencies(${target} ichor_forge ichor_seed_harness ichor_lint_cli ichor_forged_cache_digest)
     list(APPEND ichor_test_targets ${target})
 endforeach()
 add_custom_target(ichor_tests DEPENDS ${ichor_test_targets})
@@ -56,7 +72,11 @@ if(Python3_Interpreter_FOUND)
     set(layout_script ${CMAKE_SOURCE_DIR}/../tools/check_content_layout.py)
     add_test(NAME content_layout COMMAND ${Python3_EXECUTABLE} ${layout_script} --root ${CMAKE_SOURCE_DIR}/..)
     add_test(NAME content_layout_selftest COMMAND ${Python3_EXECUTABLE} ${layout_script} --self-test)
+    set(data_lint_script ${CMAKE_SOURCE_DIR}/../tools/check_data.py)
+    add_test(NAME data_lint COMMAND ${Python3_EXECUTABLE} ${data_lint_script} --root ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME data_lint_selftest COMMAND ${Python3_EXECUTABLE} ${data_lint_script} --self-test)
     set(times_script ${CMAKE_SOURCE_DIR}/../tools/test_times.py)
+    add_test(NAME test_tiers_consistent COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/ci_tiers.py --root ${CMAKE_SOURCE_DIR}/.. check)
     add_test(NAME test_time_allowlist COMMAND ${Python3_EXECUTABLE} ${times_script} --check-allowlist --root ${CMAKE_SOURCE_DIR}/..)
     add_test(NAME test_time_budget_selftest COMMAND ${Python3_EXECUTABLE} ${times_script} --self-test)
 else()
@@ -85,6 +105,7 @@ if(ENGINE_RUNTIME)
     set_tests_properties(forged_combat_app PROPERTIES TIMEOUT 600)
     add_test(NAME forged_campaign_app COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_campaign_app_check.cmake)
     set_tests_properties(forged_campaign_app PROPERTIES TIMEOUT 300)
+    set_tests_properties(forged_app_determinism forged_combat_app forged_campaign_app PROPERTIES LABELS medium)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp
     )
@@ -123,3 +144,6 @@ if(ENGINE_RUNTIME)
     set_tests_properties(offscreen_screenshot_hidden offscreen_screenshot_matches_window PROPERTIES SKIP_REGULAR_EXPRESSION "no usable Vulkan device" RUN_SERIAL TRUE)
     set_tests_properties(offscreen_screenshot_matches_window PROPERTIES LABELS needs_display)
 endif()
+
+# Last on purpose: it labels tests that every catch_discover_tests above (and the runtime ones) has already registered.
+set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/apply_test_tiers.cmake)

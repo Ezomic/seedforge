@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Re-records the combat bridge replay corpus (game/combat_bridge/tests/corpus). Run it after a combat knob is
+# changed on purpose, then commit the changed fixtures with the knob change.
+#
+#   bin/regen-combat-bridge-corpus
+#
+# Env: ICHOR_PRESET (default windows-ci).
+set -u
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+preset=${ICHOR_PRESET:-windows-ci}
+
+case "${1:-}" in
+  -h|--help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+esac
+
+"$repo/bin/build" -p "$preset" combat_bridge_corpus || { echo "regen-combat-bridge-corpus: build failed" >&2; exit 1; }
+
+exe=$(find "$repo/engine/build/$preset" -type f \( -name 'combat_bridge_corpus' -o -name 'combat_bridge_corpus.exe' \) 2>/dev/null | head -n 1)
+[ -n "$exe" ] || { echo "regen-combat-bridge-corpus: combat_bridge_corpus not found under engine/build/$preset" >&2; exit 1; }
+exec "$exe"

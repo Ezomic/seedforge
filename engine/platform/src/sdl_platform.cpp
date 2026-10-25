@@ -58,6 +58,9 @@ void SdlPlatform::pumpEvents()
             mouseLook_.setHeld(false);
             SDL_SetWindowRelativeMouseMode(window_, false);
         }
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+            mouseAttack_.click((SDL_GetModState() & SDL_KMOD_CTRL) != 0);
+        }
         if (lookEnabled_ && event.type == SDL_EVENT_MOUSE_MOTION) {
             mouseLook_.addMotion(event.motion.xrel);
         }
@@ -111,6 +114,8 @@ void SdlPlatform::pumpEvents()
     const float scaleY = windowHeight > 0 ? static_cast<float>(pixels.height) / static_cast<float>(windowHeight) : 1.0f;
     pointer_.x = static_cast<int>(std::lround(mouseX * scaleX));
     pointer_.y = static_cast<int>(std::lround(mouseY * scaleY));
+    mouseAttack_.setBlockHeld((mouseButtons & SDL_BUTTON_MMASK) != 0);
+    frame.buttons |= mouseAttack_.step(static_cast<float>(elapsed));
     pointer_.primary = (mouseButtons & SDL_BUTTON_LMASK) != 0;
     pointer_.inside = (SDL_GetWindowFlags(window_) & SDL_WINDOW_MOUSE_FOCUS) != 0;
     navKeys_ = {keys[SDL_SCANCODE_LEFT], keys[SDL_SCANCODE_RIGHT], keys[SDL_SCANCODE_UP], keys[SDL_SCANCODE_DOWN], keys[SDL_SCANCODE_PAGEUP], keys[SDL_SCANCODE_PAGEDOWN],

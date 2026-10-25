@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ichor {
@@ -30,6 +31,9 @@ struct CombatBridgeConfig {
     // World-axis steering with the player always facing the foe: what a scripted player (FightBot) needs.
     // Off is the free look a person plays with.
     bool legacyControls = false;
+    // Where every finished fight is written as a Stage 0 fights.csv row (plus world_seed and site columns), so
+    // stage0_report reads it. Empty records nothing to disk.
+    std::filesystem::path fightsCsv;
 };
 
 struct CombatHudState {
@@ -58,6 +62,9 @@ public:
     InputFrame botInput(Scene& scene);
 
     bool live() const { return phase_ == Phase::Live; }
+    // The yaw the live fight turns the stick by (the player's facing, or the way to the enemy under lock-on): what
+    // forward means for the keys right now. Zero while there is no fight.
+    float moveYaw(const Scene& scene) const;
     // Still waiting for the enemy's post to have ground: the one state startAt applies to.
     bool waiting() const { return phase_ == Phase::WaitingForGround; }
     // For a player who began somewhere else than the world (inside a dungeon): the fight is set up at once, with the
@@ -74,6 +81,8 @@ public:
     void setFightSpawns(glm::dvec3 playerFeet, glm::dvec3 foeFeet);
     // Back from somewhere else: the world spawns again, and the enemy stands at its post once that ground is there.
     void returnToWorld();
+    // The site column of the fights.csv rows from now on: a dungeon id while the dungeon fight has the player, else the settlement.
+    void setFightSite(std::string_view site);
     const stage0::BullWardenKit* bullWarden() const { return bullWarden_.get(); }
     stage0::FightOutcome outcome(const Scene& scene) const;
     CombatHudState hud(const Scene& scene) const;
@@ -98,6 +107,8 @@ private:
     void step(Scene& scene, double dt);
     void setFoe(Scene& scene, glm::dvec3 feet, bool alive);
     void logTransitions(const Scene& scene);
+    void openFightLog();
+    void stampFightLog(std::string_view site);
     void setSpawnsForLastSettlement();
     glm::dvec3 respawnFor(std::size_t settlement);
 

@@ -5,6 +5,7 @@
 #include <worldforge/forge_world.h>
 #include <worldforge/world_validation.h>
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <format>
@@ -34,7 +35,13 @@ TEST_CASE("landmark coverage passes on the first attempt at 128 and 256 for seed
     }
 }
 
-TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", "[forge_cli][landmark]")
+namespace {
+
+// The seeds in 1 to 64 that fall under the gate at 256 without the reserve, in order. The soak case below searches for them and fails
+// when the list is stale, so the PR variant can test them directly instead of searching.
+constexpr std::array<std::uint64_t, 4> kWeakSeeds256 = { 14, 17, 23, 24 };
+
+void reserveLiftsWeakSeeds(int wantedWeakSeeds)
 {
     const int minimum = forgecli::sanityThresholds().minLandmarkCoveragePermille;
     worldforge::ForgeConfig withReserve = forgecli::defaultForgeConfig(256);
@@ -42,17 +49,39 @@ TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", 
     withoutReserve.pois.coverageReserve = 0;
     REQUIRE(withReserve.pois.coverageReserve > 0);
     int found = 0;
-    for (std::uint64_t seed = 1; seed <= 64 && found < 3; ++seed) {
+    for (std::uint64_t seed = 1; seed <= 64 && found < wantedWeakSeeds; ++seed) {
         const auto before = forgeToPois(seed, 256, withoutReserve).landmarkCoverage();
         REQUIRE(before.has_value());
         if (before->coveragePermille >= minimum) continue;
+        INFO("seed " << seed << " is not the recorded weak seed " << kWeakSeeds256[static_cast<std::size_t>(found)] << ": update kWeakSeeds256");
+        CHECK(seed == kWeakSeeds256[static_cast<std::size_t>(found)]);
         ++found;
         const auto after = forgeToPois(seed, 256, withReserve).landmarkCoverage();
         REQUIRE(after.has_value());
         INFO("seed " << seed);
         CHECK(after->coveragePermille >= minimum);
     }
-    CHECK(found == 3);
+    CHECK(found == wantedWeakSeeds);
+}
+
+}
+
+TEST_CASE("the coverage reserve lifts the recorded weak seeds over the gate", "[forge_cli][landmark]")
+{
+    const int minimum = forgecli::sanityThresholds().minLandmarkCoveragePermille;
+    const worldforge::ForgeConfig withReserve = forgecli::defaultForgeConfig(256);
+    REQUIRE(withReserve.pois.coverageReserve > 0);
+    for (const std::uint64_t seed : { kWeakSeeds256[3] }) { // the weakest of them: 332 permille without the reserve
+        const auto after = forgeToPois(seed, 256, withReserve).landmarkCoverage();
+        REQUIRE(after.has_value());
+        INFO("seed " << seed);
+        CHECK(after->coveragePermille >= minimum);
+    }
+}
+
+TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", "[forge_cli][landmark]")
+{
+    reserveLiftsWeakSeeds(3);
 }
 
 // Hidden: prints the per-seed table for the ticket. Run with: ichor_tests_world "[.landmark_measure]"

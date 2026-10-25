@@ -1,10 +1,13 @@
 #include "ichor/combat_bridge/combat_bridge.h"
 
 #include "ichor/core/log.h"
+#include "ichor/stage0/session_ledger.h"
+#include "ichor/stage0/free_look.h"
 #include "ichor/world/dungeon_entry.h"
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 
 namespace ichor {
 
@@ -40,8 +43,35 @@ void CombatBridge::install(Scene& scene, StableId player, glm::dvec3 start)
     start_ = start;
     lastSettlement_ = site_.settlement;
     stage_.setLegacyControls(config_.legacyControls);
+    openFightLog();
     stage_.attach(scene, player, start, site_.enemyPost + kSettleLift);
     scene.addSystem("combat_bridge", [this](Scene& s, double dt, const InputFrame&) { step(s, dt); });
+}
+
+void CombatBridge::openFightLog()
+{
+    if (config_.fightsCsv.empty()) {
+        return;
+    }
+    stampFightLog(game_.sites[site_.settlement].id);
+    auto& recorder = stage_.recorder();
+    recorder.open(config_.fightsCsv);
+    if (!std::filesystem::exists(config_.fightsCsv)) {
+        logf(LogLevel::Warn, "combat: {} could not be created, so no fights are recorded", config_.fightsCsv.string());
+    }
+    recorder.setSession({std::format("forged-{}", game_.desc.seed), "combat"});
+}
+
+void CombatBridge::stampFightLog(std::string_view site)
+{
+    stage_.recorder().setContext("world_seed,site", std::format("{},{}", game_.desc.seed, stage0::cleanField(site)));
+}
+
+void CombatBridge::setFightSite(std::string_view site)
+{
+    if (!config_.fightsCsv.empty()) {
+        stampFightLog(site);
+    }
 }
 
 glm::dvec3 CombatBridge::respawnFor(std::size_t settlement)
@@ -107,6 +137,9 @@ void CombatBridge::parkFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, 
 
 void CombatBridge::returnToWorld()
 {
+    if (site_.found) {
+        setFightSite(game_.sites[site_.settlement].id);
+    }
     setSpawnsForLastSettlement();
     returningToWorld_ = true;
     returnParked_ = false;
@@ -338,6 +371,22 @@ void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view,
     for (const LineSegment& line : lines) {
         view.lines.push_back({line.a, line.b, line.color});
     }
+}
+
+float CombatBridge::moveYaw(const Scene& scene) const
+{
+    const entt::entity player = scene.find(stage_.playerId());
+    const entt::entity foe = scene.find(stage_.foeId());
+    if (!live() || player == entt::null || foe == entt::null) {
+        return 0.0f;
+    }
+    const auto& registry = scene.registry();
+    const auto* fighter = registry.try_get<stage0::Combatant>(player);
+    if (fighter == nullptr) {
+        return 0.0f;
+    }
+    const float toFoe = stage0::yawTowards(glm::dvec3(0.0), registry.get<Transform>(foe).position - registry.get<Transform>(player).position);
+    return stage0::viewYaw(stage_.lockedOn(), fighter->yaw, toFoe);
 }
 
 void CombatBridge::overlay(const Scene& scene, std::vector<std::string>& lines) const

@@ -1,4 +1,5 @@
 #include "ichor/combat_bridge/combat_bridge.h"
+#include "ichor/stage0/fight_report.h"
 #include "ichor/world/forge_job.h"
 
 #include <catch2/catch_approx.hpp>
@@ -6,6 +7,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -88,6 +92,31 @@ struct Setup {
         for (int i = 0; i < count; ++i) tick();
     }
 };
+
+struct TempDir {
+    std::filesystem::path path;
+
+    TempDir()
+    {
+        static int counter = 0;
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        path = std::filesystem::temp_directory_path() / ("ichor_combat_fights_" + std::to_string(stamp) + "_" + std::to_string(counter++));
+        std::filesystem::create_directories(path);
+    }
+    ~TempDir()
+    {
+        std::error_code ignored;
+        std::filesystem::remove_all(path, ignored);
+    }
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+};
+
+std::string slurp(const std::filesystem::path& file)
+{
+    std::ifstream in(file, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
 
 struct Played {
     stage0::FightOutcome outcome = stage0::FightOutcome::Ongoing;
@@ -313,6 +342,71 @@ TEST_CASE("a nonsense respawn delay or step falls back to a usable one", "[comba
     CHECK(setup.bridge->respawns() == 1);
 }
 
+TEST_CASE("a lost fight writes a fights.csv row with the world seed and the site that stage0_report reads", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(2);
+    TempDir dir;
+    CombatBridgeConfig config;
+    config.fightsCsv = dir.path / "fights.csv";
+    Setup setup(game, 2, config);
+    for (int i = 0; i < 60 * 120 && setup.bridge->outcome(setup.scene) == stage0::FightOutcome::Ongoing; ++i) setup.tick();
+    REQUIRE(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::PlayerDied);
+
+    std::string text = slurp(config.fightsCsv);
+    std::erase(text, '\r');
+    const std::string siteId = game.sites[setup.site.settlement].id;
+    CHECK(text.starts_with("fight,seconds,gap_to_retry,loser,cause,"));
+    CHECK(text.find(",kill_onscreen,world_seed,site\n") != std::string::npos);
+    CHECK(text.find("," + std::to_string(game.desc.seed) + "," + siteId + "\n") != std::string::npos);
+
+    const auto rows = stage0::parseFightLog(text);
+    REQUIRE(rows.size() == 1);
+    CHECK(rows[0].fight == 1);
+    CHECK(rows[0].playerLost);
+    CHECK(rows[0].cause == static_cast<stage0::DeathCause>(setup.fighter().deathCause));
+    CHECK(rows[0].cause != stage0::DeathCause::Unknown);
+    CHECK(rows[0].seconds > 1.0);
+    const stage0::FightSummary summary = stage0::summarise(rows);
+    CHECK(summary.playerLosses == 1);
+    CHECK(summary.playerDeaths.count(rows[0].cause) == 1);
+
+    CHECK(std::filesystem::exists(dir.path / "fights.fights" / "fight_001.ifrd"));
+}
+
+TEST_CASE("fights across a respawn are numbered in order and a second session appends to the same log", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    TempDir dir;
+    CombatBridgeConfig config;
+    config.fightsCsv = dir.path / "fights.csv";
+    for (int session = 0; session < 2; ++session) {
+        Setup setup(game, 1, config);
+        setup.tick(4);
+        REQUIRE(setup.bridge->live());
+        for (int i = 0; i < 60 * 120 && setup.bridge->outcome(setup.scene) == stage0::FightOutcome::Ongoing; ++i) setup.tick();
+        REQUIRE(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::PlayerDied);
+    }
+    const auto rows = stage0::parseFightLog(slurp(config.fightsCsv));
+    REQUIRE(rows.size() == 2);
+    CHECK(rows[0].fight == 1);
+    CHECK(rows[1].fight == 2);
+    CHECK(stage0::summarise(rows).playerLosses == 2);
+}
+
+TEST_CASE("logging the fights does not change the fight", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    TempDir dir;
+    CombatBridgeConfig config;
+    config.fightsCsv = dir.path / "fights.csv";
+    const Played plain = play(game, 1, nullptr, 0);
+    Setup logged(game, 1, config);
+    Played with;
+    for (; with.ticks < 60 * 120 && logged.bridge->outcome(logged.scene) == stage0::FightOutcome::Ongoing; ++with.ticks) logged.tick();
+    CHECK(logged.scene.stateHash() == plain.hash);
+    CHECK(with.ticks == plain.ticks);
+}
+
 TEST_CASE("the forged view hides the Stage 0 debug lines by default and still shows the enemy telegraph", "[combat_bridge]")
 {
     const ForgedGame& game = gameFor(1);
@@ -340,4 +434,35 @@ TEST_CASE("the forged view hides the Stage 0 debug lines by default and still sh
     CHECK(hasColour(debug, spacingRing));
     CHECK(debug.lines.size() > quiet.lines.size());
     CHECK(hasColour(quiet, windup));
+}
+
+TEST_CASE("a fight in a dungeon is logged with the dungeon as its site and the next one in the world with the settlement", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    TempDir dir;
+    CombatBridgeConfig config;
+    config.fightsCsv = dir.path / "fights.csv";
+    Setup setup(game, 1, config);
+    setup.tick(4);
+    REQUIRE(setup.bridge->live());
+    setup.bridge->setFightSite("dungeon:cellar,x");
+    const auto dieOnce = [&] {
+        for (int i = 0; i < 60 * 120 && setup.bridge->outcome(setup.scene) == stage0::FightOutcome::Ongoing; ++i) setup.tick();
+        REQUIRE(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::PlayerDied);
+    };
+    dieOnce();
+    setup.tick(static_cast<int>(4.0 / kDt));
+    REQUIRE(setup.bridge->respawns() == 1);
+    setup.bridge->returnToWorld();
+    setup.tick(4);
+    setup.scene.enqueue(MoveCommand{StableId::of("player"), setup.site.duelStart + glm::dvec3(0.0, 0.5, 0.0) - setup.playerAt()});
+    setup.tick(4);
+    dieOnce();
+
+    std::string text = slurp(config.fightsCsv);
+    std::erase(text, '\r');
+    const std::string settlement = game.sites[setup.site.settlement].id;
+    CHECK(text.find("," + std::to_string(game.desc.seed) + ",dungeon:cellarx\n") != std::string::npos);
+    CHECK(text.find("," + std::to_string(game.desc.seed) + "," + settlement + "\n") != std::string::npos);
+    CHECK(stage0::parseFightLog(text).size() == 2);
 }
