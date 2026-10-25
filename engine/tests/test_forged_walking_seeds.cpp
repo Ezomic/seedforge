@@ -14,7 +14,7 @@ using namespace ichor::walksupport;
 namespace {
 
 constexpr int kGrid = 129;
-constexpr std::array<std::uint64_t, 8> kSeeds = {1, 3, 4, 5, 6, 7, 8, 10}; // seed 2 moved to 10 in SEED-556: its world has an enclosed spawn whose ground-route search takes minutes
+constexpr std::array<std::uint64_t, 8> kSeeds = {1, 2, 3, 4, 5, 6, 7, 8}; // seed 2's world has an enclosed spawn; its blocker is reported, not walked round
 
 }
 
@@ -64,10 +64,25 @@ void walkSeedsAndCheck(std::span<const std::uint64_t> seeds, int minimumArrived)
 // Seed 4 has the shortest trip of the eight (790 m) and arrives; the others stay in the full case.
 TEST_CASE("from the spawn toward the nearest settlement on a recorded short trip the walker arrives", "[walking][bake]")
 {
-    walkSeedsAndCheck(std::span<const std::uint64_t>(kSeeds).subspan(2, 1), 1);
+    walkSeedsAndCheck(std::span<const std::uint64_t>(kSeeds).subspan(3, 1), 1);
 }
 
 TEST_CASE("from the spawn toward the nearest settlement on 8 seeds the walker arrives or names what stopped it", "[walking][bake]")
 {
     walkSeedsAndCheck(kSeeds, 5);
+}
+
+// Seed 2 at grid 129 spawns in a pocket of 0.4 km2 that cliffs close in. Flooding it over the window and again over the
+// world, for every goal and every other settlement tried as home, took 437 s in Release (SEED-657); the first flood is all it needs.
+TEST_CASE("the enclosed spawn of seed 2 names its pocket without searching the world for every goal", "[walking][bake]")
+{
+    const SeedWalk walk = walkSeed(2, kGrid);
+    REQUIRE(walk.hadSettlement);
+    REQUIRE_FALSE(walk.usedNavmesh);
+    REQUIRE_FALSE(walk.usedGroundRoute);
+    REQUIRE(walk.routeFailure == WalkRouteFailure::NoGroundRoute);
+    REQUIRE(walk.enclosure.starts_with("enclosed:"));
+    REQUIRE(walk.result.outcome == WalkOutcome::Blocked);
+    REQUIRE(walk.routeNodesSearched > 0);
+    REQUIRE(walk.routeNodesSearched <= 60'000);
 }
