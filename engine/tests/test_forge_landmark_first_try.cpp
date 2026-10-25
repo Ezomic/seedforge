@@ -5,6 +5,7 @@
 #include <worldforge/forge_world.h>
 #include <worldforge/world_validation.h>
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <format>
@@ -36,6 +37,10 @@ TEST_CASE("landmark coverage passes on the first attempt at 128 and 256 for seed
 
 namespace {
 
+// The seeds in 1 to 64 that fall under the gate at 256 without the reserve, in order. The soak case below searches for them and fails
+// when the list is stale, so the PR variant can test them directly instead of searching.
+constexpr std::array<std::uint64_t, 4> kWeakSeeds256 = { 14, 17, 23, 24 };
+
 void reserveLiftsWeakSeeds(int wantedWeakSeeds)
 {
     const int minimum = forgecli::sanityThresholds().minLandmarkCoveragePermille;
@@ -48,6 +53,8 @@ void reserveLiftsWeakSeeds(int wantedWeakSeeds)
         const auto before = forgeToPois(seed, 256, withoutReserve).landmarkCoverage();
         REQUIRE(before.has_value());
         if (before->coveragePermille >= minimum) continue;
+        INFO("seed " << seed << " is not the recorded weak seed " << kWeakSeeds256[static_cast<std::size_t>(found)] << ": update kWeakSeeds256");
+        CHECK(seed == kWeakSeeds256[static_cast<std::size_t>(found)]);
         ++found;
         const auto after = forgeToPois(seed, 256, withReserve).landmarkCoverage();
         REQUIRE(after.has_value());
@@ -59,9 +66,17 @@ void reserveLiftsWeakSeeds(int wantedWeakSeeds)
 
 }
 
-TEST_CASE("the coverage reserve lifts the first weak seed over the gate", "[forge_cli][landmark]")
+TEST_CASE("the coverage reserve lifts the recorded weak seeds over the gate", "[forge_cli][landmark]")
 {
-    reserveLiftsWeakSeeds(1);
+    const int minimum = forgecli::sanityThresholds().minLandmarkCoveragePermille;
+    const worldforge::ForgeConfig withReserve = forgecli::defaultForgeConfig(256);
+    REQUIRE(withReserve.pois.coverageReserve > 0);
+    for (const std::uint64_t seed : { kWeakSeeds256[0], kWeakSeeds256[3] }) {
+        const auto after = forgeToPois(seed, 256, withReserve).landmarkCoverage();
+        REQUIRE(after.has_value());
+        INFO("seed " << seed);
+        CHECK(after->coveragePermille >= minimum);
+    }
 }
 
 TEST_CASE("the coverage reserve is what lifts the weakest seeds over the gate", "[forge_cli][landmark]")

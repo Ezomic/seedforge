@@ -2,9 +2,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <span>
 #include <vector>
 
 using namespace worldforge;
@@ -220,11 +222,13 @@ TEST_CASE("density and traversal multipliers shape the layout", "[worldforge][se
     CHECK(closestPairSq(far) >= 36 * 36);
 }
 
-TEST_CASE("higher scores never get a smaller tier and the best sites come first", "[worldforge][settlements]")
+namespace {
+
+void checkScoreOrder(std::span<const std::uint64_t> seeds, int grid)
 {
     bool sawSpread = false;
-    for (std::uint64_t seed = kSeed; seed < kSeed + 6; ++seed) {
-        const World w = makeWorld(seed, 256, 256, 12);
+    for (const std::uint64_t seed : seeds) {
+        const World w = makeWorld(seed, grid, grid, 12);
         const SettlementMap s = settle(w, { .maxSettlements = 100, .minSpacing = 6 });
         REQUIRE(s.sites.size() > 10);
         for (std::size_t i = 1; i < s.sites.size(); ++i) {
@@ -234,6 +238,21 @@ TEST_CASE("higher scores never get a smaller tier and the best sites come first"
         sawSpread = sawSpread || s.sites.front().tier > s.sites.back().tier;
     }
     CHECK(sawSpread);
+}
+
+}
+
+// Two recorded seeds at grid 128, both with several tiers (seeds kSeed to kSeed + 23 all have a spread at 128; these two have 100 and 65 sites).
+TEST_CASE("higher scores never get a smaller tier and the best sites come first on two recorded seeds", "[worldforge][settlements]")
+{
+    const std::array<std::uint64_t, 2> seeds = { kSeed, kSeed + 1 };
+    checkScoreOrder(seeds, 128);
+}
+
+TEST_CASE("higher scores never get a smaller tier and the best sites come first", "[worldforge][settlements]")
+{
+    const std::array<std::uint64_t, 6> seeds = { kSeed, kSeed + 1, kSeed + 2, kSeed + 3, kSeed + 4, kSeed + 5 };
+    checkScoreOrder(seeds, 256);
 }
 
 TEST_CASE("the biome term shifts suitability and neutral matches absent", "[worldforge][settlements]")

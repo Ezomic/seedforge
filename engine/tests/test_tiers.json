@@ -24,9 +24,8 @@
     "forged_app_determinism",
     "forged_campaign_app",
     "forged_combat_app",
-    "from the spawn toward the nearest settlement on 3 seeds the walker arrives or names what stopped it",
+    "from the spawn toward the nearest settlement on a recorded short trip the walker arrives",
     "fuzz: a small seed range over every phase has no violations",
-    "higher scores never get a smaller tier and the best sites come first",
     "hostile combat times give finite poses inside the clip",
     "hostile: hydrology cache",
     "hostile: quest ruleset file through loadRuleset",
@@ -51,7 +50,7 @@
     "the character stays in place: the root travel of a locomotion clip is taken out of the pose",
     "the cooked Bull-Warden faces -Z like Stage 0 characters",
     "the cooked Exile survives the bundle file",
-    "the coverage reserve lifts the first weak seed over the gate",
+    "the coverage reserve lifts the recorded weak seeds over the gate",
     "the exported GLBs cook to the sizes the kit table says",
     "the feet plant while the body travels: the root travel matches the legs",
     "the forge request flag chooses the forged terrain and defaults to the stand-in",
@@ -72,6 +71,7 @@
   "soak": [
     "from the spawn toward the nearest settlement on 8 seeds the walker arrives or names what stopped it",
     "fuzz: a modest seed range over every phase has no violations",
+    "higher scores never get a smaller tier and the best sites come first",
     "tectonics: seeds 1 to 64 land between 20 and 70 percent for nearly every seed at 128, 256 and 1024",
     "the coverage reserve is what lifts the weakest seeds over the gate"
   ]
