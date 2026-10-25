@@ -88,13 +88,22 @@ void Stage0::addSystems(Scene& scene)
     scene.addSystem("stage0.combat", [this](Scene& s, double dt, const InputFrame& input) { combatSystem(s, dt, input); });
     scene.addSystem("stage0.skirmisher", [this](Scene& s, double dt, const InputFrame&) { skirmisherSystem(s, dt); });
     scene.addSystem("stage0.controller", [this](Scene& s, double, const InputFrame&) { controllerSystem(s); });
+    scene.addSystem("stage0.anchor", [this](Scene& s, double, const InputFrame&) { anchorSystem(s); });
+    scene.addSystem("stage0.artillery", [this](Scene& s, double, const InputFrame&) { artillerySystem(s); });
+}
+
+float Stage0::poiseCap(const entt::registry& registry, entt::entity who) const
+{
+    if (registry.all_of<AnchorBrain>(who)) return anchorTuning_.maxPoise;
+    if (registry.all_of<ArtilleryBrain>(who)) return artilleryTuning_.maxPoise;
+    return tuning_.maxPoise;
 }
 
 void Stage0::spawnFoe(Scene& scene)
 {
     SpawnCommand foe;
     foe.id = foe_;
-    foe.name.value = "skirmisher";
+    foe.name.value = role_ == FoeRole::Anchor ? "anchor" : role_ == FoeRole::Artillery ? "artillery" : "skirmisher";
     foe.transform.position = foeSpawn_;
     foe.character = CharacterBody{tuning_.bodyRadius, 0.6f};
     scene.enqueue(foe);
@@ -171,9 +180,19 @@ void Stage0::resetFight(Scene& scene)
             auto& registry = scene.registry();
             registry.remove<SkirmisherBrain>(entity);
             registry.remove<ControllerBrain>(entity);
+            registry.remove<AnchorBrain>(entity);
+            registry.remove<ArtilleryBrain>(entity);
             if (role_ == FoeRole::Controller) {
                 registry.get<Combatant>(entity).health = tuning_.controllerMaxHealth;
                 registry.emplace<ControllerBrain>(entity, ControllerBrain{});
+            } else if (role_ == FoeRole::Anchor) {
+                registry.get<Combatant>(entity).health = anchorTuning_.maxHealth;
+                registry.get<Combatant>(entity).poise = anchorTuning_.maxPoise;
+                registry.emplace<AnchorBrain>(entity, AnchorBrain{});
+            } else if (role_ == FoeRole::Artillery) {
+                registry.get<Combatant>(entity).health = artilleryTuning_.maxHealth;
+                registry.get<Combatant>(entity).poise = artilleryTuning_.maxPoise;
+                registry.emplace<ArtilleryBrain>(entity, ArtilleryBrain{});
             } else {
                 registry.emplace<SkirmisherBrain>(entity, SkirmisherBrain{});
             }
@@ -494,7 +513,7 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
             c.stamina = std::min(tuning_.maxStamina, c.stamina + regen * fdt);
         }
         if (c.combatState() == CombatState::Idle && c.sincePoiseDamage >= tuning_.poiseRegenDelay) {
-            c.poise = std::min(tuning_.maxPoise, c.poise + tuning_.poiseRegenPerSec * fdt);
+            c.poise = std::min(poiseCap(registry, entity), c.poise + tuning_.poiseRegenPerSec * fdt);
         }
 
         // Face the opponent, as fast as the state allows. This clamp replaces i-frames.
@@ -532,7 +551,7 @@ void Stage0::tickCombatant(Scene& scene, entt::entity entity, entt::entity oppon
             body.intent = glm::vec3(0.0f);
             if (elapsed(c.stateTime, tuning_.staggerDuration, fdt)) {
                 // Full poise back, so nobody is stun-locked in a fight that ends in three hits.
-                c.poise = tuning_.maxPoise;
+                c.poise = poiseCap(registry, entity);
                 c.sincePoiseDamage = 999.0f;
                 enterState(scene, entity, c, CombatState::Idle);
             }
@@ -580,17 +599,49 @@ void Stage0::debugLines(const Scene& scene, std::vector<LineSegment>& out) const
     const entt::entity foeEntity = scene.find(foe_);
     if (foeEntity != entt::null) {
         const glm::dvec3 centre = scene.registry().get<Transform>(foeEntity).position + glm::dvec3(0.0, 0.05, 0.0);
-        // Cyan is where it wants to stand, red is where it can hurt you.
-        ring(centre, tuning_.preferredSpacing, glm::vec3(0.2f, 0.9f, 0.9f), 32);
-        ring(centre, tuning_.attackRange + tuning_.attackRadius + tuning_.bodyRadius, glm::vec3(0.6f, 0.15f, 0.15f), 32);
+        const auto& registry = scene.registry();
+        if (const auto* brain = registry.try_get<AnchorBrain>(foeEntity)) {
+            // The slam covers the outer ring; the inner one grows to meet it as the wind-up runs out.
+            const glm::vec3 amber(1.0f, 0.6f, 0.1f);
+            ring(centre, anchorTuning_.slamRadius, brain->anchorState() == AnchorState::Windup ? amber : amber * 0.35f, 40);
+            if (brain->anchorState() == AnchorState::Windup) {
+                const double t = std::clamp(static_cast<double>(brain->stateTicks) / std::max(anchorTuning_.windupTicks, 1), 0.0, 1.0);
+                ring(centre, anchorTuning_.slamRadius * t, glm::vec3(1.0f, 0.2f, 0.1f), 40);
+            }
+        } else if (const auto* brain = registry.try_get<ArtilleryBrain>(foeEntity)) {
+            if (brain->artilleryState() == ArtilleryState::Aim) {
+                const double x = brain->aimX;
+                const double z = brain->aimY;
+                const glm::dvec3 mark(x, groundHeight(x, z, centre.y) + 0.1, z);
+                const double t = std::clamp(static_cast<double>(brain->stateTicks) / std::max(artilleryTuning_.windupTicks, 1), 0.0, 1.0);
+                ring(mark, artilleryTuning_.blastRadius, glm::vec3(1.0f, 0.15f, 0.15f), 32);
+                ring(mark, artilleryTuning_.blastRadius * t, glm::vec3(1.0f, 0.7f, 0.2f), 32);
+                out.push_back({mark, mark + glm::dvec3(0.0, 12.0, 0.0), glm::vec3(1.0f, 0.3f, 0.2f)});
+            }
+        } else {
+            // Cyan is where it wants to stand, red is where it can hurt you.
+            ring(centre, tuning_.preferredSpacing, glm::vec3(0.2f, 0.9f, 0.9f), 32);
+            ring(centre, tuning_.attackRange + tuning_.attackRadius + tuning_.bodyRadius, glm::vec3(0.6f, 0.15f, 0.15f), 32);
+        }
     }
 }
 
 void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const
 {
     for (auto [entity, c] : scene.registry().view<const Combatant>().each()) {
+        const char* label = "SKIRM";
+        if (c.side == 0) label = "PLAYER";
+        else if (scene.registry().all_of<ControllerBrain>(entity)) label = "CTRL";
+        else if (scene.registry().all_of<AnchorBrain>(entity)) label = "ANCHOR";
+        else if (scene.registry().all_of<ArtilleryBrain>(entity)) label = "ARTY";
         lines.push_back(std::format("{:<10} {:<10} HP {:5.1f}  ST {:5.1f}  PO {:5.1f}  t {:4.2f}{}",
-            c.side == 0 ? "PLAYER" : (scene.registry().all_of<ControllerBrain>(entity) ? "CTRL" : "SKIRM"), name(c.combatState()), c.health, c.stamina, c.poise, c.stateTime, c.blocking ? "  [block]" : ""));
+            label, name(c.combatState()), c.health, c.stamina, c.poise, c.stateTime, c.blocking ? "  [block]" : ""));
+        if (const auto* brain = scene.registry().try_get<AnchorBrain>(entity)) {
+            lines.push_back(std::format("           {:<10} cooldown {}t  slams {}", name(brain->anchorState()), brain->cooldownTicks, brain->slams));
+        }
+        if (const auto* brain = scene.registry().try_get<ArtilleryBrain>(entity)) {
+            lines.push_back(std::format("           {:<10} cooldown {}t  shots {}", name(brain->artilleryState()), brain->cooldownTicks, brain->shots));
+        }
         if (const auto* brain = scene.registry().try_get<ControllerBrain>(entity)) {
             lines.push_back(std::format("           {:<10} cooldown {}t  casts {}", name(brain->controllerState()), brain->cooldownTicks, brain->casts));
         }

@@ -151,6 +151,7 @@ struct Options {
     bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
     bool combatDebug = false; // --combat: keep the Stage 0 debug rings, lines and collider lines (F3 full shows them too)
     bool combatDuel = false;  // --combat: begin a few metres from the enemy instead of at the spawn
+    std::string combatRole;   // --combat: the enemy's role, skirmisher (the default), anchor or artillery (SEED-661)
     std::string combatBot;    // --combat: a scripted player of this skill (novice, regular, expert) instead of the keyboard
     std::string combatFights; // --combat: write each finished fight as a Stage 0 fights.csv row here (SEED-660)
     int forgedGrid = ichor::kForgedDefaultGridSize;
@@ -309,6 +310,9 @@ bool parse(int argc, char** argv, Options& options)
             options.combatDebug = true;
         } else if (arg == "--combat-duel") {
             options.combatDuel = true;
+        } else if (arg == "--combat-role" && hasValue) {
+            options.combatRole = argv[++i];
+            if (options.combatRole != "skirmisher" && options.combatRole != "anchor" && options.combatRole != "artillery") return false;
         } else if (arg == "--combat-fights" && hasValue) {
             options.combatFights = argv[++i];
         } else if (arg == "--combat-bot" && hasValue) {
@@ -748,6 +752,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         combatConfig.tuning.heavyWindupCue = ichor::resolveCueSound(audio, "combat.windup_heavy");
         combatConfig.tuning.tellCue = ichor::resolveCueSound(audio, "combat.tell");
         combatConfig.legacyControls = !options.combatBot.empty();
+        if (options.combatRole == "anchor") combatConfig.role = ichor::stage0::FoeRole::Anchor;
+        else if (options.combatRole == "artillery") combatConfig.role = ichor::stage0::FoeRole::Artillery;
         combatConfig.fightsCsv = options.combatFights;
         combat = std::make_unique<ichor::CombatBridge>(*forged, site, combatConfig);
         if (!combat->loadVisuals(renderer, std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art")) {
@@ -2062,7 +2068,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
@@ -2072,11 +2078,11 @@ int main(int argc, char** argv)
     if (!options.forged && !options.campaign.empty()) {
         ichor::log(ichor::LogLevel::Warn, "--campaign only applies with --forged and is ignored");
     }
-    if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty())) {
+    if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty() || !options.combatRole.empty())) {
         ichor::log(ichor::LogLevel::Warn, "--combat only applies with --forged and is ignored");
     }
-    if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatFights.empty())) {
-        ichor::log(ichor::LogLevel::Warn, "--combat-duel, --combat-bot and --combat-fights only apply with --combat and are ignored");
+    if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatFights.empty() || !options.combatRole.empty())) {
+        ichor::log(ichor::LogLevel::Warn, "--combat-duel, --combat-role, --combat-bot and --combat-fights only apply with --combat and are ignored");
     }
     if (options.forged && !options.campaign.empty() && !planCampaign(options)) {
         return 1;
