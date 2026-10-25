@@ -319,6 +319,60 @@ TEST_CASE("a dungeon with no reward or key room still places every item, and in 
     }
 }
 
+TEST_CASE("a route between rooms follows doorways and ramps, and a sealed room has none", "[dungeon_content][route]")
+{
+    Hand h = row(5);
+    const auto sealed = h.add("vault", {7, 0, 0});  // no path link: a lock that only the mission graph knows about
+    const auto upper = h.add("rest", {0, 0, 1});    // above the entry room, up its ramp
+    const auto behindRamp = h.add("rest", {-1, 0, 0}); // through the entry room's west wall, which its ramp (on the west side of an even floor) fills
+    h.link(1, upper);
+    h.link(1, behindRamp);
+    const Built built = build(h, items(3));
+
+    const auto walk = routeBetweenRooms(built.box, 1, 5);
+    REQUIRE(walk.has_value());
+    REQUIRE(walk->size() == 4);
+    for (const RoomStep& step : *walk) CHECK(step.link == RoomLink::Door);
+    CHECK(walk->back().room == 5);
+
+    CHECK(routeBetweenRooms(built.box, 1, 1)->empty());
+    const auto up = routeBetweenRooms(built.box, 1, upper);
+    REQUIRE(up.has_value());
+    CHECK(up->back().link == RoomLink::RampUp);
+    const auto down = routeBetweenRooms(built.box, upper, 1);
+    REQUIRE(down.has_value());
+    CHECK(down->front().link == RoomLink::RampDown);
+    CHECK_FALSE(routeBetweenRooms(built.box, 1, sealed).has_value());
+    CHECK_FALSE(routeBetweenRooms(built.box, 1, behindRamp).has_value());
+    CHECK_FALSE(routeBetweenRooms(built.box, behindRamp, 1).has_value());
+    CHECK_FALSE(routeBetweenRooms(built.box, 1, 999).has_value());
+
+    for (const DungeonRoom& room : built.content.rooms) CHECK(room.reachable == (room.id != sealed && room.id != behindRamp));
+}
+
+TEST_CASE("loot is never sealed away: a room the player cannot walk to takes none, even when it is the reward room", "[dungeon_content][route]")
+{
+    Hand h;
+    h.dungeon.seed = 9;
+    h.dungeon.poiId = "poi_0001";
+    const auto entry = h.add("entry", {0, 0, 0});
+    const auto challenge = h.add("challenge", {1, 0, 0});
+    const auto sealed = h.add("reward", {5, 0, 0});
+    h.link(entry, challenge);
+    h.dungeon.graph.addEdge(challenge, sealed, "unlocks");
+    for (std::uint64_t seed = 1; seed <= 20; ++seed) {
+        h.dungeon.seed = seed;
+        const Built built = build(h, items(6));
+        REQUIRE(built.content.loot.size() == 6);
+        for (const PlacedLoot& placed : built.content.loot) {
+            const DungeonRoom* room = built.content.roomAt({placed.x, static_cast<double>(placed.groundY), placed.z});
+            REQUIRE(room != nullptr);
+            CHECK(room->id != sealed);
+            CHECK(room->reachable);
+        }
+    }
+}
+
 TEST_CASE("a layout or grey-box that failed, a hostile origin or a flood of items gives empty or bounded content, never a crash", "[dungeon_content]")
 {
     CHECK(buildDungeonContent(BakedDungeon{}, DungeonGreyBox{}, items(3)).empty());

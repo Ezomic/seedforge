@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <map>
 #include <set>
 #include <string_view>
 #include <utility>
@@ -52,6 +53,44 @@ std::size_t lootTier(std::string_view type)
     return 5;
 }
 
+struct Neighbour {
+    std::size_t index;
+    RoomLink link;
+};
+
+// The rooms one step from rooms[from]: through each open wall (north, east, south, west), then up the ramp, then down the hole.
+std::vector<Neighbour> neighboursOf(const DungeonGreyBox& box, std::size_t from)
+{
+    const GreyBoxRoom& room = box.rooms[from];
+    const std::array<glm::dvec3, 4> sides = {{{0.0, 0.0, -greybox::kPitchM}, {greybox::kPitchM, 0.0, 0.0}, {0.0, 0.0, greybox::kPitchM}, {-greybox::kPitchM, 0.0, 0.0}}};
+    const auto at = [&](const glm::dvec3& point) -> std::optional<std::size_t> {
+        for (std::size_t i = 0; i < box.rooms.size(); ++i) {
+            if (glm::length(box.rooms[i].centre - point) < 0.5) return i;
+        }
+        return std::nullopt;
+    };
+    // A ramp or the hole over one fills the whole strip along its side wall, so a doorway in that wall opens onto a slope or a drop.
+    const auto blocked = [](const GreyBoxRoom& r, std::size_t side) {
+        constexpr std::size_t east = 1;
+        constexpr std::size_t west = 3;
+        if (side != east && side != west) return false;
+        return (r.ramp && (side == west) == r.rampWest) || (r.hole && (side == west) == r.holeWest);
+    };
+    std::vector<Neighbour> out;
+    for (std::size_t side = 0; side < sides.size(); ++side) {
+        if (!room.doors[side] || blocked(room, side)) continue;
+        const auto next = at(room.centre + sides[side]);
+        if (next && !blocked(box.rooms[*next], (side + 2) % 4)) out.push_back({*next, RoomLink::Door});
+    }
+    if (room.ramp) {
+        if (const auto next = at(room.centre + glm::dvec3(0.0, greybox::kStoreyM, 0.0))) out.push_back({*next, RoomLink::RampUp});
+    }
+    if (room.hole) {
+        if (const auto next = at(room.centre - glm::dvec3(0.0, greybox::kStoreyM, 0.0))) out.push_back({*next, RoomLink::RampDown});
+    }
+    return out;
+}
+
 std::string killName(const std::string& poiId, graph::NodeId room, std::uint32_t slot) { return std::format("dungeon_kill:{}:{}:{}", poiId, room, slot); }
 
 }
@@ -94,6 +133,32 @@ DungeonEnemyRole roleForRoom(const std::string& roomType, std::size_t ordinal)
     return DungeonEnemyRole::Skirmisher;
 }
 
+std::optional<std::vector<RoomStep>> routeBetweenRooms(const DungeonGreyBox& box, graph::NodeId from, graph::NodeId to)
+{
+    const auto find = [&](graph::NodeId id) -> std::optional<std::size_t> {
+        for (std::size_t i = 0; i < box.rooms.size(); ++i) {
+            if (box.rooms[i].id == id) return i;
+        }
+        return std::nullopt;
+    };
+    const auto start = find(from);
+    const auto goal = find(to);
+    if (!box.ok() || !start || !goal) return std::nullopt;
+    std::map<std::size_t, std::pair<std::size_t, RoomLink>> parent;
+    std::vector<std::size_t> queue{*start};
+    parent[*start] = {*start, RoomLink::Door};
+    for (std::size_t head = 0; head < queue.size() && !parent.contains(*goal); ++head) {
+        for (const Neighbour& next : neighboursOf(box, queue[head])) {
+            if (parent.emplace(next.index, std::make_pair(queue[head], next.link)).second) queue.push_back(next.index);
+        }
+    }
+    if (!parent.contains(*goal)) return std::nullopt;
+    std::vector<RoomStep> steps;
+    for (std::size_t at = *goal; at != *start; at = parent[at].first) steps.push_back({box.rooms[at].id, parent[at].second});
+    std::reverse(steps.begin(), steps.end());
+    return steps;
+}
+
 DungeonContent buildDungeonContent(const BakedDungeon& dungeon, const DungeonGreyBox& box, const std::vector<PlacedLoot>& items)
 {
     DungeonContent out;
@@ -109,6 +174,10 @@ DungeonContent buildDungeonContent(const BakedDungeon& dungeon, const DungeonGre
         room.type = node != nullptr ? node->type : std::string();
         room.centre = placed.centre;
         out.rooms.push_back(room);
+    }
+    const auto entry = std::find_if(out.rooms.begin(), out.rooms.end(), [](const DungeonRoom& r) { return r.type == graph::mission::kEntry; });
+    for (DungeonRoom& room : out.rooms) {
+        room.reachable = entry != out.rooms.end() && routeBetweenRooms(box, entry->id, room.id).has_value();
     }
 
     for (const DungeonRoom& room : out.rooms) {
@@ -148,11 +217,20 @@ DungeonContent buildDungeonContent(const BakedDungeon& dungeon, const DungeonGre
         for (std::size_t tier = 0; tier < kLootTiers && pick == out.rooms.size(); ++tier) {
             std::vector<std::size_t> open;
             for (std::size_t i = 0; i < out.rooms.size(); ++i) {
-                if (lootTier(out.rooms[i].type) == tier && used[i] < kLootSpots) open.push_back(i);
+                if (out.rooms[i].reachable && lootTier(out.rooms[i].type) == tier && used[i] < kLootSpots) open.push_back(i);
             }
             if (!open.empty()) pick = open[rng.range(0, static_cast<std::uint32_t>(open.size() - 1))];
         }
-        if (pick == out.rooms.size()) pick = rng.range(0, static_cast<std::uint32_t>(out.rooms.size() - 1)); // every spot is taken: share one
+        if (pick == out.rooms.size()) { // every spot is taken: share one of the rooms the player can reach, else any
+            std::vector<std::size_t> shared;
+            for (std::size_t i = 0; i < out.rooms.size(); ++i) {
+                if (out.rooms[i].reachable) shared.push_back(i);
+            }
+            if (shared.empty()) {
+                for (std::size_t i = 0; i < out.rooms.size(); ++i) shared.push_back(i);
+            }
+            pick = shared[rng.range(0, static_cast<std::uint32_t>(shared.size() - 1))];
+        }
         const DungeonRoom& room = out.rooms[pick];
         const Offset spot = kLootOffsets[used[pick]++ % kLootSpots];
         PlacedLoot placed = *item;
@@ -172,6 +250,30 @@ std::vector<PlacedLoot> lootAtPoi(const PlacedLootSet& loot, const std::string& 
         if (item.poiId == poiId) out.push_back(item);
     }
     return out;
+}
+
+ItemSite itemSite(const ForgedGame& game, const std::string& poiId, const std::string& itemId)
+{
+    ItemSite site;
+    if (!game.loot || !game.dungeons) return site;
+    const DungeonLayoutResult layout = game.dungeons->layout(poiId);
+    if (!layout.ok()) return site;
+    const DungeonGreyBox box = buildDungeonGreyBox(*layout.dungeon, glm::dvec3(0.0));
+    if (!box.ok()) return site;
+    const DungeonContent content = buildDungeonContent(*layout.dungeon, box, lootAtPoi(*game.loot, poiId));
+    const auto item = std::find_if(content.loot.begin(), content.loot.end(), [&](const PlacedLoot& l) { return l.itemId == itemId; });
+    if (item == content.loot.end()) return site;
+    const DungeonRoom* room = content.roomAt(glm::dvec3(item->x, static_cast<double>(item->groundY) + 0.05, item->z));
+    if (room == nullptr) return site;
+    site.inside = true;
+    site.reachable = room->reachable;
+    site.guarded = !content.enemiesIn(room->id).empty();
+    site.room = room->id;
+    site.roomType = room->type;
+    for (const PlacedLoot& other : content.loot) {
+        if (&other != &*item && std::hypot(other.x - item->x, other.z - item->z) < 0.25 && std::abs(static_cast<double>(other.groundY) - item->groundY) < 1.0) site.crowded = true;
+    }
+    return site;
 }
 
 std::shared_ptr<const PlacedLootSet> outdoorLoot(const ForgedGame& game)
