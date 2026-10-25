@@ -18,6 +18,7 @@ constexpr int kLookahead = 64;
 constexpr double kMaxPieces = 4096.0;
 constexpr double kMaxParamMetres = 1.0e6;
 constexpr std::size_t kMaxNodesLimit = 50'000'000;
+constexpr std::size_t kMaxPocketNodes = 2'000'000;
 
 bool finite2(const glm::dvec3& v)
 {
@@ -106,11 +107,15 @@ struct Search {
     std::size_t steep = 0;
     std::size_t deepWater = 0;
     std::size_t mapEdge = 0;
+    bool leaks = false;                 // a reached node borders ground outside the window, so a bigger window could reach further
+    std::vector<glm::vec2> reachedNodes; // when there is no route: where the start can stand
+    double step = 0.0;
 };
 
-Search searchWindow(const ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& goal, const Grid& grid, double goalRadius, double checkMetres)
+Search searchWindow(const ForgedWalking& walking, double worldSize, const glm::dvec3& from, const glm::dvec3& goal, const Grid& grid, double goalRadius, double checkMetres)
 {
     Search out;
+    out.step = grid.step;
     const std::size_t total = static_cast<std::size_t>(grid.nx) * static_cast<std::size_t>(grid.nz);
     std::vector<float> pace(total, -1.0f);
     const auto paceAt = [&](int i, int j) {
@@ -196,15 +201,14 @@ Search searchWindow(const ForgedWalking& walking, const glm::dvec3& from, const 
             if (ni < 0 || nj < 0 || ni >= grid.nx || nj >= grid.nz) continue;
             const float p = paceAt(ni, nj);
             if (p <= 0.0f) continue;
-            if (!segmentWalkable(walking, grid.xOf(i), grid.zOf(j), grid.xOf(ni), grid.zOf(nj), checkMetres)) continue;
             const double d = flat(grid.xOf(ni) - grid.xOf(i), grid.zOf(nj) - grid.zOf(j));
             const double c = cost[static_cast<std::size_t>(at)] + d / static_cast<double>(p);
             const std::int32_t to = grid.index(ni, nj);
-            if (c < cost[static_cast<std::size_t>(to)]) {
-                cost[static_cast<std::size_t>(to)] = c;
-                parent[static_cast<std::size_t>(to)] = at;
-                open.emplace(c + heuristic(ni, nj), to);
-            }
+            if (!(c < cost[static_cast<std::size_t>(to)])) continue; // a worse way into a node is not worth the probes along it
+            if (!segmentWalkable(walking, grid.xOf(i), grid.zOf(j), grid.xOf(ni), grid.zOf(nj), checkMetres)) continue;
+            cost[static_cast<std::size_t>(to)] = c;
+            parent[static_cast<std::size_t>(to)] = at;
+            open.emplace(c + heuristic(ni, nj), to);
         }
     }
     if (reached < 0) {
@@ -212,11 +216,15 @@ Search searchWindow(const ForgedWalking& walking, const glm::dvec3& from, const 
             for (int i = 0; i < grid.nx; ++i) {
                 if (!(cost[static_cast<std::size_t>(grid.index(i, j))] < std::numeric_limits<double>::infinity())) continue;
                 out.reachableSquareMetres += grid.step * grid.step;
+                out.reachedNodes.emplace_back(static_cast<float>(grid.xOf(i)), static_cast<float>(grid.zOf(j)));
                 for (int k = 0; k < 4; ++k) {
                     const int ni = i + kDi[k];
                     const int nj = j + kDj[k];
                     if (ni < 0 || nj < 0 || ni >= grid.nx || nj >= grid.nz) {
                         ++out.mapEdge;
+                        const double ox = grid.xOf(i) + kDi[k] * grid.step;
+                        const double oz = grid.zOf(j) + kDj[k] * grid.step;
+                        out.leaks = out.leaks || (ox >= 0.0 && oz >= 0.0 && ox <= worldSize && oz <= worldSize);
                     } else if (paceAt(ni, nj) <= 0.0f) {
                         const WalkBlock block = walking.assess(grid.xOf(ni), grid.zOf(nj)).block;
                         if (block == WalkBlock::DeepWater) {
@@ -260,6 +268,23 @@ std::vector<glm::dvec3> pull(const ForgedWalking& walking, const std::vector<glm
     return out;
 }
 
+bool pocketReaches(const WalkRoutePocket& pocket, const glm::dvec3& goal)
+{
+    const double reach = std::max(pocket.goalRadiusMetres, pocket.step) + pocket.step;
+    return std::any_of(pocket.nodes.begin(), pocket.nodes.end(), [&](const glm::vec2& n) { return flat(n.x - goal.x, n.y - goal.z) <= reach; });
+}
+
+WalkRoute pocketRoute(const WalkRoutePocket& pocket)
+{
+    WalkRoute route;
+    route.failure = WalkRouteFailure::NoGroundRoute;
+    route.reachableSquareMetres = pocket.reachableSquareMetres;
+    route.boundarySteep = pocket.boundarySteep;
+    route.boundaryDeepWater = pocket.boundaryDeepWater;
+    route.boundaryMapEdge = pocket.boundaryMapEdge;
+    return route;
+}
+
 }
 
 const char* walkRouteFailureName(WalkRouteFailure failure)
@@ -274,7 +299,7 @@ const char* walkRouteFailureName(WalkRouteFailure failure)
     return "unknown";
 }
 
-WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& goal, const WalkRouteParams& params)
+WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, const glm::dvec3& goal, const WalkRouteParams& params, WalkRouteMemo* memo)
 {
     WalkRoute route;
     const bool paramsOk = std::isfinite(params.stepMetres) && params.stepMetres >= 0.5 && std::isfinite(params.checkMetres) && params.checkMetres >= 0.05
@@ -285,6 +310,14 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
         return route;
     }
 
+    if (memo != nullptr) {
+        for (const WalkRoutePocket& pocket : memo->pockets) {
+            if (pocket.fromX == from.x && pocket.fromZ == from.z && pocket.goalRadiusMetres == params.goalRadiusMetres && !pocketReaches(pocket, goal)) {
+                return pocketRoute(pocket);
+            }
+        }
+    }
+
     const double size = walking.sizeMetres();
     const double minX = std::min(from.x, goal.x) - params.marginMetres;
     const double maxX = std::max(from.x, goal.x) + params.marginMetres;
@@ -292,12 +325,12 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
     const double maxZ = std::max(from.z, goal.z) + params.marginMetres;
     const bool wholeWorld = minX <= 0.0 && minZ <= 0.0 && maxX >= size && maxZ >= size;
 
-    Search search = searchWindow(walking, from, goal, makeGrid(walking, minX, minZ, maxX, maxZ, params), params.goalRadiusMetres, params.checkMetres);
+    Search search = searchWindow(walking, size, from, goal, makeGrid(walking, minX, minZ, maxX, maxZ, params), params.goalRadiusMetres, params.checkMetres);
     route.nodesSearched = search.searched;
     bool retried = false;
-    if (!search.found && !wholeWorld && search.startOk && search.goalOk) {
+    if (!search.found && !wholeWorld && search.startOk && search.goalOk && search.leaks) {
         retried = true;
-        search = searchWindow(walking, from, goal, makeGrid(walking, 0.0, 0.0, size, size, params), params.goalRadiusMetres, params.checkMetres);
+        search = searchWindow(walking, size, from, goal, makeGrid(walking, 0.0, 0.0, size, size, params), params.goalRadiusMetres, params.checkMetres);
         route.nodesSearched += search.searched;
     }
     if (retried && (!search.startOk || !search.goalOk)) {
@@ -313,6 +346,9 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
         return route;
     }
     if (!search.found) {
+        if (memo != nullptr && search.reachedNodes.size() <= kMaxPocketNodes) {
+            memo->pockets.push_back({from.x, from.z, search.step, params.goalRadiusMetres, std::move(search.reachedNodes), search.reachableSquareMetres, search.steep, search.deepWater, search.mapEdge});
+        }
         route.failure = WalkRouteFailure::NoGroundRoute;
         route.reachableSquareMetres = search.reachableSquareMetres;
         route.boundarySteep = search.steep;

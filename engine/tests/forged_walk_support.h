@@ -23,6 +23,7 @@ namespace ichor::walksupport {
 
 constexpr double kSettlementArrive = 12.0;
 constexpr double kMinTrip = 60.0;
+constexpr std::size_t kRouteNodeBudget = 30'000; // grid nodes the ground-route searches may expand before no other spawn settlement is tried
 
 struct SeedWalk {
     std::uint64_t seed = 0;
@@ -41,6 +42,7 @@ struct SeedWalk {
     int goalRank = 0;      // 0 is the nearest settlement; higher when nearer ones are cut off by cliffs or deep water
     std::string nearerCut; // why the nearer settlements were skipped
     std::string enclosure; // what bounds the ground the spawn can reach, when the nearest settlement is cut off
+    std::size_t routeNodesSearched = 0; // grid nodes expanded by every ground-route search of this walk
 };
 
 inline std::string describeRoute(const SeedWalk& walk)
@@ -164,7 +166,8 @@ inline SeedWalk walkSeed(std::uint64_t seed, int grid)
     }
     std::sort(homes.begin(), homes.end());
     constexpr int kGoalRanks = 4;
-    for (std::size_t homeRank = 0; homeRank < homes.size() && !out.usedNavmesh && !out.usedGroundRoute; ++homeRank) {
+    WalkRouteMemo routeMemo;
+    for (std::size_t homeRank = 0; homeRank < homes.size() && !out.usedNavmesh && !out.usedGroundRoute && out.routeNodesSearched < kRouteNodeBudget; ++homeRank) {
         const std::size_t candidateHome = homes[homeRank].second;
         for (int attempt = 0; attempt < 12 && !out.usedNavmesh && !out.usedGroundRoute; ++attempt) {
             glm::dvec3 candidate;
@@ -203,7 +206,8 @@ inline SeedWalk walkSeed(std::uint64_t seed, int grid)
                 } else {
                     WalkRouteParams routeParams;
                     routeParams.goalRadiusMetres = kSettlementArrive - 2.0;
-                    route = findWalkRoute(walking, candidate, target, routeParams);
+                    route = findWalkRoute(walking, candidate, target, routeParams, &routeMemo);
+                    out.routeNodesSearched += route.nodesSearched;
                     if (!route.found) {
                         if (rank == 0) {
                             out.routeFailure = route.failure;

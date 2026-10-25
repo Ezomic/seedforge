@@ -46,6 +46,16 @@ Heightfield ridgeOf(std::uint32_t gapLow, std::uint32_t gapHigh)
     });
 }
 
+// Flat ground with a ring of ridge 12 to 20 m out from (40, 40) in either axis: the ground inside is a pocket.
+Heightfield pocketOf()
+{
+    return gridOf(129, [](std::uint32_t x, std::uint32_t z) {
+        const int d = std::max(std::abs(static_cast<int>(x) - 40), std::abs(static_cast<int>(z) - 40));
+        const int ridge = d < 12 || d > 20 ? 0 : std::min(d - 12, 20 - d) * 25;
+        return static_cast<std::uint16_t>(10000 + ridge);
+    });
+}
+
 // Flat to x = 80, then a slope the walker cannot climb.
 Heightfield cliffSideOf()
 {
@@ -121,6 +131,58 @@ TEST_CASE("a wall with no gap has no route, and the report says what bounds the 
     const std::string text = describeEnclosure(route);
     REQUIRE(text.find("enclosed") != std::string::npos);
     REQUIRE(text.find("cliffs") != std::string::npos);
+}
+
+TEST_CASE("a window that holds the whole pocket is not searched a second time over the world", "[walking][route]")
+{
+    const Heightfield field = pocketOf();
+    const ForgedWalking walking(field, nullptr, CapabilitySet{});
+    WalkRouteParams params;
+    params.marginMetres = 30.0;
+    const WalkRoute route = findWalkRoute(walking, {40.0, 0.0, 40.0}, {100.0, 0.0, 100.0}, params);
+    REQUIRE_FALSE(route.found);
+    REQUIRE(route.failure == WalkRouteFailure::NoGroundRoute);
+    REQUIRE(route.reachableSquareMetres > 0.0);
+    REQUIRE(static_cast<double>(route.nodesSearched) * params.stepMetres * params.stepMetres <= 1.2 * route.reachableSquareMetres);
+}
+
+TEST_CASE("a window that cuts the ground off still gives way to the whole world", "[walking][route]")
+{
+    const Heightfield field = ridgeOf(1, 0);
+    const ForgedWalking walking(field, nullptr, CapabilitySet{});
+    WalkRouteParams params;
+    params.marginMetres = 10.0;
+    const WalkRoute route = findWalkRoute(walking, {20.0, 0.0, 64.0}, {110.0, 0.0, 64.0}, params);
+    REQUIRE_FALSE(route.found);
+    REQUIRE(route.failure == WalkRouteFailure::NoGroundRoute);
+    REQUIRE(route.reachableSquareMetres > 0.5 * 60.0 * 128.0); // the window alone is 20 m across
+}
+
+TEST_CASE("a start shown to be shut in answers another goal at once, and still finds a goal inside the pocket", "[walking][route]")
+{
+    const Heightfield field = pocketOf();
+    const ForgedWalking walking(field, nullptr, CapabilitySet{});
+    WalkRouteParams params;
+    params.marginMetres = 30.0;
+    WalkRouteMemo memo;
+    const glm::dvec3 from{40.0, 0.0, 40.0};
+    const WalkRoute first = findWalkRoute(walking, from, {100.0, 0.0, 100.0}, params, &memo);
+    REQUIRE(first.failure == WalkRouteFailure::NoGroundRoute);
+    REQUIRE(first.nodesSearched > 0);
+    REQUIRE(memo.pockets.size() == 1);
+
+    const WalkRoute again = findWalkRoute(walking, from, {110.0, 0.0, 20.0}, params, &memo);
+    REQUIRE(again.failure == WalkRouteFailure::NoGroundRoute);
+    REQUIRE(again.nodesSearched == 0);
+    REQUIRE(again.reachableSquareMetres == first.reachableSquareMetres);
+    REQUIRE(again.boundarySteep == first.boundarySteep);
+    REQUIRE(describeEnclosure(again) == describeEnclosure(first));
+
+    const WalkRoute inside = findWalkRoute(walking, from, {46.0, 0.0, 46.0}, params, &memo);
+    REQUIRE(inside.found);
+
+    const WalkRoute elsewhere = findWalkRoute(walking, {10.0, 0.0, 10.0}, {110.0, 0.0, 20.0}, params, &memo);
+    REQUIRE(elsewhere.found);
 }
 
 TEST_CASE("a start or goal on ground that cannot be walked is named, not searched blindly", "[walking][route]")
