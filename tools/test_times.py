@@ -40,6 +40,9 @@ from pathlib import Path
 PROFILES = {"sanitizer": 120.0, "release": 30.0}
 FAST_CAPS = {"sanitizer": 90.0, "release": 5.0}
 TIERS = "engine/tests/test_tiers.json"
+# A medium or soak case without an allowlist entry may run up to these, so the full suite under the sanitizers (main, nightly) does not
+# trip the default budget on the cases that are long on purpose. A fast case keeps the fast cap above.
+TIER_BUDGETS = {"sanitizer": {"medium": 300.0, "soak": 600.0}, "release": {"medium": 30.0, "soak": 60.0}}
 CTEST_TIMEOUT = 1500.0
 CAP_STEP = 30.0
 ALLOWLIST = "tools/test_time_allowlist.json"
@@ -209,13 +212,25 @@ def evaluate(times, entries, budget):
 
 
 def tier_lists(path):
+    """{test name: "medium" or "soak"}, or None when the file is absent."""
     if not Path(path).exists():
         return None
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        return set(data["medium"]) | set(data["soak"])
+        return {**{n: "medium" for n in data["medium"]}, **{n: "soak" for n in data["soak"]}}
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise InputError(f"{path}: {e}")
+
+
+def apply_tier_budgets(over, tiers, profile, entries):
+    """Drops the cases that broke the default budget but are within the budget of their tier (an allowlist entry keeps its own cap)."""
+    kept = []
+    for name, sec, limit, reason in over:
+        tier = tiers.get(name)
+        if tier and name not in entries and sec <= TIER_BUDGETS[profile][tier]:
+            continue
+        kept.append((name, sec, limit if not tier or name in entries else TIER_BUDGETS[profile][tier], reason))
+    return kept
 
 
 def evaluate_tiers(times, slow_tiers, profile, entries):
@@ -316,6 +331,7 @@ def run(argv, out=sys.stdout):
         over = evaluate(times, entries, budget)
         slow_tiers = tier_lists(args.tiers or str(Path(args.root) / TIERS))
         if slow_tiers is not None and args.budget is None:
+            over = apply_tier_budgets(over, slow_tiers, args.profile, entries)
             seen = {o[0] for o in over}
             over += [o for o in evaluate_tiers(times, slow_tiers, args.profile, entries) if o[0] not in seen]
             over.sort(key=lambda o: -o[1])
@@ -366,6 +382,12 @@ def self_test(out):
 
     expect("a fast case over the fast cap is red", [o[0] for o in evaluate_tiers({"x": 6.0}, set(), "release", {})], ["x"])
     expect("a medium case over the fast cap is green", evaluate_tiers({"x": 6.0}, {"x"}, "release", {}), [])
+    tiers = {"m": "medium", "k": "soak"}
+    over_default = [("m", 200.0, 120.0, None), ("k", 500.0, 120.0, None), ("f", 200.0, 120.0, None)]
+    expect("a medium and a soak case within their tier budget are green, a fast one is red",
+           [o[0] for o in apply_tier_budgets(over_default, tiers, "sanitizer", {})], ["f"])
+    expect("a medium case over its tier budget is red", [o[0] for o in apply_tier_budgets([("m", 301.0, 120.0, None)], tiers, "sanitizer", {})], ["m"])
+    expect("an allowlisted medium case keeps its own cap", [o[0] for o in apply_tier_budgets([("m", 200.0, 150.0, "r")], tiers, "sanitizer", {"m": {}})], ["m"])
     expect("a fast case within the cap is green", evaluate_tiers({"x": 4.0}, set(), "release", {}), [])
     expect("cap rounds 1.5x up to 30 s", cap_for(100.0), 150.0)
     expect("cap never passes the ctest timeout", cap_for(1500.0), CTEST_TIMEOUT)
