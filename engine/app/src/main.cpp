@@ -9,6 +9,7 @@
 #include "ichor/combat_bridge/combat_bridge.h"
 #include "ichor/combat_bridge/dungeon_fight.h"
 #include "ichor/audio/music_player.h"
+#include "ichor/audio/sound_legend.h"
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
 #include "ichor/audio/reverb.h"
@@ -22,6 +23,7 @@
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
+#include "ichor/ui/caption_screen.h"
 #include "ichor/ui/combat_hud_screen.h"
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
@@ -108,6 +110,8 @@ constexpr float kFovStepDegrees = 5.0f;
 struct Options {
     bool headless = false;
     bool audioProbe = false; // open the device, play nothing, exit
+    bool soundLegend = false; // open the sound legend card from the first frame (a screenshot asks for it)
+    bool audioLog = false;   // print each sound cue as it fires, and which cues have no clip
     std::uint64_t frames = 0; // 0 runs until quit
     std::uint64_t seed = 1;
     std::filesystem::path content = ICHOR_CONTENT_DIR; // cooked bundles and fonts; a packaged build points it beside the exe
@@ -186,6 +190,10 @@ bool parse(int argc, char** argv, Options& options)
             options.headless = true;
         } else if (arg == "--audio-probe") {
             options.audioProbe = true;
+        } else if (arg == "--sound-legend") {
+            options.soundLegend = true;
+        } else if (arg == "--audio-log") {
+            options.audioLog = true;
         } else if (arg == "--mouse-sens" && hasValue) {
             if (!parseNumber(argv[++i], options.mouseSensitivity)) return false;
         } else if (arg == "--frames" && hasValue) {
@@ -592,8 +600,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     }
     // No playback device is not a reason not to run; cues then go to the null host.
     ichor::NullAudio silent;
-    ichor::AudioHost& audio = device.init() ? device : static_cast<ichor::AudioHost&>(silent);
-    if (&audio == &silent) {
+    ichor::AudioHost& hostAudio = device.init() ? device : static_cast<ichor::AudioHost&>(silent);
+    ichor::AnnouncingAudio audio(hostAudio);
+    if (&hostAudio == &silent) {
         ichor::log(ichor::LogLevel::Warn, "audio: running silent");
     }
 
@@ -654,6 +663,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     splashSounds.sounds.push_back(ichor::makeRainClip());
     splashSounds.sounds.push_back(ichor::makeWindClip());
     audio.addBundle(splashSounds);
+    // A combat cue with no clip beeps instead, so a missing sound is not mistaken for a bug.
+    ichor::addMissingCombatPlaceholders(audio);
 
     // The forged world, if there is one: its splat layers go to the renderer
     // and its cells stream around the player. The arena sits on a plateau at
@@ -733,9 +744,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return 1;
         }
         ichor::CombatBridgeConfig combatConfig;
-        combatConfig.tuning.lightWindupCue = audio.findSound("A_WindupLight");
-        combatConfig.tuning.heavyWindupCue = audio.findSound("A_WindupHeavy");
-        combatConfig.tuning.tellCue = audio.findSound("A_Tell");
+        combatConfig.tuning.lightWindupCue = ichor::resolveCueSound(audio, "combat.windup_light");
+        combatConfig.tuning.heavyWindupCue = ichor::resolveCueSound(audio, "combat.windup_heavy");
+        combatConfig.tuning.tellCue = ichor::resolveCueSound(audio, "combat.tell");
         combatConfig.legacyControls = !options.combatBot.empty();
         combatConfig.fightsCsv = options.combatFights;
         combat = std::make_unique<ichor::CombatBridge>(*forged, site, combatConfig);
@@ -812,8 +823,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::WorldStreamer streamer(heightfield, streaming);
 
     const std::uint32_t armClip = animations.findClip("wave");
-    const std::uint32_t windupCue = audio.findSound("A_WindupLight");
-    const std::uint32_t tellCue = audio.findSound("A_Tell");
+    const std::uint32_t windupCue = ichor::resolveCueSound(audio, "combat.windup_light");
+    const std::uint32_t tellCue = ichor::resolveCueSound(audio, "combat.tell");
     const std::uint32_t splashCue = audio.findSound("A_Splash");
     const std::uint32_t rainBed = audio.findSound("A_Rain");
     ichor::AmbienceLayers ambience;
@@ -830,6 +841,15 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::Engine engine(platform, renderer, config);
     engine.setOverlayMode(ichor::startingOverlayMode(!options.screenshot.empty(), options.overlay));
     engine.setControlsOverlay(ichor::startControlsOverlay(firstRunHint(options), options.controls));
+    ichor::SoundHelp soundHelp;
+    soundHelp.legendOpen = options.soundLegend;
+    ichor::CaptionFeed captionFeed;
+    engine.setCardLinesBuilder([&](std::vector<std::string>& lines) {
+        soundHelp = ichor::stepSoundHelp(soundHelp, platform.soundLegendKey(), platform.captionKey());
+        if (soundHelp.legendOpen) {
+            lines = ichor::soundLegendLines();
+        }
+    });
     engine.scene().setAnimations(&animations);
     // The stand-in world has no roads, so its field is empty and the bonus never applies.
     const ichor::NullRoadField noRoads;
@@ -926,9 +946,21 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     if (!ichor::loadMusicCues(data, musicCues)) {
         ichor::log(ichor::LogLevel::Warn, "data: a music cue is malformed, so none were loaded");
     }
+    const std::vector<ichor::MusicCue> musicCuesLoaded = musicCues;
     ichor::MusicPlayer musicPlayer(std::move(musicCues), ichor::MusicConfig{}, worldSeed);
     audio.addBundle(musicPlayer.makeBundle());
     musicPlayer.bind(audio);
+    audio.bind(musicCuesLoaded);
+    if (options.audioLog) {
+        std::size_t missing = 0;
+        for (const ichor::CueClipStatus& status : ichor::auditCueClips(audio, musicCuesLoaded)) {
+            if (!status.present) {
+                ++missing;
+                ichor::logf(ichor::LogLevel::Info, "audio-log: no clip {} for cue {}", status.clip, status.cue->id);
+            }
+        }
+        ichor::logf(ichor::LogLevel::Info, "audio-log: {} of the cue clips are missing", missing);
+    }
 
     constexpr std::uint32_t kGenVersion = 1;
     // With --campaign the slots live in the campaign's own folder, beside the world they belong to.
@@ -1290,6 +1322,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
+    std::unique_ptr<ichor::CaptionScreen> captionScreen;
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -1341,9 +1374,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             pauseMenu->setFovDegrees(settings.fovDegrees);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
+            captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            captionScreen.reset();
             combatHud.reset();
             newGameScreen.reset();
             pauseMenu.reset();
@@ -1411,6 +1446,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     hudMaxStamina = fighter.maxStamina;
                 }
                 combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = hudStamina, .maxStamina = hudMaxStamina}));
+                if (captionScreen) {
+                    captionFeed.prune(engine.scene().tickCount());
+                    captionScreen->bind(soundHelp.captionsOn ? captionFeed.visible(engine.scene().tickCount()) : std::vector<std::string>{});
+                }
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
                     for (auto& line : chronicle.recent(config.fixedDt, ichor::Ledger::kMaxRows)) {
@@ -1889,6 +1928,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (!engine.frame(dt)) {
             break;
+        }
+        for (const ichor::AnnouncingAudio::Fired& fired : audio.drain()) {
+            if (options.audioLog) {
+                ichor::logf(ichor::LogLevel::Info, "audio-log: tick {} {} {}", engine.scene().tickCount(), fired.bedStart ? "bed" : "cue", fired.cue->id);
+            }
+            captionFeed.push(*fired.cue, engine.scene().tickCount());
         }
         if (options.frameStats != 0 && engine.frameCount() % options.frameStats == 0) {
             std::size_t plantTotal = 0;

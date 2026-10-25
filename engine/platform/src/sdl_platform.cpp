@@ -122,6 +122,8 @@ void SdlPlatform::pumpEvents()
         down(SDL_SCANCODE_LSHIFT, SDL_SCANCODE_RSHIFT)};
     overlayKey_ = keys[SDL_SCANCODE_F3];
     helpKey_ = keys[SDL_SCANCODE_F1];
+    soundLegendKey_ = keys[SDL_SCANCODE_F2];
+    captionKey_ = keys[SDL_SCANCODE_F4];
     input_ = frame;
 }
 

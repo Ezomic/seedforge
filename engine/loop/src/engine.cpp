@@ -97,6 +97,13 @@ bool Engine::frame(double frameSeconds)
     for (std::string& line : controlsOverlayLines(controls_)) {
         renderer_.debugText(std::move(line));
     }
+    if (cardLinesBuilder_) {
+        overlay_.clear();
+        cardLinesBuilder_(overlay_);
+        for (std::string& line : overlay_) {
+            renderer_.debugText(std::move(line));
+        }
+    }
     const double fps = frameMillis_ > 0.0 ? 1000.0 / frameMillis_ : 0.0;
     if (overlayToggle_.mode == OverlayMode::Compact) {
         renderer_.debugText(std::format("{:.0f} fps  {:.1f} ms", fps, frameMillis_));
