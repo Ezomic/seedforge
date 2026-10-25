@@ -1,6 +1,7 @@
 name: engine
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
@@ -26,7 +27,9 @@ jobs:
   windows:
     name: windows runtime + tests
     runs-on: windows-2022
-    timeout-minutes: 15
+    # 15 minutes is the budget of a pull request. A run on main starts with cold caches (a cache saved on a PR branch is not visible to main) and
+    # a job killed by its limit saves no cache, so main gets room to finish once and warm them.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -134,9 +137,9 @@ jobs:
   linux-shard:
     name: linux sanitizers shard ${{ matrix.shard }} of 4
     runs-on: ubuntu-latest
-    # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in about 15 to 25 minutes on 4 cores, and a job
-    # killed by this limit saves nothing, so the limit is 30 until the caches exist on main; then set it back to 15.
-    timeout-minutes: 30
+    # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in 12 to 25 minutes, and on main the shards also run
+    # the medium tier. A job killed by its limit saves no cache, so only a pull request is held to 15 minutes.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -219,8 +222,8 @@ jobs:
   linux-gpu:
     name: linux gpu goldens
     runs-on: ubuntu-latest
-    # 30 until the vcpkg cache for the linux-gpu preset is warm: the first run builds SDL3 and friends from source (737 s of configure).
-    timeout-minutes: 30
+    # Cold, this job builds SDL3 and friends from source (670 to 737 s of configure), so only a pull request is held to 15 minutes.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -312,7 +315,7 @@ jobs:
     name: linux soak tests
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
