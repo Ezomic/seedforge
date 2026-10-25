@@ -62,6 +62,8 @@ struct StreetLot {
     float halfDepthM = 0.0f; // along z
     std::uint8_t facing = 0; // quarter turns, towards the street
     bool temple = false;     // the lot sized for the settlement's temple
+    std::size_t street = 0;  // index into SettlementLayout::streets of the street it fronts
+    std::int8_t side = 1;    // which side of it: +1 or -1
     float alongHalfM = 0.0f; // half the frontage, parallel to the street
     float acrossHalfM = 0.0f; // half the depth, away from the street
 };

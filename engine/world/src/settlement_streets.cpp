@@ -136,7 +136,6 @@ void layOutSettlement(const SettlementSite& site, const Heightfield& field, cons
     const int lines = p.linesPerAxis[tier];
     const double pitch = static_cast<double>(p.pitchM[tier]);
     const bool stone = tier >= kTown;
-    std::vector<std::pair<double, std::size_t>> priority; // |offset| and the street's index, to order the lots by
     for (const bool alongX : {true, false}) {
         if (!alongX && p.crossAxis[tier] == 0) continue;
         for (int k = -(lines / 2); k <= lines / 2; ++k) {
@@ -152,7 +151,6 @@ void layOutSettlement(const SettlementSite& site, const Heightfield& field, cons
             street.from = centre - reach;
             street.to = centre + reach;
             street.widthM = p.widthM;
-            priority.emplace_back(std::abs(static_cast<double>(k) * pitch), layout.streets.size());
             layout.streets.push_back(street);
         }
     }
@@ -174,6 +172,8 @@ void layOutSettlement(const SettlementSite& site, const Heightfield& field, cons
                 cursor = middle + alongHalf + static_cast<double>(p.lotGapM);
                 if (skip) continue;
                 StreetLot lot = makeLot(street, side, middle, alongHalf, acrossHalf, p);
+                lot.street = s;
+                lot.side = static_cast<std::int8_t>(side);
                 const bool inside = std::abs(lot.x - layout.centreX) + lot.halfWidthM <= limit && std::abs(lot.z - layout.centreZ) + lot.halfDepthM <= limit;
                 if (!inside) continue;
                 bool clear = true;
@@ -195,27 +195,19 @@ void layOutSettlement(const SettlementSite& site, const Heightfield& field, cons
     for (const std::size_t i : order) sorted.push_back(layout.lots[i]);
     layout.lots = std::move(sorted);
 
-    // The nearest lot is the temple's, sized for it; it keeps its street and side, so it still fronts the street.
+    // The nearest lot is the temple's, sized for it on the same street and side; it must pass the checks the other lots do, or the lot stays as it was.
     if (tier >= kVillage && !layout.lots.empty()) {
         const StreetLot first = layout.lots.front();
-        const Street* fronting = nullptr;
-        double side = 1.0;
-        for (const Street& street : layout.streets) {
-            const double across = street.alongX ? first.z - street.fixed : first.x - street.fixed;
-            const double along = street.alongX ? first.x : first.z;
-            if (std::abs(across) < static_cast<double>(street.widthM) * 0.5 + static_cast<double>(p.frontGapM) + static_cast<double>(first.acrossHalfM) + 0.01 && along >= street.from
-                && along <= street.to) {
-                fronting = &street;
-                side = across > 0.0 ? 1.0 : -1.0;
-                break;
-            }
+        const Street& fronting = layout.streets[first.street];
+        StreetLot temple = makeLot(fronting, static_cast<double>(first.side), fronting.alongX ? first.x : first.z, kTempleHalfM, kTempleHalfM, p);
+        temple.temple = true;
+        temple.street = first.street;
+        temple.side = first.side;
+        bool fits = std::abs(temple.x - layout.centreX) + temple.halfWidthM <= limit && std::abs(temple.z - layout.centreZ) + temple.halfDepthM <= limit;
+        for (std::size_t o = 0; o < layout.streets.size() && fits; ++o) {
+            if (o != first.street) fits = !lotTouchesStreet(temple, layout.streets[o], 0.5);
         }
-        if (fronting != nullptr) {
-            const double along = fronting->alongX ? first.x : first.z;
-            StreetLot temple = makeLot(*fronting, side, along, kTempleHalfM, kTempleHalfM, p);
-            temple.temple = true;
-            layout.lots.front() = temple;
-        }
+        if (fits) layout.lots.front() = temple;
     }
     SettlementStreetBuilder::add(out, std::move(layout));
 }
@@ -330,6 +322,11 @@ SettlementStreets layoutSettlementStreets(const std::vector<SettlementSite>& sit
 {
     if (heightfield.empty() || !heightfield.desc().valid()) return failure("the heightfield is empty");
     if (!paramsValid(params)) return failure("a street parameter is out of range or not finite");
+    for (const SettlementTierParams& t : tiers.tiers) {
+        if (!std::isfinite(t.minHalfFootprintM) || !std::isfinite(t.maxHalfFootprintM) || !(t.minHalfFootprintM > 0.0f) || t.maxHalfFootprintM < t.minHalfFootprintM) {
+            return failure("a settlement tier's footprint is out of range or not finite");
+        }
+    }
     for (const SettlementSite& site : sites) {
         if (!std::isfinite(site.x) || !std::isfinite(site.z)) return failure(std::format("{} has a position that is not finite", site.id));
     }
