@@ -1,5 +1,7 @@
 // Renders the Exile player in idle, run and a heavy swing, driven by the real combat code, on a
 // headless Vulkan device: no window is created. Writes one PNG with the three side by side.
+// With `--sheets` as the third argument it instead writes one contact sheet per clip into the
+// folder named by the first argument: eight poses across the clip, front view above side view.
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
 #include "ichor/core/log.h"
@@ -12,6 +14,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <filesystem>
+#include <string>
 
 namespace {
 
@@ -29,8 +32,69 @@ struct Shot {
 
 }
 
+int writeSheets(const std::filesystem::path& outDir, const std::filesystem::path& artDir)
+{
+    constexpr std::uint32_t kCellW = 256;
+    constexpr std::uint32_t kCellH = 384;
+    constexpr int kColumns = 8;
+    OffscreenRenderer renderer;
+    if (!renderer.init(kCellW, kCellH, false)) {
+        log(LogLevel::Error, "no Vulkan 1.3 device available");
+        return 1;
+    }
+    SceneBundle bundle;
+    appendGreyBoxMeshes(bundle);
+    if (!renderer.uploadBundle(bundle)) return 1;
+    ExilePlayer exile;
+    if (!exile.prepare(artDir, static_cast<std::uint32_t>(bundle.meshes.size()))) return 1;
+    for (const SceneBundle& part : exile.kit().bundles) {
+        if (!renderer.uploadBundle(part)) return 1;
+    }
+    std::filesystem::create_directories(outDir);
+    for (std::size_t i = 0; i < kExileClipCount; ++i) {
+        ExileClipChoice choice;
+        choice.clip = static_cast<ExileClip>(i);
+        choice.locomotion = i <= static_cast<std::size_t>(ExileClip::Run);
+        std::vector<std::uint8_t> sheet(static_cast<std::size_t>(kCellW) * kColumns * kCellH * 2 * 4);
+        for (int view = 0; view < 2; ++view) {
+            for (int column = 0; column < kColumns; ++column) {
+                const float phase = static_cast<float>(column) / static_cast<float>(kColumns - 1);
+                choice.progress = phase;
+                std::vector<glm::mat4> skin;
+                if (!exile.pose(choice, choice.locomotion ? phase * 0.875f : phase, skin)) return 1;
+                RenderView rv;
+                exile.appendPosed(skin, glm::dvec3(0.0), 0.0f, rv);
+                for (int g = -3; g <= 3; ++g) {
+                    const double at = static_cast<double>(g) * 0.5;
+                    rv.lines.push_back({glm::dvec3(at, 0.0, -1.5), glm::dvec3(at, 0.0, 1.5), glm::vec3(0.35f)});
+                    rv.lines.push_back({glm::dvec3(-1.5, 0.0, at), glm::dvec3(1.5, 0.0, at), glm::vec3(0.35f)});
+                }
+                rv.sunDirection = glm::normalize(glm::vec3(-0.5f, 0.9f, 0.35f));
+                // The body faces -Z: the front view looks from -Z, the side view from +X.
+                const glm::dvec3 eye = view == 0 ? glm::dvec3(0.0, 1.1, -4.6) : glm::dvec3(4.6, 1.1, 0.0);
+                const glm::dvec3 target(0.0, 1.0, 0.0);
+                rv.camera.position = eye;
+                rv.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+                std::vector<std::uint8_t> pixels;
+                if (!renderer.render(rv, pixels)) return 1;
+                for (std::uint32_t y = 0; y < kCellH; ++y) {
+                    std::copy_n(pixels.begin() + static_cast<std::ptrdiff_t>(y) * kCellW * 4, kCellW * 4,
+                        sheet.begin() + (static_cast<std::ptrdiff_t>(view * kCellH + y) * kCellW * kColumns + static_cast<std::ptrdiff_t>(column) * kCellW) * 4);
+                }
+            }
+        }
+        const std::filesystem::path file = outDir / (std::string("sheet_") + name(choice.clip) + ".png");
+        if (!writePng(file, kCellW * kColumns, kCellH * 2, sheet.data())) return 1;
+        logf(LogLevel::Info, "wrote {}", file.string());
+    }
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
+    if (argc > 3 && std::string(argv[3]) == "--sheets") {
+        return writeSheets(argv[1], argc > 4 ? std::filesystem::path(argv[4]) : std::filesystem::path(ICHOR_ART_DIR) / "exile");
+    }
     const std::filesystem::path out = argc > 1 ? argv[1] : "exile_player.png";
     const std::filesystem::path artDir = argc > 2 ? argv[2] : std::filesystem::path(ICHOR_ART_DIR) / "exile";
 

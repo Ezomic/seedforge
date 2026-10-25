@@ -1,3 +1,5 @@
+#include "ichor/anim/animation.h"
+#include "ichor/assets/cooker.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/sim/scene.h"
 #include "ichor/stage0/exile_player.h"
@@ -7,7 +9,9 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <memory>
 #include <filesystem>
 #include <limits>
 
@@ -98,7 +102,7 @@ TEST_CASE("the guard comes up over a short time and then holds")
     guard.blockTicks = 0;
     CHECK(chooseExileClip(guard, tuning, 0.0f, kDt).progress == 0.0f);
     guard.blockTicks = 600;
-    CHECK(chooseExileClip(guard, tuning, 0.0f, kDt).progress == 1.0f);
+    CHECK(chooseExileClip(guard, tuning, 0.0f, kDt).progress == Catch::Approx(kExileGuardPhase));
     guard.blockTicks = -5;
     CHECK(chooseExileClip(guard, tuning, 0.0f, kDt).progress == 0.0f);
 }
@@ -107,8 +111,8 @@ TEST_CASE("the playback rate keeps the feet on the ground within a range")
 {
     CHECK(exileLocomotionRate(5.2f, 5.2f) == Catch::Approx(1.0f));
     CHECK(exileLocomotionRate(2.6f, 5.2f) == Catch::Approx(0.5f));
-    CHECK(exileLocomotionRate(0.0f, 5.2f) == Catch::Approx(0.4f));
-    CHECK(exileLocomotionRate(99.0f, 5.2f) == Catch::Approx(1.6f));
+    CHECK(exileLocomotionRate(0.0f, 5.2f) == Catch::Approx(kExileMinRate));
+    CHECK(exileLocomotionRate(99.0f, 5.2f) == Catch::Approx(kExileMaxRate));
     CHECK(exileLocomotionRate(4.0f, 0.0f) == 1.0f);
     CHECK(exileLocomotionRate(std::numeric_limits<float>::quiet_NaN(), 5.2f) == 1.0f);
 }
@@ -189,4 +193,197 @@ TEST_CASE("drawing the Exile does not touch the simulation")
         return scene.stateHash();
     };
     CHECK(play(true) == play(false));
+}
+
+namespace {
+
+std::unique_ptr<AnimationSet> animationsOf(const SceneBundle& bundle)
+{
+    auto set = std::make_unique<AnimationSet>();
+    REQUIRE(set->load(bundle));
+    return set;
+}
+
+float travelSpeedOf(const AnimationSet& set, const char* clipName)
+{
+    const std::uint32_t clip = set.findClip(clipName);
+    REQUIRE(clip != AnimationSet::kNoClip);
+    const float duration = set.clipDuration(clip);
+    glm::vec3 start;
+    glm::vec3 end;
+    REQUIRE(set.rootTranslation(clip, 0.0f, start));
+    REQUIRE(set.rootTranslation(clip, duration, end));
+    return std::hypot(end.x - start.x, end.z - start.z) / duration;
+}
+
+glm::vec3 facingOf(const RenderView& view)
+{
+    return view.instances[0].basis * glm::vec3(0.0f, 0.0f, -1.0f);
+}
+
+}
+
+TEST_CASE("every clip the player can pick exists in the rig, whatever the combat state")
+{
+    const auto owned = animationsOf(exile().kit().bundles[0]);
+    const AnimationSet& set = *owned;
+    for (std::size_t i = 0; i < kExileClipCount; ++i) {
+        const char* clip = name(static_cast<ExileClip>(i));
+        INFO(clip);
+        CHECK(set.findClip(clip) != AnimationSet::kNoClip);
+    }
+    const Tuning tuning;
+    for (std::uint8_t state = 0; state <= static_cast<std::uint8_t>(CombatState::Dead); ++state) {
+        for (const AttackKind attack : {AttackKind::Light, AttackKind::Heavy}) {
+            for (const bool blocking : {false, true}) {
+                for (const float speed : {0.0f, 1.0f, 3.0f, 9.0f}) {
+                    Combatant c = in(static_cast<CombatState>(state), 0.2f, attack);
+                    c.blocking = blocking;
+                    const ExileClipChoice choice = chooseExileClip(c, tuning, speed, kDt);
+                    CHECK(static_cast<std::size_t>(choice.clip) < kExileClipCount);
+                    CHECK(set.findClip(name(choice.clip)) != AnimationSet::kNoClip);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("the feet keep pace with the ground at every speed the player can move")
+{
+    const auto owned = animationsOf(exile().kit().bundles[0]);
+    const AnimationSet& set = *owned;
+    const float travel[] = {0.0f, travelSpeedOf(set, "walk"), travelSpeedOf(set, "run")};
+    const Tuning tuning;
+    const Combatant idle = in(CombatState::Idle, 0.0f);
+    for (float speed = 0.3f; speed <= 8.0f; speed += 0.05f) {
+        const ExileClipChoice choice = chooseExileClip(idle, tuning, speed, kDt);
+        REQUIRE(choice.locomotion);
+        const std::size_t index = static_cast<std::size_t>(choice.clip);
+        REQUIRE((index == 1 || index == 2));
+        const float feet = exileLocomotionRate(speed, travel[index]) * travel[index];
+        INFO("speed " << speed << " clip " << name(choice.clip));
+        CHECK(feet == Catch::Approx(speed).epsilon(0.03));
+    }
+    const float run = exileLocomotionRate(tuning.moveSpeed, travel[2]);
+    CHECK(run > 0.6f);
+    CHECK(run < 1.0f);
+}
+
+TEST_CASE("blending two poses keeps each end exact and the joints rigid in between")
+{
+    ExilePlayer& player = exile();
+    ExileClipChoice from;
+    from.clip = ExileClip::Idle;
+    ExileClipChoice to;
+    to.clip = ExileClip::Dodge;
+    to.progress = 0.3f;
+    std::vector<glm::mat4> a;
+    std::vector<glm::mat4> b;
+    REQUIRE(player.pose(from, 0.0f, a));
+    REQUIRE(player.pose(to, 0.0f, b));
+    std::vector<glm::mat4> out;
+    blendSkin(a, b, 0.0f, out);
+    for (std::size_t i = 0; i < a.size(); ++i) CHECK(glm::distance(a[i][3], out[i][3]) < 1e-4f);
+    blendSkin(a, b, 1.0f, out);
+    for (std::size_t i = 0; i < b.size(); ++i) CHECK(glm::distance(b[i][3], out[i][3]) < 1e-4f);
+    blendSkin(a, b, 0.5f, out);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        for (int k = 0; k < 3; ++k) CHECK(glm::length(glm::vec3(out[i][k])) == Catch::Approx(1.0f).margin(0.01f));
+        CHECK(glm::dot(glm::cross(glm::vec3(out[i][0]), glm::vec3(out[i][1])), glm::vec3(out[i][2])) > 0.98f);
+    }
+}
+
+TEST_CASE("the body faces the way it travels, and a dodge steps along the way it was aimed")
+{
+    NullRenderer renderer;
+    ExilePlayer player;
+    REQUIRE(player.load(kExile, renderer));
+    const auto owned = animationsOf(player.kit().bundles[0]);
+    const AnimationSet& set = *owned;
+    const Tuning tuning;
+    Scene scene(1);
+    Stage0 stage(tuning);
+    stage.install(scene, {0.0, 0.0, 3.0}, {0.0, 0.0, -9.0});
+    scene.tick(1.0 / 60.0);
+    stage.resetFight(scene);
+    for (int i = 0; i < 30; ++i) scene.tick(1.0 / 60.0);
+    const entt::entity entity = scene.find(stage.playerId());
+
+    InputFrame back;
+    back.moveY = -1.0f;
+    glm::vec3 facing(0.0f);
+    for (int i = 0; i < 60; ++i) {
+        scene.tick(1.0 / 60.0, back);
+        RenderView view;
+        player.append(scene, 1.0, 1.0 / 60.0, kDt, tuning, view);
+        facing = facingOf(view);
+    }
+    const auto& transform = scene.registry().get<Transform>(entity);
+    const auto& previous = scene.registry().get<PreviousTransform>(entity);
+    const glm::dvec3 step = glm::normalize(transform.position - previous.position);
+    const Combatant& c = scene.registry().get<Combatant>(entity);
+    REQUIRE(glm::dot(glm::vec3(step), glm::vec3(std::sin(c.yaw), 0.0f, -std::cos(c.yaw))) < -0.9f);
+    CHECK(glm::dot(facing, glm::vec3(step)) > 0.95f);
+
+    InputFrame dodge;
+    dodge.moveX = 1.0f;
+    dodge.buttons = InputFrame::Dodge;
+    scene.tick(1.0 / 60.0, dodge);
+    REQUIRE(scene.registry().get<Combatant>(entity).combatState() == CombatState::Dodging);
+    RenderView view;
+    player.append(scene, 1.0, 1.0 / 60.0, kDt, tuning, view);
+    const std::uint32_t clip = set.findClip("dodge");
+    glm::vec3 start;
+    glm::vec3 end;
+    REQUIRE(set.rootTranslation(clip, 0.0f, start));
+    REQUIRE(set.rootTranslation(clip, set.clipDuration(clip), end));
+    const glm::vec3 travel = view.instances[0].basis * glm::normalize(end - start);
+    const glm::vec3 wanted = scene.registry().get<Combatant>(entity).dodgeDirection;
+    CHECK(glm::dot(travel, wanted) > 0.99f);
+}
+
+TEST_CASE("the three Exile costumes share one skeleton, one set of clips and a skin that fits them")
+{
+    SceneBundle reference;
+    CookStats stats;
+    CookOptions options;
+    options.rootYawDegrees = 180.0f;
+    REQUIRE(cookGltf(kExile / "SK_Exile.glb", reference, stats, options));
+    REQUIRE(reference.skeletons.size() == 1);
+    const Skeleton& skeleton = reference.skeletons[0];
+    const auto referenceSet = animationsOf(reference);
+    for (const char* costume : {"SK_ExileFounder.glb", "SK_ExileRags.glb"}) {
+        INFO(costume);
+        SceneBundle bundle;
+        REQUIRE(cookGltf(kExile / costume, bundle, stats, options));
+        REQUIRE(bundle.skeletons.size() == 1);
+        CHECK(bundle.skeletons[0].jointNames == skeleton.jointNames);
+        REQUIRE(bundle.skeletons[0].inverseBind.size() == skeleton.inverseBind.size());
+        for (std::size_t i = 0; i < skeleton.inverseBind.size(); ++i) {
+            for (int c = 0; c < 4; ++c) CHECK(glm::distance(bundle.skeletons[0].inverseBind[i][c], skeleton.inverseBind[i][c]) < 1e-3f);
+        }
+        REQUIRE_FALSE(bundle.meshes.empty());
+        for (const Mesh& mesh : bundle.meshes) {
+            CHECK(mesh.skeleton == 0);
+            for (const Vertex& v : mesh.vertices) {
+                for (int k = 0; k < 4; ++k) REQUIRE(v.joints[k] < skeleton.jointNames.size());
+            }
+        }
+        const auto set = animationsOf(bundle);
+        CHECK(set->clipCount() == referenceSet->clipCount());
+        CHECK(set->jointNames(0) == referenceSet->jointNames(0));
+        for (std::size_t i = 0; i < kExileClipCount; ++i) {
+            const char* clipName = name(static_cast<ExileClip>(i));
+            INFO(clipName);
+            const std::uint32_t clip = set->findClip(clipName);
+            REQUIRE(clip != AnimationSet::kNoClip);
+            CHECK(set->clipSkeleton(clip) == 0);
+            CHECK(set->clipDuration(clip) == Catch::Approx(referenceSet->clipDuration(referenceSet->findClip(clipName))));
+        }
+    }
+    for (const Mesh& mesh : reference.meshes) {
+        for (const Vertex& v : mesh.vertices) {
+            for (int k = 0; k < 4; ++k) REQUIRE(v.joints[k] < skeleton.jointNames.size());
+        }
+    }
 }

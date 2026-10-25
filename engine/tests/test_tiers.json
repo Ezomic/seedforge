@@ -14,6 +14,7 @@
     "coverage is deterministic and bounded",
     "drawing the Bull-Warden does not move the simulation",
     "drawing the Exile does not touch the simulation",
+    "the three Exile costumes share one skeleton, one set of clips and a skin that fits them",
     "each combat state picks its Bull-Warden clip",
     "each skill parameter changes the outcome on its own",
     "every file truncated, flipped, extended or deleted is refused or recovers to a real state",
