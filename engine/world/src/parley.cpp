@@ -1,6 +1,7 @@
 #include "ichor/world/parley.h"
 
 #include "ichor/core/hash.h"
+#include "ichor/graph/mission.h"
 #include "ichor/economy/merchant_service.h"
 
 #include <algorithm>
@@ -270,7 +271,12 @@ void ParleySystem::loadDialogue(const DataSet& data)
 
 void ParleySystem::bindQuest(const ParleyWorld& world)
 {
-    if (!quest_ || !world.cast || !world.pois || !world.loot) {
+    if (!quest_) {
+        binding_.reason = "there is no quest record";
+        return;
+    }
+    if (!world.cast || !world.pois || !world.loot) {
+        binding_.reason = "the world has no cast, places or loot";
         return;
     }
     const NpcSpawn* giver = nullptr;
@@ -286,24 +292,39 @@ void ParleySystem::bindQuest(const ParleyWorld& world)
         }
     }
     if (giver == nullptr) {
+        binding_.reason = "the world has no " + quest_->giverArchetype + " to give the errand";
         return;
     }
     const PlacedLoot* item = nullptr;
     const PlacedPoi* dungeon = nullptr;
+    ItemSite itemSite;
+    int itemRank = 0;
     double itemDistance = 0.0;
     for (const PlacedLoot& loot : world.loot->all()) {
         const PlacedPoi* poi = world.pois->find(loot.poiId);
         if (poi == nullptr || poi->kind != PlacedPoiKind::Dungeon || carry_.catalogue().info(loot.itemId) == nullptr) {
             continue;
         }
+        ItemSite site;
+        int rank = 0;
+        if (world.siteOf) {
+            site = world.siteOf(loot);
+            if (site.inside && !site.reachable) {
+                continue;
+            }
+            rank = site.inside ? (site.guarded || site.crowded || site.roomType == graph::mission::kEntry ? 1 : 0) : 2;
+        }
         const double d = squaredDistance(loot.x, loot.z, giver->x, giver->z);
-        if (item == nullptr || d < itemDistance) {
+        if (item == nullptr || rank < itemRank || (rank == itemRank && d < itemDistance)) {
             item = &loot;
             dungeon = poi;
+            itemSite = std::move(site);
+            itemRank = rank;
             itemDistance = d;
         }
     }
     if (item == nullptr) {
+        binding_.reason = "no dungeon in the world holds an item the player can reach";
         return;
     }
     const double metres = std::sqrt(itemDistance);
@@ -315,6 +336,8 @@ void ParleySystem::bindQuest(const ParleyWorld& world)
     binding_.dungeonKind = dungeon->archetype.empty() ? std::string("ruin") : dungeon->archetype;
     binding_.itemId = item->itemId;
     binding_.itemName = carry_.catalogue().info(item->itemId)->name;
+    binding_.inside = itemSite.inside;
+    binding_.roomType = itemSite.roomType;
     binding_.where = std::format("about {} m to the {}", rounded, compass(item->x - giver->x, item->z - giver->z));
 }
 

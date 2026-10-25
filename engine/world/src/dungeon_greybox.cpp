@@ -202,6 +202,8 @@ DungeonGreyBox buildDungeonGreyBox(const BakedDungeon& dungeon, glm::dvec3 origi
         for (int side = 0; side < 4; ++side) placed.doors[side] = room.door[side];
         placed.ramp = room.ramp;
         placed.hole = room.hole;
+        placed.rampWest = rampOnWest(cell.floor);
+        placed.holeWest = rampOnWest(cell.floor - 1);
         b.out.rooms.push_back(placed);
     }
     std::sort(b.out.rooms.begin(), b.out.rooms.end(), [](const GreyBoxRoom& a, const GreyBoxRoom& other) { return a.id < other.id; });

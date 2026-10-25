@@ -7,12 +7,14 @@
 #include "ichor/npc/dialogue_select.h"
 #include "ichor/sim/scene.h"
 #include "ichor/world/carry.h"
+#include "ichor/world/dungeon_content.h"
 #include "ichor/world/placed_cast.h"
 #include "ichor/world/placed_loot.h"
 #include "ichor/world/placed_pois.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -37,7 +39,10 @@ namespace ichor {
 //    its stock changes and survives a save.
 //  - One quest, written by hand in data/parley: the merchant nearest the spawn asks the player to bring an item
 //    back from the nearest dungeon that has loot lying at it. The giver, the dungeon and the item are chosen from
-//    the world by a pure function (never by chance), so a seed always gives the same errand. Progress is Active
+//    the world by a pure function (never by chance), so a seed always gives the same errand. Where the world can say
+//    where an item ends up (ParleyWorld::siteOf), an item with a spot of its own in an unguarded room the player can walk to is preferred,
+//    then one in a guarded or crowded room, and only then one left outdoors at the mouth of a dungeon that cannot be entered. A
+//    world with no merchant or no loot at a dungeon has no errand, and binding().reason says why. Progress is Active
 //    (accepted), Found (the item is in the pack) and Done (handed in, paid).
 //
 // All state the player has earned is one reflected component on the player, `Parley`, registered with the scene,
@@ -45,8 +50,7 @@ namespace ichor {
 // change is a GameCommand (parley.talk, accept, turnin, buy, sell): logged, applied at the start of a tick,
 // deterministic. Which NPC the player is talking to and which page is open are the screen's business, not state.
 //
-// Deferred: dungeon interiors hold no loot yet, so the errand's item lies at the dungeon's mouth in the world;
-// prices do not follow the region's scarcity (the market is the economy module's neutral one); only the one quest.
+// Deferred: prices do not follow the region's scarcity (the market is the economy module's neutral one); only the one quest.
 
 constexpr const char* kParleyComponent = "world.parley";
 constexpr double kTalkReachM = 3.0;  // F opens a conversation within this of an NPC
@@ -126,16 +130,21 @@ struct ParleyWorld {
     double referenceX = 0.0;
     double referenceZ = 0.0;
     std::uint64_t seed = 0;
+    // Where a dungeon item ends up (dungeon_content.h itemSite); null when the world cannot say, then every item counts alike.
+    std::function<ItemSite(const PlacedLoot&)> siteOf;
 };
 
 struct QuestBinding {
     bool bound = false;
+    std::string reason; // when not bound: why there is no errand in this world
     std::string giverNpc;
     std::string giverName;
     std::string dungeonPoi;
     std::string dungeonKind; // the dungeon's archetype, "crypt"
     std::string itemId;
     std::string itemName;
+    bool inside = false;     // the item lies in a room of the dungeon, not outdoors at its mouth
+    std::string roomType;    // that room's mission role, "reward"; empty outdoors
     std::string where; // "about 640 m to the north-east", from the giver
 };
 

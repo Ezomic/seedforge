@@ -142,6 +142,7 @@ struct Options {
     bool showInventory = false; // --inventory: start with the inventory screen open
     bool talk = false;          // --forged: start in conversation with the merchant who asks the errand
     bool acceptQuest = false;   // --forged: the errand is taken at the start
+    bool turnInQuest = false;   // --forged: and handed in at once, with its item granted, to look at the finished journal
     bool showJournal = false;   // --journal: start with the journal open
     bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
     bool combatDebug = false; // --combat: keep the Stage 0 debug rings, lines and collider lines (F3 full shows them too)
@@ -221,6 +222,9 @@ bool parse(int argc, char** argv, Options& options)
             options.talk = true;
         } else if (arg == "--accept-quest") {
             options.acceptQuest = true;
+        } else if (arg == "--turn-in-quest") {
+            options.acceptQuest = true;
+            options.turnInQuest = true;
         } else if (arg == "--journal") {
             options.showJournal = true;
         } else if (arg == "--dungeon" && hasValue) {
@@ -951,7 +955,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             carry->setInteriorLoot([&dungeonEntry] { return &dungeonEntry->content().loot; });
         }
         carry->install(engine.scene());
-        parley = std::make_unique<ichor::ParleySystem>(ichor::ParleyWorld{forged->cast, forged->pois, forged->loot, forged->spawn.x, forged->spawn.z, forged->desc.seed}, data, *carry);
+        ichor::ParleyWorld parleyWorld{forged->cast, forged->pois, forged->loot, forged->spawn.x, forged->spawn.z, forged->desc.seed};
+        parleyWorld.siteOf = [&game = *forged](const ichor::PlacedLoot& item) { return ichor::itemSite(game, item.poiId, item.itemId); };
+        parley = std::make_unique<ichor::ParleySystem>(std::move(parleyWorld), data, *carry);
+        if (!parley->binding().bound) {
+            ichor::logf(ichor::LogLevel::Warn, "parley: no errand in this world: {}", parley->binding().reason);
+        }
         for (const std::string& problem : parley->problems()) {
             ichor::logf(ichor::LogLevel::Warn, "{}", problem);
         }
@@ -988,6 +997,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (errandGiver != nullptr && options.acceptQuest) {
             parley->choose(engine.scene(), "accept");
+        }
+        if (errandGiver != nullptr && parley->binding().bound && options.turnInQuest) {
+            carry->requestGrant(engine.scene(), parley->binding().itemId, 1);
+            parley->choose(engine.scene(), "turnin");
         }
         if (combat) {
             combat->install(engine.scene(), ichor::StableId::of("player"), anchor);
@@ -2000,7 +2013,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
