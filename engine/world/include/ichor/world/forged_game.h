@@ -19,6 +19,7 @@
 #include "ichor/world/placed_pois.h"
 #include "ichor/world/placed_settlements.h"
 #include "ichor/world/settlement_kit.h"
+#include "ichor/world/settlement_streets.h"
 #include "ichor/world/water_field.h"
 
 #include <worldforge/forge_world.h>
@@ -86,6 +87,10 @@ struct ForgedContentSetup {
 // (quests/expansion_rules.json). The cast archetypes are a fixed list: the shipped data has no table for them yet.
 ForgedContentSetup loadForgedContentSetup(const DataSet& data, const std::filesystem::path& dataDir);
 
+// The building tiers the forged settlements are laid out and filled with: the placement defaults, with the counts a street
+// grid carries (a hamlet 4 houses, a village 12, a town 30, a city 64).
+PlacedSettlementParams forgedStreetTierParams();
+
 struct ForgedGame {
     ForgedGame() = default;
     ForgedGame(const ForgedGame&) = delete;
@@ -101,6 +106,7 @@ struct ForgedGame {
     std::shared_ptr<const PlacedPoiSet> pois;
     std::shared_ptr<const PlacedBuildingSet> buildings;
     std::vector<SettlementSite> sites; // the settlements in the forge's order, in world metres
+    std::shared_ptr<const SettlementStreetSet> streets; // the streets inside the settlements, and the lots the buildings front
     std::shared_ptr<const SettlementKitSet> kit; // the textured pieces that stand in for the buildings
     std::shared_ptr<const NavSurface> navSurface; // water and roads as the navmesh sees them; reads `waterField` and `roads`
     ForgedRegionTiers tiers;
@@ -127,6 +133,7 @@ struct ForgedGame {
 struct ForgedScenery {
     SceneBundle bundle;
     std::map<CellId, std::uint32_t> roadMesh;
+    std::map<CellId, std::uint32_t> streetMesh; // the settlement streets of a cell, with the road's material
     std::map<std::string, std::uint32_t> poiMesh; // by PlacedPoi::id, at its own height with its base on y = 0
     bool kitLoaded = false;                  // the textured kit cooked into `bundle`; when false the buildings are drawn as boxes
     KitMeshes kitMesh;                       // by KitPiece, valid when kitLoaded

@@ -23,8 +23,9 @@ namespace ichor {
 //
 // Enemies are placed by the room's role in the mission graph: a challenge room holds one or two, the key room one
 // guard and the climax room two, with the boss marker standing at its centre. The entry room, rests, junctions,
-// reveals, gates and rewards hold none. Only skirmishers are placed: the other stage0 roles need systems the combat
-// bridge does not register yet, so a room is never given an enemy the game cannot fight.
+// reveals, gates and rewards hold none. Roles follow the room (SEED-661): the key room's guard is an Anchor, a
+// challenge room's first enemy is a Skirmisher and its second an Artillery, and the climax room holds an Anchor and an
+// Artillery. The other stage0 roles are not placed: the combat bridge does not register them.
 //
 // Every enemy stands on one of four posts inside the hall, well clear of the walls, so never in a doorway, never over
 // a ramp or a hole in the floor, and never in the entry room. Loot is the manifest's own: the items placed at this
@@ -33,7 +34,7 @@ namespace ichor {
 // What the player has done to it is not here: kills are recorded in the scene (recordKill), one marker entity per
 // kill, so they are saved and loaded with the campaign and a scene that kills nothing hashes as it always did.
 
-enum class DungeonEnemyRole : std::uint8_t { Skirmisher };
+enum class DungeonEnemyRole : std::uint8_t { Skirmisher, Anchor, Artillery };
 
 struct DungeonRoom {
     graph::NodeId id = 0;
@@ -85,6 +86,9 @@ struct DungeonContent {
     const DungeonRoom* roomAt(const glm::dvec3& point) const;
     std::vector<std::size_t> enemiesIn(graph::NodeId room) const;
 };
+
+// The role of the `ordinal`th enemy (0 first, in slot order) of a room of this type; a Skirmisher for any other type.
+DungeonEnemyRole roleForRoom(const std::string& roomType, std::size_t ordinal);
 
 // `items` are the loot placed at this dungeon (their coordinates are replaced). Never throws; a layout or grey-box
 // that failed, or a non-finite coordinate, gives empty content.

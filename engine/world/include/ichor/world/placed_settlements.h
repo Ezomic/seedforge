@@ -17,6 +17,8 @@ class ForgedWorld;
 
 namespace ichor {
 
+class SettlementStreetSet;
+
 // The bake step that fills the forged settlements with grey-box building clusters (doc 08 phase 12).
 // libworldforge picks where settlements stand and gives each a size tier (hamlet, village, town, city);
 // this turns every one into axis-aligned boxes standing around its centre, in world metres.
@@ -45,6 +47,7 @@ struct PlacedBuilding {
     float halfWidthM = 0.0f;  // half the footprint along x
     float halfDepthM = 0.0f;  // half the footprint along z
     float heightM = 0.0f;     // above groundY
+    std::int8_t facing = -1;  // quarter turns of the house's front (0 faces +z, 1 +x, 2 -z, 3 -x) when it stands on a street lot; -1 faces the settlement's centre
     CellId cell;
 };
 
@@ -100,15 +103,17 @@ struct PlacedSettlements {
 };
 
 // The core: clusters for explicit sites. `roads` and `water` may be null (nothing to keep clear of).
+// With `streets` a settlement that has a layout there puts its buildings on the street lots, fronting the streets, nearest the middle first;
+// without, or for a site with no layout, the buildings scatter over the disc.
 // Fails, with a message, on an empty heightfield, bad params, two sites with one id, or a site whose position is not finite.
 // Roads, water and slope are probed over the whole footprint (and the road margin) every 2 m, so a thin road or creek cannot slip between samples.
 PlacedSettlements placeSettlementBuildings(const std::vector<SettlementSite>& sites, const Heightfield& heightfield, const RoadField* roads,
-    const WaterField* water, const PlacedSettlementParams& params = {});
+    const WaterField* water, const PlacedSettlementParams& params = {}, const SettlementStreetSet* streets = nullptr);
 
 // The forged world's settlements (phase 7), at the same grid-to-metres mapping the other bake adapters
 // use. Fails when the world did not reach the settlements phase or the heightfield is empty.
 PlacedSettlements placeForgedSettlements(const worldforge::ForgedWorld& world, const Heightfield& heightfield, const RoadField* roads,
-    const WaterField* water, const PlacedSettlementParams& params = {});
+    const WaterField* water, const PlacedSettlementParams& params = {}, const SettlementStreetSet* streets = nullptr);
 
 // The forged world's settlement sites (phase 7) in world metres, in the forge's order. Fails, with a message in `error`,
 // when the world did not reach the settlements phase, has no grid, or the heightfield is empty.

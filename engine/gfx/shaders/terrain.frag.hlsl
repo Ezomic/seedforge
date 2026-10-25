@@ -79,6 +79,12 @@ float4 main(PSIn i) : SV_Target
         const float grainShade = 0.7 + 0.6 * luma(g);
         baseColor = lerp(baseColor, float3(0.50, 0.42, 0.26) * grainShade, sandAmount);
         baseColor = lerp(baseColor, float3(0.06, 0.045, 0.03) * grainShade, bankAmount * 0.85);
+        // Inside a settlement the vertex stage lowered w below -1 by how packed the earth is: worn, bare ground
+        // between the houses, patchy where the grass is still coming through.
+        const float packedAmount = saturate(-i.tangent.w - 1.0);
+        const float patchiness = smoothstep(0.25, 0.75, luma(g) * 1.4 + (luma(r) - 0.5) * 0.3);
+        const float worn = packedAmount * (1.0 - rock) * (1.0 - 0.25 * snow) * (1.0 - bankAmount) * lerp(0.45, 0.85, patchiness);
+        baseColor = lerp(baseColor, float3(0.34, 0.27, 0.18) * grainShade, worn);
     } else {
         // A second, larger tiling breaks the repetition of the near one.
         const float3 g = lerp(grassTex.Sample(materialSampler, i.uv).rgb, grassTex.Sample(materialSampler, i.uv * 0.13).rgb, 0.4);

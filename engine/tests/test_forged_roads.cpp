@@ -1,5 +1,6 @@
 #include "ichor/world/forged_heightfield.h"
 #include "ichor/world/forged_roads.h"
+#include "ichor/world/ribbon_height.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -276,8 +277,9 @@ TEST_CASE("a cell with a road gets a ribbon lying on the ground, a cell without 
                 CHECK(v.position.x <= static_cast<float>(f.desc.cellMetres) + margin);
                 CHECK(v.position.z >= -margin);
                 CHECK(v.position.z <= static_cast<float>(f.desc.cellMetres) + margin);
-                const float ground = deformed.field.heightAt(ox + v.position.x, oz + v.position.z);
-                CHECK(v.position.y == Catch::Approx(ground + 0.08f).margin(1e-3));
+                const float ground = terrainMeshHeightAt(deformed.field, ox + v.position.x, oz + v.position.z);
+                CHECK(v.position.y >= ground + ForgedRoadParams{}.lift - 1e-3f);
+                CHECK(v.position.y <= ground + ForgedRoadParams{}.lift + 1.0f + 1e-3f);
             }
             for (const std::uint32_t i : mesh.indices) CHECK(i < mesh.vertices.size());
             for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3) {

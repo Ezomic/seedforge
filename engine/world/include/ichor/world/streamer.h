@@ -10,6 +10,7 @@
 #include "ichor/world/placed_loot.h"
 #include "ichor/world/placed_pois.h"
 #include "ichor/world/placed_settlements.h"
+#include "ichor/world/settlement_streets.h"
 #include "ichor/world/forged_scenery_scatter.h"
 #include "ichor/world/vegetation.h"
 
@@ -67,6 +68,9 @@ struct StreamerConfig {
     // The forged biomes (biomesFromForgedWorld). With them each vertex carries its splat weights (in its tangent,
     // with w = -1 to say so) and the trees follow the cell's biome; without them the terrain and trees are the stand-in's.
     std::shared_ptr<const ForgedBiomeField> biomes;
+    // The settlements' street layouts (layoutSettlementStreets). With them (and `biomes`) a forged vertex inside a settlement's
+    // footprint carries how much of the ground is packed earth, as w = -(1 + amount), so w stays -1 everywhere else.
+    std::shared_ptr<const SettlementStreetSet> streets;
     // What the biome scenery keeps clear of (roads, buildings, water); empty keeps nothing clear. Used with `biomes` only.
     SceneryGuard scenery;
     // Which ground the navmesh may stand on (water, roads); the surface must outlive the streamer. Null is open ground.
