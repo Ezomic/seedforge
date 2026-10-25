@@ -169,7 +169,7 @@ inline SeedWalk walkSeed(std::uint64_t seed, int grid)
     WalkRouteMemo routeMemo;
     for (std::size_t homeRank = 0; homeRank < homes.size() && !out.usedNavmesh && !out.usedGroundRoute && out.routeNodesSearched < kRouteNodeBudget; ++homeRank) {
         const std::size_t candidateHome = homes[homeRank].second;
-        for (int attempt = 0; attempt < 12 && !out.usedNavmesh && !out.usedGroundRoute; ++attempt) {
+        for (int attempt = 0; attempt < 12 && !out.usedNavmesh && !out.usedGroundRoute && out.routeNodesSearched < kRouteNodeBudget; ++attempt) {
             glm::dvec3 candidate;
             if (!findWalkableSpawn(walking, goals[candidateHome].x + attempt * 6.0, goals[candidateHome].z, 60.0, candidate)) {
                 continue;

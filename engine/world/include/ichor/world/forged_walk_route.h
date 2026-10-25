@@ -55,7 +55,7 @@ struct WalkRoutePocket {
     double fromX = 0.0;
     double fromZ = 0.0;
     double step = 0.0;
-    double goalRadiusMetres = 0.0;
+    WalkRouteParams params;       // the pocket answers only a search made with these
     std::vector<glm::vec2> nodes; // every grid node the start can stand on
     double reachableSquareMetres = 0.0;
     std::size_t boundarySteep = 0;
@@ -63,8 +63,8 @@ struct WalkRoutePocket {
     std::size_t boundaryMapEdge = 0;
 };
 
-// Pockets remembered between searches over one ForgedWalking with one set of WalkRouteParams. Pass the same memo to
-// every findWalkRoute call that retries starts and goals over the same world.
+// Pockets remembered between searches over one ForgedWalking. A pocket answers only a search with the same start and the
+// same WalkRouteParams, so one memo can be passed to every findWalkRoute call that retries starts and goals over a world.
 struct WalkRouteMemo {
     std::vector<WalkRoutePocket> pockets;
 };

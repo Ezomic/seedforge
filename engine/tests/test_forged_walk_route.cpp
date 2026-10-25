@@ -181,6 +181,9 @@ TEST_CASE("a start shown to be shut in answers another goal at once, and still f
     const WalkRoute inside = findWalkRoute(walking, from, {46.0, 0.0, 46.0}, params, &memo);
     REQUIRE(inside.found);
 
+    const WalkRoute onRidge = findWalkRoute(walking, from, {40.0, 0.0, 56.0}, params, &memo); // a goal on unwalkable ground is judged by the search, not the memo
+    REQUIRE(onRidge.nodesSearched > 0);
+
     const WalkRoute elsewhere = findWalkRoute(walking, {10.0, 0.0, 10.0}, {110.0, 0.0, 20.0}, params, &memo);
     REQUIRE(elsewhere.found);
 }

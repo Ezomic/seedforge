@@ -268,9 +268,15 @@ std::vector<glm::dvec3> pull(const ForgedWalking& walking, const std::vector<glm
     return out;
 }
 
+bool sameParams(const WalkRouteParams& a, const WalkRouteParams& b)
+{
+    return a.stepMetres == b.stepMetres && a.checkMetres == b.checkMetres && a.clearanceMetres == b.clearanceMetres && a.marginMetres == b.marginMetres
+        && a.goalRadiusMetres == b.goalRadiusMetres && a.maxNodes == b.maxNodes;
+}
+
 bool pocketReaches(const WalkRoutePocket& pocket, const glm::dvec3& goal)
 {
-    const double reach = std::max(pocket.goalRadiusMetres, pocket.step) + pocket.step;
+    const double reach = std::max(pocket.params.goalRadiusMetres, pocket.step) + pocket.step;
     return std::any_of(pocket.nodes.begin(), pocket.nodes.end(), [&](const glm::vec2& n) { return flat(n.x - goal.x, n.y - goal.z) <= reach; });
 }
 
@@ -310,9 +316,9 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
         return route;
     }
 
-    if (memo != nullptr) {
+    if (memo != nullptr && walking.assess(goal.x, goal.z).walkable()) {
         for (const WalkRoutePocket& pocket : memo->pockets) {
-            if (pocket.fromX == from.x && pocket.fromZ == from.z && pocket.goalRadiusMetres == params.goalRadiusMetres && !pocketReaches(pocket, goal)) {
+            if (pocket.fromX == from.x && pocket.fromZ == from.z && sameParams(pocket.params, params) && !pocketReaches(pocket, goal)) {
                 return pocketRoute(pocket);
             }
         }
@@ -347,7 +353,7 @@ WalkRoute findWalkRoute(const ForgedWalking& walking, const glm::dvec3& from, co
     }
     if (!search.found) {
         if (memo != nullptr && search.reachedNodes.size() <= kMaxPocketNodes) {
-            memo->pockets.push_back({from.x, from.z, search.step, params.goalRadiusMetres, std::move(search.reachedNodes), search.reachableSquareMetres, search.steep, search.deepWater, search.mapEdge});
+            memo->pockets.push_back({from.x, from.z, search.step, params, std::move(search.reachedNodes), search.reachableSquareMetres, search.steep, search.deepWater, search.mapEdge});
         }
         route.failure = WalkRouteFailure::NoGroundRoute;
         route.reachableSquareMetres = search.reachableSquareMetres;
