@@ -14,6 +14,7 @@ Fails, printing file:line of each violation, when under data/:
 
 Usage: check_data.py [--root DIR]    check the tree (default: this repository)
        check_data.py --self-test     prove every rule goes red on a deliberate violation
+       check_data.py --write-baseline  print the baseline entries for the current tree
 """
 import argparse
 import json
@@ -24,6 +25,7 @@ import tempfile
 from pathlib import Path
 
 BASELINE = "tools/data_lint_baseline.txt"
+TABLE_FREE_DIRS = ("axioms", "conflicts", "materials", "synergies", "ui")
 ITEM_DIRS = ("catalogue", "notable_items", "provisions")
 SEGMENT = re.compile(r"[a-z][a-z0-9_]*")
 MAX_ID = 64
@@ -95,8 +97,9 @@ def top_level_spans(text):
 
 
 class Record:
-    def __init__(self, file, data, text, span):
+    def __init__(self, file, data, text, span, index=0):
         self.file = file
+        self.index = index
         self.data = data
         self.text = text
         self.span = span
@@ -132,13 +135,15 @@ def load_records(root):
             tables.setdefault(folder, []).append(Record(rel, parsed, text, (0, len(text))))
             continue
         if not isinstance(parsed, list):
+            if folder not in TABLE_FREE_DIRS:
+                problems.append(("parse", f"{rel}:1", rel, f"{rel}:1: expected a top-level array of records"))
             continue
         spans = top_level_spans(text)
-        if len(spans) != len(parsed):
+        if len(spans) != len(parsed) or not all(isinstance(item, dict) for item in parsed):
+            problems.append(("parse", f"{rel}:1", rel, f"{rel}:1: every element of the top-level array must be an object"))
             continue
-        for item, span in zip(parsed, spans):
-            if isinstance(item, dict):
-                tables.setdefault(folder, []).append(Record(rel, item, text, span))
+        for index, (item, span) in enumerate(zip(parsed, spans)):
+            tables.setdefault(folder, []).append(Record(rel, item, text, span, index))
     return tables, problems
 
 
@@ -184,7 +189,6 @@ def reference_rules(tables):
         ("catalogue", "home", key("home"), axioms),
         ("notable_items", "home", key("home"), axioms),
         ("catalogue", "grants", key("grants"), capabilities),
-        ("notable_items", "grants", key("grants"), capabilities),
         ("traversal", "capability", key("capability"), capabilities),
         ("progression", "capability", key("capability"), capabilities),
         ("progression", "requires", key("requires"), capabilities),
@@ -212,15 +216,14 @@ def violations(root):
     seen_items = {}
     for folder, records in sorted(tables.items()):
         for record in records:
-            if "id" in record.data:
-                problem = id_problem(record.id)
-                if problem:
-                    found.append(("bad-id", record.where("id"), f"{record.file} {record.id}", f"{record.where('id')}: {problem} \"{record.id}\""))
-                    continue
-            elif folder != "ui":
-                found.append(("missing-field", record.where(), f"{record.file} {record.line()} id", f"{record.where()}: record has no id"))
+            if "id" not in record.data:
+                if folder not in TABLE_FREE_DIRS:
+                    found.append(("missing-field", record.where(), f"{record.file} #{record.index} id", f"{record.where()}: record has no id"))
                 continue
-            else:
+            problem = id_problem(record.id)
+            if problem:
+                found.append(("bad-id", record.where("id"), f"{record.file} {record.id}", f"{record.where('id')}: {problem} \"{record.id}\""))
+            if not isinstance(record.id, str):
                 continue
             first = seen_in_folder.setdefault((folder, record.id), record)
             if first is not record:
@@ -289,6 +292,52 @@ def sample_tree(root):
                                               {"id": "quest.errand", "giver_archetype": "merchant", "reward_item": "loaf"}])
 
 
+def rule_coverage(repo):
+    """Break every reference and required-field rule in a copy of the real data and expect it red."""
+    failures = []
+    root = Path(tempfile.mkdtemp(prefix="check_data_"))
+    try:
+        shutil.copytree(repo / "data", root / "data")
+        tables, _ = load_records(root)
+        for folder, label, values, _valid in reference_rules(tables):
+            record = next((r for r in tables.get(folder, []) if values(r)), None)
+            if record is None:
+                failures.append(f"no {folder} record exercises the reference rule '{label}'")
+                continue
+            path = root / record.file
+            original = path.read_text(encoding="utf-8")
+            start, end = record.span
+            key = label.split()[0]
+            body = original[start:end]
+            at = max(body.find(f'"{key}"'), 0)
+            match = re.compile(r'(?<=["=|])' + re.escape(values(record)[0]) + r'(?=["|])').search(body, at)
+            if match is None:
+                failures.append(f"cannot locate {folder} '{label}' value to break")
+                continue
+            path.write_text(original[:start] + body[:match.start()] + "ghost_x" + body[match.end():] + original[end:], encoding="utf-8")
+            if not any(v[0] == "orphan-ref" and label in v[3] and "ghost_x" in v[3] for v in violations(root)):
+                failures.append(f"reference rule {folder} '{label}' stayed green on an orphan")
+            path.write_text(original, encoding="utf-8")
+        for folder, rules in REQUIRED.items():
+            for predicate, fields in rules:
+                record = next((r for r in tables.get(folder, []) if predicate is None or predicate in r.data), None)
+                if record is None:
+                    failures.append(f"no {folder} record exercises the required fields for '{predicate}'")
+                    continue
+                target = next(f for f in fields if f != predicate)
+                path = root / record.file
+                original = path.read_text(encoding="utf-8")
+                parsed = json.loads(original)
+                del parsed[record.index][target]
+                path.write_text(json.dumps(parsed), encoding="utf-8")
+                if not any(v[0] == "missing-field" and f'"{target}"' in v[3] for v in violations(root)):
+                    failures.append(f"required field {folder} '{target}' stayed green when missing")
+                path.write_text(original, encoding="utf-8")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    return failures
+
+
 def self_test():
     cases = [
         ("clean tree", lambda r: None, None),
@@ -297,6 +346,8 @@ def self_test():
         ("orphan loot home", lambda r: write(r / "data/catalogue/gear.json", [{"id": "lamp", "name": "Lamp", "home": ["cataclysm.nope"], "tier": "common", "class": "gear", "weight": 1, "description": "d", "benefit": "b", "cost": "c", "cost_kinds": []}]), "orphan-ref"),
         ("orphan quest reward item", lambda r: write(r / "data/parley/parley.json", [{"id": "merchant", "archetype": "merchant"}, {"id": "quest.errand", "giver_archetype": "merchant", "reward_item": "ghost_item"}]), "orphan-ref"),
         ("missing required field", lambda r: write(r / "data/provisions/provisions.json", [{"id": "loaf", "name": "Loaf"}]), "missing-field"),
+        ("record without an id", lambda r: write(r / "data/currency/currencies.json", [{"name": "c"}]), "missing-field"),
+        ("uppercase id", lambda r: write(r / "data/currency/currencies.json", [{"id": "Coin", "name": "c", "symbol": "s", "earn": 1, "spend": 1, "cap": 1}]), "bad-id"),
         ("id ending in a number", lambda r: write(r / "data/currency/currencies.json", [{"id": "coin_2", "name": "c", "symbol": "s", "earn": 1, "spend": 1, "cap": 1}]), "bad-id"),
         ("unparseable file", lambda r: (r / "data/currency").mkdir(parents=True, exist_ok=True) or (r / "data/currency/bad.json").write_text("[{", encoding="utf-8"), "parse"),
     ]
@@ -328,10 +379,12 @@ def self_test():
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
+    failures += rule_coverage(Path(__file__).resolve().parent.parent)
+
     for failure in failures:
         print(f"SELF-TEST FAILED: {failure}")
     if not failures:
-        print(f"data lint self-test: all {len(cases)} cases behave")
+        print(f"data lint self-test: all {len(cases)} cases and every rule behave")
     return 1 if failures else 0
 
 
