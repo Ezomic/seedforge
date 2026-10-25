@@ -122,6 +122,8 @@ Because the required name belongs to the last job, branch protection needs no ch
 
 Nothing stops being tested: medium runs under the sanitizers on every merge to main, soak runs under the sanitizers after every merge to main and in the nightly (`soak` job in `nightly.yml`, preset `linux-headless-asan-soak`; `windows-ci-soak` runs the same tests in Release locally), and the nightly stress job still runs every other test three times in random order (`bin/ctest-stress` leaves soak out unless `-S` is given, since the soak job covers it). The Windows job runs the medium tier on every PR.
 
+The time guard has a budget per tier. Without an allowlist entry a fast case may run 5 s in Release or 90 s under the sanitizers, a medium case 30 s or 300 s, a soak case 60 s or 600 s (`TIER_BUDGETS` in `tools/test_times.py`); an allowlist entry replaces the tier budget with its own cap. The main shards run fast + medium under ASan, so the medium budget is what they are held to there.
+
 ### Adding or moving a test
 
 - A new test is fast by default. If it takes over about 1 s in Release, add its name to `medium` in `engine/tests/test_tiers.json` (the time guard says so when it is over 5 s). `python tools/ci_tiers.py write-tiers <ctest log>` rewrites the medium list from a Release run and keeps the soak list.
