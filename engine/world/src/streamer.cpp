@@ -1,6 +1,7 @@
 #include "ichor/world/streamer.h"
 
 #include "ichor/core/log.h"
+#include "ichor/world/settlement_streets.h"
 #include "ichor/world/terrain_shore.h"
 
 #include <glm/geometric.hpp>
@@ -21,7 +22,8 @@ std::int32_t chebyshev(CellId a, CellId b)
 
 // One grid at a given sample stride, with a skirt dropped around the edge so
 // a coarser neighbour never shows a crack.
-Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std::uint32_t stride, const ForgedBiomeField* biomes, const std::vector<glm::vec2>& shore)
+Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std::uint32_t stride, const ForgedBiomeField* biomes, const SettlementStreetSet* streets,
+    const std::vector<glm::vec2>& shore)
 {
     const WorldDesc& desc = heightfield.desc();
     const std::uint32_t side = cell.samplesPerSide;
@@ -46,7 +48,8 @@ Mesh buildLod(const Heightfield& heightfield, const Heightfield::Cell& cell, std
         v.tangent = {1.0f, 0.0f, 0.0f, 1.0f};
         if (biomes != nullptr) {
             const glm::vec3 splat = biomes->smoothSplatAt(originX + v.position.x, originZ + v.position.z);
-            v.tangent = {splat, -1.0f};
+            const float packed = streets != nullptr ? streets->groundAmountAt(originX + v.position.x, originZ + v.position.z) : 0.0f;
+            v.tangent = {splat, -1.0f - packed};
             // The forged shader tiles its textures by world position, so a forged vertex's uv carries how much
             // sand and how much wet bank the ground has there.
             const std::size_t at = static_cast<std::size_t>(sz) * side + sx;
@@ -149,7 +152,7 @@ void WorldStreamer::buildPayload(const Heightfield& heightfield, CellId id, cons
         if (config.biomes && config.water && hydrology != nullptr) {
             shore = terrainShore(heightfield, *hydrology, config.rivers, id);
         }
-        out.lods.push_back(buildLod(heightfield, out.cell, 1, config.biomes.get(), shore));
+        out.lods.push_back(buildLod(heightfield, out.cell, 1, config.biomes.get(), config.streets.get(), shore));
     }
     std::size_t reduction = 1;
     for (std::uint32_t lod = 1; lod < lodCount; ++lod) {

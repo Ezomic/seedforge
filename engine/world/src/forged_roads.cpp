@@ -1,5 +1,7 @@
 #include "ichor/world/forged_roads.h"
 
+#include "ichor/world/ribbon_height.h"
+
 #include <glm/geometric.hpp>
 
 #include <algorithm>
@@ -13,6 +15,7 @@ namespace ichor {
 namespace {
 
 constexpr float kMaxWidth = 1024.0f;
+constexpr float kMaxRaise = 1.0f; // a ribbon piece that would have to float further over the ground is on a cliff and is left out
 
 double distanceSquaredToSegment(double px, double pz, double ax, double az, double bx, double bz)
 {
@@ -171,10 +174,10 @@ Mesh ForgedRoads::buildMesh(const Heightfield& heightfield, CellId id) const
         const double px = wx + sideX * half;
         const double pz = wz + sideZ * half;
         Vertex v{};
-        v.position = {static_cast<float>(px - originX), heightfield.heightAt(px, pz) + params_.lift, static_cast<float>(pz - originZ)};
+        v.position = {static_cast<float>(px - originX), terrainMeshHeightAt(heightfield, px, pz) + params_.lift, static_cast<float>(pz - originZ)};
         v.normal = heightfield.normalAt(px, pz);
         v.tangent = {static_cast<float>(-sideZ), 0.0f, static_cast<float>(sideX), 1.0f};
-        v.uv = {across, static_cast<float>(along)};
+        v.uv = {across, static_cast<float>(along / static_cast<double>(params_.widthMetres))};
         v.weights[0] = 65535;
         return v;
     };
@@ -215,6 +218,8 @@ Mesh ForgedRoads::buildMesh(const Heightfield& heightfield, CellId id) const
         mesh.boundsMin = glm::min(mesh.boundsMin, v.position);
         mesh.boundsMax = glm::max(mesh.boundsMax, v.position);
     }
+    raiseOverGround(heightfield, mesh, originX, originZ, params_.lift * 0.5f, kMaxRaise);
+    if (mesh.indices.empty()) return Mesh{};
     mesh.submeshes.push_back({0, static_cast<std::uint32_t>(mesh.indices.size()), 0});
     return mesh;
 }

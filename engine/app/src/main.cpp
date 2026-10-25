@@ -790,6 +790,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
+        streaming.streets = forged->streets;
         streaming.loot = outdoorSet;
         streaming.cast = forged->cast;
         waterField = forged->waterField.get();
@@ -1569,6 +1570,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             if (!sceneryDrawn || distance >= 2.2) continue;
             if (const auto road = scenery.roadMesh.find(id); road != scenery.roadMesh.end()) {
                 view.instances.push_back({sceneryBase + road->second, cell.origin});
+            }
+            if (const auto street = scenery.streetMesh.find(id); street != scenery.streetMesh.end()) {
+                view.instances.push_back({sceneryBase + street->second, cell.origin});
             }
             for (const ichor::PlacedPoi& poi : cell.pois) {
                 if (const auto mesh = scenery.poiMesh.find(poi.id); mesh != scenery.poiMesh.end()) {

@@ -1,6 +1,7 @@
 #include "ichor/world/forged_game.h"
 
 #include "ichor/core/hash.h"
+#include "ichor/world/road_surface.h"
 
 #include <algorithm>
 #include <bit>
@@ -8,6 +9,14 @@
 #include <limits>
 
 namespace ichor {
+
+PlacedSettlementParams forgedStreetTierParams()
+{
+    PlacedSettlementParams params;
+    constexpr int kBuildings[kSettlementTierCount] = {4, 12, 30, 64};
+    for (std::size_t t = 0; t < kSettlementTierCount; ++t) params.tiers[t].buildings = kBuildings[t];
+    return params;
+}
 
 namespace {
 
@@ -272,18 +281,26 @@ std::unique_ptr<ForgedGame> buildForgedGame(const ForgeJobResult& result, const 
     }
     game->pois = std::make_shared<const PlacedPoiSet>(std::move(pois.set));
 
-    PlacedSettlements settlements = placeForgedSettlements(world, game->heightfield, game->roads.get(), game->waterField.get());
+    std::string siteError;
+    if (!forgedSettlementSites(world, game->heightfield, game->sites, siteError)) {
+        game->error = "settlements: " + siteError;
+        return game;
+    }
+    const PlacedSettlementParams streetTiers = forgedStreetTierParams();
+    SettlementStreets streets = layoutSettlementStreets(game->sites, game->heightfield, streetTiers);
+    if (!streets.ok()) {
+        game->error = "settlement streets: " + streets.error;
+        return game;
+    }
+    game->streets = std::make_shared<const SettlementStreetSet>(std::move(streets.set));
+
+    PlacedSettlements settlements = placeForgedSettlements(world, game->heightfield, game->roads.get(), game->waterField.get(), streetTiers, game->streets.get());
     if (!settlements.ok()) {
         game->error = "settlements: " + settlements.error;
         return game;
     }
     game->buildings = std::make_shared<const PlacedBuildingSet>(std::move(settlements.set));
 
-    std::string siteError;
-    if (!forgedSettlementSites(world, game->heightfield, game->sites, siteError)) {
-        game->error = "settlements: " + siteError;
-        return game;
-    }
     PlacedKit kit = placeSettlementKit(game->sites, *game->buildings, game->heightfield, game->roads.get(), game->waterField.get());
     if (!kit.ok()) {
         game->error = "settlement kit: " + kit.error;
@@ -410,7 +427,9 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
         m.roughnessFactor = roughness;
         bundle.materials.push_back(m);
     };
-    material("road", {0.22f, 0.17f, 0.12f}, 0.95f);
+    bundle.textures.push_back(dirtRoadTexture());
+    material("road", {1.0f, 1.0f, 1.0f}, 0.95f);
+    bundle.materials.back().baseColorTexture = 0;
     material("settlement", {0.62f, 0.38f, 0.22f}, 0.8f);
     material("dungeon", {0.30f, 0.20f, 0.36f}, 0.8f);
     material("landmark", {0.62f, 0.60f, 0.54f}, 0.85f);
@@ -438,6 +457,19 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
                     ribbon.submeshes.push_back({0, static_cast<std::uint32_t>(ribbon.indices.size()), 0});
                 }
                 scenery.roadMesh[id] = push(std::move(ribbon), 0);
+            }
+        }
+    }
+    if (game.streets && !game.streets->empty()) {
+        const std::uint32_t side = game.desc.cellsPerSide();
+        for (std::uint32_t z = 0; z < side; ++z) {
+            for (std::uint32_t x = 0; x < side; ++x) {
+                const CellId id{static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)};
+                Mesh strip = game.streets->buildMesh(game.heightfield, id, game.roads.get(), game.waterField.get());
+                if (strip.vertices.empty()) {
+                    continue;
+                }
+                scenery.streetMesh[id] = push(std::move(strip), 0);
             }
         }
     }

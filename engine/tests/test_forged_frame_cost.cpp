@@ -132,6 +132,7 @@ std::vector<Counts> measure(const Forged& world, const std::vector<Seam>& seams)
     config.scenery = forgedSceneryGuard(game);
     config.pois = game.pois;
     config.buildings = game.buildings;
+    config.streets = game.streets;
 
     std::map<CellId, ResidentCost> resident;
     Counts counts;
@@ -147,7 +148,7 @@ std::vector<Counts> measure(const Forged& world, const std::vector<Seam>& seams)
         }
         cost.plants = payload.plants.size();
         cost.hasWater = !payload.water.vertices.empty();
-        cost.instances = (world.scenery.roadMesh.contains(payload.cell.id) ? 1 : 0);
+        cost.instances = (world.scenery.roadMesh.contains(payload.cell.id) ? 1 : 0) + (world.scenery.streetMesh.contains(payload.cell.id) ? 1 : 0);
         for (const PlacedPoi& poi : payload.pois) {
             cost.instances += world.scenery.poiMesh.contains(poi.id) ? 1 : 0;
         }

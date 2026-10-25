@@ -23,7 +23,7 @@ namespace ichor {
 struct ForgedRoadParams {
     float widthMetres = 4.0f; // the road surface, fully covered
     float shoulderMetres = 2.0f; // beyond the surface on each side, coverage falls to zero
-    float lift = 0.08f;       // metres the ribbon lies over the ground, against z-fighting
+    float lift = 0.1f;        // metres the ribbon lies over the ground, against z-fighting; a piece that would dip under a bump is raised clear of it (raiseOverGround)
 };
 
 struct RoadHit {
@@ -50,7 +50,7 @@ public:
     double edgeLengthMetres(int edge) const;
 
     // The ribbon of one cell, positions relative to the cell origin like the terrain's, lying on the
-    // heightfield. uv.x runs across the road from 0 to 1, uv.y along it in metres. A cell with no
+    // heightfield. uv.x runs across the road from 0 to 1, uv.y along it in road widths (so a square texture tile is not stretched). A cell with no
     // road, or a heightfield that is not of this world's desc, comes back with no vertices.
     // Each segment is its own quad, clipped to the cell, so a bend leaves a small wedge on its outer side and
     // the ribbon's ends reach half a width past the cell edge. Segments between cells that are not neighbours
