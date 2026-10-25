@@ -172,13 +172,14 @@ void Scene::applyInput(const InputFrame& input, double dt)
         }
         const double speed = player.metresPerSecond * ((input.buttons & InputFrame::Sprint) != 0 ? 2.0 : 1.0) * kept;
         glm::dvec3 velocity(stick.x * speed, 0.0, -stick.y * speed);
-        if (velocityFilter_) {
+        auto* body = registry_.try_get<CharacterBody>(entity);
+        if (velocityFilter_ && body == nullptr) {
             if (const auto* where = registry_.try_get<Transform>(entity)) {
                 const glm::dvec3 allowed = velocityFilter_(where->position, velocity);
                 velocity = std::isfinite(allowed.x) && std::isfinite(allowed.y) && std::isfinite(allowed.z) ? allowed : glm::dvec3(0.0);
             }
         }
-        if (auto* body = registry_.try_get<CharacterBody>(entity)) {
+        if (body != nullptr) {
             body->intent = glm::vec3(velocity);
             physics_->setCharacterIntent(id, body->intent);
             continue;
@@ -191,6 +192,17 @@ void Scene::applyInput(const InputFrame& input, double dt)
         move.delta = velocity * dt;
         log_.entries.push_back({tickCount_, move});
         apply(move);
+    }
+}
+
+void Scene::filterPlayerIntent()
+{
+    if (!velocityFilter_) {
+        return;
+    }
+    for (auto [entity, transform, player, body] : registry_.view<const Transform, const Player, CharacterBody>().each()) {
+        const glm::dvec3 allowed = velocityFilter_(transform.position, glm::dvec3(body.intent));
+        body.intent = std::isfinite(allowed.x) && std::isfinite(allowed.y) && std::isfinite(allowed.z) ? glm::vec3(allowed) : glm::vec3(0.0f);
     }
 }
 
@@ -347,6 +359,7 @@ void Scene::tick(double dt, const InputFrame& input)
 
     applyInput(input, dt);
     gameSystems(dt, input);
+    filterPlayerIntent();
     spinSystem(dt);
     animationSystem(dt);
     physicsSystem(dt);
