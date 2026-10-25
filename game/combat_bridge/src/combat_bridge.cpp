@@ -2,9 +2,13 @@
 
 #include "ichor/combat_bridge/role_view.h"
 #include "ichor/core/log.h"
+#include "ichor/stage0/session_ledger.h"
+#include "ichor/stage0/free_look.h"
+#include "ichor/world/dungeon_entry.h"
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 
 namespace ichor {
 
@@ -69,8 +73,35 @@ void CombatBridge::install(Scene& scene, StableId player, glm::dvec3 start)
     start_ = start;
     lastSettlement_ = site_.settlement;
     stage_.setLegacyControls(config_.legacyControls);
+    openFightLog();
     stage_.attach(scene, player, start, site_.enemyPost + kSettleLift);
     scene.addSystem("combat_bridge", [this](Scene& s, double dt, const InputFrame&) { step(s, dt); });
+}
+
+void CombatBridge::openFightLog()
+{
+    if (config_.fightsCsv.empty()) {
+        return;
+    }
+    stampFightLog(game_.sites[site_.settlement].id);
+    auto& recorder = stage_.recorder();
+    recorder.open(config_.fightsCsv);
+    if (!std::filesystem::exists(config_.fightsCsv)) {
+        logf(LogLevel::Warn, "combat: {} could not be created, so no fights are recorded", config_.fightsCsv.string());
+    }
+    recorder.setSession({std::format("forged-{}", game_.desc.seed), "combat"});
+}
+
+void CombatBridge::stampFightLog(std::string_view site)
+{
+    stage_.recorder().setContext("world_seed,site", std::format("{},{}", game_.desc.seed, stage0::cleanField(site)));
+}
+
+void CombatBridge::setFightSite(std::string_view site)
+{
+    if (!config_.fightsCsv.empty()) {
+        stampFightLog(site);
+    }
 }
 
 glm::dvec3 CombatBridge::respawnFor(std::size_t settlement)
@@ -89,6 +120,61 @@ void CombatBridge::setSpawnsForLastSettlement()
     stage_.setSpawns(respawnFor(lastSettlement_), site_.enemyPost + kSettleLift);
 }
 
+void CombatBridge::setFightSpawns(glm::dvec3 playerFeet, glm::dvec3 foeFeet)
+{
+    stage_.setSpawns(playerFeet + kSettleLift, foeFeet + kSettleLift);
+}
+
+// The same reset the stage gives the foe, for the foe alone: resetFight would also move the player.
+void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive)
+{
+    auto& registry = scene.registry();
+    const entt::entity foe = scene.find(stage_.foeId());
+    if (foe == entt::null) {
+        return;
+    }
+    const stage0::Tuning& tuning = stage_.tuning();
+    stage0::Combatant combatant;
+    combatant.side = 1;
+    if (alive) {
+        combatant.health = tuning.maxHealth;
+        combatant.stamina = tuning.maxStamina;
+        combatant.poise = tuning.maxPoise;
+        const entt::entity player = scene.find(player_);
+        combatant.yaw = stage0::yawTowards(feet, player != entt::null ? registry.get<Transform>(player).position : feet);
+    } else {
+        combatant.health = 0.0f;
+        combatant.state = static_cast<std::uint8_t>(stage0::CombatState::Dead);
+    }
+    registry.emplace_or_replace<stage0::Combatant>(foe, combatant);
+    registry.remove<stage0::SkirmisherBrain>(foe);
+    registry.remove<stage0::ControllerBrain>(foe);
+    if (alive) {
+        registry.emplace<stage0::SkirmisherBrain>(foe);
+    }
+    registry.get<CharacterBody>(foe).intent = glm::vec3(0.0f);
+    Transform moved = registry.get<Transform>(foe);
+    moved.position = feet + kSettleLift;
+    scene.enqueue(SetTransformCommand{stage_.foeId(), moved});
+    foeParked_ = !alive;
+    lastEnemyAlive_ = alive;
+    lastEnemyState_ = combatant.state;
+}
+
+void CombatBridge::placeFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, true); }
+
+void CombatBridge::parkFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, false); }
+
+void CombatBridge::returnToWorld()
+{
+    if (site_.found) {
+        setFightSite(game_.sites[site_.settlement].id);
+    }
+    setSpawnsForLastSettlement();
+    returningToWorld_ = true;
+    returnParked_ = false;
+}
+
 void CombatBridge::step(Scene& scene, double dt)
 {
     auto& registry = scene.registry();
@@ -97,6 +183,13 @@ void CombatBridge::step(Scene& scene, double dt)
         return;
     }
     if (phase_ == Phase::WaitingForGround) {
+        if (startAt_) {
+            stage_.setSpawns(registry.get<Transform>(player).position, *startAt_ + kSettleLift);
+            stage_.spawnFoe(scene);
+            startAt_.reset();
+            phase_ = Phase::FoeQueued;
+            return;
+        }
         if (!groundReady_ || groundReady_(site_.enemyPost)) {
             stage_.spawnFoe(scene);
             phase_ = Phase::FoeQueued;
@@ -121,6 +214,16 @@ void CombatBridge::step(Scene& scene, double dt)
     }
 
     const glm::dvec3 at = registry.get<Transform>(player).position;
+    if (returningToWorld_ && !inDungeonPocket(at)) {
+        // Parked where the player stands, which has ground, until the enemy's own post has some.
+        if (!returnParked_) {
+            parkFoe(scene, at);
+            returnParked_ = true;
+        } else if (!groundReady_ || groundReady_(site_.enemyPost)) {
+            placeFoe(scene, site_.enemyPost);
+            returningToWorld_ = false;
+        }
+    }
     std::size_t inside = 0;
     if (settlementAt(game_, at.x, at.z, inside) && inside != lastSettlement_) {
         lastSettlement_ = inside;
@@ -249,7 +352,7 @@ bool CombatBridge::loadVisuals(Renderer& renderer, const std::filesystem::path& 
     return loaded;
 }
 
-void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view)
+void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view, CombatDebugAids aids)
 {
     if (!live()) {
         return;
@@ -285,19 +388,46 @@ void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view)
     rig_.setFraming(stage_.lockedOn() ? stage0::CameraFraming::LockOn : stage0::CameraFraming::Follow);
     stage0::CameraPose pose = stage_.lockedOn() ? rig_.update(p - origin, f - origin, frameSeconds) : rig_.updateFree(p - origin, fighter->yaw, frameSeconds);
     pose.position += origin;
-    pose.position.y = std::max(pose.position.y, static_cast<double>(game_.heightfield.heightAt(pose.position.x, pose.position.z)) + kCameraGroundClearM);
+    if (!inDungeonPocket(pose.position)) {
+        pose.position.y = std::max(pose.position.y, static_cast<double>(game_.heightfield.heightAt(pose.position.x, pose.position.z)) + kCameraGroundClearM);
+    }
     view.camera.position = pose.position;
     view.camera.rotation = pose.rotation;
 
     exile_.append(scene, alpha, frameSeconds, static_cast<float>(config_.fixedDt), stage_.tuning(), view);
-    if (bullWarden_) {
+    if (bullWarden_ && !foeParked_) {
         appendRoleFoe(scene, stage_, alpha, *bullWarden_, view);
     }
+    if (foeParked_) {
+        return;
+    }
     std::vector<LineSegment> lines;
-    stage_.debugLines(scene, lines);
+    if (const auto* foeFighter = registry.try_get<stage0::Combatant>(foe)) {
+        appendEnemyTelegraph(enemyTelegraph(*foeFighter, stage_.tuning()), f, stage0::forwardFromYaw(foeFighter->yaw), stage_.tuning(),
+            [this](double x, double z) { return static_cast<double>(game_.heightfield.heightAt(x, z)); }, lines);
+    }
+    if (aids.stageLines) {
+        stage_.debugLines(scene, lines);
+    }
     for (const LineSegment& line : lines) {
         view.lines.push_back({line.a, line.b, line.color});
     }
+}
+
+float CombatBridge::moveYaw(const Scene& scene) const
+{
+    const entt::entity player = scene.find(stage_.playerId());
+    const entt::entity foe = scene.find(stage_.foeId());
+    if (!live() || player == entt::null || foe == entt::null) {
+        return 0.0f;
+    }
+    const auto& registry = scene.registry();
+    const auto* fighter = registry.try_get<stage0::Combatant>(player);
+    if (fighter == nullptr) {
+        return 0.0f;
+    }
+    const float toFoe = stage0::yawTowards(glm::dvec3(0.0), registry.get<Transform>(foe).position - registry.get<Transform>(player).position);
+    return stage0::viewYaw(stage_.lockedOn(), fighter->yaw, toFoe);
 }
 
 void CombatBridge::overlay(const Scene& scene, std::vector<std::string>& lines) const

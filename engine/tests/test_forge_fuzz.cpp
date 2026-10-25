@@ -3,20 +3,35 @@
 #include <forgecli/fuzz.h>
 
 #include <algorithm>
+#include <cstdint>
 
 using namespace forgecli;
 
-TEST_CASE("fuzz: a modest seed range over every phase has no violations", "[forgefuzz]")
+namespace {
+
+void fuzzSeedRange(std::uint64_t lastSeed)
 {
     FuzzOptions o;
     o.seedBegin = 1;
-    o.seedEnd = 64;
+    o.seedEnd = lastSeed;
     o.size = 128;
     const FuzzResult r = runFuzz(o);
     REQUIRE(r.error.empty());
-    CHECK(r.seedsRun == 64);
+    CHECK(r.seedsRun == lastSeed);
     CHECK(r.violations.empty());
     if (!r.violations.empty()) FAIL(fuzzSummary(o, r));
+}
+
+}
+
+TEST_CASE("fuzz: a small seed range over every phase has no violations", "[forgefuzz]")
+{
+    fuzzSeedRange(8);
+}
+
+TEST_CASE("fuzz: a modest seed range over every phase has no violations", "[forgefuzz]")
+{
+    fuzzSeedRange(64);
 }
 
 TEST_CASE("fuzz: invalid options are rejected", "[forgefuzz]")

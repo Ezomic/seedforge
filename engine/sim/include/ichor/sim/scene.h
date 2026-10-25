@@ -85,7 +85,9 @@ public:
     void setSpeedModifier(SpeedModifier modifier) { speedModifier_ = std::move(modifier); }
 
     // Where the player may go: given the position and the velocity input asks for (after the speed modifier), it
-    // returns the velocity to use, for ground that cannot be walked. Same rules as the speed modifier: pure in the
+    // returns the velocity to use, for ground that cannot be walked. A player with a CharacterBody is filtered after the
+    // game systems, on the intent they left (turned toward the camera, or a committed dodge), so the ground that is
+    // checked is the way the player really goes. Same rules as the speed modifier: pure in the
     // position and velocity, configuration not state, a result that is not a number counts as no movement.
     using VelocityFilter = std::function<glm::dvec3(const glm::dvec3& position, const glm::dvec3& velocity)>;
     void setVelocityFilter(VelocityFilter filter) { velocityFilter_ = std::move(filter); }
@@ -153,6 +155,7 @@ private:
     void applyInput(const InputFrame& input, double dt);
     void rememberPreviousTransforms();
     void gameSystems(double dt, const InputFrame& input);
+    void filterPlayerIntent();
     void spinSystem(double dt);
     void animationSystem(double dt);
     void physicsSystem(double dt);

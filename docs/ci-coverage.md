@@ -70,3 +70,72 @@ The night fails when a seed is silently stuck:
 A seed with no second settlement 60 m or more from the spawn settlement prints `no trip` and does not fail (seeds 5 and 6 at 256 today); it is visible in the log, not a verdict. Local timings on a Release build: all 8 seeds took about 60 s at 256 and about 190 s at 1024. The first CI run used the sanitizer Debug build and took about 190 s per seed at 1024 (the budget ran out after 6 seeds), so this job configures the same preset as Release with sanitizers off. The budget guard stays so a slow night fails loudly instead of timing out.
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
+
+## Test-time budget (SEED-658)
+
+Main went red twice because one test ran too close to the sanitizer timeout (the SEED-492 walk test on the SEED-556 worlds, and the SEED-650 live-worlds probe, which timed out at 1500 s). `tools/test_times.py` reads the per-test durations of a ctest run, prints the 20 slowest cases, and fails when a case exceeds its budget:
+
+| Profile | Where | Default budget per case |
+|---|---|---|
+| `sanitizer` | `linux headless + sanitizers` | 120 s |
+| `release` | `windows runtime + tests`, local runs | 30 s |
+
+A case may run longer only when `tools/test_time_allowlist.json` lists it under that profile with its own cap in seconds and a reason. Going over the cap fails too, so an allowlisted test cannot quietly double. A ctest timeout is always over the cap.
+
+Run it locally after any ctest run: `bin/test-times` (preset `windows-ci`, profile `release`; `-p linux-headless-asan` picks `sanitizer`). It reads `Testing/Temporary/LastTest.log` of the build tree. The script also accepts a JUnit file (`ctest --output-junit ctest.xml`) and captured ctest console output, so a CI log can be checked offline.
+
+Two ctest cases run in both required jobs and need no timing data: `test_time_allowlist` (the file parses, has no duplicate keys, is sorted, every cap is above the default budget and at most the 1500 s ctest timeout, every entry has a reason, and every name appears in a test source so a renamed test cannot leave a dead entry) and `test_time_budget_selftest` (a synthetic slow case turns the check red, an allowlisted one stays green, one over its own cap is red again, and the three input formats parse).
+
+Regenerate the allowlist after an intended slowdown: run the suite, then `python tools/test_times.py <input> --profile <profile> --update --reason "why it is slow"`. This adds every case over budget with a cap of 1.5 x the observed time rounded up to 30 s (never above the 1500 s ctest timeout), raises a cap that was exceeded, and drops entries that now run within the default budget. Edit the reason of a new entry in the file if the shared one does not fit, and commit it. When a slow test is made fast, delete its entry; the script prints a note for each entry that is no longer needed.
+
+The first allowlist was seeded from the CI logs of runs 40052978212 and 40054121237. It includes `live worlds: the probe finds a spawn, ...` and `a showcase run ranks the seeds, ...`, which time out or come close on the Linux job today; remove those entries when their fix lands.
+
+The step now lives in the workflows: the Windows job and every Linux shard run `tools/test_times.py` after ctest (SEED-664). It also checks the tiers: a case that is in no tier list (so it is fast) and runs over 5 s in Release or 90 s under the sanitizers fails and names `engine/tests/test_tiers.json` as the place to move it.
+
+## Test tiers and the 15 minute PR budget (SEED-664, 666, 670, 671, 672)
+
+Each required check has a hard 15 minute `timeout-minutes`. `docs/ci-time-baseline.md` has the measurements behind the design. Every ctest case is in exactly one tier, listed in `engine/tests/test_tiers.json` and applied as a ctest label when ctest loads the tests (`engine/tests/apply_test_tiers.cmake`; the three app tests that are not Catch2 cases are labelled in `engine/tests/CMakeLists.txt`). A case in no list is fast and has no label.
+
+| Tier | Rule | Runs on a PR | Runs on main and nightly |
+|---|---|---|---|
+| fast | under about 1 s in Release and under 90 s under the sanitizers (the guard fails a fast case over either; a test that is cheap in Release but heavy under ASan goes to medium) | Windows Release, and the Linux sanitizer shards | everywhere |
+| medium | about 1 s to 10 s in Release | Windows Release only | also the Linux sanitizer shards |
+| soak | the full variant of a heavy test | never | `linux soak tests` job after every merge to main, and the nightly `soak` job |
+
+A heavy test has a small PR variant in the fast or medium tier that fails for the same breakage (fewer seeds, smaller grid), and the original case, unchanged, is listed under soak. The four converted so far:
+
+| Soak (full) | Small PR variant |
+|---|---|
+| the coverage reserve is what lifts the weakest seeds over the gate (3 weak seeds) | the coverage reserve lifts the first weak seed over the gate |
+| from the spawn toward the nearest settlement on 8 seeds ... | ... on 3 seeds ... (2 must arrive, 5 of 8 in the full one) |
+| fuzz: a modest seed range over every phase has no violations (64 seeds) | fuzz: a small seed range ... (8 seeds) |
+| tectonics: seeds 1 to 64 land between 20 and 70 percent ... at 128, 256 and 1024 | tectonics: seeds 1 to 16 ... at 128 and 256 |
+
+Each required check and where its time goes:
+
+| Check name (unchanged) | How it is built | Preset |
+|---|---|---|
+| `windows runtime + tests` | one job, 15 min | `windows-ci`: everything except soak |
+| `linux headless + sanitizers` | four jobs `linux sanitizers shard N of 4` (each takes every fourth ctest index, `-I N,,4`), plus `linux gpu goldens`; a final job with the required name passes only when all five passed | PR: `linux-headless-asan-fast` (no medium, no soak). Push to main: `linux-headless-asan` (no soak) |
+
+Because the required name belongs to the last job, branch protection needs no change. A cancelled or skipped shard fails it.
+
+Nothing stops being tested: medium runs under the sanitizers on every merge to main, soak runs under the sanitizers after every merge to main and in the nightly (`soak` job in `nightly.yml`, preset `linux-headless-asan-soak`; `windows-ci-soak` runs the same tests in Release locally), and the nightly stress job still runs every other test three times in random order (`bin/ctest-stress` leaves soak out unless `-S` is given, since the soak job covers it). The Windows job runs the medium tier on every PR.
+
+The time guard has a budget per tier. Without an allowlist entry a fast case may run 5 s in Release or 90 s under the sanitizers, a medium case 30 s or 300 s, a soak case 60 s or 600 s (`TIER_BUDGETS` in `tools/test_times.py`); an allowlist entry replaces the tier budget with its own cap. The main shards run fast + medium under ASan, so the medium budget is what they are held to there.
+
+### Adding or moving a test
+
+- A new test is fast by default. If it takes over about 1 s in Release, add its name to `medium` in `engine/tests/test_tiers.json` (the time guard says so when it is over 5 s). `python tools/ci_tiers.py write-tiers <ctest log>` rewrites the medium list from a Release run and keeps the soak list.
+- A new heavy test needs a small PR variant and a full variant under `soak`. `ctest --preset windows-ci-soak` runs the soak tests locally, `ctest --preset windows-ci -L medium` the medium ones.
+- `test_tiers_consistent` fails when a name in the file is in two tiers, unsorted, contains a `;`, or is in no test source.
+
+### Cache and cancel changes (SEED-671)
+
+- vcpkg is checked out at the `builtin-baseline` commit (`VCPKG_COMMIT` in `engine.yml`; change it together with the baseline in `engine/vcpkg.json`) so the binary cache can hit. Cache keys carry `v2` to leave the stale entries behind.
+- The Linux GPU golden steps are their own job and share nothing with the sanitizer shards, so they overlap them.
+- The forged world test cache (SEED-665, `<build>/forged-world-cache`) is restored by `actions/cache`, keyed on the sources its generator digest hashes (and on the shard number, since each shard forges different worlds and a cache key is written once). A cold run is slower for the tests that use it (the cache stores whole forges), so the first run after a generator change is the slow one.
+- The 15 minute limit applies to pull requests only. A run on main (push, or a manual `workflow_dispatch`) starts with cold caches, because a cache saved on a PR branch is not visible to main, and a job killed by its limit saves no cache; so on main the Windows, shard and GPU jobs get 60 minutes and the soak job 90. The first main run after a cache eviction is therefore slow (about 35 minutes for the whole run) and the next ones are warm. Run `engine.yml` by hand from the Actions tab to warm main on purpose.
+- To warm the caches after they are lost or renamed: run `engine.yml` from the Actions tab on main (`workflow_dispatch`, 60 minute limits). The pull request limit is 15 minutes (search `PR_LIMIT` in `engine.yml`; main run 40204448268 on 4de0045 had warm caches and every job was under 12 minutes). After a cache eviction or a key rename a cold PR run needs about 25 minutes: raise the limit to 30 until a main run has saved the caches again, then back to 15.
+- The ccache keys are `ccache-asan-`, `ccache-gpu-` and `ccache-walk-`: restore keys match by prefix, and the old shared `ccache-linux-` prefix let an ASan job restore the newest Release GPU cache (no hits, a 15 minute cold build).
+- A new push to a pull request cancels the run of the previous commit (`cancel-in-progress` was already set for PRs and stays); runs on main queue.

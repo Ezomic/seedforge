@@ -7,6 +7,7 @@
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
 #include "ichor/combat_bridge/combat_bridge.h"
+#include "ichor/combat_bridge/dungeon_fight.h"
 #include "ichor/audio/music_player.h"
 #include "ichor/audio/rain_ambience.h"
 #include "ichor/audio/weather_ambience.h"
@@ -28,7 +29,9 @@
 #include "ichor/traversal/roads.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/character_screen.h"
+#include "ichor/ui/dialogue_screen.h"
 #include "ichor/ui/inventory_screen.h"
+#include "ichor/ui/quest_journal.h"
 #include "ichor/ui/journal_screen.h"
 #include "ichor/ui/landmark_compass_screen.h"
 #include "ichor/ui/journal_screen_bind.h"
@@ -66,6 +69,7 @@
 #include "ichor/world/forged_campaign_hook.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/world/carry.h"
+#include "ichor/world/parley.h"
 #include "ichor/world/forged_water_view.h"
 #include "ichor/npc/schedule.h"
 #include "ichor/ui/journal_screen_model.h"
@@ -119,6 +123,7 @@ struct Options {
     int settlement = -1;   // --forged: start in this settlement (an index in the forge's order); -1 keeps the usual spawn
     int dungeon = -1;      // --forged: start at the entrance of this dungeon (an index among the dungeon POIs); -1 keeps the usual spawn
     bool enterDungeon = false; // --forged: go in as soon as an entrance is in reach, as if Enter were pressed
+    int dungeonRoom = -1;      // --enter-dungeon: come in standing in this room (an index in the dungeon's rooms) instead of the entry room
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
@@ -135,10 +140,15 @@ struct Options {
     int lootIndex = -1;       // --forged: start beside this placed item (an index in the loot set's order)
     std::vector<std::string> give; // --forged: items granted at the start, as a reward would be (--give id,id)
     bool showInventory = false; // --inventory: start with the inventory screen open
+    bool talk = false;          // --forged: start in conversation with the merchant who asks the errand
+    bool acceptQuest = false;   // --forged: the errand is taken at the start
+    bool showJournal = false;   // --journal: start with the journal open
     bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
+    bool combatDebug = false; // --combat: keep the Stage 0 debug rings, lines and collider lines (F3 full shows them too)
     bool combatDuel = false;  // --combat: begin a few metres from the enemy instead of at the spawn
     std::string combatRole;   // --combat: the enemy's role, skirmisher (the default), anchor or artillery (SEED-661)
     std::string combatBot;    // --combat: a scripted player of this skill (novice, regular, expert) instead of the keyboard
+    std::string combatFights; // --combat: write each finished fight as a Stage 0 fights.csv row here (SEED-660)
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
     ichor::CampaignWorldPlan campaignPlan; // what main() decided for `campaign` before run()
@@ -208,10 +218,18 @@ bool parse(int argc, char** argv, Options& options)
             }
         } else if (arg == "--inventory") {
             options.showInventory = true;
+        } else if (arg == "--talk") {
+            options.talk = true;
+        } else if (arg == "--accept-quest") {
+            options.acceptQuest = true;
+        } else if (arg == "--journal") {
+            options.showJournal = true;
         } else if (arg == "--dungeon" && hasValue) {
             if (!parseNumber(argv[++i], options.dungeon) || options.dungeon < 0) return false;
         } else if (arg == "--enter-dungeon") {
             options.enterDungeon = true;
+        } else if (arg == "--dungeon-room" && hasValue) {
+            if (!parseNumber(argv[++i], options.dungeonRoom) || options.dungeonRoom < 0) return false;
         } else if (arg == "--settlement" && hasValue) {
             if (!parseNumber(argv[++i], options.settlement) || options.settlement < 0 || options.biome) return false;
         } else if (arg == "--world" && hasValue) {
@@ -276,11 +294,15 @@ bool parse(int argc, char** argv, Options& options)
             options.forged = true;
         } else if (arg == "--combat") {
             options.combat = true;
+        } else if (arg == "--combat-debug") {
+            options.combatDebug = true;
         } else if (arg == "--combat-duel") {
             options.combatDuel = true;
         } else if (arg == "--combat-role" && hasValue) {
             options.combatRole = argv[++i];
             if (options.combatRole != "skirmisher" && options.combatRole != "anchor" && options.combatRole != "artillery") return false;
+        } else if (arg == "--combat-fights" && hasValue) {
+            options.combatFights = argv[++i];
         } else if (arg == "--combat-bot" && hasValue) {
             options.combatBot = argv[++i];
             if (!ichor::stage0::findBotSkill(options.combatBot)) return false;
@@ -717,6 +739,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         combatConfig.legacyControls = !options.combatBot.empty();
         if (options.combatRole == "anchor") combatConfig.role = ichor::stage0::FoeRole::Anchor;
         else if (options.combatRole == "artillery") combatConfig.role = ichor::stage0::FoeRole::Artillery;
+        combatConfig.fightsCsv = options.combatFights;
         combat = std::make_unique<ichor::CombatBridge>(*forged, site, combatConfig);
         if (!combat->loadVisuals(renderer, std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art")) {
             ichor::log(ichor::LogLevel::Warn, "--combat: the fighters' art did not load, so some of them are not drawn");
@@ -731,6 +754,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::ForgedScenery scenery;
     std::set<std::string> bakedDungeons;
     std::unique_ptr<ichor::DungeonEntry> dungeonEntry;
+    std::unique_ptr<ichor::DungeonFight> dungeonFight; // SEED-648: the enemies in the dungeons, with --combat
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
     if (forged) {
@@ -745,11 +769,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         const std::uint32_t dungeonKitBase = renderer.meshCount();
         if (renderer.uploadBundle(ichor::buildDungeonKit())) {
-            dungeonEntry = std::make_unique<ichor::DungeonEntry>(*forged, dungeonKitBase, ichor::DungeonEntryParams{.autoEnter = options.enterDungeon});
+            dungeonEntry = std::make_unique<ichor::DungeonEntry>(*forged, dungeonKitBase, ichor::DungeonEntryParams{.autoEnter = options.enterDungeon, .startRoom = options.dungeonRoom});
         } else {
             ichor::log(ichor::LogLevel::Warn, "the dungeon kit could not be uploaded; dungeons cannot be entered");
         }
     }
+    // The loot that lies inside a dungeon is not also outside its door.
+    const std::shared_ptr<const ichor::PlacedLootSet> outdoorSet = forged ? ichor::outdoorLoot(*forged) : nullptr;
     ichor::StreamerConfig streaming;
     streaming.synchronous = options.headless || !options.screenshot.empty(); // a replay or an unthrottled screenshot must see the same cells on the same frames
     streaming.navmesh = !options.headless; // nothing consumes tiles on the null backends, and they are slow to build
@@ -770,7 +796,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         streaming.navSurface = forged->navSurface;
         streaming.pois = forged->pois;
         streaming.buildings = forged->buildings;
-        streaming.loot = forged->loot;
+        streaming.loot = outdoorSet;
         streaming.cast = forged->cast;
         waterField = forged->waterField.get();
     } else if (!heightfield.empty()) {
@@ -811,6 +837,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const ichor::RoadField& roadField = forged ? static_cast<const ichor::RoadField&>(*forged->roads) : noRoads;
     int roadBonusPermille = ichor::kDefaultRoadBonusPermille;
     std::unique_ptr<ichor::CarrySystem> carry; // made below, once the data is loaded; the speed modifier reads it
+    std::unique_ptr<ichor::ParleySystem> parley;
     if (waterField) {
         engine.scene().setSpeedModifier([&](const glm::dvec3& position) {
             const double load = carry ? carry->speedFactor(engine.scene()) : 1.0;
@@ -819,6 +846,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return load * static_cast<double>(ichor::wadingSpeedFactor(depth)) * ichor::roadSpeedFactor(roadField.coverageAt(position.x, position.z), depth, roadBonusPermille);
         });
     }
+    // A forged world starts facing the place the spawn was searched around.
+    float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
     // Walking rules for the forged world: ground too steep or water too deep to walk stops the player, and a player
     // who keeps trying to move without getting anywhere is reported. The report only reads the scene: a teleport out
     // of it would be state the replay and the snapshots cannot see.
@@ -832,7 +861,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 if (ichor::inDungeonPocket(feet)) continue;
                 const bool wantsToMove = input.moveX != 0.0f || input.moveY != 0.0f;
                 const double probe = walking->params().probeMetres;
-                const ichor::WalkAssessment ahead = walking->assess(feet.x + input.moveX * probe, feet.z - input.moveY * probe);
+                const float yaw = combat && combat->live() ? combat->moveYaw(scene) : viewYaw;
+                const glm::vec3 step = ichor::walkRelativeIntent(glm::vec3(input.moveX, 0.0f, -input.moveY), yaw);
+                const ichor::WalkAssessment ahead = walking->assess(feet.x + step.x * probe, feet.z + step.z * probe);
                 const ichor::StuckReport stuck = detector.step(feet, wantsToMove, walking->assess(feet.x, feet.z), ahead.block, dt);
                 if (stuck.stuck) {
                     ichor::logf(ichor::LogLevel::Warn, "walking: {}", ichor::describeStuck(stuck));
@@ -918,11 +949,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     // What the player carries: registered before any slot loads, since its component is part of the snapshot.
     if (forged) {
         std::vector<std::string> carryProblems;
-        carry = std::make_unique<ichor::CarrySystem>(forged->loot, ichor::CarryCatalogue::fromData(data, carryProblems));
+        carry = std::make_unique<ichor::CarrySystem>(outdoorSet, ichor::CarryCatalogue::fromData(data, carryProblems));
         for (const std::string& problem : carryProblems) {
             ichor::logf(ichor::LogLevel::Warn, "carry: {}", problem);
         }
+        if (dungeonEntry) {
+            carry->setInteriorLoot([&dungeonEntry] { return &dungeonEntry->content().loot; });
+        }
         carry->install(engine.scene());
+        parley = std::make_unique<ichor::ParleySystem>(ichor::ParleyWorld{forged->cast, forged->pois, forged->loot, forged->spawn.x, forged->spawn.z, forged->desc.seed}, data, *carry);
+        for (const std::string& problem : parley->problems()) {
+            ichor::logf(ichor::LogLevel::Warn, "{}", problem);
+        }
+        parley->install(engine.scene());
     }
 
     if (!options.loadSlot.empty()) {
@@ -942,9 +981,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return 1;
         }
     } else if (forged) {
+        const ichor::NpcSpawn* errandGiver = parley->binding().bound ? forged->cast->find(parley->binding().giverNpc) : nullptr;
+        if ((options.talk || options.acceptQuest) && errandGiver != nullptr) {
+            anchor = {errandGiver->x + 1.5, errandGiver->groundY + 0.5, errandGiver->z};
+        }
         populateForged(engine.scene(), anchor);
         for (const std::string& item : options.give) {
             carry->requestGrant(engine.scene(), item, 1);
+        }
+        if (errandGiver != nullptr && options.talk) {
+            parley->begin(engine.scene(), errandGiver->npcId);
+        }
+        if (errandGiver != nullptr && options.acceptQuest) {
+            parley->choose(engine.scene(), "accept");
         }
         if (combat) {
             combat->install(engine.scene(), ichor::StableId::of("player"), anchor);
@@ -1069,6 +1118,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // the streamer itself until the required ring is in.
         if (dungeonEntry) {
             dungeonEntry->install(engine.scene());
+            if (combat) {
+                dungeonFight = std::make_unique<ichor::DungeonFight>(*combat, *dungeonEntry);
+                dungeonFight->install(engine.scene(), ichor::StableId::of("player"));
+            }
         }
         // Inside a dungeon the player is outside the world: the cells around the entrance stay as they were.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
@@ -1117,6 +1170,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             lines.push_back(std::format("time {:02}:{:02}", static_cast<int>(hour), static_cast<int>((hour - std::floor(hour)) * 60.0f)));
             if (combat) {
                 combat->overlay(scene, lines);
+            }
+            if (dungeonFight) {
+                dungeonFight->overlay(scene, lines);
             }
         });
     }
@@ -1216,6 +1272,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::JournalScreen> journalScreen;
     std::unique_ptr<ichor::CharacterScreen> characterScreen;
     std::unique_ptr<ichor::InventoryScreen> inventoryScreen;
+    std::unique_ptr<ichor::DialogueScreen> dialogueScreen;
     std::unique_ptr<ichor::MapScreen> mapScreen;
     std::unique_ptr<ichor::LandmarkCompassScreen> landmarkCompass;
     std::unique_ptr<ichor::MapScreenBinding> mapBinding;
@@ -1253,6 +1310,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             journalScreen = std::make_unique<ichor::JournalScreen>(*ui);
             characterScreen = std::make_unique<ichor::CharacterScreen>(*ui);
             inventoryScreen = std::make_unique<ichor::InventoryScreen>(*ui);
+            dialogueScreen = std::make_unique<ichor::DialogueScreen>(*ui);
             mapScreen = std::make_unique<ichor::MapScreen>(*ui);
             landmarkCompass = std::make_unique<ichor::LandmarkCompassScreen>(*ui);
             if (forged) {
@@ -1276,7 +1334,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             combatHud.reset();
             newGameScreen.reset();
@@ -1284,6 +1342,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             landmarkCompass.reset();
             mapBinding.reset();
             mapScreen.reset();
+            dialogueScreen.reset();
             inventoryScreen.reset();
             characterScreen.reset();
             journalScreen.reset();
@@ -1298,6 +1357,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         platform.setMouseSensitivity(options.mouseSensitivity);
         if (options.showInventory && carry && !editing) {
             inventoryScreen->setVisible(true);
+        }
+        if (options.showJournal && !editing) {
+            journalScreen->setVisible(true);
         }
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
@@ -1358,9 +1420,21 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                                 static_cast<std::uint8_t>(quest.intensity)});
                         }
                     }
+                    if (parley) {
+                        for (ichor::JournalModelEntry& line : ichor::questJournalEntries(parley->questLog(engine.scene()), engine.scene().tickCount())) {
+                            entries.push_back(std::move(line));
+                        }
+                    }
                     ichor::bindJournalModel(*journalScreen, entries);
                 }
                 mapBinding->setVisible(mapScreen->visible());
+                if (parley) {
+                    const ichor::ParleyView talking = parley->view(engine.scene());
+                    dialogueScreen->setVisible(talking.open);
+                    if (talking.open) {
+                        dialogueScreen->bind(talking);
+                    }
+                }
                 if (inventoryScreen->visible() && carry) {
                     inventoryScreen->bind(ichor::buildInventoryScreen(carry->view(engine.scene()), carry->notice(engine.scene())));
                 }
@@ -1388,8 +1462,6 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const ichor::RenderView reference = ichor::kitReferenceView(bundle, 16.0f / 9.0f);
     ichor::PickCamera pickCamera;
     ichor::SurfaceWetness surfaceWetness;
-    // A forged world starts facing the place the spawn was searched around.
-    float viewYaw = forged ? static_cast<float>(std::atan2(forgedLook.x, -forgedLook.y)) : 0.0f;
     exileAvatar.face(viewYaw);
     engine.scene().addSystem("walk_look", [&](ichor::Scene& scene, double dt, const ichor::InputFrame& input) {
         if (combat && combat->live()) return; // the fight steers and aims the camera itself
@@ -1431,6 +1503,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (inDungeon) {
             ichor::applyDungeonInterior(view);
             dungeonEntry->appendInstances(view);
+            dungeonEntry->appendContentInstances(scene, view);
+            if (dungeonFight) {
+                dungeonFight->appendView(scene, view);
+            }
         }
         // Rendering sits between the last two fixed steps.
         const auto blend = [alpha](const ichor::PreviousTransform& previous, const ichor::Transform& current) {
@@ -1478,8 +1554,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(centre - view.camera.position)), glm::vec3(0.0f, 1.0f, 0.0f));
             }
         }
-        if (combat && !inDungeon) {
-            combat->buildView(scene, alpha, view);
+        const ichor::CombatDebugAids combatAids = ichor::combatDebugAids(engine.overlayMode(), options.combatDebug);
+        if (combat) {
+            combat->buildView(scene, alpha, view, combatAids);
         }
         const double cellMetres = heightfield.desc().cellMetres;
         const ichor::Carried* carried = carry ? carry->carried(scene) : nullptr;
@@ -1549,7 +1626,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         pickCamera = {view.camera.position, view.camera.rotation, view.camera.fovY};
         std::vector<ichor::LineSegment> colliders;
-        if (!inDungeon && !exileAvatar.loaded()) {
+        if (!inDungeon && !exileAvatar.loaded() && (!combat || !combat->live() || combatAids.colliders)) {
             scene.physics().debugLines(colliders);
         }
         for (const ichor::LineSegment& line : colliders) {
@@ -1576,9 +1653,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 viewYaw = static_cast<float>(*yaw);
             }
         }
-        if (carry && !inDungeon && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
+        if (carry && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
             if (const std::string prompt = carry->prompt(scene); !prompt.empty()) {
                 hudGuide = prompt;
+            } else if (const std::string talk = parley ? parley->prompt(scene) : std::string(); !talk.empty()) {
+                hudGuide = talk;
             }
         }
     });
@@ -1619,7 +1698,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // The journal is only a view, so it works in a replay too.
         const bool menu = (buttons & ichor::InputFrame::Menu) != 0;
         if (menu && !menuHeld && pauseMenu) {
-            if (inventoryScreen && inventoryScreen->visible()) {
+            if (parley && parley->open()) {
+                parley->close();
+            } else if (inventoryScreen && inventoryScreen->visible()) {
                 inventoryScreen->setVisible(false);
             } else if (mapScreen && mapScreen->visible()) {
                 mapScreen->setVisible(false); // Esc first puts the map away
@@ -1684,6 +1765,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (journalScreen->takeCloseRequest()) {
                 journalScreen->setVisible(false);
+            }
+            for (const std::string& key : dialogueScreen->takeChoices()) {
+                if (parley) parley->choose(engine.scene(), key);
             }
             if (inventoryScreen->takeCloseRequest()) {
                 inventoryScreen->setVisible(false);
@@ -1780,6 +1864,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 ichor::logf(ichor::LogLevel::Warn, "autosave failed: {}", slots.lastError());
             }
         }
+        // The mouse fights only in a live --combat fight, and only while nothing on screen wants the click.
+        const auto shown = [](const auto& screen) { return screen && screen->visible(); };
+        const bool uiFocus = editing || paused || engine.controlsOverlay().open || shown(inventoryScreen) || shown(mapScreen) || shown(newGameScreen) || shown(ledger) || shown(journalScreen) || shown(characterScreen) || shown(dialogueScreen);
+        platform.enableMouseAttack(combat && combat->live() && !uiFocus);
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
         const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
@@ -1918,7 +2006,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
@@ -1931,8 +2019,8 @@ int main(int argc, char** argv)
     if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty())) {
         ichor::log(ichor::LogLevel::Warn, "--combat only applies with --forged and is ignored");
     }
-    if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatRole.empty())) {
-        ichor::log(ichor::LogLevel::Warn, "--combat-duel, --combat-role and --combat-bot only apply with --combat and are ignored");
+    if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatFights.empty() || !options.combatRole.empty())) {
+        ichor::log(ichor::LogLevel::Warn, "--combat-duel, --combat-role, --combat-bot and --combat-fights only apply with --combat and are ignored");
     }
     if (options.forged && !options.campaign.empty() && !planCampaign(options)) {
         return 1;

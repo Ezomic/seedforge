@@ -68,7 +68,8 @@ A new small library `game/combat_bridge` (`ichor_combat_bridge`, one `add_subdir
 
 ## What is deliberately not built
 
-Dungeon room entries as enemy sites, more than one enemy, other roles, the bow, loot or xp on a kill, a leash
+More than one enemy at once (SEED-648 puts a dungeon room's enemies on the one foe in turns, `DungeonFight`), other
+roles, the bow, loot or xp on a kill, a leash
 that returns the enemy to its post, a lock-on camera in the world, saving a fight in a campaign, and any
 tuning. A foe whose ground cell unloads (the player outruns it by more than the streaming radius) has no
 floor; the respawn resets it.
@@ -77,6 +78,27 @@ Also not supported: saving or loading a fight (the bridge keeps its phase, last 
 outside the scene, so `--combat` is ignored with `--load` and `--load-slot`), and bit-identical replays in
 live play, where the tick on which the enemy's ground cell arrives depends on the streaming thread (headless
 and `--screenshot` runs stream synchronously and are deterministic).
+
+## Replay corpus (SEED-659)
+
+`game/combat_bridge/tests/corpus` holds 20 recorded bot fights in forged worlds (7 novice, 7 regular, 6 expert, on
+worlds 1 to 3 at grid 64, wins and losses of both), the bridge's counterpart of the Stage 0 corpus. Each `.replay` file
+has a header (skill, world seed, grid, world hash, pick) followed by a Stage 0 corpus body: the scene seed, the player's
+input frames run-length encoded, and the outcome (winner, cause, ticks, player hits, damage taken in tenths, final
+state hash). `bridge_corpus.h` has the recorder, the replayer and the format; the combat state and sim hashes are not
+touched.
+
+- The test (`[bridge_corpus]` in `test_bridge_corpus.cpp`) forges each world headless, replays every entry and compares
+  the whole outcome. A control with a changed light damage must differ, so the corpus does go red on a balance change.
+- The scene seed of an entry is found by search: the first seed from 1 to 64 whose fight ends the wanted way (`pick`
+  chooses the nth such seed, so slots with the same skill, world and winner differ). It is recorded in the file.
+- When the world forged now has another hash than the file (a worldgen change), the loader does not compare against
+  stale numbers. It re-runs the same search in the new world, which is a pure function of the world, and prints a
+  message such as `novice-world-1-scene-1: world 1 changed (hash ..., now ...), so the recorded fight no longer applies;
+  re-picked scene seed 1 -> 4`. The re-picked fight must still replay to itself, so the test stays green but loud, and
+  the fixtures are refreshed on purpose with the command below.
+- Regenerate after a combat knob or a worldgen change: `bin/regen-combat-bridge-corpus` (builds and runs
+  `combat_bridge_corpus`, about 15 seconds). Commit the changed fixtures with the change.
 
 ## What gets reworked if the combat design changes
 

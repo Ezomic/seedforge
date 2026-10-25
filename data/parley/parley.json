@@ -1,0 +1,15 @@
+[
+  {"id": "names", "list": ["Marta", "Dion", "Kallis", "Eudora", "Teron", "Philo", "Nysa", "Orsolo", "Hadra", "Menos", "Ione", "Basil"]},
+  {"id": "prices", "unique": 400, "notable": 120, "common": 5, "fallback": 10},
+  {"id": "merchant", "archetype": "merchant", "trade_prompt": "What are you buying, and what are you selling?", "farewell": "Mind the road."},
+  {"id": "quest.errand", "title": "The Merchant's Errand", "giver_archetype": "merchant",
+   "offer": "A carrier of mine walked into the {dungeon} {where} and did not walk out. {item} was in his pack. Bring it back to me and the purse is yours.",
+   "reminder": "Any word of {item}? It lies at the {dungeon}, {where}.",
+   "found": "That is it. I would know {item} anywhere. Hand it over and take what I promised.",
+   "thanks": "You have done me a real service. Come and trade whenever you like.",
+   "obj_speak": "Hear out {giver}, a merchant in the settlement",
+   "obj_fetch": "Recover {item} from the {dungeon}, {where}",
+   "obj_return": "Bring {item} back to {giver}",
+   "done": "{giver} paid {reward}",
+   "reward_coin": 120, "reward_item": "linen_bandage", "reward_count": 2}
+]

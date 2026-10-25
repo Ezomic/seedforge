@@ -71,4 +71,7 @@ bool bullWardenFrame(const BullWardenKit& kit, const BullWardenPose& pose, BullW
 // Adds the Bull-Warden for the entity with `foe` as its id, posed from its combat state.
 void appendBullWarden(const Scene& scene, StableId foe, double alpha, const Tuning& tuning, const BullWardenKit& kit, RenderView& view);
 
+// The same for a Bull-Warden that is not an entity: posed from `combatant` and standing at `feet`, facing its yaw.
+void appendBullWardenAt(const Combatant& combatant, glm::dvec3 feet, bool moving, double clock, const Tuning& tuning, const BullWardenKit& kit, RenderView& view);
+
 }

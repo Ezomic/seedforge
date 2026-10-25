@@ -60,13 +60,19 @@
   ],
   "testPresets": [
     { "name": "windows-debug", "configurePreset": "windows", "configuration": "Debug", "output": { "outputOnFailure": true },
-      "execution": { "jobs": 4 } },
+      "filter": { "exclude": { "label": "soak" } }, "execution": { "jobs": 4 } },
     { "name": "windows-release", "configurePreset": "windows", "configuration": "Release", "output": { "outputOnFailure": true },
-      "execution": { "jobs": 4 } },
+      "filter": { "exclude": { "label": "soak" } }, "execution": { "jobs": 4 } },
     { "name": "windows-ci", "configurePreset": "windows-ci", "output": { "outputOnFailure": true },
-      "execution": { "jobs": 4 } },
+      "filter": { "exclude": { "label": "soak" } }, "execution": { "jobs": 4 } },
+    { "name": "windows-ci-soak", "configurePreset": "windows-ci", "output": { "outputOnFailure": true },
+      "filter": { "include": { "label": "soak" } }, "execution": { "jobs": 4 } },
+    { "name": "linux-headless-asan-fast", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true },
+      "filter": { "exclude": { "label": "medium|soak" } }, "execution": { "jobs": 4 } },
     { "name": "linux-headless-asan", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true },
-      "execution": { "jobs": 4 } },
+      "filter": { "exclude": { "label": "soak" } }, "execution": { "jobs": 4 } },
+    { "name": "linux-headless-asan-soak", "configurePreset": "linux-headless-asan", "output": { "outputOnFailure": true },
+      "filter": { "include": { "label": "soak" } }, "execution": { "jobs": 4 } },
     { "name": "linux-gpu", "configurePreset": "linux-gpu", "output": { "outputOnFailure": true },
       "filter": { "include": { "name": "^golden image" } }, "execution": { "jobs": 1 } }
   ]
