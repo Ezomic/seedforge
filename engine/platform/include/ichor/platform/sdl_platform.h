@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/platform/mouse_attack.h"
 #include "ichor/platform/mouse_look.h"
 #include "ichor/platform/platform.h"
 
@@ -30,6 +31,7 @@ public:
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
     void enableLook(bool enabled) override;
     void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
+    void enableMouseAttack(bool enabled) override { mouseAttack_.setEnabled(enabled); }
 
     SDL_Window* window() const { return window_; }
 
@@ -48,6 +50,7 @@ private:
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
     MouseLook mouseLook_;
+    MouseAttack mouseAttack_;
     double lastPump_ = 0.0;
     std::function<void(const SDL_Event&)> hook_;
 };

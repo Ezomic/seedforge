@@ -1,3 +1,5 @@
+#include "forged_world_fixture.h"
+
 #include "ichor/world/forge_job.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/world/streamer.h"
@@ -63,19 +65,12 @@ WorldDesc descFor(std::uint64_t seed)
 Forged forge(std::uint64_t seed)
 {
     Forged made;
-    ForgeJob job(descFor(seed), kGrid);
-    if (!job.start()) {
-        made.error = "the forge did not start";
+    const test::ForgedFixture forged = test::forgedFixture(descFor(seed), kGrid);
+    if (!forged.ok()) {
+        made.error = "the forge did not finish: " + forged.error;
         return made;
     }
-    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    if (job.state() != ForgeJobState::Done) {
-        made.error = "the forge did not finish: " + job.error();
-        return made;
-    }
-    made.game = buildForgedGame(*job.result(), descFor(seed));
+    made.game = buildForgedGame(forged.result, descFor(seed));
     if (!made.game->ok()) {
         made.error = made.game->error;
         return made;

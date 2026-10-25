@@ -137,13 +137,18 @@ void appendBullWarden(const Scene& scene, StableId foe, double alpha, const Tuni
     const auto* combatant = scene.registry().try_get<Combatant>(entity);
     if (transform == nullptr || previous == nullptr || combatant == nullptr) return;
     const glm::dvec3 feet = glm::mix(previous->position, transform->position, alpha);
-    if (!std::isfinite(feet.x + feet.y + feet.z) || !std::isfinite(kit.scale)) return;
     const bool moving = glm::dot(transform->position - previous->position, transform->position - previous->position) > 1e-8;
-    const BullWardenPose pose = bullWardenPose(*combatant, tuning, kit.clips, kit.swing, moving, scene.time());
+    appendBullWardenAt(*combatant, feet, moving, scene.time(), tuning, kit, view);
+}
+
+void appendBullWardenAt(const Combatant& combatant, glm::dvec3 feet, bool moving, double clock, const Tuning& tuning, const BullWardenKit& kit, RenderView& view)
+{
+    if (!std::isfinite(feet.x + feet.y + feet.z) || !std::isfinite(kit.scale)) return;
+    const BullWardenPose pose = bullWardenPose(combatant, tuning, kit.clips, kit.swing, moving, clock);
 
     BullWardenFrame frame;
     if (!bullWardenFrame(kit, pose, frame)) return;
-    const float yaw = std::isfinite(combatant->yaw) ? combatant->yaw : 0.0f;
+    const float yaw = std::isfinite(combatant.yaw) ? combatant.yaw : 0.0f;
     RenderInstance instance;
     instance.mesh = kit.mesh;
     instance.position = feet + glm::dvec3(0.0, static_cast<double>(frame.lift * kit.scale), 0.0);

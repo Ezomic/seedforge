@@ -8,7 +8,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstddef>
 #include <cstdlib>
+#include <initializer_list>
 #include <vector>
 
 using namespace worldforge;
@@ -35,16 +37,30 @@ std::vector<int> tectonicLandShares(int size, std::uint64_t firstSeed, std::uint
 
 }
 
-TEST_CASE("tectonics: seeds 1 to 64 land between 20 and 70 percent for nearly every seed at 128, 256 and 1024", "[worldforge][tectonics][land_share]")
+namespace {
+
+void landShareInBand(std::initializer_list<int> sizes, std::uint64_t lastSeed, std::ptrdiff_t minimumInBand)
 {
-    for (const int size : { 128, 256, 1024 }) {
-        const std::vector<int> shares = tectonicLandShares(size, 1, 64);
+    for (const int size : sizes) {
+        const std::vector<int> shares = tectonicLandShares(size, 1, lastSeed);
         const auto inBand = std::count_if(shares.begin(), shares.end(), [](int s) { return s >= 200 && s <= 700; });
         INFO("size " << size);
-        CHECK(inBand >= 58);
+        CHECK(inBand >= minimumInBand);
         CHECK(*std::min_element(shares.begin(), shares.end()) >= 150);
         CHECK(*std::max_element(shares.begin(), shares.end()) <= 750);
     }
+}
+
+}
+
+TEST_CASE("tectonics: seeds 1 to 16 land between 20 and 70 percent for nearly every seed at 128 and 256", "[worldforge][tectonics][land_share]")
+{
+    landShareInBand({ 128, 256 }, 16, 14);
+}
+
+TEST_CASE("tectonics: seeds 1 to 64 land between 20 and 70 percent for nearly every seed at 128, 256 and 1024", "[worldforge][tectonics][land_share]")
+{
+    landShareInBand({ 128, 256, 1024 }, 64, 58);
 }
 
 TEST_CASE("tectonics: land share still differs a lot from seed to seed", "[worldforge][tectonics][land_share]")

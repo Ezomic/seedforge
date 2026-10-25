@@ -1,3 +1,5 @@
+#include "forged_world_fixture.h"
+
 #include "ichor/data/data_set.h"
 #include "ichor/world/forge_job.h"
 #include "ichor/world/forged_game.h"
@@ -25,14 +27,8 @@ WorldDesc descFor(std::uint64_t seed)
 
 std::unique_ptr<ForgedGame> gameFor(std::uint64_t seed)
 {
-    ForgeJob job(descFor(seed), kGrid);
-    REQUIRE(job.start());
-    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    INFO(job.error());
-    REQUIRE(job.state() == ForgeJobState::Done);
-    auto game = buildForgedGame(*job.result(), descFor(seed));
+    const ForgeJobResult forged = test::forgedWorldFixture(descFor(seed), kGrid);
+    auto game = buildForgedGame(forged, descFor(seed));
     REQUIRE(game->ok());
     return game;
 }
@@ -301,14 +297,8 @@ Content contentFor(std::uint64_t seed)
     REQUIRE(data.loadDirectory(ICHOR_GAME_DATA_DIR));
     Content out;
     out.setup = loadForgedContentSetup(data, ICHOR_GAME_DATA_DIR);
-    ForgeJob job(descFor(seed), kContentGrid, {}, out.setup.config);
-    REQUIRE(job.start());
-    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    INFO(job.error());
-    REQUIRE(job.state() == ForgeJobState::Done);
-    out.game = buildForgedGame(*job.result(), descFor(seed), out.setup.inputs);
+    const ForgeJobResult forged = test::forgedWorldFixture(descFor(seed), kContentGrid, test::variantOfContentLists(out.setup.config));
+    out.game = buildForgedGame(forged, descFor(seed), out.setup.inputs);
     INFO(out.game->error);
     REQUIRE(out.game->ok());
     return out;
@@ -391,13 +381,8 @@ TEST_CASE("content that cannot be placed is left out and named, and the game sti
     Content content = contentFor(1);
     ForgedContentInputs broken = content.setup.inputs;
     broken.lootCatalogue.push_back(broken.lootCatalogue.front()); // one id twice: the loot is refused whole
-    ForgeJob job(descFor(1), kContentGrid, {}, content.setup.config);
-    REQUIRE(job.start());
-    for (int i = 0; i < 12000 && job.state() == ForgeJobState::Running; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    REQUIRE(job.state() == ForgeJobState::Done);
-    const auto game = buildForgedGame(*job.result(), descFor(1), broken);
+    const ForgeJobResult forged = test::forgedWorldFixture(descFor(1), kContentGrid, test::variantOfContentLists(content.setup.config));
+    const auto game = buildForgedGame(forged, descFor(1), broken);
     REQUIRE(game->ok());
     CHECK_FALSE(game->loot);
     CHECK(game->contentProblems.size() == 1);

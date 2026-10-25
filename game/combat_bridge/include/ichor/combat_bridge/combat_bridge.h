@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/combat_bridge/combat_presentation.h"
 #include "ichor/combat_bridge/combat_site.h"
 #include "ichor/core/input.h"
 #include "ichor/gfx/render_view.h"
@@ -60,6 +61,26 @@ public:
     InputFrame botInput(Scene& scene);
 
     bool live() const { return phase_ == Phase::Live; }
+    // The yaw the live fight turns the stick by (the player's facing, or the way to the enemy under lock-on): what
+    // forward means for the keys right now. Zero while there is no fight.
+    float moveYaw(const Scene& scene) const;
+    // Still waiting for the enemy's post to have ground: the one state startAt applies to.
+    bool waiting() const { return phase_ == Phase::WaitingForGround; }
+    // For a player who began somewhere else than the world (inside a dungeon): the fight is set up at once, with the
+    // enemy at `foeFeet` and the player where they stand, without waiting for the post's ground.
+    void startAt(glm::dvec3 foeFeet) { startAt_ = foeFeet; }
+
+    // The enemy stands at `feet` with full bars and a fresh brain (the fight is not reset: the player is left alone), or
+    // is parked there, dead and not drawn, out of the fight until it is placed again. A host that moves the enemy to a
+    // new post calls these (the dungeon fight); the world fight never does.
+    void placeFoe(Scene& scene, glm::dvec3 feet);
+    void parkFoe(Scene& scene, glm::dvec3 feet);
+    bool foeParked() const { return foeParked_; }
+    // Where both fighters stand after a death or a retry, until the host says otherwise.
+    void setFightSpawns(glm::dvec3 playerFeet, glm::dvec3 foeFeet);
+    // Back from somewhere else: the world spawns again, and the enemy stands at its post once that ground is there.
+    void returnToWorld();
+    const stage0::BullWardenKit* bullWarden() const { return bullWarden_.get(); }
     stage0::FightOutcome outcome(const Scene& scene) const;
     CombatHudState hud(const Scene& scene) const;
     std::size_t lastSettlement() const { return lastSettlement_; }
@@ -70,8 +91,9 @@ public:
 
     // The bodies, drawn from the art folder. False when either did not load; the fight then runs without them.
     bool loadVisuals(Renderer& renderer, const std::filesystem::path& artDir);
-    // The third person camera, the bodies and the telegraph lines. Frame time is taken from the scene's own clock.
-    void buildView(const Scene& scene, double alpha, RenderView& view);
+    // The third person camera, the bodies and the enemy's ground telegraph. The Stage 0 debug lines are added only when
+    // `aids.stageLines` is set. Frame time is taken from the scene's own clock.
+    void buildView(const Scene& scene, double alpha, RenderView& view, CombatDebugAids aids = {});
     void overlay(const Scene& scene, std::vector<std::string>& lines) const;
 
 private:
@@ -80,6 +102,7 @@ private:
     enum class Phase : std::uint8_t { WaitingForGround, FoeQueued, Live };
 
     void step(Scene& scene, double dt);
+    void setFoe(Scene& scene, glm::dvec3 feet, bool alive);
     void logTransitions(const Scene& scene);
     void openFightLog();
     void setSpawnsForLastSettlement();
@@ -92,6 +115,10 @@ private:
     StableId player_{};
     glm::dvec3 start_{0.0};
     Phase phase_ = Phase::WaitingForGround;
+    std::optional<glm::dvec3> startAt_;
+    bool foeParked_ = false;
+    bool returningToWorld_ = false;
+    bool returnParked_ = false;
     std::function<bool(glm::dvec3)> groundReady_;
     std::size_t lastSettlement_ = 0;
     std::map<std::size_t, glm::dvec3> respawnPoints_;

@@ -2,6 +2,7 @@
 
 #include "ichor/gfx/render_view.h"
 #include "ichor/sim/scene.h"
+#include "ichor/world/dungeon_content.h"
 #include "ichor/world/dungeon_greybox.h"
 #include "ichor/world/forged_game.h"
 
@@ -41,6 +42,7 @@ struct DungeonEntryParams {
     std::uint32_t fadeOutTicks = 12;
     std::uint32_t fadeInTicks = 18;
     bool autoEnter = false;              // as if Confirm were pressed, once, the first time an entrance is in reach
+    int startRoom = -1;                  // a way to look at a room: come in standing in the room at this index of the content's rooms, not at the entry
 };
 
 // The dungeon POI nearest (x, z) within reach, else null. Ties go to the lower id.
@@ -69,8 +71,13 @@ public:
     std::optional<double> takeViewYaw();
     // The dungeon's boxes as instances; nothing outside a dungeon.
     void appendInstances(RenderView& view) const;
+    // The loot still lying in the hall and the boss marker. Both are looks: the loot is gone once it is in the player's
+    // Carried, and the marker shrinks when the boss room is cleared.
+    void appendContentInstances(const Scene& scene, RenderView& view) const;
     // The boxes of the dungeon the player is in now (for tests and the view); empty outside.
     const DungeonGreyBox& greyBox() const { return current_; }
+    // What stands in that dungeon: derived data like the boxes, made with them and empty outside a dungeon.
+    const DungeonContent& content() const { return content_; }
 
 private:
     enum class Phase : std::uint8_t { Idle, FadingOut, FadingIn };
@@ -86,6 +93,7 @@ private:
     std::uint32_t kitFirstMesh_;
     DungeonEntryParams params_;
     DungeonGreyBox current_;
+    DungeonContent content_;
     std::size_t boxes_ = 0;
     Phase phase_ = Phase::Idle;
     bool leaving_ = false;          // the swap the fade is waiting for: out of the dungeon rather than into one

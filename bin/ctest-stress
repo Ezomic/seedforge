@@ -2,9 +2,10 @@
 # Stress the ctest suite for races: every Catch2 case is its own process, so shared scratch files, fixed paths and order dependence show up
 # as tests that pass alone but fail in some runs. Runs the suite several times in random order with more parallel jobs than cores.
 #
-#   bin/ctest-stress [-p preset] [-c config] [-n rounds] [-j jobs] [-R regex] [-- extra ctest args]
+#   bin/ctest-stress [-p preset] [-c config] [-n rounds] [-j jobs] [-R regex] [-S] [-- extra ctest args]
 #
 # Defaults: preset windows-ci, 5 rounds, jobs = 2 x cores. Build first with bin/build (this script never builds).
+# Tests labelled `soak` (the full variants of the heavy tests, SEED-664) are left out unless -S is given; the nightly runs them once in their own job.
 # Each round clears <build>/test-output so stale scratch from an earlier round cannot hide or cause a failure.
 # Exit: 0 every round clean, 1 some test failed in at least one round (flaky ones are listed with their failure count), 2 usage/setup error.
 set -u
@@ -15,6 +16,7 @@ rounds=5
 cores=$(nproc 2>/dev/null || echo 4)
 jobs=$((cores * 2))
 regex=
+label_exclude=soak
 extra=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -22,6 +24,7 @@ while [ $# -gt 0 ]; do
       [ $# -ge 2 ] || { echo "ctest-stress: $1 needs a value" >&2; exit 2; }
       case "$1" in -p) preset=$2 ;; -c) config=$2 ;; -n) rounds=$2 ;; -j) jobs=$2 ;; *) regex=$2 ;; esac
       shift 2 ;;
+    -S) label_exclude=; shift ;;
     --) shift; extra+=("$@"); break ;;
     -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "ctest-stress: unknown option $1" >&2; exit 2 ;;
@@ -48,6 +51,7 @@ cfg=()
 [ -n "$config" ] && cfg=(-C "$config")
 sel=()
 [ -n "$regex" ] && sel=(-R "$regex")
+[ -n "$label_exclude" ] && sel+=(-LE "$label_exclude")
 
 tally=$(mktemp)
 trap 'rm -f "$tally"' EXIT
