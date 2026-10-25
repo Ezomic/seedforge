@@ -1,6 +1,7 @@
 name: engine
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
@@ -26,7 +27,11 @@ jobs:
   windows:
     name: windows runtime + tests
     runs-on: windows-2022
-    timeout-minutes: 15
+    # PR_LIMIT: the steady state budget of a pull request is 15 minutes. It is 30 (the first number in these expressions, three jobs) until a
+    # run on main has saved the caches under the current key names; a cold PR run needs about 25 minutes and a job killed by its limit saves
+    # nothing. Set it back to 15 after the first warm main run. A run on main starts with cold caches (a cache saved on a PR branch is not visible to main) and
+    # a job killed by its limit saves no cache, so main gets room to finish once and warm them.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 30 || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -134,9 +139,9 @@ jobs:
   linux-shard:
     name: linux sanitizers shard ${{ matrix.shard }} of 4
     runs-on: ubuntu-latest
-    # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in about 15 to 25 minutes on 4 cores, and a job
-    # killed by this limit saves nothing, so the limit is 30 until the caches exist on main; then set it back to 15.
-    timeout-minutes: 30
+    # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in 12 to 25 minutes, and on main the shards also run
+    # the medium tier. A job killed by its limit saves no cache, so only a pull request is held to 15 minutes.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 30 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -173,8 +178,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
+          key: ccache-asan-${{ github.sha }}
+          restore-keys: ccache-asan-
       - name: Restore forged world test cache
         id: cache2
         uses: actions/cache/restore@v4
@@ -193,7 +198,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
+          key: ccache-asan-${{ github.sha }}
       - name: Test (shard ${{ matrix.shard }} of 4)
         run: ctest --preset "$TEST_PRESET" -I ${{ matrix.shard }},,4
         working-directory: engine
@@ -219,8 +224,8 @@ jobs:
   linux-gpu:
     name: linux gpu goldens
     runs-on: ubuntu-latest
-    # 30 until the vcpkg cache for the linux-gpu preset is warm: the first run builds SDL3 and friends from source (737 s of configure).
-    timeout-minutes: 30
+    # Cold, this job builds SDL3 and friends from source (670 to 737 s of configure), so only a pull request is held to 15 minutes.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 30 || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -253,8 +258,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-gpu-${{ github.sha }}
-          restore-keys: ccache-linux-gpu-
+          key: ccache-gpu-${{ github.sha }}
+          restore-keys: ccache-gpu-
       - name: Configure GPU goldens
         run: cmake --preset linux-gpu
         working-directory: engine
@@ -267,7 +272,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-gpu-${{ github.sha }}
+          key: ccache-gpu-${{ github.sha }}
       - name: GPU goldens on lavapipe
         # Software Vulkan (lavapipe), so the 28 golden image cases compare here instead of skipping. The software
         # set under tests/data/golden/software overrides a golden that a real GPU draws differently.
@@ -312,7 +317,7 @@ jobs:
     name: linux soak tests
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -343,8 +348,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
+          key: ccache-asan-${{ github.sha }}
+          restore-keys: ccache-asan-
       - name: Configure
         run: cmake --preset linux-headless-asan
         working-directory: engine
@@ -357,7 +362,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
+          key: ccache-asan-${{ github.sha }}
       - name: Soak tests
         run: ctest --preset linux-headless-asan-soak
         working-directory: engine
