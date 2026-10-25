@@ -49,13 +49,18 @@ const ForgedGame& gameFor(std::uint64_t seed)
     return *slot;
 }
 
-void addGround(Scene& scene, const Heightfield& heightfield)
+// Terrain collision for the cells within `radius` of `near` (all of them when `near` is empty), as the app's streamer would have put it in.
+void addGround(Scene& scene, const Heightfield& heightfield, std::optional<glm::dvec3> near = std::nullopt, double radius = 300.0)
 {
     const WorldDesc& desc = heightfield.desc();
     for (std::int32_t z = 0; z < static_cast<std::int32_t>(desc.cellsPerSide()); ++z) {
         for (std::int32_t x = 0; x < static_cast<std::int32_t>(desc.cellsPerSide()); ++x) {
             Heightfield::Cell cell;
             if (!heightfield.cell({x, z}, cell)) continue;
+            if (near) {
+                const double half = desc.cellMetres * 0.5;
+                if (std::hypot(heightfield.cellOriginX(cell.id) + half - near->x, heightfield.cellOriginZ(cell.id) + half - near->z) > radius + half) continue;
+            }
             scene.physics().addHeightField(StableId::of("cell", cellKey(cell.id)), cell.heights.data(), cell.samplesPerSide,
                 {heightfield.cellOriginX(cell.id), 0.0, heightfield.cellOriginZ(cell.id)}, static_cast<float>(desc.metresPerSample));
         }
@@ -78,7 +83,7 @@ struct Fight {
         CombatBridgeConfig config;
         config.role = role;
         config.legacyControls = true;
-        addGround(scene, game.heightfield);
+        addGround(scene, game.heightfield, foe);
         installFieldRules(scene, game);
         SpawnCommand spawn;
         spawn.id = StableId::of("player");

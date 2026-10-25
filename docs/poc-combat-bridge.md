@@ -100,6 +100,37 @@ touched.
 - Regenerate after a combat knob or a worldgen change: `bin/regen-combat-bridge-corpus` (builds and runs
   `combat_bridge_corpus`, about 15 seconds). Commit the changed fixtures with the change.
 
+## Anchor and Artillery (SEED-661)
+
+The bridge's one foe can now play two more roles, run from the pure brains of `anchor.cpp` and `artillery.cpp`.
+
+- `Stage0` gains `FoeRole::Anchor` and `FoeRole::Artillery`, their two systems (`role_systems.cpp`), a poise cap per
+  role, and a `Ground` hook: line of sight, ground height for the shell marker, and the walking pace and filter. Without
+  it the ground is flat and open, so stage0 on its own and the replay corpus behave as before. Skirmisher and Controller
+  runs are untouched.
+- The bridge fills the hook from the heightfield and `ForgedWalking`, so the two foes wade slowly and cannot climb ground
+  too steep to walk, as the player cannot. In the engine only the player has those rules today. A dungeon hall is
+  outside the world, so the hook answers open and flat there.
+- `--combat-role skirmisher|anchor|artillery` picks the role of the world enemy. Both new roles are drawn as the
+  Bull-Warden (Anchor 1.3 times, Artillery 0.8 times) in a coloured ring; the slam and the shell play its attack clip.
+- `placeFoe(scene, feet, role)` swaps the live foe's role. Dungeon rooms pick roles by room type
+  (`roleForRoom`): the key room's guard is an Anchor, a challenge room's second enemy an Artillery, the climax room an
+  Anchor and an Artillery. The bridge bot uses `roleBotInput` when the foe is one of these roles.
+- Validation on the five terrain conditions of doc 18 (`terrain_trials`): `findTrial` scans a forged world for open
+  field, dense forest, a narrow defile, a steep slope and shallow water with a bank. The tests play each role there with
+  a player who stands still (the role must act and hurt) and with a scripted player (it must win, the same way twice),
+  and count ticks in which the foe asked to move and did not (stuck).
+
+Limits, stated plainly:
+- Trees are not solid in the engine, so dense forest means the forest density pattern of the tree scatter, not trunks in
+  the way. Nothing blocks a shot but terrain.
+- The Anchor never walks closer than its slam range (3.5 m), which is wider than its slam radius (2.5 m): a player who
+  stays outside the radius is never hit. That is the stage0 brain, left as it is.
+- The scripted player is a probe, not a model of a person. The Artillery backs away from anyone nearer than its minimum
+  range at a pace the player can only beat by sprinting, so chasing it never lands a blow; the bot waits inside its
+  band until it aims, then runs in off the marked point.
+- Artillery in a 10 m dungeon hall is cramped by design (minimum range 7 m); its fight there is a positioning problem.
+
 ## What gets reworked if the combat design changes
 
 - Tuning numbers or the skirmisher's rhythm: nothing in the bridge. It reads `Tuning` and `Stage0` as they are.
