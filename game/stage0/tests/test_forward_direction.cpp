@@ -124,3 +124,23 @@ TEST_CASE("W walks away from the camera and toward the foe under lock-on, from s
         }
     }
 }
+
+TEST_CASE("the walking guard in a fight blocks where the player goes, not where the keys point", "[freelook][fight][direction]")
+{
+    // Nothing may move toward +Z (south), as a cliff or deep water there would.
+    const auto southWall = [](const glm::dvec3&, const glm::dvec3& velocity) {
+        return velocity.z > 0.0 ? glm::dvec3(velocity.x, velocity.y, 0.0) : velocity;
+    };
+    Walk walk(false, {0.0, 0.0, 0.0}, {0.0, 0.0, -8.0});
+    walk.scene.setVelocityFilter(southWall);
+    for (int i = 0; i < 200 && std::abs(walk.yaw()) < 2.6f; ++i) walk.turn(1.0f, 1);
+    REQUIRE(std::abs(walk.yaw()) >= 2.6f);
+
+    InputFrame w;
+    w.moveY = 1.0f;
+    CHECK(walk.displacementUnder(w, 20).z < 0.05);
+
+    InputFrame s;
+    s.moveY = -1.0f;
+    CHECK(walk.displacementUnder(s, 20).z < -0.5);
+}

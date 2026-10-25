@@ -66,6 +66,9 @@ public:
     virtual void enableLook(bool enabled) { (void)enabled; }
     // Scales how far the mouse turns the player; 1 is the default. Only meaningful with enableLook.
     virtual void setMouseSensitivity(float sensitivity) { (void)sensitivity; }
+    // While set, the left button attacks (Ctrl for heavy) and the middle button blocks, as InputFrame::Attack, Heavy
+    // and Block. The app turns it off whenever a UI screen has focus, so a click on the UI stays a UI click.
+    virtual void enableMouseAttack(bool enabled) { (void)enabled; }
 };
 
 }

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Print the slowest ctest cases of the last run in a build tree and fail when one is over its time budget (SEED-658).
+#
+#   bin/test-times [-p preset] [--profile sanitizer|release] [-- extra test_times.py args]
+#
+# Defaults: preset windows-ci, profile release (sanitizer for a preset whose name contains "asan"). Reads
+# <build>/Testing/Temporary/LastTest.log, so run ctest first (bin/build -t ... or ctest --preset ...). Never builds.
+# Exit: 0 within budget, 1 a case over budget, 2 usage or setup error. Budgets and the allowlist: tools/test_times.py.
+set -u
+
+preset=windows-ci
+profile=
+extra=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p|--profile)
+      [ $# -ge 2 ] || { echo "test-times: $1 needs a value" >&2; exit 2; }
+      if [ "$1" = "-p" ]; then preset=$2; else profile=$2; fi
+      shift 2 ;;
+    --) shift; extra+=("$@"); break ;;
+    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "test-times: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+if [ -z "$profile" ]; then
+  case "$preset" in *asan*) profile=sanitizer ;; *) profile=release ;; esac
+fi
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+log=$repo/engine/build/$preset/Testing/Temporary/LastTest.log
+[ -f "$log" ] || { echo "test-times: $log not found, run ctest for preset $preset first" >&2; exit 2; }
+
+py=$(command -v python3 || command -v python || true)
+[ -n "$py" ] || { echo "test-times: python not found on PATH" >&2; exit 2; }
+exec "$py" "$repo/tools/test_times.py" "$log" --profile "$profile" ${extra[@]+"${extra[@]}"}
