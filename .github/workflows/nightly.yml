@@ -53,8 +53,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
+          key: ccache-asan-${{ github.sha }}
+          restore-keys: ccache-asan-
       - name: Configure
         run: cmake --preset linux-headless-asan
         working-directory: engine
@@ -138,10 +138,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-walk-${{ github.sha }}
+          key: ccache-walk-${{ github.sha }}
           restore-keys: |
-            ccache-linux-walk-
-            ccache-linux-
+            ccache-walk-
+            ccache-asan-
       # Release without sanitizers: the first run of this job under ASan Debug took about 190 s per seed at grid 1024, so 8 seeds
       # alone overran the budget. Memory errors in the walker are covered by the sanitizer jobs on the PR suite's 129 grid.
       - name: Configure
@@ -206,8 +206,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
+          key: ccache-asan-${{ github.sha }}
+          restore-keys: ccache-asan-
       - name: Configure
         run: cmake --preset linux-headless-asan
         working-directory: engine

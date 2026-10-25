@@ -176,8 +176,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
+          key: ccache-asan-${{ github.sha }}
+          restore-keys: ccache-asan-
       - name: Restore forged world test cache
         id: cache2
         uses: actions/cache/restore@v4
@@ -196,7 +196,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
+          key: ccache-asan-${{ github.sha }}
       - name: Test (shard ${{ matrix.shard }} of 4)
         run: ctest --preset "$TEST_PRESET" -I ${{ matrix.shard }},,4
         working-directory: engine
@@ -256,8 +256,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-gpu-${{ github.sha }}
-          restore-keys: ccache-linux-gpu-
+          key: ccache-gpu-${{ github.sha }}
+          restore-keys: ccache-gpu-
       - name: Configure GPU goldens
         run: cmake --preset linux-gpu
         working-directory: engine
@@ -270,7 +270,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-gpu-${{ github.sha }}
+          key: ccache-gpu-${{ github.sha }}
       - name: GPU goldens on lavapipe
         # Software Vulkan (lavapipe), so the 28 golden image cases compare here instead of skipping. The software
         # set under tests/data/golden/software overrides a golden that a real GPU draws differently.
@@ -346,8 +346,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
+          key: ccache-asan-${{ github.sha }}
+          restore-keys: ccache-asan-
       - name: Configure
         run: cmake --preset linux-headless-asan
         working-directory: engine
@@ -360,7 +360,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
+          key: ccache-asan-${{ github.sha }}
       - name: Soak tests
         run: ctest --preset linux-headless-asan-soak
         working-directory: engine
