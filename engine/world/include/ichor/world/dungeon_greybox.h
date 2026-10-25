@@ -51,6 +51,8 @@ struct GreyBoxRoom {
     bool doors[4] = {false, false, false, false};
     bool ramp = false; // a ramp up to the room above, along one side
     bool hole = false; // a hole in the floor, over the ramp of the room below
+    bool rampWest = false; // the side the ramp runs along, when there is one: west (-x) or east (+x)
+    bool holeWest = false; // the side the hole lies on, when there is one
 };
 
 struct DungeonGreyBox {
