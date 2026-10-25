@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace ichor::stage0 {
 
@@ -28,6 +29,10 @@ class FightRecorder {
 public:
     // No path means record in memory only.
     void open(const std::filesystem::path& csv);
+
+    // Extra trailing columns for every row, e.g. ("world_seed,site", "7,s3"). The header is taken at open(); the values may change between fights. The values must hold
+    // no comma beyond their column separators and no newline. Empty (the default) leaves the stage0 layout as it is.
+    void setContext(std::string_view header, std::string_view values);
 
     // Stamps every later fight in the sidecar ledger (<csv>.sessions.csv) with this session and variable.
     void setSession(SessionMarker marker) { session_ = std::move(marker); }
@@ -67,6 +72,7 @@ public:
 
 private:
     SideRecord& side(bool playerSide) { return playerSide ? player_ : foe_; }
+    std::string header() const;
     void begin(double now);
     void saveFight(const FightRecord& record) const;
 
@@ -74,6 +80,8 @@ private:
     std::filesystem::path recordDir_;
     FightRecordBuffer buffer_;
     double clock_ = 0.0;
+    std::string contextHeader_;
+    std::string contextValues_;
     SessionMarker session_;
     SideRecord player_;
     SideRecord foe_;

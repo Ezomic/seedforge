@@ -240,3 +240,20 @@ TEST_CASE("session report text is stable")
                            "diagnosis: telegraph problem\n";
     CHECK(formatReport(summarise(parseFightLog(text))) == expected);
 }
+
+TEST_CASE("recorder context columns are appended to the row and absent by default")
+{
+    const auto lastRowAfterDeath = [](bool withContext) {
+        FightRecorder recorder;
+        if (withContext) recorder.setContext("world_seed,site", "7,s3");
+        recorder.noteAttack(true, 1.0);
+        recorder.noteDeath(true, DeathCause::Unreadable, 0.0f, 50.0f, 5.0);
+        return recorder.lastRow();
+    };
+    const std::string plain = lastRowAfterDeath(false);
+    const std::string tagged = lastRowAfterDeath(true);
+    CHECK(tagged == plain.substr(0, plain.size() - 1) + ",7,s3\n");
+    const auto rows = parseFightLog(tagged);
+    REQUIRE(rows.size() == 1);
+    CHECK(rows[0].cause == DeathCause::Unreadable);
+}
