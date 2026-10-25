@@ -14,7 +14,6 @@
     "coverage is deterministic and bounded",
     "drawing the Bull-Warden does not move the simulation",
     "drawing the Exile does not touch the simulation",
-    "the three Exile costumes share one skeleton, one set of clips and a skin that fits them",
     "each combat state picks its Bull-Warden clip",
     "each skill parameter changes the outcome on its own",
     "every file truncated, flipped, extended or deleted is refused or recovers to a real state",
@@ -68,6 +67,7 @@
     "the spear is held in the right hand and the shield in the left, on the hand at the start of idle",
     "the stride moves with the speed and standing still holds a pose",
     "the surface blocks open water, lets a road bridge it, and leaves dry ground walkable",
+    "the three Exile costumes share one skeleton, one set of clips and a skin that fits them",
     "the walk and run clips are different poses at the same moment of the stride",
     "the wind-up lifts the axe above where it rests",
     "walk travels about 1.05 m/s and run about 5.2 m/s along the way the body faces, from the root joint"
