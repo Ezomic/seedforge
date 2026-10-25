@@ -73,6 +73,7 @@ void DungeonFight::arrive(Scene& scene)
 {
     here_ = true;
     poi_ = entry_.content().poiId;
+    bridge_.setFightSite(poi_);
     engaged_.reset();
     wakeAt_ = scene.time();
     bridge_.parkFoe(scene, parkingSpot());

@@ -435,3 +435,31 @@ TEST_CASE("the forged view hides the Stage 0 debug lines by default and still sh
     CHECK(debug.lines.size() > quiet.lines.size());
     CHECK(hasColour(quiet, windup));
 }
+
+TEST_CASE("a fight in a dungeon is logged with the dungeon as its site and the next one in the world with the settlement", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    TempDir dir;
+    CombatBridgeConfig config;
+    config.fightsCsv = dir.path / "fights.csv";
+    Setup setup(game, 1, config);
+    setup.tick(4);
+    REQUIRE(setup.bridge->live());
+    setup.bridge->setFightSite("dungeon:cellar,x");
+    const auto dieOnce = [&] {
+        for (int i = 0; i < 60 * 120 && setup.bridge->outcome(setup.scene) == stage0::FightOutcome::Ongoing; ++i) setup.tick();
+        REQUIRE(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::PlayerDied);
+    };
+    dieOnce();
+    setup.tick(static_cast<int>(4.0 / kDt));
+    REQUIRE(setup.bridge->respawns() == 1);
+    setup.bridge->returnToWorld();
+    dieOnce();
+
+    std::string text = slurp(config.fightsCsv);
+    std::erase(text, '\r');
+    const std::string settlement = game.sites[setup.site.settlement].id;
+    CHECK(text.find("," + std::to_string(game.desc.seed) + ",dungeon:cellarx\n") != std::string::npos);
+    CHECK(text.find("," + std::to_string(game.desc.seed) + "," + settlement + "\n") != std::string::npos);
+    CHECK(stage0::parseFightLog(text).size() == 2);
+}

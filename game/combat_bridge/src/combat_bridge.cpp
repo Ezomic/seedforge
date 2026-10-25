@@ -53,11 +53,22 @@ void CombatBridge::openFightLog()
     if (config_.fightsCsv.empty()) {
         return;
     }
-    const std::string site = stage0::cleanField(game_.sites[site_.settlement].id);
+    stampFightLog(game_.sites[site_.settlement].id);
     auto& recorder = stage_.recorder();
-    recorder.setContext("world_seed,site", std::format("{},{}", game_.desc.seed, site));
     recorder.open(config_.fightsCsv);
     recorder.setSession({std::format("forged-{}", game_.desc.seed), "combat"});
+}
+
+void CombatBridge::stampFightLog(std::string_view site)
+{
+    stage_.recorder().setContext("world_seed,site", std::format("{},{}", game_.desc.seed, stage0::cleanField(site)));
+}
+
+void CombatBridge::setFightSite(std::string_view site)
+{
+    if (!config_.fightsCsv.empty()) {
+        stampFightLog(site);
+    }
 }
 
 glm::dvec3 CombatBridge::respawnFor(std::size_t settlement)
@@ -123,6 +134,9 @@ void CombatBridge::parkFoe(Scene& scene, glm::dvec3 feet) { setFoe(scene, feet, 
 
 void CombatBridge::returnToWorld()
 {
+    if (site_.found) {
+        setFightSite(game_.sites[site_.settlement].id);
+    }
     setSpawnsForLastSettlement();
     returningToWorld_ = true;
     returnParked_ = false;

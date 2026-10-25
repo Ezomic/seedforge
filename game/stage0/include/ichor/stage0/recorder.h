@@ -30,7 +30,7 @@ public:
     // No path means record in memory only.
     void open(const std::filesystem::path& csv);
 
-    // Extra trailing columns for every row, e.g. ("world_seed,site", "7,s3"). Call before open(); the values must hold
+    // Extra trailing columns for every row, e.g. ("world_seed,site", "7,s3"). The header is taken at open(); the values may change between fights. The values must hold
     // no comma beyond their column separators and no newline. Empty (the default) leaves the stage0 layout as it is.
     void setContext(std::string_view header, std::string_view values);
 
