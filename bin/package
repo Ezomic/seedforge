@@ -62,6 +62,7 @@ mkdir -p "$out/shaders" && cp "$bdir"/shaders/*.spv "$out/shaders/" || exit 1
 mkdir -p "$out/scripts" && cp "$repo"/engine/content/scripts/*.lua "$out/scripts/" || exit 1
 cp -r "$repo/data" "$out/data" || exit 1
 mkdir -p "$out/art" && cp -r "$repo/art/exile" "$repo/art/settlement_kit" "$out/art/" || exit 1
+cp "$repo/CREDITS.md" "$out/CREDITS.md" || exit 1
 
 # The Visual C++ runtime is not on a clean machine; ship the release one beside the exe.
 crt=
