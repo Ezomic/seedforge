@@ -1,10 +1,9 @@
 # Cuts the CC0 ambience, weather, footstep and settlement clips from their downloaded sources
-# into 16-bit mono 32 kHz WAVs next to this script. Sources and licences: art/audio_sources.md.
+# into 16-bit mono 32 kHz WAVs next to this script. Sources and licences: art/LICENSES.json.
 #
-#   python art/audio/make_clips.py SOURCES_DIR
+#   python tools/make_audio_clips.py SOURCES_DIR
 #
-# SOURCES_DIR holds one folder per source (beach, vistula, ...), exactly as art/audio_sources.md
-# names them, with any archive already unpacked. Needs numpy, scipy and soundfile.
+# SOURCES_DIR holds one folder per source (beach, vistula, ...), as named in CLIPS below, with any archive already unpacked. Needs numpy, scipy and soundfile.
 #
 # A loop is cut a little long and its tail is cross-faded over its head, so the end meets the
 # start without a click. Every clip is scaled to the RMS its kind asks for, with the peak held
@@ -18,7 +17,7 @@ import soundfile as sf
 from scipy.signal import resample_poly
 
 RATE = 32000
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "art", "audio")
 PEAK_LIMIT = 0.89
 FADE = 0.75
 

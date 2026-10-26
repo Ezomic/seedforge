@@ -17,6 +17,222 @@
       "license": "OFL-1.1",
       "attribution": "Copyright 2013 The Alegreya Sans Project Authors (https://github.com/huertatipografica/Alegreya-Sans), SIL Open Font License 1.1.",
       "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_step_grass",
+      "path": "art/audio/A_Step_Grass.wav",
+      "source_url": "https://opengameart.org/content/fantozzis-footsteps-grasssand-stone",
+      "author": "Raassh (uploaded by qubodup)",
+      "license": "CC0-1.0",
+      "attribution": "Raassh (uploaded by qubodup), https://opengameart.org/content/fantozzis-footsteps-grasssand-stone (CC0), cut from Fantozzi-SandL1.flac.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_step_rock",
+      "path": "art/audio/A_Step_Rock.wav",
+      "source_url": "https://opengameart.org/content/fantozzis-footsteps-grasssand-stone",
+      "author": "Raassh (uploaded by qubodup)",
+      "license": "CC0-1.0",
+      "attribution": "Raassh (uploaded by qubodup), https://opengameart.org/content/fantozzis-footsteps-grasssand-stone (CC0), cut from Fantozzi-StoneL1.flac.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_step_road",
+      "path": "art/audio/A_Step_Road.wav",
+      "source_url": "https://opengameart.org/content/fantozzis-footsteps-grasssand-stone",
+      "author": "Raassh (uploaded by qubodup)",
+      "license": "CC0-1.0",
+      "attribution": "Raassh (uploaded by qubodup), https://opengameart.org/content/fantozzis-footsteps-grasssand-stone (CC0), cut from Fantozzi-StoneR2.flac.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_step_snow",
+      "path": "art/audio/A_Step_Snow.wav",
+      "source_url": "https://opengameart.org/content/42-snow-and-gravel-footsteps",
+      "author": "Corsica_S, extracted by Iwan Gabovitch (uploaded by qubodup)",
+      "license": "CC0-1.0",
+      "attribution": "Corsica_S, extracted by Iwan Gabovitch (uploaded by qubodup), https://opengameart.org/content/42-snow-and-gravel-footsteps (CC0), cut from Corsica_S-Walking_on_snow_covered_gravel_01.flac.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_surf",
+      "path": "art/audio/A_Bed_Surf.wav",
+      "source_url": "https://opengameart.org/content/beach-ocean-waves",
+      "author": "Four Bidden, from a Freesound CC0 recording by jasinski",
+      "license": "CC0-1.0",
+      "attribution": "Four Bidden, from a Freesound CC0 recording by jasinski, https://opengameart.org/content/beach-ocean-waves (CC0), cut from wave_01, wave_02, wave_03 (alkaibeach .flac).",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_lake",
+      "path": "art/audio/A_Bed_Lake.wav",
+      "source_url": "https://opengameart.org/content/sea-and-river-wave-sounds",
+      "author": "RandomMind (uploaded by Snabisch)",
+      "license": "CC0-1.0",
+      "attribution": "RandomMind (uploaded by Snabisch), https://opengameart.org/content/sea-and-river-wave-sounds (CC0), cut from Vistula.mp3, 1200 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_taiga",
+      "path": "art/audio/A_Bed_Taiga.wav",
+      "source_url": "https://opengameart.org/content/windy-ambient-noise",
+      "author": "Some Weirdo",
+      "license": "CC0-1.0",
+      "attribution": "Some Weirdo, https://opengameart.org/content/windy-ambient-noise (CC0), cut from windy_ambiance_0.ogg, 30 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_forest",
+      "path": "art/audio/A_Bed_Forest.wav",
+      "source_url": "https://opengameart.org/content/amb-outside-1",
+      "author": "Kresiek The Furry",
+      "license": "CC0-1.0",
+      "attribution": "Kresiek The Furry, https://opengameart.org/content/amb-outside-1 (CC0), cut from amb_outdoor1_loop.wav.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_grassland",
+      "path": "art/audio/A_Bed_Grassland.wav",
+      "source_url": "https://opengameart.org/content/mild-wind-background-noise",
+      "author": "Bashar3A",
+      "license": "CC0-1.0",
+      "attribution": "Bashar3A, https://opengameart.org/content/mild-wind-background-noise (CC0), cut from wind background noise 2.wav, 10 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_marsh",
+      "path": "art/audio/A_Bed_Marsh.wav",
+      "source_url": "https://opengameart.org/content/swamp-environment-audio",
+      "author": "Jorge Avila (uploaded by LokiF)",
+      "license": "CC0-1.0",
+      "attribution": "Jorge Avila (uploaded by LokiF), https://opengameart.org/content/swamp-environment-audio (CC0), cut from swamp.ogg, 40 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_rainforest",
+      "path": "art/audio/A_Bed_Rainforest.wav",
+      "source_url": "https://opengameart.org/content/dripping-water-loop",
+      "author": "supergamez2014 (uploaded by qubodup)",
+      "license": "CC0-1.0",
+      "attribution": "supergamez2014 (uploaded by qubodup), https://opengameart.org/content/dripping-water-loop (CC0), cut from atmosbasement.mp3_.flac.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_savanna",
+      "path": "art/audio/A_Bed_Savanna.wav",
+      "source_url": "https://opengameart.org/content/cicada-sounds",
+      "author": "syncopika",
+      "license": "CC0-1.0",
+      "attribution": "syncopika, https://opengameart.org/content/cicada-sounds (CC0), cut from 082526-cicadasounds_0.ogg, 5 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_blight",
+      "path": "art/audio/A_Bed_Blight.wav",
+      "source_url": "https://opengameart.org/content/dark-ambiences",
+      "author": "johndh (uploaded by Ogrebane)",
+      "license": "CC0-1.0",
+      "attribution": "johndh (uploaded by Ogrebane), https://opengameart.org/content/dark-ambiences (CC0), cut from ambience-1.wav.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_bed_farmland",
+      "path": "art/audio/A_Bed_Farmland.wav",
+      "source_url": "https://opengameart.org/content/amb-morning-sounds-perfect-loop",
+      "author": "Kresiek The Furry",
+      "license": "CC0-1.0",
+      "attribution": "Kresiek The Furry, https://opengameart.org/content/amb-morning-sounds-perfect-loop (CC0), cut from amb_morning.wav, 10 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_dawn_birds",
+      "path": "art/audio/A_Dawn_Birds.wav",
+      "source_url": "https://opengameart.org/content/park-ambiences",
+      "author": "Thimras",
+      "license": "CC0-1.0",
+      "attribution": "Thimras, https://opengameart.org/content/park-ambiences (CC0), cut from park_ambience_birds.wav, 60 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_day_insects",
+      "path": "art/audio/A_Day_Insects.wav",
+      "source_url": "https://opengameart.org/content/cicada-sounds",
+      "author": "syncopika",
+      "license": "CC0-1.0",
+      "attribution": "syncopika, https://opengameart.org/content/cicada-sounds (CC0), cut from 082526-cicadasounds2_0.ogg, 10 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_dusk_crickets",
+      "path": "art/audio/A_Dusk_Crickets.wav",
+      "source_url": "https://opengameart.org/content/crickets-ambient-noise-loopable",
+      "author": "2DPIXX (uploaded by Wolfgang_)",
+      "license": "CC0-1.0",
+      "attribution": "2DPIXX (uploaded by Wolfgang_), https://opengameart.org/content/crickets-ambient-noise-loopable (CC0), cut from crickets_1.mp3.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_night_insects",
+      "path": "art/audio/A_Night_Insects.wav",
+      "source_url": "https://opengameart.org/content/birdcricketfrog-and-mosquito-sounds",
+      "author": "Aj_",
+      "license": "CC0-1.0",
+      "attribution": "Aj_, https://opengameart.org/content/birdcricketfrog-and-mosquito-sounds (CC0), cut from cricket2.wav.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_night_wolves",
+      "path": "art/audio/A_Night_Wolves.wav",
+      "source_url": "https://opengameart.org/content/wolf-monster-sound",
+      "author": "CaveboyTup",
+      "license": "CC0-1.0",
+      "attribution": "CaveboyTup, https://opengameart.org/content/wolf-monster-sound (CC0), cut from wolf_monster_6.mp3.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_settlement_chatter",
+      "path": "art/audio/A_Settlement_Chatter.wav",
+      "source_url": "https://opengameart.org/content/crowd-shoutingspeaking-ambience",
+      "author": "StarNinjas",
+      "license": "CC0-1.0",
+      "attribution": "StarNinjas, https://opengameart.org/content/crowd-shoutingspeaking-ambience (CC0), cut from crowd_shouting_0.ogg, 5 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_settlement_bell",
+      "path": "art/audio/A_Settlement_Bell.wav",
+      "source_url": "https://opengameart.org/content/bell-dingschimes",
+      "author": "PWL",
+      "license": "CC0-1.0",
+      "attribution": "PWL, https://opengameart.org/content/bell-dingschimes (CC0), cut from bell_ding3.wav.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_settlement_mill",
+      "path": "art/audio/A_Settlement_Mill.wav",
+      "source_url": "https://opengameart.org/content/park-ambiences",
+      "author": "Thimras",
+      "license": "CC0-1.0",
+      "attribution": "Thimras, https://opengameart.org/content/park-ambiences (CC0), cut from park_ambience_river.wav, 100 s in.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_settlement_surf",
+      "path": "art/audio/A_Settlement_Surf.wav",
+      "source_url": "https://opengameart.org/content/beach-ocean-waves",
+      "author": "Four Bidden / jasinski, with a seagull by Rango Mango (solo-seagull-sound-effects)",
+      "license": "CC0-1.0",
+      "attribution": "Four Bidden / jasinski, with a seagull by Rango Mango (solo-seagull-sound-effects), https://opengameart.org/content/beach-ocean-waves (CC0), cut from beach waves mixed with Seagull Ambient 1.wav.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "audio_settlement_machinery",
+      "path": "art/audio/A_Settlement_Machinery.wav",
+      "source_url": "https://opengameart.org/content/steam-boiler-sound-loop",
+      "author": "bart",
+      "license": "CC0-1.0",
+      "attribution": "bart, https://opengameart.org/content/steam-boiler-sound-loop (CC0), cut from generator_loop.wav, 4 s in.",
+      "date_added": "2026-10-26"
     }
   ]
 }

@@ -51,7 +51,6 @@ ART_RULES = {
     ".py": (SNAKE, "scripts are snake_case.py"),
     ".json": (SNAKE, "the only .json in art/ is a kit manifest, snake_case.json"),
     ".txt": (rf"{PASCAL}-OFL", "the only .txt in art/ is a font licence, Family-OFL.txt"),
-    ".md": (SNAKE, "the only .md in art/ is a source ledger, snake_case.md"),
 }
 
 
