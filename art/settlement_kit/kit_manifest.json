@@ -1,0 +1,11 @@
+{
+  "pieces": [
+    {"id": "SmallHouse", "file": "SM_SmallHouse.glb", "category": "building", "footprint": {"halfWidthM": 1.97, "halfDepthM": 1.84, "heightM": 3.38}},
+    {"id": "TempleFront", "file": "SM_TempleFront.glb", "category": "building", "footprint": {"halfWidthM": 4.0, "halfDepthM": 4.0, "heightM": 7.03}},
+    {"id": "ColonnadeBay", "file": "SM_ColonnadeBay.glb", "category": "building", "footprint": {"halfWidthM": 2.02, "halfDepthM": 0.45, "heightM": 4.0}},
+    {"id": "WallTower", "file": "SM_WallTower.glb", "category": "tower", "footprint": {"halfWidthM": 2.01, "halfDepthM": 2.02, "heightM": 8.0}},
+    {"id": "GateBayGrid", "file": "SM_GateBayGrid.glb", "category": "gate", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.6, "heightM": 4.5}},
+    {"id": "WallSegmentGrid", "file": "SM_WallSegmentGrid.glb", "category": "wall", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.3, "heightM": 3.2}},
+    {"id": "PalisadeRunGrid", "file": "SM_PalisadeRunGrid.glb", "category": "wall", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.15, "heightM": 2.5}}
+  ]
+}

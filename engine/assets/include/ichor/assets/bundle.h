@@ -58,6 +58,9 @@ struct Texture {
 
 constexpr std::uint32_t kNoTexture = 0xffffffffu;
 
+// How many materials the renderer holds in total, across every bundle it has uploaded.
+constexpr std::uint32_t kMaxSceneMaterials = 256;
+
 struct Material {
     std::string name;
     glm::vec4 baseColorFactor{1.0f};

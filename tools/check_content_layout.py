@@ -46,6 +46,7 @@ ART_RULES = {
     ".otf": (rf"{PASCAL}(?:-{PASCAL})?", "fonts are Family-Style.otf"),
     ".blend": (SNAKE, "Blender sources are snake_case.blend"),
     ".py": (SNAKE, "scripts are snake_case.py"),
+    ".json": (SNAKE, "the only .json in art/ is a kit manifest, snake_case.json"),
     ".txt": (rf"{PASCAL}-OFL", "the only .txt in art/ is a font licence, Family-OFL.txt"),
 }
 
@@ -212,6 +213,7 @@ def self_test():
         ("blend in PascalCase", "art-file", add("art/hoplite/IchorKit.blend")),
         ("stray licence text", "art-file", add("art/ui/notes.txt")),
         ("blender backup committed", "art-backup", add("art/hoplite/ichor_kit.blend1")),
+        ("art manifest in CamelCase", "art-file", add("art/hoplite/KitManifest.json")),
         ("unknown art extension", "art-extension", add("art/hoplite/thing.psd")),
         ("extensionless art file", "art-extension", add("art/hoplite/Makefile")),
         ("case-only collision", "case-collision", add("data/axioms/Last_Favour.json", "data/axioms/last_favour.JSON")),
