@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
+    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
   pull_request:
-    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
+    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
 
 # A new push to a PR cancels the run of the previous commit; runs on main queue and none is cancelled.
 concurrency:
@@ -373,3 +373,68 @@ jobs:
         with:
           path: .vcpkg-cache
           key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+
+  linux-package:
+    # Not a PR check and not part of `linux headless + sanitizers`: the Linux counterpart of bin/package (SEED-663). On every merge to main it builds the app
+    # with the linux-gpu preset (the only Linux preset with ENGINE_RUNTIME on), packs tools/package_linux.sh's tarball, unpacks it in a fresh folder and runs
+    # the unpacked binary --headless from another directory. Warm it takes about 2.5 minutes; cold it builds SDL3 and the renderer, hence no PR run.
+    name: linux package + smoke
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_COMMIT }}
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 autoconf autoconf-archive automake libtool libltdl-dev pkg-config
+      - name: Restore vcpkg binaries
+        id: cache1
+        uses: actions/cache/restore@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-gpu-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: |
+            vcpkg-linux-gpu-v2-
+            vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-package-${{ github.sha }}
+          restore-keys: |
+            ccache-package-
+            ccache-gpu-
+      - name: Package and smoke run
+        run: tools/package_linux.sh --smoke --out "$RUNNER_TEMP/dist/ichor-linux"
+      - name: Save ccache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-package-${{ github.sha }}
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ichor-linux-package
+          path: ${{ runner.temp }}/dist/ichor-linux.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+      - name: Save vcpkg binaries
+        if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-gpu-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
