@@ -132,14 +132,13 @@ bool buildExileRunRig(const std::vector<std::string>& jointNames, ExileRunRig& r
         return true;
     };
     if (!find("Hips", rig.hips) || !find("Spine2", rig.chest) || !find("LeftArm", rig.leftArm) || !find("RightArm", rig.rightArm)) return false;
-    std::uint32_t spine = 0;
-    if (!find("Spine", spine)) return false;
-    for (std::uint32_t j = spine; j < jointNames.size(); ++j) {
+    for (std::uint32_t j = 0; j < jointNames.size(); ++j) {
         const std::string& n = jointNames[j];
+        const auto has = [&](const char* part) { return n.find(part) != std::string::npos; };
+        if (!(has("Spine") || has("Shoulder") || has("Arm") || has("Hand") || has("Neck") || has("Head"))) continue;
         rig.upperBody.push_back(j);
-        const bool arm = n.find("Arm") != std::string::npos || n.find("Hand") != std::string::npos;
-        if (!arm) continue;
-        (n.find("mixamorig:Left") == 0 ? rig.leftArmJoints : rig.rightArmJoints).push_back(j);
+        if (!has("Arm") && !has("Hand")) continue;
+        (has("mixamorig:Left") ? rig.leftArmJoints : rig.rightArmJoints).push_back(j);
     }
     return !rig.leftArmJoints.empty() && !rig.rightArmJoints.empty();
 }

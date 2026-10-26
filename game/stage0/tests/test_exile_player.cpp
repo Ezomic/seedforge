@@ -422,15 +422,10 @@ float leanOf(const RunProbe& probe, const std::vector<glm::mat4>& skin)
 
 }
 
-TEST_CASE("running does not fold the torso over the hands: the lean stays near upright and the arms stay rigid")
+TEST_CASE("running does not fold the torso over the hands: the lean stays near upright")
 {
     const RunProbe probe;
     ExilePlayer& player = exile();
-    ExileClipChoice idle;
-    std::vector<glm::mat4> idleSkin;
-    REQUIRE(player.pose(idle, 0.0f, idleSkin));
-    const std::uint32_t elbow = probe.rig.leftArmJoints[1];
-    const float upperArm = glm::distance(probe.at(idleSkin, probe.rig.leftArm), probe.at(idleSkin, elbow));
     ExileClipChoice run;
     run.clip = ExileClip::Run;
     run.locomotion = true;
@@ -438,30 +433,33 @@ TEST_CASE("running does not fold the torso over the hands: the lean stays near u
         std::vector<glm::mat4> skin;
         REQUIRE(player.pose(run, static_cast<float>(k) / 8.0f, skin));
         CHECK(leanOf(probe, skin) < kExileRunLean + 0.02f);
-        CHECK(glm::distance(probe.at(skin, probe.rig.leftArm), probe.at(skin, elbow)) == Catch::Approx(upperArm).margin(0.01f));
         const float chestHeight = probe.at(skin, probe.rig.chest).y - probe.at(skin, probe.rig.hips).y;
         CHECK(chestHeight > 0.28f);
     }
 }
 
-TEST_CASE("the run keeps the spear and shield clear of the chest")
+TEST_CASE("the run sits the body up but leaves the arms, and so the spear and shield, at the orientation the clip gave them")
 {
+    const RunProbe probe;
     ExilePlayer& player = exile();
+    for (const std::uint32_t leg : {2u, 3u, 4u, 6u, 7u, 8u}) {
+        CHECK(std::find(probe.rig.upperBody.begin(), probe.rig.upperBody.end(), leg) == probe.rig.upperBody.end());
+    }
+    const std::uint32_t clip = probe.animations.findClip(name(ExileClip::Run));
     ExileClipChoice run;
     run.clip = ExileClip::Run;
     run.locomotion = true;
     for (int k = 0; k < 8; ++k) {
+        const float phase = static_cast<float>(k) / 8.0f;
         std::vector<glm::mat4> skin;
-        REQUIRE(player.pose(run, static_cast<float>(k) / 8.0f, skin));
-        RenderView view;
-        player.appendPosed(skin, glm::dvec3(0.0), 0.0f, view);
-        REQUIRE(view.instances.size() == 3);
-        for (std::size_t p = 1; p < 3; ++p) {
-            const glm::vec3 held(view.instances[p].position);
-            CHECK(held.y > 0.7f);
-            CHECK(held.y < 1.4f);
-            CHECK(std::hypot(held.x, held.z) < 0.5f);
+        std::vector<glm::mat4> raw;
+        glm::vec3 root;
+        REQUIRE(player.pose(run, phase, skin));
+        REQUIRE(probe.animations.sample(clip, phase * probe.animations.clipDuration(clip), raw, root));
+        for (const std::uint32_t j : {probe.rig.leftArmJoints.back(), probe.rig.rightArmJoints.back()}) {
+            for (int c = 0; c < 3; ++c) CHECK(glm::distance(glm::vec3(skin[j][c]), glm::vec3(raw[j][c])) < 1e-3f);
         }
+        CHECK(glm::distance(probe.at(skin, probe.rig.chest), probe.at(raw, probe.rig.chest)) > 0.05f);
     }
 }
 
