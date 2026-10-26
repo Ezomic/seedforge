@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
     paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
+  # No path filter on a pull request: the required checks must report on every PR, and the `changes` job decides what runs (SEED-548).
   pull_request:
-    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
 
 # A new push to a PR cancels the run of the previous commit; runs on main queue and none is cancelled.
 concurrency:
@@ -24,8 +24,76 @@ env:
   VCPKG_COMMIT: e456309491fd875487bf02b8a0dca76c1b1b00cc
 
 jobs:
+  changes:
+    # Decides the scope of the PR from its changed paths. `heavy` is everything as before the split; `art` adds the Windows art tests.
+    # Anything not named as light below is heavy, so a new top-level folder runs the full suite until it is classified here.
+    name: changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      heavy: ${{ steps.scope.outputs.heavy }}
+      art: ${{ steps.scope.outputs.art }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Classify the changed paths
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          heavy=true
+          art=false
+          if [ "$EVENT" = pull_request ]; then
+            heavy=false
+            # The checkout is the merge commit: its first parent is the base, so this is exactly the PR's diff. Renames count as delete + add.
+            git -c core.quotepath=off diff --no-renames --name-only HEAD^1 HEAD > changed.txt
+            cat changed.txt
+            while IFS= read -r f; do
+              case "$f" in
+                art/audio/*|art/fonts/*) heavy=true ;;
+                art/*) art=true ;;
+                tools/check_smoke_hash.py|tools/test_times.py|tools/test_time_allowlist.json|tools/ci_tiers.py) heavy=true ;;
+                docs/*|tools/*) ;;
+                */*) heavy=true ;;
+                *.md) ;;
+                *) heavy=true ;;
+              esac
+            done < changed.txt
+          fi
+          echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
+          echo "art=$art" >> "$GITHUB_OUTPUT"
+          echo "scope: heavy=$heavy art=$art (event: $EVENT)"
+
+  light:
+    # The python checks of the ctest suite, run directly. About 30 s, on every PR, so a docs or tools only change is still checked.
+    name: python tools + content layout
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Content layout
+        run: |
+          python3 tools/check_content_layout.py --root .
+          python3 tools/check_content_layout.py --self-test
+      - name: Data lint and dependency policy
+        run: |
+          python3 tools/check_data.py --root .
+          python3 tools/check_data.py --self-test
+          python3 tools/check_deps.py --root .
+          python3 tools/check_deps.py --root . --self-test
+      - name: Test tiers and time budget tools
+        run: |
+          python3 tools/ci_tiers.py --root . check
+          python3 tools/test_times.py --check-allowlist --root .
+          python3 tools/test_times.py --self-test
+
   windows:
-    name: windows runtime + tests
+    # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
+    # tests that load art/ when the PR changes art and nothing else the suite covers.
+    name: windows build + tests
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true' || needs.changes.outputs.art == 'true'
     runs-on: windows-2022
     # PR_LIMIT: 15 minutes, the budget of a pull request (the first number in these expressions, three jobs). Raise it to 30 after a cache
     # eviction or a key rename until a run on main has saved the caches again: a cold PR run needs about 25 minutes and a job killed by its
@@ -104,21 +172,38 @@ jobs:
         run: cmake --preset windows-ci
         working-directory: engine
       - name: Build
+        if: needs.changes.outputs.heavy == 'true'
         run: cmake --build --preset windows-ci
+        working-directory: engine
+      - name: Build the art tests
+        if: needs.changes.outputs.heavy != 'true'
+        # The three executables that hold the art-loading tests (and what they depend on), not the engine runtime.
+        run: cmake --build --preset windows-ci --target ichor_tests_ui ichor_tests_world stage0_tests
         working-directory: engine
       - name: Compiler cache stats
         if: env.SCCACHE_READY == '1'
         run: sccache --show-stats
       - name: Test
+        if: needs.changes.outputs.heavy == 'true'
         # fast + medium: the preset leaves out the soak label
         run: ctest --preset windows-ci
         working-directory: engine
+      - name: Art tests
+        if: needs.changes.outputs.heavy != 'true'
+        # Every test that opens a file under art/ (docs/ci-coverage.md lists them): the cooker, the Exile mesh, rig and avatar,
+        # the Bull-Warden, the exported settlement kit and the content layout. --no-tests=error: a rename must not leave this empty.
+        shell: bash
+        run: |
+          ctest --preset windows-ci --no-tests=error -R 'Exile|cooker|bundle round-trips|reading garbage|mip chains|Bull-Warden|exported GLBs|content_layout'
+          build/windows-ci/tests/ichor_tests_ui.exe "[exile]"
+        working-directory: engine
       - name: Test time budget
-        if: always()
+        if: always() && needs.changes.outputs.heavy == 'true'
         shell: bash
         run: python ../tools/test_times.py build/windows-ci/Testing/Temporary/LastTest.log --profile release
         working-directory: engine
       - name: Headless smoke run
+        if: needs.changes.outputs.heavy == 'true'
         run: python ../tools/check_smoke_hash.py build/windows-ci/app/ichor.exe
         working-directory: engine
       - name: Save vcpkg binaries
@@ -136,8 +221,29 @@ jobs:
           path: engine/build/windows-ci/forged-world-cache
           key: forged-cache-windows-${{ hashFiles('libworldforge/include/**', 'libworldforge/src/**', 'engine/world/include/ichor/world/forged_heightfield.h', 'engine/world/src/forged_heightfield.cpp', 'engine/world/include/ichor/world/forged_world_cache.h', 'engine/world/src/forged_world_cache.cpp', 'engine/world/include/ichor/world/forged_phase_maps.h', 'engine/world/src/forged_phase_maps.cpp', 'engine/world/include/ichor/world/heightfield.h', 'engine/world/src/heightfield.cpp', 'engine/world/include/ichor/world/world_desc.h', 'engine/core/include/ichor/core/binary.h', 'engine/core/include/ichor/core/hash.h') }}
 
+  windows-required:
+    # The required check keeps its name. It passes when the Windows job ran and passed, or when no heavy or art change made it needed.
+    name: windows runtime + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [changes, light, windows]
+    if: always()
+    steps:
+      - name: The Windows job passed or was not needed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          LIGHT: ${{ needs.light.result }}
+          WINDOWS: ${{ needs.windows.result }}
+          NEEDED: ${{ needs.changes.outputs.heavy == 'true' || needs.changes.outputs.art == 'true' }}
+        run: |
+          echo "changes: $CHANGES, python checks: $LIGHT, windows: $WINDOWS, windows needed: $NEEDED"
+          test "$CHANGES" = success && test "$LIGHT" = success
+          if [ "$NEEDED" = true ]; then test "$WINDOWS" = success; else test "$WINDOWS" = skipped; fi
+
   linux-shard:
     name: linux sanitizers shard ${{ matrix.shard }} of 4
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in 12 to 25 minutes, and on main the shards also run
     # the medium tier. A job killed by its limit saves no cache, so only a pull request is held to 15 minutes.
@@ -223,6 +329,8 @@ jobs:
 
   linux-gpu:
     name: linux gpu goldens
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     # Cold, this job builds SDL3 and friends from source (670 to 737 s of configure), so only a pull request is held to 15 minutes.
     timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
@@ -300,17 +408,24 @@ jobs:
           key: vcpkg-linux-gpu-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
 
   linux-headless:
-    # The required check keeps its name. It passes when every shard and the GPU goldens passed; a skipped or cancelled one fails it.
+    # The required check keeps its name. When the PR is heavy it passes only if every shard and the GPU goldens passed (a skipped or
+    # cancelled one fails it); otherwise the shards are skipped on purpose and it passes once the `changes` job did.
     name: linux headless + sanitizers
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [linux-shard, linux-gpu]
+    needs: [changes, linux-shard, linux-gpu]
     if: always()
     steps:
-      - name: Every Linux job passed
+      - name: Every Linux job passed or was not needed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          SHARDS: ${{ needs.linux-shard.result }}
+          GPU: ${{ needs.linux-gpu.result }}
+          HEAVY: ${{ needs.changes.outputs.heavy }}
         run: |
-          echo "shards: ${{ needs.linux-shard.result }}, gpu goldens: ${{ needs.linux-gpu.result }}"
-          test "${{ needs.linux-shard.result }}" = success && test "${{ needs.linux-gpu.result }}" = success
+          echo "changes: $CHANGES, heavy: $HEAVY, shards: $SHARDS, gpu goldens: $GPU"
+          test "$CHANGES" = success
+          if [ "$HEAVY" = true ]; then test "$SHARDS" = success && test "$GPU" = success; else test "$SHARDS" = skipped && test "$GPU" = skipped; fi
 
   linux-soak:
     # Not a PR check: the full variants of the heavy tests under the sanitizers, on every merge to main (nightly.yml runs them too).
