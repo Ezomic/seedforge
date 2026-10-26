@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <glm/geometric.hpp>
+#include <glm/matrix.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -386,4 +387,109 @@ TEST_CASE("the three Exile costumes share one skeleton, one set of clips and a s
             for (int k = 0; k < 4; ++k) REQUIRE(v.joints[k] < skeleton.jointNames.size());
         }
     }
+}
+
+namespace {
+
+struct RunProbe {
+    AnimationSet animations;
+    ExileRunRig rig;
+    std::vector<glm::vec3> bind; // each joint's bind-pose position, model space
+
+    RunProbe()
+    {
+        ExileKit kit;
+        REQUIRE(cookExile(kExile, kit));
+        REQUIRE(animations.load(kit.bundles[0]));
+        REQUIRE(buildExileRunRig(animations.jointNames(0), rig));
+        const std::uint32_t idle = animations.findClip(name(ExileClip::Idle));
+        std::vector<glm::mat4> world;
+        std::vector<glm::mat4> skin;
+        glm::vec3 root;
+        REQUIRE(animations.samplePose(idle, 0.0f, world));
+        REQUIRE(animations.sample(idle, 0.0f, skin, root));
+        for (std::size_t j = 0; j < world.size(); ++j) bind.push_back(glm::vec3(glm::inverse(skin[j]) * world[j][3]));
+    }
+
+    glm::vec3 at(const std::vector<glm::mat4>& skin, std::uint32_t joint) const { return glm::vec3(skin[joint] * glm::vec4(bind[joint], 1.0f)); }
+};
+
+float leanOf(const RunProbe& probe, const std::vector<glm::mat4>& skin)
+{
+    const glm::vec3 spine = probe.at(skin, probe.rig.chest) - probe.at(skin, probe.rig.hips);
+    return std::atan2(-spine.z, spine.y);
+}
+
+}
+
+TEST_CASE("running does not fold the torso over the hands: the lean stays near upright and the arms stay rigid")
+{
+    const RunProbe probe;
+    ExilePlayer& player = exile();
+    ExileClipChoice idle;
+    std::vector<glm::mat4> idleSkin;
+    REQUIRE(player.pose(idle, 0.0f, idleSkin));
+    const std::uint32_t elbow = probe.rig.leftArmJoints[1];
+    const float upperArm = glm::distance(probe.at(idleSkin, probe.rig.leftArm), probe.at(idleSkin, elbow));
+    ExileClipChoice run;
+    run.clip = ExileClip::Run;
+    run.locomotion = true;
+    for (int k = 0; k < 8; ++k) {
+        std::vector<glm::mat4> skin;
+        REQUIRE(player.pose(run, static_cast<float>(k) / 8.0f, skin));
+        CHECK(leanOf(probe, skin) < kExileRunLean + 0.02f);
+        CHECK(glm::distance(probe.at(skin, probe.rig.leftArm), probe.at(skin, elbow)) == Catch::Approx(upperArm).margin(0.01f));
+        const float chestHeight = probe.at(skin, probe.rig.chest).y - probe.at(skin, probe.rig.hips).y;
+        CHECK(chestHeight > 0.28f);
+    }
+}
+
+TEST_CASE("the run keeps the spear and shield clear of the chest")
+{
+    ExilePlayer& player = exile();
+    ExileClipChoice run;
+    run.clip = ExileClip::Run;
+    run.locomotion = true;
+    for (int k = 0; k < 8; ++k) {
+        std::vector<glm::mat4> skin;
+        REQUIRE(player.pose(run, static_cast<float>(k) / 8.0f, skin));
+        RenderView view;
+        player.appendPosed(skin, glm::dvec3(0.0), 0.0f, view);
+        REQUIRE(view.instances.size() == 3);
+        for (std::size_t p = 1; p < 3; ++p) {
+            const glm::vec3 held(view.instances[p].position);
+            CHECK(held.y > 0.7f);
+            CHECK(held.y < 1.4f);
+            CHECK(std::hypot(held.x, held.z) < 0.5f);
+        }
+    }
+}
+
+TEST_CASE("blending a pose with itself gives the pose, and the idle-to-run midpoint is a valid skeleton")
+{
+    const RunProbe probe;
+    ExilePlayer& player = exile();
+    ExileClipChoice idle;
+    ExileClipChoice run;
+    run.clip = ExileClip::Run;
+    run.locomotion = true;
+    std::vector<glm::mat4> a;
+    std::vector<glm::mat4> b;
+    REQUIRE(player.pose(idle, 0.0f, a));
+    REQUIRE(player.pose(run, 0.25f, b));
+    std::vector<glm::mat4> same;
+    for (const float t : {0.0f, 0.3f, 0.5f, 1.0f}) {
+        blendSkin(b, b, t, same);
+        for (std::size_t j = 0; j < b.size(); ++j) {
+            for (int k = 0; k < 4; ++k) CHECK(glm::distance(glm::vec3(same[j][k]), glm::vec3(b[j][k])) < 1e-3f);
+        }
+    }
+    std::vector<glm::mat4> mid;
+    blendSkin(a, b, 0.5f, mid);
+    const glm::vec3 hips = probe.at(mid, probe.rig.hips);
+    for (std::uint32_t j = 0; j < mid.size(); ++j) {
+        CHECK(glm::length(glm::vec3(mid[j][0])) == Catch::Approx(1.0f).margin(0.01f));
+        CHECK(glm::distance(probe.at(mid, j), hips) < 1.2f);
+    }
+    CHECK(leanOf(probe, mid) < kExileRunLean + 0.1f);
 }

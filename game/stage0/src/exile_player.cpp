@@ -3,10 +3,13 @@
 #include "ichor/anim/exile_avatar.h"
 #include "ichor/core/log.h"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <string>
+#include <string_view>
 
 namespace ichor::stage0 {
 
@@ -119,6 +122,48 @@ void blendSkin(const std::vector<glm::mat4>& from, const std::vector<glm::mat4>&
     }
 }
 
+bool buildExileRunRig(const std::vector<std::string>& jointNames, ExileRunRig& rig)
+{
+    rig = ExileRunRig{};
+    const auto find = [&](std::string_view name, std::uint32_t& out) {
+        const auto it = std::find(jointNames.begin(), jointNames.end(), std::string("mixamorig:") + std::string(name));
+        if (it == jointNames.end()) return false;
+        out = static_cast<std::uint32_t>(it - jointNames.begin());
+        return true;
+    };
+    if (!find("Hips", rig.hips) || !find("Spine2", rig.chest) || !find("LeftArm", rig.leftArm) || !find("RightArm", rig.rightArm)) return false;
+    std::uint32_t spine = 0;
+    if (!find("Spine", spine)) return false;
+    for (std::uint32_t j = spine; j < jointNames.size(); ++j) {
+        const std::string& n = jointNames[j];
+        rig.upperBody.push_back(j);
+        const bool arm = n.find("Arm") != std::string::npos || n.find("Hand") != std::string::npos;
+        if (!arm) continue;
+        (n.find("mixamorig:Left") == 0 ? rig.leftArmJoints : rig.rightArmJoints).push_back(j);
+    }
+    return !rig.leftArmJoints.empty() && !rig.rightArmJoints.empty();
+}
+
+void correctRunPose(const ExileRunRig& rig, const std::vector<glm::mat4>& world, std::vector<glm::mat4>& skin)
+{
+    if (world.size() != skin.size() || rig.hips >= world.size() || rig.chest >= world.size() || rig.leftArm >= world.size() || rig.rightArm >= world.size()) return;
+    const glm::vec3 hips(world[rig.hips][3]);
+    const glm::vec3 spine = glm::vec3(world[rig.chest][3]) - hips;
+    const float lean = std::atan2(-spine.z, spine.y);
+    const float back = std::max(lean - kExileRunLean, 0.0f);
+    const auto about = [](glm::vec3 pivot, glm::vec3 axis, float angle) {
+        return glm::translate(glm::mat4(1.0f), pivot) * glm::rotate(glm::mat4(1.0f), angle, axis) * glm::translate(glm::mat4(1.0f), -pivot);
+    };
+    const glm::mat4 sitUp = about(hips, glm::vec3(1.0f, 0.0f, 0.0f), back);
+    for (const std::uint32_t j : rig.upperBody) skin[j] = sitUp * skin[j];
+    const glm::vec3 left = glm::vec3(sitUp * world[rig.leftArm][3]);
+    const glm::vec3 right = glm::vec3(sitUp * world[rig.rightArm][3]);
+    const glm::mat4 leftLevel = about(left, glm::vec3(1.0f, 0.0f, 0.0f), -back);
+    const glm::mat4 rightLevel = about(right, glm::vec3(1.0f, 0.0f, 0.0f), -back);
+    for (const std::uint32_t j : rig.leftArmJoints) skin[j] = leftLevel * skin[j];
+    for (const std::uint32_t j : rig.rightArmJoints) skin[j] = rightLevel * skin[j];
+}
+
 bool ExilePlayer::load(const std::filesystem::path& folder, Renderer& renderer)
 {
     if (!prepare(folder, renderer.meshCount())) return false;
@@ -168,6 +213,8 @@ bool ExilePlayer::prepare(const std::filesystem::path& folder, std::uint32_t mes
     lastSkin_.clear();
     fadeFrom_.clear();
     fadeSeconds_ = kExileFadeSeconds;
+    hasRunRig_ = buildExileRunRig(animations_.jointNames(animations_.clipSkeleton(clips_[static_cast<std::size_t>(ExileClip::Run)])), runRig_);
+    if (!hasRunRig_) log(LogLevel::Warn, "the Exile's skeleton lacks the joints to straighten the Run clip");
     loaded_ = true;
     return true;
 }
@@ -179,6 +226,10 @@ bool ExilePlayer::pose(const ExileClipChoice& choice, float locomotionPhase, std
     const float phase = choice.locomotion ? locomotionPhase - std::floor(locomotionPhase) : choice.progress;
     glm::vec3 root(0.0f);
     if (!animations_.sample(clip, phase * duration, skin, root)) return false;
+    if (choice.clip == ExileClip::Run && hasRunRig_) {
+        std::vector<glm::mat4> world;
+        if (animations_.samplePose(clip, phase * duration, world)) correctRunPose(runRig_, world, skin);
+    }
     for (glm::mat4& m : skin) {
         m[3].x -= root.x;
         m[3].z -= root.z;
