@@ -16,7 +16,6 @@
 #include <cmath>
 #include <limits>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace ichor {
 
@@ -365,14 +364,14 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
         meshIndex[src.mesh] = static_cast<std::uint32_t>(bundle.meshes.size());
         bundle.meshes.push_back(std::move(mesh));
     }
-    std::unordered_set<const cgltf_mesh*> collisionMeshes;
+    std::vector<bool> collisionMesh(data->meshes_count, false);
     for (cgltf_size n = 0; n < data->nodes_count; ++n) {
         if (conventions.roles[n] == NodeRole::Collision) {
-            collisionMeshes.insert(data->nodes[n].mesh);
+            collisionMesh[static_cast<std::size_t>(data->nodes[n].mesh - data->meshes)] = true;
         }
     }
     for (cgltf_size m = 0; m < data->meshes_count; ++m) {
-        if (!meshIndex.contains(&data->meshes[m]) && !collisionMeshes.contains(&data->meshes[m])) {
+        if (!meshIndex.contains(&data->meshes[m]) && !collisionMesh[m]) {
             logf(LogLevel::Warn, "mesh {}: no node references it, dropped", data->meshes[m].name != nullptr ? data->meshes[m].name : "");
         }
     }
