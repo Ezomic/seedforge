@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "id": "font_cinzel",
+      "path": "art/fonts/Cinzel*",
+      "source_url": "https://github.com/NDISCOVER/Cinzel",
+      "author": "The Cinzel Project Authors",
+      "license": "OFL-1.1",
+      "attribution": "Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel), SIL Open Font License 1.1.",
+      "date_added": "2026-10-26"
+    },
+    {
+      "id": "font_alegreya_sans",
+      "path": "art/fonts/AlegreyaSans*",
+      "source_url": "https://github.com/huertatipografica/Alegreya-Sans",
+      "author": "The Alegreya Sans Project Authors",
+      "license": "OFL-1.1",
+      "attribution": "Copyright 2013 The Alegreya Sans Project Authors (https://github.com/huertatipografica/Alegreya-Sans), SIL Open Font License 1.1.",
+      "date_added": "2026-10-26"
+    }
+  ]
+}
