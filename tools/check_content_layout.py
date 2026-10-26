@@ -8,7 +8,7 @@ data/json/trainers.json. Fails when, under data/ or art/:
   3. a data/ file is not a snake_case .json (plus .gitkeep, and README.md at the data/ root).
   4. an art/ file breaks its naming rule: textures T_PascalCase.png, meshes SM_/SK_PascalCase.fbx or .glb,
      audio A_PascalCase.wav/.ogg, fonts Family-Style.ttf/.otf with a Family-OFL.txt licence,
-     Blender sources and scripts snake_case. Backups (.blend1) and unknown extensions are rejected.
+     Blender sources and scripts snake_case, plus the art/LICENSES.json ledger (SEED-680). Backups (.blend1) and unknown extensions are rejected.
   5. two paths differ only by case (they collide on Windows and macOS).
   6. tools/content_layout_baseline.txt lists a violation that no longer exists, or the checker
      finds one it does not list. The baseline is the known debt: shrink it, never grow it.
@@ -20,6 +20,9 @@ import argparse
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_assets_licensed  # noqa: E402
 
 CONTENT_ROOTS = ("data", "art")
 MAX_DEPTH = 4
@@ -61,6 +64,8 @@ def check_file(parts):
     if name == ".gitkeep":
         return []
     stem, ext = stem_and_ext(name)
+    if parts == ["art", "LICENSES.json"]:
+        return []
     if top == "data":
         if len(parts) == 2 and name == "README.md":
             return []
@@ -241,11 +246,14 @@ def self_test():
     ok = any("no longer a violation" in e for e in errs)
     print(f"  a stale baseline line fails the check: {'red as expected' if ok else 'STAYED GREEN'}")
     missed += not ok
+    ok = not violations(CLEAN + ["art/LICENSES.json"]) and bool(violations(CLEAN + ["art/Other.json"]))
+    print(f"  the licence ledger is the one allowed non-snake_case json: {'ok' if ok else 'FAILED'}")
+    missed += not ok
 
     if missed:
         print(f"self-test: {missed} rule(s) did not behave")
         return 1
-    print(f"self-test: all {len(cases) + 4} checks passed")
+    print(f"self-test: all {len(cases) + 5} checks passed")
     return 0
 
 
@@ -256,7 +264,7 @@ def main():
     parser.add_argument("--print-baseline", action="store_true", help="print the current violations as baseline lines")
     args = parser.parse_args()
     if args.self_test:
-        return self_test()
+        return self_test() or check_assets_licensed.main(["--self-test"])
     if args.print_baseline:
         for line in sorted(keys(violations(walk(args.root)))):
             print(line)
@@ -268,7 +276,7 @@ def main():
             print(f"  - {e}")
         return 1
     print("content layout: ok")
-    return 0
+    return check_assets_licensed.main(["--root", args.root])
 
 
 if __name__ == "__main__":

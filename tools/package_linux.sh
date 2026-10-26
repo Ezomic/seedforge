@@ -62,6 +62,7 @@ cp "$bdir"/shaders/*.spv "$out/shaders/" || exit 1
 cp "$repo"/engine/content/scripts/*.lua "$out/scripts/" || exit 1
 cp -r "$repo/data" "$out/data" || exit 1
 cp -r "$repo/art/exile" "$repo/art/settlement_kit" "$out/art/" || exit 1
+cp "$repo/CREDITS.md" "$out/CREDITS.md" || exit 1
 
 # Libraries the build tree supplied (vcpkg) go beside the binary; system libraries stay the target machine's own.
 if [ "$(uname -s)" = Linux ] && command -v ldd >/dev/null 2>&1; then
