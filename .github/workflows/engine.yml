@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
   pull_request:
-    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
+    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
 
 # A new push to a PR cancels the run of the previous commit; runs on main queue and none is cancelled.
 concurrency:

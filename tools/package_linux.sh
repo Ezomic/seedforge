@@ -7,6 +7,7 @@
 # which starts `ichor --forged` with a default seed and grid. Everything is found beside the binary, so the folder can be moved
 # anywhere. The tarball is <out-dir>.tar.gz. --smoke unpacks the tarball into a fresh folder and runs the unpacked binary headless
 # from a different directory. It needs the build tree of a preset with ENGINE_RUNTIME on (linux-gpu); linux-headless-asan has no app.
+# -b names the build tree that is built (when not --no-build) and packaged; it must be the tree the preset configures.
 # Env: ICHOR_PACKAGE_SEED (default 1), ICHOR_PACKAGE_GRID (default 128).
 set -u
 
@@ -38,10 +39,10 @@ case "$grid" in ''|*[!0-9]*) echo "package: ICHOR_PACKAGE_GRID must be a whole n
 mkdir -p "$(dirname "$out")" || exit 1
 outabs=$(cd "$(dirname "$out")" && pwd)/$(basename "$out")
 case "$repo/" in "$outabs"/*) echo "package: refusing to replace $outabs, which contains the repository" >&2; exit 2 ;; esac
-case "$outabs" in "$repo/engine"*|"$repo/bin"*|"$repo/tools"*|"$repo/data"*|"$repo/art"*|"$repo/.git"*) echo "package: refusing to replace $outabs, which is inside the repository sources" >&2; exit 2 ;; esac
+case "$outabs/" in "$repo/engine/"*|"$repo/bin/"*|"$repo/tools/"*|"$repo/data/"*|"$repo/art/"*|"$repo/docs/"*|"$repo/.github/"*|"$repo/.git/"*) echo "package: refusing to replace $outabs, which is inside the repository sources" >&2; exit 2 ;; esac
 
 if [ "$build" = 1 ]; then
-  (cd "$repo/engine" && cmake --preset "$preset" && cmake --build "build/$preset" --target ichor) || { echo "package: build failed" >&2; exit 1; }
+  (cd "$repo/engine" && cmake --preset "$preset" && cmake --build "$bdir" --target ichor) || { echo "package: build failed" >&2; exit 1; }
 fi
 
 exe=$bdir/app/ichor
@@ -95,6 +96,11 @@ if [ "$smoke" = 1 ]; then
   mkdir "$work/unpacked" "$work/elsewhere" || exit 1
   tar -xzf "$outabs.tar.gz" -C "$work/unpacked" || { echo "package: the tarball did not unpack" >&2; exit 1; }
   unpacked=$work/unpacked/$(basename "$out")
+  if [ "$(uname -s)" = Linux ] && command -v ldd >/dev/null 2>&1; then
+    # Every library must come from the unpacked folder or the system, never from the build tree the binary was linked in.
+    stray=$(LD_LIBRARY_PATH="$unpacked/lib" ldd "$unpacked/ichor" | awk '/=> \//{print $3}' | grep -E "^($bdir|$repo)/|/vcpkg_installed/" | grep -v "^$unpacked/")
+    [ -z "$stray" ] || { echo "package: the binary still loads libraries from outside the package:" >&2; echo "$stray" >&2; exit 1; }
+  fi
   echo "package: smoke run of $unpacked from $work/elsewhere"
   log=$work/smoke.log
   (cd "$work/elsewhere" && LD_LIBRARY_PATH="$unpacked/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$unpacked/ichor" --headless --forged --seed "$seed" --grid 64 --frames 30) > "$log" 2>&1
@@ -103,5 +109,11 @@ if [ "$smoke" = 1 ]; then
   [ "$status" = 0 ] || { echo "package: smoke run failed ($status)" >&2; exit 1; }
   grep -qF "packaged build: assets are read from $unpacked" "$log" || { echo "package: the binary did not resolve its assets beside itself" >&2; exit 1; }
   grep -q "exit after 30 frames" "$log" || { echo "package: the smoke run did not finish its frames" >&2; exit 1; }
+  echo "package: start script run from $work/elsewhere"
+  (cd "$work/elsewhere" && "$unpacked/ichor.sh" --headless --grid 64 --frames 30) > "$log" 2>&1
+  status=$?
+  cat "$log"
+  [ "$status" = 0 ] || { echo "package: the start script run failed ($status)" >&2; exit 1; }
+  grep -q "exit after 30 frames" "$log" || { echo "package: the start script run did not finish its frames" >&2; exit 1; }
   echo "package: smoke run passed"
 fi

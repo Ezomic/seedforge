@@ -1,7 +1,8 @@
 # Stages a package folder the way tools/package_linux.sh and bin/package do (the executable and what it links beside it, with content/,
 # shaders/, scripts/, data/ and art/) and runs the staged executable headless from another directory. The run must log that it reads its
 # assets from the staged folder: a fallback to the compiled-in build-tree paths would also run, but would not log that line.
-# Needs ICHOR (the executable), BUILD (the build tree), REPO (the repository root) and SCRATCH.
+# It tests the app's asset roots, not the scripts' copy lists (the Linux script's own --smoke covers those); no Linux ctest preset builds the app, so the
+# *.dll glob below is enough. Needs ICHOR (the executable), BUILD (the build tree), REPO (the repository root) and SCRATCH.
 set(stage "${SCRATCH}/packaged_app/ichor")
 set(elsewhere "${SCRATCH}/packaged_app/elsewhere")
 file(REMOVE_RECURSE "${SCRATCH}/packaged_app")
