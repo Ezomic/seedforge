@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 namespace ichor::stage0 {
@@ -53,6 +54,27 @@ float exileLocomotionRate(float speed, float clipTravelSpeed);
 // rotation spherically, so a crossfade keeps limb lengths and the props on the hands stay attached.
 void blendSkin(const std::vector<glm::mat4>& from, const std::vector<glm::mat4>& to, float t, std::vector<glm::mat4>& out);
 
+// The Run clip leans the torso about 40 degrees over arms that hang at hip height, so the chest swallows the hands and
+// the shield and spear on them. For Run only, the spine and head are sat back up to this lean and the arms keep the
+// orientation the clip gave them, so the props stay level and only their position follows the body.
+constexpr float kExileRunLean = 0.21f; // radians
+
+struct ExileRunRig {
+    std::uint32_t hips = 0;
+    std::uint32_t chest = 0;
+    std::uint32_t leftArm = 0;
+    std::uint32_t rightArm = 0;
+    std::vector<std::uint32_t> upperBody; // spine up, both arms and the head, none of the legs
+    std::vector<std::uint32_t> leftArmJoints;
+    std::vector<std::uint32_t> rightArmJoints;
+};
+
+// Finds the Mixamo joints by name; false when the skeleton lacks them.
+bool buildExileRunRig(const std::vector<std::string>& jointNames, ExileRunRig& rig);
+
+// `world` is the clip's model-space pose and `skin` the skinning matrices of the same sample (facing -Z).
+void correctRunPose(const ExileRunRig& rig, const std::vector<glm::mat4>& world, std::vector<glm::mat4>& skin);
+
 class ExilePlayer {
 public:
     // Cooks the folder's three GLBs and uploads them; meshes land at meshCount() as it was before the call.
@@ -81,6 +103,8 @@ private:
     bool loaded_ = false;
     std::uint32_t meshBase_ = 0;
     ExileKit kit_;
+    ExileRunRig runRig_;
+    bool hasRunRig_ = false;
     AnimationSet animations_;
     std::array<std::uint32_t, kExileClipCount> clips_{};
     std::array<float, kExileClipCount> travelSpeed_{};

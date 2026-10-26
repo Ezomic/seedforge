@@ -90,8 +90,91 @@ int writeSheets(const std::filesystem::path& outDir, const std::filesystem::path
     return 0;
 }
 
+// Drives the real player through walking, running and sprinting and writes one PNG per gait: the live blended
+// pose after 10, 30 and 70 ticks, front view above side view. Also prints where the held props sit.
+int writeLocomotion(const std::filesystem::path& outDir, const std::filesystem::path& artDir)
+{
+    constexpr std::uint32_t kCellW = 256;
+    constexpr std::uint32_t kCellH = 384;
+    OffscreenRenderer renderer;
+    if (!renderer.init(kCellW, kCellH, false)) return 1;
+    SceneBundle bundle;
+    appendGreyBoxMeshes(bundle);
+    if (!renderer.uploadBundle(bundle)) return 1;
+    ExilePlayer exile;
+    if (!exile.prepare(artDir, static_cast<std::uint32_t>(bundle.meshes.size()))) return 1;
+    for (const SceneBundle& part : exile.kit().bundles) {
+        if (!renderer.uploadBundle(part)) return 1;
+    }
+    std::filesystem::create_directories(outDir);
+    struct Gait {
+        const char* label;
+        float move;
+        std::uint32_t buttons;
+    };
+    const Gait gaits[] = {{"walk", 0.3f, 0}, {"run", 1.0f, 0}, {"sprint", 1.0f, InputFrame::Sprint}};
+    const int ticks[] = {10, 30, 70};
+    const Tuning tuning;
+    for (const Gait& gait : gaits) {
+        Scene scene(1);
+        Stage0 stage(tuning);
+        stage.install(scene, {0.0, 0.0, 30.0}, {0.0, 0.0, -90.0});
+        scene.tick(kDt);
+        stage.resetFight(scene);
+        ExilePlayer player;
+        if (!player.prepare(artDir, static_cast<std::uint32_t>(bundle.meshes.size()))) return 1;
+        for (int i = 0; i < 30; ++i) scene.tick(kDt);
+        InputFrame input;
+        input.moveY = gait.move;
+        input.buttons = gait.buttons;
+        std::vector<std::uint8_t> sheet(static_cast<std::size_t>(kCellW) * 3 * kCellH * 2 * 4);
+        int tick = 0;
+        for (int column = 0; column < 3; ++column) {
+            RenderView view;
+            for (; tick < ticks[column]; ++tick) {
+                scene.tick(kDt, input);
+                view.instances.clear();
+                view.jointPalette.clear();
+                player.append(scene, 1.0, kDt, static_cast<float>(kDt), tuning, view);
+            }
+            const entt::entity entity = scene.find(stage.playerId());
+            const glm::dvec3 feet = scene.registry().get<Transform>(entity).position;
+            for (std::size_t k = 0; k < view.instances.size(); ++k) {
+                const glm::dvec3 rel = view.instances[k].position - feet;
+                logf(LogLevel::Info, "{} t{} instance {} rel ({:.2f}, {:.2f}, {:.2f})", gait.label, ticks[column], k, rel.x, rel.y, rel.z);
+            }
+            for (int v = 0; v < 2; ++v) {
+                RenderView rv = view;
+                for (int g = -3; g <= 3; ++g) {
+                    const double at = static_cast<double>(g) * 0.5;
+                    rv.lines.push_back({feet + glm::dvec3(at, 0.0, -1.5), feet + glm::dvec3(at, 0.0, 1.5), glm::vec3(0.35f)});
+                    rv.lines.push_back({feet + glm::dvec3(-1.5, 0.0, at), feet + glm::dvec3(1.5, 0.0, at), glm::vec3(0.35f)});
+                }
+                rv.sunDirection = glm::normalize(glm::vec3(-0.5f, 0.9f, 0.35f));
+                const glm::dvec3 eye = feet + (v == 0 ? glm::dvec3(0.0, 1.1, -4.6) : glm::dvec3(4.6, 1.1, 0.0));
+                const glm::dvec3 target = feet + glm::dvec3(0.0, 1.0, 0.0);
+                rv.camera.position = eye;
+                rv.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(target - eye)), glm::vec3(0.0f, 1.0f, 0.0f));
+                std::vector<std::uint8_t> pixels;
+                if (!renderer.render(rv, pixels)) return 1;
+                for (std::uint32_t y = 0; y < kCellH; ++y) {
+                    std::copy_n(pixels.begin() + static_cast<std::ptrdiff_t>(y) * kCellW * 4, kCellW * 4,
+                        sheet.begin() + (static_cast<std::ptrdiff_t>(v * kCellH + y) * kCellW * 3 + static_cast<std::ptrdiff_t>(column) * kCellW) * 4);
+                }
+            }
+        }
+        const std::filesystem::path file = outDir / (std::string("live_") + gait.label + ".png");
+        if (!writePng(file, kCellW * 3, kCellH * 2, sheet.data())) return 1;
+        logf(LogLevel::Info, "wrote {}", file.string());
+    }
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
+    if (argc > 3 && std::string(argv[3]) == "--locomotion") {
+        return writeLocomotion(argv[1], argc > 4 ? std::filesystem::path(argv[4]) : std::filesystem::path(ICHOR_ART_DIR) / "exile");
+    }
     if (argc > 3 && std::string(argv[3]) == "--sheets") {
         return writeSheets(argv[1], argc > 4 ? std::filesystem::path(argv[4]) : std::filesystem::path(ICHOR_ART_DIR) / "exile");
     }
