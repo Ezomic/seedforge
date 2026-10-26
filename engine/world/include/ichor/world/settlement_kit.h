@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ichor {
@@ -53,6 +54,45 @@ struct KitPieceInfo {
 // Measured from the exported GLBs (every piece is centred on the origin in x and z with its base on y = 0).
 const KitPieceInfo& kitPieceInfo(KitPiece piece);
 
+// The kit as data: one entry per piece, read from kit_manifest.json next to the GLBs. The seven pieces placement
+// knows by role (KitPiece) must be listed under their role id; any further entry is cooked and reachable by its id
+// without a code change. The built-in manifest is those seven, so a kit folder with no manifest behaves as before.
+struct KitManifestPiece {
+    std::string id;       // letters, digits and underscores; the role pieces use the KitPiece names
+    std::string file;     // a .glb directly under the kit folder
+    std::string category; // a free label such as building, wall, tower, gate
+    float halfWidthM = 0.0f;
+    float halfDepthM = 0.0f;
+    float heightM = 0.0f;
+};
+
+struct KitManifest {
+    std::vector<KitManifestPiece> pieces;
+
+    // The index of the piece with this id, or -1.
+    int find(std::string_view id) const;
+    // The index of a role piece; every valid manifest has all seven.
+    std::size_t role(KitPiece piece) const;
+};
+
+constexpr const char* kKitManifestFile = "kit_manifest.json";
+constexpr std::size_t kMaxKitManifestBytes = 1u << 20;
+constexpr std::size_t kMaxKitManifestPieces = 128;
+
+const KitManifest& builtinKitManifest();
+
+struct KitManifestResult {
+    KitManifest manifest;
+    std::string error; // empty on success; names the entry and the rule that failed
+
+    bool ok() const { return error.empty(); }
+};
+
+// Never throws or crashes on any bytes: bad JSON, wrong types, a duplicate id, a path that leaves the kit folder, a
+// non-finite or non-positive size, a missing role piece and an oversized file are all errors.
+KitManifestResult parseKitManifest(std::string_view text);
+KitManifestResult loadKitManifest(const std::filesystem::path& file);
+
 // Turns a piece about the vertical in exact quarter turns (no libm): quarter 0 leaves it, 1 sends +x to -z.
 glm::mat3 kitBasis(std::uint8_t quarterTurns);
 
@@ -80,6 +120,7 @@ private:
 };
 
 struct SettlementKitParams {
+    const KitManifest* manifest = nullptr; // the footprints placement uses; null means the built-in manifest
     float sinkM = 0.2f;           // a piece stands this far below the lowest ground under it
     float wallMarginM = 8.0f;     // the perimeter stands this far beyond the buildings' disc
     float towerSpacingM = 24.0f;  // stone walls get a tower this often along a side (a multiple of the grid)
@@ -105,12 +146,34 @@ std::array<bool, kKitPieceCount> kitPiecesUsed(const SettlementKitSet& set);
 
 // Where each cooked piece landed in a bundle: indices into SceneBundle::meshes.
 struct KitMeshes {
-    std::array<std::uint32_t, kKitPieceCount> mesh{};
+    std::array<std::uint32_t, kKitPieceCount> mesh{}; // by KitPiece
+    std::vector<std::uint32_t> byManifest;            // by position in the manifest the kit was cooked with
 };
 
 // Cooks the pieces marked in `wanted` through the glTF cooker and appends them to `bundle` (textures, materials
 // and meshes, rebased). Pieces not wanted keep mesh index 0. Returns false, with `bundle` untouched, when a file
-// is missing, fails to cook, or does not hold exactly one mesh.
+// is missing, fails to cook, does not hold exactly one mesh, or the materials would not fit the renderer.
 bool cookSettlementKit(const std::filesystem::path& folder, const std::array<bool, kKitPieceCount>& wanted, SceneBundle& bundle, KitMeshes& meshes);
+
+// The same for any manifest: `wanted` has one flag per manifest piece.
+bool cookSettlementKit(const std::filesystem::path& folder, const KitManifest& manifest, const std::vector<bool>& wanted, SceneBundle& bundle, KitMeshes& meshes);
+
+// Which manifest pieces the set uses (the role pieces it places).
+std::vector<bool> kitManifestPiecesUsed(const SettlementKitSet& set, const KitManifest& manifest);
+
+// How the appended kit used the renderer's material slots, filled by a successful merge.
+struct KitMergeStats {
+    std::size_t materialsIn = 0;     // materials across the cooked pieces
+    std::size_t materialsOut = 0;    // slots they take after sharing
+    std::size_t texturesIn = 0;
+    std::size_t texturesOut = 0;
+};
+
+// The merge step of cookSettlementKit: appends one cooked bundle per wanted piece (`pieces[i]` holds one mesh) to
+// `bundle`, sharing a material slot between materials of the same name, factors and texture set, and a texture
+// between identical images. Fails, with `error` set and `bundle` untouched, when the total would pass
+// kMaxSceneMaterials. `meshIndex[i]` is where piece i landed.
+bool mergeKitPieces(std::vector<SceneBundle>& pieces, const std::vector<bool>& wanted, SceneBundle& bundle, std::vector<std::uint32_t>& meshIndex, KitMergeStats& stats,
+    std::string& error);
 
 }

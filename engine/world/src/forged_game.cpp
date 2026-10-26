@@ -1,6 +1,7 @@
 #include "ichor/world/forged_game.h"
 
 #include "ichor/core/hash.h"
+#include "ichor/core/log.h"
 #include "ichor/world/road_surface.h"
 
 #include <algorithm>
@@ -488,9 +489,19 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
 bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder)
 {
     if (!game.kit || game.kit->empty()) return false;
+    KitManifest manifest = builtinKitManifest();
+    const std::filesystem::path manifestFile = folder / kKitManifestFile;
+    if (std::filesystem::exists(manifestFile)) {
+        KitManifestResult loaded = loadKitManifest(manifestFile);
+        if (!loaded.ok()) {
+            logf(LogLevel::Error, "{}", loaded.error);
+            return false;
+        }
+        manifest = std::move(loaded.manifest);
+    }
     SceneBundle staged = scenery.bundle;
     KitMeshes meshes;
-    if (!cookSettlementKit(folder, kitPiecesUsed(*game.kit), staged, meshes)) return false;
+    if (!cookSettlementKit(folder, manifest, kitManifestPiecesUsed(*game.kit, manifest), staged, meshes)) return false;
     scenery.bundle = std::move(staged);
     scenery.kitMesh = meshes;
     scenery.kitLoaded = true;
