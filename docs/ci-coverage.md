@@ -139,3 +139,22 @@ The time guard has a budget per tier. Without an allowlist entry a fast case may
 - To warm the caches after they are lost or renamed: run `engine.yml` from the Actions tab on main (`workflow_dispatch`, 60 minute limits). The pull request limit is 15 minutes (search `PR_LIMIT` in `engine.yml`; main run 40204448268 on 4de0045 had warm caches and every job was under 12 minutes). After a cache eviction or a key rename a cold PR run needs about 25 minutes: raise the limit to 30 until a main run has saved the caches again, then back to 15.
 - The ccache keys are `ccache-asan-`, `ccache-gpu-` and `ccache-walk-`: restore keys match by prefix, and the old shared `ccache-linux-` prefix let an ASan job restore the newest Release GPU cache (no hits, a 15 minute cold build).
 - A new push to a pull request cancels the run of the previous commit (`cancel-in-progress` was already set for PRs and stays); runs on main queue.
+
+## Linux package and headless smoke run (SEED-663)
+
+`tools/package_linux.sh` is the Linux counterpart of `bin/package` (SEED-644). It builds the `ichor` app, assembles `ichor-linux/` (the binary, any vcpkg shared libraries beside it in `lib/`, `content/`, `shaders/`, `scripts/`, `data/`, `art/` and `ichor.sh`, which starts `ichor --forged` with the default seed 1 and grid 128) and packs `ichor-linux.tar.gz`. With `--smoke` it unpacks that tarball into a fresh folder and runs the unpacked binary `--headless --forged --frames 30` from a different directory. The run must exit 0, log `packaged build: assets are read from <the unpacked folder>` (a fallback to the compiled-in build-tree paths also runs, but does not log that line) and log `exit after 30 frames`.
+
+- **Preset.** The `linux-headless-asan` preset has `ENGINE_RUNTIME=OFF`, so it never builds the `ichor` app and cannot be packaged. The script defaults to `linux-gpu` (Release, clang, `ENGINE_RUNTIME=ON`), whose vcpkg and ccache caches the `linux gpu goldens` job already keeps warm. `-p` picks another preset and `-b` a build directory.
+- **Where it runs.** Job `linux package + smoke` in `nightly.yml`, which also uploads the tarball as the `ichor-linux-package` artifact (7 days). It is not in `engine.yml`: even warm it builds the app, SDL3 and the renderer on top of the goldens job, which does not fit the 5 minutes a new PR check may add. No required check name changed.
+- **The ctest case.** `packaged_app_smoke` (medium tier, about 11 s, `engine/tests/packaged_app_check.cmake`) stages a folder the same way, runs the staged executable from another directory and asserts the `packaged build` line names the staged folder. It runs wherever `ENGINE_RUNTIME` is on, which is the `windows-ci` job; no Linux ctest preset builds the app.
+
+What was checked where:
+
+| Check | Where |
+|---|---|
+| `shellcheck` clean, `bash -n` | Locally on Windows (shellcheck 0.11 from pip) |
+| Packaging, tarball layout and modes (`ichor` and `ichor.sh` 755, owner 0), `ichor.sh` content, unpack, run from another directory, the failing path (a binary that does not log the packaged line fails the smoke), the refusal of an output inside the repository sources and of a non-numeric seed | Locally on Windows, against a fake build tree whose `ichor` is a shell script (`-b`, `--no-build`) |
+| `packaged_app_smoke` | Locally on Windows with the real `ichor.exe`, and in the `windows-ci` job |
+| Building the app on Linux, the `ldd` step (unresolved libraries fail the script, vcpkg libraries are copied to `lib/`), `LD_LIBRARY_PATH` in `ichor.sh`, the real `/proc/self/exe` resolution, the smoke run of a real Linux binary | Only the nightly job (run it by hand with `workflow_dispatch` on `nightly`) |
+
+The tarball needs a glibc at least as new as the runner's (ubuntu-latest) and, to open a window, a Vulkan loader (`libvulkan1`) on the player's machine; `--headless` needs neither a GPU nor a display.

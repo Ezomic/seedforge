@@ -217,3 +217,54 @@ jobs:
       - name: Soak tests
         run: ctest --preset linux-headless-asan-soak
         working-directory: engine
+
+  linux-package:
+    # The Linux counterpart of bin/package (SEED-663): builds the app with the linux-gpu preset (the only Linux preset with ENGINE_RUNTIME on),
+    # packs tools/package_linux.sh's tarball, unpacks it in a fresh folder and runs the unpacked binary --headless from another directory.
+    # Not in engine.yml: a cold build compiles SDL3 and the renderer, and even a warm run adds more than the 5 minutes a required PR check can spare.
+    name: linux package + smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 autoconf autoconf-archive automake libtool libltdl-dev pkg-config
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-gpu-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: |
+            vcpkg-linux-gpu-v2-
+            vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-package-${{ github.sha }}
+          restore-keys: |
+            ccache-package-
+            ccache-gpu-
+      - name: Package and smoke run
+        run: tools/package_linux.sh --smoke --out "$RUNNER_TEMP/dist/ichor-linux"
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ichor-linux-package
+          path: ${{ runner.temp }}/dist/ichor-linux.tar.gz
+          retention-days: 7
+          if-no-files-found: error
