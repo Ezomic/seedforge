@@ -25,7 +25,7 @@ test::ForgedVariant lowRiverThreshold()
 }
 
 constexpr int kGrid = 257;
-constexpr std::uint64_t kFirstSeed = 1;
+constexpr std::uint64_t kFirstSeed = 14; // seeds 1 to 13 have no lake or river wide enough to cross; each one skipped is a full forge
 constexpr float kFord = 0.5f;
 
 struct Crossing {

@@ -1,13 +1,5 @@
 {
   "sanitizer": {
-    "a path over the forged navmesh does not cross open lake water, and one over the plain navmesh does": {
-      "seconds": 510.0,
-      "reason": "Forges and walks real worlds, slow under the sanitizer."
-    },
-    "a road over the water is a bridge: the path crosses where the road does": {
-      "seconds": 510.0,
-      "reason": "Forges and walks real worlds, slow under the sanitizer."
-    },
     "a showcase run ranks the seeds, writes the tables, thumbnails and the data file, and is repeatable": {
       "seconds": 1500.0,
       "reason": "SEED-650 showcase run forges many seeds, 1275 s on the Linux sanitizer job (main 8fd2b13); shrink it or keep the cap"
@@ -21,12 +13,12 @@
       "reason": "Runs every forge phase over a seed range, about 450 s under the sanitizer"
     },
     "hydrology survives degenerate and extreme terrain": {
-      "seconds": 450.0,
-      "reason": "Forges and walks real worlds, slow under the sanitizer."
+      "seconds": 600.0,
+      "reason": "Main shard 3 measured 404 s under ASan (runs 40246266294 and 40245116992), 450 s was too close"
     },
     "landmark coverage passes on the first attempt at 128 and 256 for seeds 1 to 8": {
-      "seconds": 300.0,
-      "reason": "Forges and walks real worlds, slow under the sanitizer."
+      "seconds": 420.0,
+      "reason": "Main shard 3 measured 261 s under ASan (runs 40246266294 and 40245116992), 300 s was too close"
     },
     "live worlds: the probe finds a spawn, repeats itself, and the walk reaches a settlement on some seed": {
       "seconds": 1500.0,
@@ -46,10 +38,6 @@
     },
     "the land erosion removes is about the same at 64, 128 and 256": {
       "seconds": 300.0,
-      "reason": "Forges and walks real worlds, slow under the sanitizer."
-    },
-    "the surface blocks open water, lets a road bridge it, and leaves dry ground walkable": {
-      "seconds": 450.0,
       "reason": "Forges and walks real worlds, slow under the sanitizer."
     }
   },
