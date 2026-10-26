@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/assets/bundle.h"
+#include "ichor/assets/piece_conventions.h"
 
 #include <filesystem>
 
@@ -21,5 +22,8 @@ struct CookOptions {
 // glTF or GLB in, bundle out. Meshes are deduplicated and reordered for the
 // vertex cache; textures get a full mip chain; node transforms are flattened.
 bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats, const CookOptions& options = {});
+
+// The validator mode: what cookGltf would find in the names of `source`, without cooking meshes or textures.
+bool inspectGltf(const std::filesystem::path& source, ConventionScan& scan);
 
 }

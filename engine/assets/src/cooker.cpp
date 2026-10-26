@@ -1,6 +1,7 @@
 #include "ichor/assets/cooker.h"
 
 #include "ichor/assets/image.h"
+#include "ichor/assets/piece_conventions.h"
 #include "ichor/assets/skeleton_cook.h"
 #include "ichor/core/log.h"
 
@@ -15,6 +16,7 @@
 #include <cmath>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ichor {
 
@@ -244,25 +246,46 @@ bool cookTexture(const cgltf_image& image, TextureFormat format, Texture& textur
     return decodeTexture(bytes, image.buffer_view->size, format, texture);
 }
 
-}
-
-bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats, const CookOptions& cookOptions)
+// A parsed, buffer-loaded and validated glTF, or null with the reason logged.
+cgltf_data* loadValidated(const std::filesystem::path& source)
 {
     const std::string file = source.string();
     cgltf_options options{};
     cgltf_data* data = nullptr;
     if (cgltf_parse_file(&options, file.c_str(), &data) != cgltf_result_success) {
         logf(LogLevel::Error, "cannot parse {}", file);
-        return false;
+        return nullptr;
     }
     if (cgltf_load_buffers(&options, data, file.c_str()) != cgltf_result_success) {
         logf(LogLevel::Error, "cannot load buffers for {}", file);
         cgltf_free(data);
-        return false;
+        return nullptr;
     }
     if (cgltf_validate(data) != cgltf_result_success) {
         logf(LogLevel::Error, "{} fails glTF validation", file);
         cgltf_free(data);
+        return nullptr;
+    }
+    return data;
+}
+
+}
+
+bool inspectGltf(const std::filesystem::path& source, ConventionScan& scan)
+{
+    cgltf_data* data = loadValidated(source);
+    if (data == nullptr) {
+        return false;
+    }
+    scanConventions(*data, scan);
+    cgltf_free(data);
+    return true;
+}
+
+bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats, const CookOptions& cookOptions)
+{
+    cgltf_data* data = loadValidated(source);
+    if (data == nullptr) {
         return false;
     }
 
@@ -318,12 +341,18 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
         }
     }
 
+    ConventionScan conventions;
+    scanConventions(*data, conventions);
+    for (const std::string& issue : conventions.issues) {
+        logf(LogLevel::Warn, "{}: {}", source.filename().string(), issue);
+    }
+
     // Meshes are cooked once per glTF mesh; skinning data comes from the first
     // node's skin, which is how exporters pair them.
     std::unordered_map<const cgltf_mesh*, std::uint32_t> meshIndex;
     for (cgltf_size n = 0; n < data->nodes_count && ok; ++n) {
         const cgltf_node& src = data->nodes[n];
-        if (src.mesh == nullptr || meshIndex.contains(src.mesh)) {
+        if (src.mesh == nullptr || meshIndex.contains(src.mesh) || conventions.roles[n] == NodeRole::Collision) {
             continue;
         }
         Mesh mesh;
@@ -336,8 +365,14 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
         meshIndex[src.mesh] = static_cast<std::uint32_t>(bundle.meshes.size());
         bundle.meshes.push_back(std::move(mesh));
     }
+    std::unordered_set<const cgltf_mesh*> collisionMeshes;
+    for (cgltf_size n = 0; n < data->nodes_count; ++n) {
+        if (conventions.roles[n] == NodeRole::Collision) {
+            collisionMeshes.insert(data->nodes[n].mesh);
+        }
+    }
     for (cgltf_size m = 0; m < data->meshes_count; ++m) {
-        if (!meshIndex.contains(&data->meshes[m])) {
+        if (!meshIndex.contains(&data->meshes[m]) && !collisionMeshes.contains(&data->meshes[m])) {
             logf(LogLevel::Warn, "mesh {}: no node references it, dropped", data->meshes[m].name != nullptr ? data->meshes[m].name : "");
         }
     }
@@ -345,7 +380,7 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
     for (cgltf_size n = 0; n < data->nodes_count && ok; ++n) {
         const cgltf_node& src = data->nodes[n];
         const auto found = src.mesh != nullptr ? meshIndex.find(src.mesh) : meshIndex.end();
-        if (found == meshIndex.end()) {
+        if (found == meshIndex.end() || conventions.roles[n] == NodeRole::Collision || conventions.roles[n] == NodeRole::LodExtra) {
             continue;
         }
         Node node;
@@ -355,6 +390,19 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
         cgltf_node_transform_world(&src, world);
         node.world = glm::make_mat4(world);
         bundle.nodes.push_back(node);
+    }
+
+    if (ok) {
+        bundle.sockets = std::move(conventions.sockets);
+        bundle.collision = std::move(conventions.collision);
+        for (const ConventionScan::Lod& lod : conventions.lods) {
+            LodGroup group;
+            group.piece = lod.piece;
+            for (std::size_t level = 0; level < lod.nodes.size(); ++level) {
+                group.levels.push_back(LodLevel{.mesh = meshIndex.at(data->nodes[lod.nodes[level]].mesh), .distance = lod.distances[level]});
+            }
+            bundle.lodGroups.push_back(std::move(group));
+        }
     }
 
     cgltf_free(data);

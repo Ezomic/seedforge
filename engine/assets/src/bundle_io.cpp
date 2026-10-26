@@ -8,12 +8,17 @@
 #include <cstring>
 #include <fstream>
 
+#include <glm/geometric.hpp>
+
 namespace ichor {
 
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'C', 'N'};
 constexpr std::uint32_t kVersion = 3;
+// Sockets, LOD groups and collision follow the nodes under this tag, and only when there are any,
+// so a bundle without them is the same bytes it always was.
+constexpr std::array<char, 4> kPieceTag{'I', 'P', 'C', '1'};
 
 class Writer {
 public:
@@ -94,6 +99,8 @@ public:
         in_.read(reinterpret_cast<char*>(values.data()), static_cast<std::streamsize>(n * sizeof(T)));
         return in_.good() || (n == 0);
     }
+
+    bool atEnd() const { return remaining_ == 0; }
 
     bool strings(std::vector<std::string>& values)
     {
@@ -176,6 +183,27 @@ bool validate(const SceneBundle& bundle, const std::string& file)
     for (const Node& n : bundle.nodes) {
         if (n.mesh >= bundle.meshes.size()) return fail("node mesh index");
     }
+    for (const Socket& s : bundle.sockets) {
+        const float length = glm::length(s.rotation);
+        if (s.name.empty() || !std::isfinite(s.position.x + s.position.y + s.position.z) || !(length > 0.5f && length < 1.5f)) return fail("socket");
+    }
+    for (const LodGroup& g : bundle.lodGroups) {
+        if (g.levels.size() < 2 || g.levels.front().distance != 0.0f) return fail("lod group shape");
+        float previous = 0.0f;
+        for (const LodLevel& level : g.levels) {
+            if (level.mesh >= bundle.meshes.size() || !std::isfinite(level.distance) || level.distance < previous) return fail("lod level");
+            previous = level.distance;
+        }
+    }
+    for (const CollisionShape& c : bundle.collision) {
+        if (c.kind != CollisionKind::Box && c.kind != CollisionKind::Convex) return fail("collision kind");
+        const glm::vec3 extent = c.boundsMax - c.boundsMin;
+        if (!std::isfinite(extent.x + extent.y + extent.z) || extent.x < 0.0f || extent.y < 0.0f || extent.z < 0.0f) return fail("collision bounds");
+        if ((c.kind == CollisionKind::Box) != c.points.empty()) return fail("collision points");
+        for (const glm::vec3& p : c.points) {
+            if (!std::isfinite(p.x + p.y + p.z)) return fail("collision point");
+        }
+    }
     return true;
 }
 
@@ -253,6 +281,31 @@ bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle)
         w.pod(n.mesh);
         w.pod(n.world);
     }
+
+    if (!bundle.sockets.empty() || !bundle.lodGroups.empty() || !bundle.collision.empty()) {
+        w.pod(kPieceTag);
+        w.pod(static_cast<std::uint32_t>(bundle.sockets.size()));
+        for (const auto& s : bundle.sockets) {
+            w.string(s.piece);
+            w.string(s.name);
+            w.pod(s.position);
+            w.pod(s.rotation);
+        }
+        w.pod(static_cast<std::uint32_t>(bundle.lodGroups.size()));
+        for (const auto& g : bundle.lodGroups) {
+            w.string(g.piece);
+            w.pods(g.levels);
+        }
+        w.pod(static_cast<std::uint32_t>(bundle.collision.size()));
+        for (const auto& c : bundle.collision) {
+            w.string(c.piece);
+            w.string(c.name);
+            w.pod(c.kind);
+            w.pod(c.boundsMin);
+            w.pod(c.boundsMax);
+            w.pods(c.points);
+        }
+    }
     return out.good();
 }
 
@@ -266,6 +319,9 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
         return false;
     }
     Reader r(in, fileSize);
+    bundle.sockets.clear();
+    bundle.lodGroups.clear();
+    bundle.collision.clear();
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
     if (!r.pod(magic) || magic != kMagic || !r.pod(version) || version != kVersion) {
@@ -327,6 +383,39 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
     bundle.nodes.resize(count);
     for (auto& n : bundle.nodes) {
         if (!r.string(n.name) || !r.pod(n.mesh) || !r.pod(n.world)) {
+            return false;
+        }
+    }
+
+    if (!r.atEnd()) {
+        std::array<char, 4> tag{};
+        if (!r.pod(tag) || tag != kPieceTag) {
+            logf(LogLevel::Error, "{}: unknown data after the nodes", path.string());
+            return false;
+        }
+        if (!r.count(count, 36)) return false;
+        bundle.sockets.resize(count);
+        for (auto& s : bundle.sockets) {
+            if (!r.string(s.piece) || !r.string(s.name) || !r.pod(s.position) || !r.pod(s.rotation)) {
+                return false;
+            }
+        }
+        if (!r.count(count, 8)) return false;
+        bundle.lodGroups.resize(count);
+        for (auto& g : bundle.lodGroups) {
+            if (!r.string(g.piece) || !r.pods(g.levels)) {
+                return false;
+            }
+        }
+        if (!r.count(count, 40)) return false;
+        bundle.collision.resize(count);
+        for (auto& c : bundle.collision) {
+            if (!r.string(c.piece) || !r.string(c.name) || !r.pod(c.kind) || !r.pod(c.boundsMin) || !r.pod(c.boundsMax) || !r.pods(c.points)) {
+                return false;
+            }
+        }
+        if (!r.atEnd()) {
+            logf(LogLevel::Error, "{}: trailing bytes", path.string());
             return false;
         }
     }

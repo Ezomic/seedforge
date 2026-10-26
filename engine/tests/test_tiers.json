@@ -32,6 +32,7 @@
     "hostile combat times give finite poses inside the clip",
     "hostile: hydrology cache",
     "hostile: quest ruleset file through loadRuleset",
+    "hostile: scene files with and without conventions never crash the cooker or the reader",
     "hostile: world heightmap through readWorld",
     "hydrology survives degenerate and extreme terrain",
     "idle, walk and run loop: the last pose meets the first",
