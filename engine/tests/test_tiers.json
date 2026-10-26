@@ -73,6 +73,7 @@
     "the lift puts the model on the floor in every state, where the raw clips sink it",
     "the player is drawn on the terrain, faces the way it walks and keeps its facing at rest",
     "the player's stride follows the render clock and a hostile clock or tick moves nothing",
+    "the real settlement kit art shares its materials under the renderer cap",
     "the root's travel is taken out of the pose across a whole stride",
     "the spear is held in the right hand and the shield in the left, on the hand at the start of idle",
     "the stride moves with the speed and standing still holds a pose",

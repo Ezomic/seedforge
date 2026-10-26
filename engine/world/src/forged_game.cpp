@@ -1,6 +1,7 @@
 #include "ichor/world/forged_game.h"
 
 #include "ichor/core/hash.h"
+#include "ichor/core/log.h"
 #include "ichor/world/road_surface.h"
 
 #include <algorithm>
@@ -488,9 +489,28 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
 bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder)
 {
     if (!game.kit || game.kit->empty()) return false;
+    KitManifest manifest = builtinKitManifest();
+    const std::filesystem::path manifestFile = folder / kKitManifestFile;
+    std::error_code exists;
+    if (std::filesystem::exists(manifestFile, exists)) {
+        KitManifestResult loaded = loadKitManifest(manifestFile);
+        if (!loaded.ok()) {
+            logf(LogLevel::Error, "{}", loaded.error);
+            return false;
+        }
+        for (std::size_t r = 0; r < kKitPieceCount; ++r) {
+            const KitManifestPiece& file = loaded.manifest.pieces[loaded.manifest.role(static_cast<KitPiece>(r))];
+            const KitManifestPiece& built = builtinKitManifest().pieces[r];
+            if (file.halfWidthM != built.halfWidthM || file.halfDepthM != built.halfDepthM || file.heightM != built.heightM) {
+                logf(LogLevel::Error, "kit manifest: the footprint of {} differs from the one the settlements were placed with", file.id);
+                return false;
+            }
+        }
+        manifest = std::move(loaded.manifest);
+    }
     SceneBundle staged = scenery.bundle;
     KitMeshes meshes;
-    if (!cookSettlementKit(folder, kitPiecesUsed(*game.kit), staged, meshes)) return false;
+    if (!cookSettlementKit(folder, manifest, kitManifestPiecesUsed(*game.kit, manifest), staged, meshes)) return false;
     scenery.bundle = std::move(staged);
     scenery.kitMesh = meshes;
     scenery.kitLoaded = true;
