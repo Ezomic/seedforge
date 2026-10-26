@@ -491,11 +491,20 @@ bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std:
     if (!game.kit || game.kit->empty()) return false;
     KitManifest manifest = builtinKitManifest();
     const std::filesystem::path manifestFile = folder / kKitManifestFile;
-    if (std::filesystem::exists(manifestFile)) {
+    std::error_code exists;
+    if (std::filesystem::exists(manifestFile, exists)) {
         KitManifestResult loaded = loadKitManifest(manifestFile);
         if (!loaded.ok()) {
             logf(LogLevel::Error, "{}", loaded.error);
             return false;
+        }
+        for (std::size_t r = 0; r < kKitPieceCount; ++r) {
+            const KitManifestPiece& file = loaded.manifest.pieces[loaded.manifest.role(static_cast<KitPiece>(r))];
+            const KitManifestPiece& built = builtinKitManifest().pieces[r];
+            if (file.halfWidthM != built.halfWidthM || file.halfDepthM != built.halfDepthM || file.heightM != built.heightM) {
+                logf(LogLevel::Error, "kit manifest: the footprint of {} differs from the one the settlements were placed with", file.id);
+                return false;
+            }
         }
         manifest = std::move(loaded.manifest);
     }

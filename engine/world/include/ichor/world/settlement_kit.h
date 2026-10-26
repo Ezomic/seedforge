@@ -56,7 +56,9 @@ const KitPieceInfo& kitPieceInfo(KitPiece piece);
 
 // The kit as data: one entry per piece, read from kit_manifest.json next to the GLBs. The seven pieces placement
 // knows by role (KitPiece) must be listed under their role id; any further entry is cooked and reachable by its id
-// without a code change. The built-in manifest is those seven, so a kit folder with no manifest behaves as before.
+// without a code change (cookSettlementKit returns its mesh in KitMeshes::byManifest; placement does not place it yet).
+// Settlements are placed before the kit folder is known, so with the built-in footprints; addSettlementKit refuses a
+// manifest whose role footprints differ. The built-in manifest is those seven, so a kit folder with no manifest behaves as before.
 struct KitManifestPiece {
     std::string id;       // letters, digits and underscores; the role pieces use the KitPiece names
     std::string file;     // a .glb directly under the kit folder

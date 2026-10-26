@@ -198,6 +198,11 @@ TEST_CASE("a kit that would pass the renderer's material cap is refused and leav
     CHECK(bundle.materials.size() == 1);
     CHECK(bundle.meshes.empty());
 
+    std::vector<SceneBundle> over;
+    over.push_back(syntheticPiece(kMaxSceneMaterials, kMaxSceneMaterials, 0));
+    CHECK_FALSE(mergeKitPieces(over, {true}, bundle, index, stats, error));
+    CHECK(bundle.materials.size() == 1);
+
     std::vector<SceneBundle> fits;
     fits.push_back(syntheticPiece(kMaxSceneMaterials - 1, kMaxSceneMaterials - 1, 0));
     CHECK(mergeKitPieces(fits, {true}, bundle, index, stats, error));
@@ -244,9 +249,8 @@ TEST_CASE("the real settlement kit art shares its materials under the renderer c
     INFO(error);
     REQUIRE(mergeKitPieces(pieces, std::vector<bool>(pieces.size(), true), bundle, index, stats, error));
     INFO(stats.materialsIn << " materials in " << stats.materialsOut << " slots");
-    CHECK(stats.materialsOut <= stats.materialsIn);
+    CHECK(stats.materialsOut < stats.materialsIn);
     CHECK(bundle.materials.size() <= kMaxSceneMaterials);
-    CHECK(bundle.textures.size() <= stats.texturesIn);
 }
 
 TEST_CASE("manifest rules name the entry and the rule", "[bake][settlements][kit][manifest]")

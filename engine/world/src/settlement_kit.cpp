@@ -9,11 +9,14 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <format>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <set>
+#include <system_error>
 
 namespace ichor {
 
