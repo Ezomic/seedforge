@@ -17,9 +17,14 @@ on:
       walk_grids:
         description: forged walk bot grid sizes, comma separated
         default: "256,1024"
+      package_only:
+        description: run only the Linux package + smoke job
+        type: boolean
+        default: false
 
 jobs:
   stress-and-sanity:
+    if: ${{ !inputs.package_only }}
     name: ctest-stress + world sanity (linux headless)
     runs-on: ubuntu-latest
     timeout-minutes: 100
@@ -105,6 +110,7 @@ jobs:
           if-no-files-found: ignore
 
   forged-walk:
+    if: ${{ !inputs.package_only }}
     name: forged walk bot 256 and 1024 (linux headless)
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -173,6 +179,7 @@ jobs:
           if-no-files-found: ignore
 
   soak:
+    if: ${{ !inputs.package_only }}
     # The full variants of the heavy tests (label soak in engine/tests/test_tiers.json) under ASan/UBSan. The stress job above runs
     # every other test, so together the nightly covers the whole suite. Pull requests run the small variants only (SEED-664, SEED-672).
     name: soak tests (linux headless)
