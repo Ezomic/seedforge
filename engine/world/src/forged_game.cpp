@@ -486,7 +486,7 @@ ForgedScenery buildForgedScenery(const ForgedGame& game)
     return scenery;
 }
 
-bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder)
+bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder, bool useVariants)
 {
     if (!game.kit || game.kit->empty()) return false;
     KitManifest manifest = builtinKitManifest();
@@ -510,7 +510,7 @@ bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std:
     }
     SceneBundle staged = scenery.bundle;
     KitMeshes meshes;
-    if (!cookSettlementKit(folder, manifest, kitManifestPiecesUsed(*game.kit, manifest), staged, meshes)) return false;
+    if (!cookSettlementKit(folder, manifest, kitManifestPiecesUsed(*game.kit, manifest, useVariants), staged, meshes)) return false;
     scenery.bundle = std::move(staged);
     scenery.kitMesh = meshes;
     scenery.kitLoaded = true;

@@ -56,7 +56,9 @@ const KitPieceInfo& kitPieceInfo(KitPiece piece);
 
 // The kit as data: one entry per piece, read from kit_manifest.json next to the GLBs. The seven pieces placement
 // knows by role (KitPiece) must be listed under their role id; any further entry is cooked and reachable by its id
-// without a code change (cookSettlementKit returns its mesh in KitMeshes::byManifest; placement does not place it yet).
+// without a code change (cookSettlementKit returns its mesh in KitMeshes::byManifest). An entry with "variantOf": "<role id>"
+// is a look-alike for that role: its footprint must fit inside the role's, and it is cooked and drawn in the role's place
+// only when the kit is asked for variants (addSettlementKit's useVariants, the app's --kit-variants), so a default run is unchanged.
 // Settlements are placed before the kit folder is known, so with the built-in footprints; addSettlementKit refuses a
 // manifest whose role footprints differ. The built-in manifest is those seven, so a kit folder with no manifest behaves as before.
 struct KitManifestPiece {
@@ -66,6 +68,7 @@ struct KitManifestPiece {
     float halfWidthM = 0.0f;
     float halfDepthM = 0.0f;
     float heightM = 0.0f;
+    std::string variantOf; // empty, or the id of the role piece this one may stand in for (see KitMeshes::variants)
 };
 
 struct KitManifest {
@@ -150,7 +153,12 @@ std::array<bool, kKitPieceCount> kitPiecesUsed(const SettlementKitSet& set);
 struct KitMeshes {
     std::array<std::uint32_t, kKitPieceCount> mesh{}; // by KitPiece
     std::vector<std::uint32_t> byManifest;            // by position in the manifest the kit was cooked with
+    std::array<std::vector<std::uint32_t>, kKitPieceCount> variants; // by KitPiece: the cooked look-alikes of that role, in manifest order
 };
+
+// The mesh to draw for a placed piece: one of the role's variants chosen from the piece's position (so a settlement's
+// houses differ from each other and the same world always draws the same), else the role's own mesh.
+std::uint32_t kitMeshFor(const KitMeshes& meshes, const KitInstance& instance);
 
 // Cooks the pieces marked in `wanted` through the glTF cooker and appends them to `bundle` (textures, materials
 // and meshes, rebased). Pieces not wanted keep mesh index 0. Returns false, with `bundle` untouched, when a file
@@ -161,7 +169,8 @@ bool cookSettlementKit(const std::filesystem::path& folder, const std::array<boo
 bool cookSettlementKit(const std::filesystem::path& folder, const KitManifest& manifest, const std::vector<bool>& wanted, SceneBundle& bundle, KitMeshes& meshes);
 
 // Which manifest pieces the set uses (the role pieces it places).
-std::vector<bool> kitManifestPiecesUsed(const SettlementKitSet& set, const KitManifest& manifest);
+// With `variants`, the look-alikes of every used role count as used too.
+std::vector<bool> kitManifestPiecesUsed(const SettlementKitSet& set, const KitManifest& manifest, bool variants = false);
 
 // How the appended kit used the renderer's material slots, filled by a successful merge.
 struct KitMergeStats {

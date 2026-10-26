@@ -332,6 +332,13 @@ KitManifestResult parseEntries(const nlohmann::json& root)
         if (!text("file", piece.file) || !validFile(piece.file)) return manifestFailure(std::format("{} needs a \"file\" that is a plain .glb name inside the kit folder", piece.id));
         if (!files.insert(piece.file).second) return manifestFailure(std::format("{} reuses the file {}", piece.id, piece.file));
         if (!text("category", piece.category) || !validId(piece.category)) return manifestFailure(std::format("{} has a missing or invalid category", piece.id));
+        const auto variant = entry.find("variantOf");
+        if (variant != entry.end()) {
+            if (!variant->is_string()) return manifestFailure(std::format("{} has a \"variantOf\" that is not a string", piece.id));
+            piece.variantOf = variant->get<std::string>();
+            const auto role = std::find(std::begin(kRoleId), std::end(kRoleId), piece.variantOf);
+            if (role == std::end(kRoleId)) return manifestFailure(std::format("{} is a variant of {}, which is not a role piece", piece.id, piece.variantOf));
+        }
         const auto footprint = entry.find("footprint");
         if (footprint == entry.end() || !footprint->is_object()) return manifestFailure(std::format("{} has no \"footprint\" object", piece.id));
         const auto size = [&](const char* key, float& dest) {
@@ -345,6 +352,14 @@ KitManifestResult parseEntries(const nlohmann::json& root)
     }
     for (const char* role : kRoleId) {
         if (out.manifest.find(role) < 0) return manifestFailure(std::format("the piece {} that placement needs is missing", role));
+    }
+    for (const KitManifestPiece& piece : out.manifest.pieces) {
+        if (piece.variantOf.empty()) continue;
+        if (std::find(std::begin(kRoleId), std::end(kRoleId), piece.id) != std::end(kRoleId)) return manifestFailure(std::format("{} is a role piece and cannot be a variant", piece.id));
+        const KitManifestPiece& role = out.manifest.pieces[static_cast<std::size_t>(out.manifest.find(piece.variantOf))];
+        if (piece.halfWidthM > role.halfWidthM || piece.halfDepthM > role.halfDepthM) {
+            return manifestFailure(std::format("{} does not fit inside the footprint of {}, the piece it stands in for", piece.id, role.id));
+        }
     }
     return out;
 }
@@ -403,12 +418,22 @@ KitManifestResult loadKitManifest(const std::filesystem::path& file)
     return result;
 }
 
-std::vector<bool> kitManifestPiecesUsed(const SettlementKitSet& set, const KitManifest& manifest)
+std::vector<bool> kitManifestPiecesUsed(const SettlementKitSet& set, const KitManifest& manifest, bool variants)
 {
     std::vector<bool> used(manifest.pieces.size(), false);
+    std::array<bool, kKitPieceCount> roleUsed{};
     for (const KitInstance& instance : set.all()) {
         const std::size_t at = manifest.role(instance.piece);
         if (at < used.size()) used[at] = true;
+        roleUsed[static_cast<std::size_t>(instance.piece)] = true;
+    }
+    if (!variants) return used;
+    for (std::size_t i = 0; i < manifest.pieces.size(); ++i) {
+        const std::string& of = manifest.pieces[i].variantOf;
+        if (of.empty()) continue;
+        for (std::size_t r = 0; r < kKitPieceCount; ++r) {
+            if (of == kRoleId[r] && roleUsed[r]) used[i] = true;
+        }
     }
     return used;
 }
@@ -534,7 +559,23 @@ bool cookSettlementKit(const std::filesystem::path& folder, const KitManifest& m
         const std::size_t at = manifest.role(static_cast<KitPiece>(r));
         if (at < index.size()) meshes.mesh[r] = index[at];
     }
+    for (std::size_t i = 0; i < manifest.pieces.size(); ++i) {
+        if (manifest.pieces[i].variantOf.empty() || !wanted[i]) continue;
+        for (std::size_t r = 0; r < kKitPieceCount; ++r) {
+            if (manifest.pieces[i].variantOf == kRoleId[r]) meshes.variants[r].push_back(index[i]);
+        }
+    }
     return true;
+}
+
+std::uint32_t kitMeshFor(const KitMeshes& meshes, const KitInstance& instance)
+{
+    const std::size_t role = static_cast<std::size_t>(instance.piece);
+    const std::vector<std::uint32_t>& variants = meshes.variants[role];
+    if (variants.empty()) return meshes.mesh[role];
+    const std::uint64_t pick = worldforge::splitmix64(worldforge::hashText(instance.settlementId) ^ static_cast<std::uint64_t>(std::llround(instance.x * 8.0)) * 0x9e3779b97f4a7c15ull
+        ^ static_cast<std::uint64_t>(std::llround(instance.z * 8.0)));
+    return variants[pick % variants.size()];
 }
 
 bool cookSettlementKit(const std::filesystem::path& folder, const std::array<bool, kKitPieceCount>& wanted, SceneBundle& bundle, KitMeshes& meshes)
