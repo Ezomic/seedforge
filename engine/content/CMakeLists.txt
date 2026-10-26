@@ -13,7 +13,17 @@ foreach(lfs_file ${sources} ${CMAKE_SOURCE_DIR}/../art/audio/A_Tell.wav)
     endif()
 endforeach()
 # The three telegraph cues doc 18 asks for travel with the kit.
-set(kit_sounds ${ICHOR_ART_DIR}/audio/A_WindupLight.wav ${ICHOR_ART_DIR}/audio/A_WindupHeavy.wav ${ICHOR_ART_DIR}/audio/A_Tell.wav)
+set(kit_sound_names A_WindupLight A_WindupHeavy A_Tell)
+# The footsteps, country beds, hour layers and settlement sounds the sound legend names, cut from CC0 sources (art/audio_sources.md).
+list(APPEND kit_sound_names
+    A_Step_Grass A_Step_Rock A_Step_Road A_Step_Snow
+    A_Bed_Surf A_Bed_Lake A_Bed_Taiga A_Bed_Forest A_Bed_Grassland A_Bed_Marsh A_Bed_Rainforest A_Bed_Savanna A_Bed_Blight A_Bed_Farmland
+    A_Dawn_Birds A_Day_Insects A_Dusk_Crickets A_Night_Insects A_Night_Wolves
+    A_Settlement_Chatter A_Settlement_Bell A_Settlement_Mill A_Settlement_Surf A_Settlement_Machinery)
+set(kit_sounds)
+foreach(sound ${kit_sound_names})
+    list(APPEND kit_sounds ${ICHOR_ART_DIR}/audio/${sound}.wav)
+endforeach()
 set(outputs)
 foreach(src ${sources})
     get_filename_component(stem ${src} NAME_WE)
