@@ -19,7 +19,7 @@ namespace ichor {
 namespace {
 
 constexpr std::uint32_t kShadowSize = 2048;
-constexpr std::uint32_t kMaxMaterials = 256;
+constexpr std::uint32_t kMaxMaterials = kMaxSceneMaterials;
 constexpr std::uint32_t kMaxDebugLines = 65536;
 // One stamp before the first pass and one after each, in draw order.
 constexpr std::array<const char*, 8> kPassNames{"shadow", "sky", "instances", "terrain", "trees", "water", "rain", "overlay"};
