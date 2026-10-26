@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/piece_data.h"
 
 #include <cstddef>
 #include <string>

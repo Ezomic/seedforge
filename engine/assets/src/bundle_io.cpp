@@ -125,7 +125,7 @@ private:
     std::size_t remaining_;
 };
 
-bool validate(const SceneBundle& bundle, const std::string& file)
+bool validate(const SceneBundle& bundle, const PieceData& pieces, const std::string& file)
 {
     const auto fail = [&](const std::string& why) {
         logf(LogLevel::Error, "{}: {}", file, why);
@@ -183,11 +183,11 @@ bool validate(const SceneBundle& bundle, const std::string& file)
     for (const Node& n : bundle.nodes) {
         if (n.mesh >= bundle.meshes.size()) return fail("node mesh index");
     }
-    for (const Socket& s : bundle.sockets) {
+    for (const Socket& s : pieces.sockets) {
         const float length = glm::length(s.rotation);
         if (s.name.empty() || !std::isfinite(s.position.x + s.position.y + s.position.z) || !(length > 0.5f && length < 1.5f)) return fail("socket");
     }
-    for (const LodGroup& g : bundle.lodGroups) {
+    for (const LodGroup& g : pieces.lodGroups) {
         if (g.levels.size() < 2 || g.levels.front().distance != 0.0f) return fail("lod group shape");
         float previous = 0.0f;
         for (const LodLevel& level : g.levels) {
@@ -195,7 +195,7 @@ bool validate(const SceneBundle& bundle, const std::string& file)
             previous = level.distance;
         }
     }
-    for (const CollisionShape& c : bundle.collision) {
+    for (const CollisionShape& c : pieces.collision) {
         if (c.kind != CollisionKind::Box && c.kind != CollisionKind::Convex) return fail("collision kind");
         const glm::vec3 extent = c.boundsMax - c.boundsMin;
         if (!std::isfinite(extent.x + extent.y + extent.z) || extent.x < 0.0f || extent.y < 0.0f || extent.z < 0.0f) return fail("collision bounds");
@@ -210,6 +210,17 @@ bool validate(const SceneBundle& bundle, const std::string& file)
 }
 
 bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle)
+{
+    return writeBundle(path, bundle, PieceData{});
+}
+
+bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
+{
+    PieceData discarded;
+    return readBundle(path, bundle, discarded);
+}
+
+bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle, const PieceData& pieces)
 {
     std::ofstream out(path, std::ios::binary);
     if (!out) {
@@ -282,22 +293,22 @@ bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle)
         w.pod(n.world);
     }
 
-    if (!bundle.sockets.empty() || !bundle.lodGroups.empty() || !bundle.collision.empty()) {
+    if (!pieces.empty()) {
         w.pod(kPieceTag);
-        w.pod(static_cast<std::uint32_t>(bundle.sockets.size()));
-        for (const auto& s : bundle.sockets) {
+        w.pod(static_cast<std::uint32_t>(pieces.sockets.size()));
+        for (const auto& s : pieces.sockets) {
             w.string(s.piece);
             w.string(s.name);
             w.pod(s.position);
             w.pod(s.rotation);
         }
-        w.pod(static_cast<std::uint32_t>(bundle.lodGroups.size()));
-        for (const auto& g : bundle.lodGroups) {
+        w.pod(static_cast<std::uint32_t>(pieces.lodGroups.size()));
+        for (const auto& g : pieces.lodGroups) {
             w.string(g.piece);
             w.pods(g.levels);
         }
-        w.pod(static_cast<std::uint32_t>(bundle.collision.size()));
-        for (const auto& c : bundle.collision) {
+        w.pod(static_cast<std::uint32_t>(pieces.collision.size()));
+        for (const auto& c : pieces.collision) {
             w.string(c.piece);
             w.string(c.name);
             w.pod(c.kind);
@@ -309,7 +320,7 @@ bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle)
     return out.good();
 }
 
-bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
+bool readBundle(const std::filesystem::path& path, SceneBundle& bundle, PieceData& pieces)
 {
     std::error_code ec;
     const std::uintmax_t fileSize = std::filesystem::file_size(path, ec);
@@ -319,9 +330,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
         return false;
     }
     Reader r(in, fileSize);
-    bundle.sockets.clear();
-    bundle.lodGroups.clear();
-    bundle.collision.clear();
+    pieces = {};
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
     if (!r.pod(magic) || magic != kMagic || !r.pod(version) || version != kVersion) {
@@ -394,22 +403,22 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
             return false;
         }
         if (!r.count(count, 36)) return false;
-        bundle.sockets.resize(count);
-        for (auto& s : bundle.sockets) {
+        pieces.sockets.resize(count);
+        for (auto& s : pieces.sockets) {
             if (!r.string(s.piece) || !r.string(s.name) || !r.pod(s.position) || !r.pod(s.rotation)) {
                 return false;
             }
         }
         if (!r.count(count, 8)) return false;
-        bundle.lodGroups.resize(count);
-        for (auto& g : bundle.lodGroups) {
+        pieces.lodGroups.resize(count);
+        for (auto& g : pieces.lodGroups) {
             if (!r.string(g.piece) || !r.pods(g.levels)) {
                 return false;
             }
         }
         if (!r.count(count, 40)) return false;
-        bundle.collision.resize(count);
-        for (auto& c : bundle.collision) {
+        pieces.collision.resize(count);
+        for (auto& c : pieces.collision) {
             if (!r.string(c.piece) || !r.string(c.name) || !r.pod(c.kind) || !r.pod(c.boundsMin) || !r.pod(c.boundsMax) || !r.pods(c.points)) {
                 return false;
             }
@@ -419,7 +428,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle)
             return false;
         }
     }
-    return validate(bundle, path.string());
+    return validate(bundle, pieces, path.string());
 }
 
 }

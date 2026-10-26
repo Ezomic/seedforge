@@ -283,6 +283,12 @@ bool inspectGltf(const std::filesystem::path& source, ConventionScan& scan)
 
 bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStats& stats, const CookOptions& cookOptions)
 {
+    PieceData discarded;
+    return cookGltf(source, bundle, discarded, stats, cookOptions);
+}
+
+bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, PieceData& pieces, CookStats& stats, const CookOptions& cookOptions)
+{
     cgltf_data* data = loadValidated(source);
     if (data == nullptr) {
         return false;
@@ -392,15 +398,15 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, CookStat
     }
 
     if (ok) {
-        bundle.sockets = std::move(conventions.sockets);
-        bundle.collision = std::move(conventions.collision);
+        pieces.sockets = std::move(conventions.sockets);
+        pieces.collision = std::move(conventions.collision);
         for (const ConventionScan::Lod& lod : conventions.lods) {
             LodGroup group;
             group.piece = lod.piece;
             for (std::size_t level = 0; level < lod.nodes.size(); ++level) {
                 group.levels.push_back(LodLevel{.mesh = meshIndex.at(data->nodes[lod.nodes[level]].mesh), .distance = lod.distances[level]});
             }
-            bundle.lodGroups.push_back(std::move(group));
+            pieces.lodGroups.push_back(std::move(group));
         }
     }
 

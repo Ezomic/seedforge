@@ -246,8 +246,9 @@ TEST_CASE("sockets, LODs and collision shapes cook, round-trip and are found by 
 {
     const auto source = writeText("ichor_conventions.gltf", conventionGltf());
     SceneBundle cooked;
+    PieceData pieces;
     CookStats stats;
-    REQUIRE(cookGltf(source, cooked, stats));
+    REQUIRE(cookGltf(source, cooked, pieces, stats));
     std::filesystem::remove(source);
 
     // Four drawn meshes (three LODs and the plain one); the collision cubes are not meshes.
@@ -256,13 +257,13 @@ TEST_CASE("sockets, LODs and collision shapes cook, round-trip and are found by 
     REQUIRE(cooked.nodes[0].name == "SM_Foo_LOD0");
     REQUIRE(cooked.nodes[1].name == "SM_Plain");
 
-    const Socket* hand = findSocket(cooked, "SM_Foo", "hand");
+    const Socket* hand = findSocket(pieces, "SM_Foo", "hand");
     REQUIRE(hand != nullptr);
     REQUIRE(glm::distance(hand->position, glm::vec3(1.0f, 2.0f, 0.0f)) < 1e-5f);
     REQUIRE(glm::length(hand->rotation) == Catch::Approx(1.0f));
-    REQUIRE(findSocket(cooked, "SM_Plain", "hand") == nullptr);
+    REQUIRE(findSocket(pieces, "SM_Plain", "hand") == nullptr);
 
-    const LodGroup* group = findLodGroup(cooked, "SM_Foo");
+    const LodGroup* group = findLodGroup(pieces, "SM_Foo");
     REQUIRE(group != nullptr);
     REQUIRE(group->levels.size() == 3);
     REQUIRE(group->levels[0].distance == 0.0f);
@@ -272,56 +273,59 @@ TEST_CASE("sockets, LODs and collision shapes cook, round-trip and are found by 
     REQUIRE(lodMeshAt(*group, 0.0f) == group->levels[0].mesh);
     REQUIRE(lodMeshAt(*group, group->levels[1].distance) == group->levels[1].mesh);
     REQUIRE(lodMeshAt(*group, 1.0e6f) == group->levels[2].mesh);
-    REQUIRE(findLodGroup(cooked, "SM_Plain") == nullptr);
+    REQUIRE(findLodGroup(pieces, "SM_Plain") == nullptr);
 
-    REQUIRE(cooked.collision.size() == 2);
-    const CollisionShape& convex = cooked.collision[0];
+    REQUIRE(pieces.collision.size() == 2);
+    const CollisionShape& convex = pieces.collision[0];
     REQUIRE(convex.kind == CollisionKind::Convex);
     REQUIRE(convex.piece == "SM_Foo");
     REQUIRE(convex.points.size() == 8);
     REQUIRE(glm::distance(convex.boundsMin, glm::vec3(-0.5f)) < 1e-5f);
     REQUIRE(glm::distance(convex.boundsMax, glm::vec3(0.5f)) < 1e-5f);
-    const CollisionShape& box = cooked.collision[1];
+    const CollisionShape& box = pieces.collision[1];
     REQUIRE(box.kind == CollisionKind::Box);
     REQUIRE(box.points.empty());
     REQUIRE(glm::distance(box.boundsMin, glm::vec3(-2.0f, -1.0f, -2.0f)) < 1e-5f);
     REQUIRE(glm::distance(box.boundsMax, glm::vec3(2.0f, 3.0f, 2.0f)) < 1e-5f);
 
     const auto path = test::tempPath("ichor_conventions.iscene");
-    REQUIRE(writeBundle(path, cooked));
+    REQUIRE(writeBundle(path, cooked, pieces));
     SceneBundle loaded;
-    REQUIRE(readBundle(path, loaded));
+    PieceData loadedPieces;
+    REQUIRE(readBundle(path, loaded, loadedPieces));
+    SceneBundle plainRead;
+    REQUIRE(readBundle(path, plainRead));
     std::filesystem::remove(path);
-    REQUIRE(loaded.sockets.size() == 1);
-    REQUIRE(loaded.sockets[0].piece == "SM_Foo");
-    REQUIRE(loaded.sockets[0].position == hand->position);
-    REQUIRE(loaded.sockets[0].rotation == hand->rotation);
-    REQUIRE(loaded.lodGroups.size() == 1);
-    REQUIRE(loaded.lodGroups[0].levels.size() == 3);
-    REQUIRE(loaded.lodGroups[0].levels[2].distance == group->levels[2].distance);
-    REQUIRE(loaded.collision.size() == 2);
-    REQUIRE(loaded.collision[0].points == convex.points);
-    REQUIRE(loaded.collision[1].boundsMax == box.boundsMax);
+    REQUIRE(plainRead.meshes.size() == cooked.meshes.size());
+    REQUIRE(loadedPieces.sockets.size() == 1);
+    REQUIRE(loadedPieces.sockets[0].piece == "SM_Foo");
+    REQUIRE(loadedPieces.sockets[0].position == hand->position);
+    REQUIRE(loadedPieces.sockets[0].rotation == hand->rotation);
+    REQUIRE(loadedPieces.lodGroups.size() == 1);
+    REQUIRE(loadedPieces.lodGroups[0].levels.size() == 3);
+    REQUIRE(loadedPieces.lodGroups[0].levels[2].distance == group->levels[2].distance);
+    REQUIRE(loadedPieces.collision.size() == 2);
+    REQUIRE(loadedPieces.collision[0].points == convex.points);
+    REQUIRE(loadedPieces.collision[1].boundsMax == box.boundsMax);
 }
 
 TEST_CASE("a file without socket, LOD or collision nodes cooks with none and writes no extra bytes")
 {
     const auto source = writeText("ichor_plain.gltf", synthGltf({{.name = "SM_Plain", .size = 1.0f}, {.name = "Empty"}}, {0, 1}));
     SceneBundle plain;
+    PieceData plainPieces;
     CookStats stats;
-    REQUIRE(cookGltf(source, plain, stats));
+    REQUIRE(cookGltf(source, plain, plainPieces, stats));
     std::filesystem::remove(source);
     REQUIRE(plain.nodes.size() == 1);
-    REQUIRE(plain.sockets.empty());
-    REQUIRE(plain.lodGroups.empty());
-    REQUIRE(plain.collision.empty());
+    REQUIRE(plainPieces.empty());
 
     const auto withPath = test::tempPath("ichor_plain_a.iscene");
-    REQUIRE(writeBundle(withPath, plain));
-    SceneBundle other = plain;
+    REQUIRE(writeBundle(withPath, plain, plainPieces));
+    PieceData other;
     other.sockets.push_back(Socket{.name = "hand"});
     const auto extraPath = test::tempPath("ichor_plain_b.iscene");
-    REQUIRE(writeBundle(extraPath, other));
+    REQUIRE(writeBundle(extraPath, plain, other));
     // The plain bundle is the same file as the extended one up to the tag that introduces the extra data.
     REQUIRE(std::filesystem::file_size(extraPath) > std::filesystem::file_size(withPath) + 4);
     std::ifstream a(withPath, std::ios::binary);
@@ -354,20 +358,21 @@ TEST_CASE("malformed socket, LOD and collision names are reported and the pieces
             },
             {0, 5, 6, 7, 8, 9}));
     SceneBundle bundle;
+    PieceData pieces;
     CookStats stats;
     ConventionScan scan;
     REQUIRE(inspectGltf(source, scan));
-    REQUIRE(cookGltf(source, bundle, stats));
+    REQUIRE(cookGltf(source, bundle, pieces, stats));
     std::filesystem::remove(source);
 
     // empty socket name, wrong case, duplicate, LOD5, a lone LOD1, collision without a piece, UBX_ without a mesh, a socket with a mesh
     REQUIRE(scan.issues.size() >= 8);
-    REQUIRE(bundle.sockets.size() == 1);
-    REQUIRE(bundle.sockets[0].name == "twin");
-    REQUIRE(glm::distance(bundle.sockets[0].position, glm::vec3(1.0f, 0.0f, 0.0f)) < 1e-5f);
-    REQUIRE(bundle.lodGroups.empty());
-    REQUIRE(bundle.collision.size() == 1);
-    REQUIRE(bundle.collision[0].piece == "Missing");
+    REQUIRE(pieces.sockets.size() == 1);
+    REQUIRE(pieces.sockets[0].name == "twin");
+    REQUIRE(glm::distance(pieces.sockets[0].position, glm::vec3(1.0f, 0.0f, 0.0f)) < 1e-5f);
+    REQUIRE(pieces.lodGroups.empty());
+    REQUIRE(pieces.collision.size() == 1);
+    REQUIRE(pieces.collision[0].piece == "Missing");
     // SM_Bar, SM_Bar_LOD5, SM_Solo_LOD1 and the mesh-carrying SOCKET_solid stay ordinary nodes.
     REQUIRE(bundle.nodes.size() == 4);
     REQUIRE(describeConventions(scan).size() == scan.sockets.size() + scan.lods.size() + scan.collision.size() + scan.issues.size());
@@ -394,20 +399,17 @@ TEST_CASE("hostile: scene files with and without conventions never crash the coo
 
     const auto source = writeText("ichor_hostile_src.gltf", json);
     SceneBundle cooked;
-    REQUIRE(cookGltf(source, cooked, stats));
+    PieceData cookedPieces;
+    REQUIRE(cookGltf(source, cooked, cookedPieces, stats));
     std::filesystem::remove(source);
     const auto path = test::tempPath("ichor_hostile.iscene");
-    REQUIRE(writeBundle(path, cooked));
+    REQUIRE(writeBundle(path, cooked, cookedPieces));
     std::ifstream in(path, std::ios::binary);
     std::vector<char> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     in.close();
 
     // The extension block is the tail; cut the file inside it and flip every byte of it in turn.
-    SceneBundle withoutExtras = cooked;
-    withoutExtras.sockets.clear();
-    withoutExtras.lodGroups.clear();
-    withoutExtras.collision.clear();
-    REQUIRE(writeBundle(path, withoutExtras));
+    REQUIRE(writeBundle(path, cooked));
     const std::size_t tail = std::filesystem::file_size(path);
     REQUIRE(tail < bytes.size());
     const auto readBack = [&](const std::vector<char>& data) {

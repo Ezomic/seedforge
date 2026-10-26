@@ -13,7 +13,7 @@ An **empty** node named `SOCKET_<name>` is kept as a named transform instead of 
 - `<name>` is whatever follows the prefix: `SOCKET_hand_r` is the socket `hand_r`. No whitespace. Names are case sensitive and unique per piece; the prefix must be exactly `SOCKET_` in capitals.
 - The node must be an empty. A `SOCKET_` node that carries a mesh stays an ordinary piece.
 
-Engine side: `findSocket(bundle, "SM_Foo", "hand_r")` returns the socket (`position`, `rotation` as a quaternion) or `nullptr`. A file-level socket is found by any piece name when the piece has none of that name.
+Engine side (`piece_data.h`, read with `readBundle(path, bundle, pieces)` or got from `cookGltf(..., pieces, ...)`): `findSocket(pieces, "SM_Foo", "hand_r")` returns the socket (`position`, `rotation` as a quaternion) or `nullptr`. A file-level socket is found by any piece name when the piece has none of that name.
 
 ## LODs: `<piece>_LOD0`, `_LOD1`, `_LOD2`
 
@@ -25,7 +25,7 @@ Give the meshes of one piece the suffix `_LOD0`, `_LOD1`, `_LOD2` (`SM_Foo_LOD0`
 - Sockets and collision of a piece are named after the piece without the suffix (`SM_Foo`), whichever LOD node they hang from.
 - A malformed group (no `_LOD0`, a gap, a second mesh for one level, `_LOD3` or higher) is reported and its meshes stay ordinary placed pieces, so nothing disappears.
 
-Engine side: `findLodGroup(bundle, "SM_Foo")` then `lodMeshAt(group, distance)` gives the mesh index to draw.
+Engine side: `findLodGroup(pieces, "SM_Foo")` then `lodMeshAt(group, distance)` gives the mesh index to draw.
 
 ## Collision: `UBX_<piece>` and `UCX_<piece>`
 
@@ -36,7 +36,7 @@ A mesh node named `UBX_<piece>` (box) or `UCX_<piece>` (convex) is a collision s
 - `<piece>` must be the name of a placed piece in the same file. If it is not, the shape is reported and kept in file space.
 - Several shapes may belong to one piece.
 
-Engine side: `bundle.collision` lists the shapes with their `piece`.
+Engine side: `pieces.collision` lists the shapes with their `piece`.
 
 ## Checking a file before it goes in
 
