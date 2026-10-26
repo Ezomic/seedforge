@@ -9,7 +9,7 @@ Audit of the three promises SEED-272 names: determinism on every commit, golden 
 | `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `tools/check_smoke_hash.py` (runs `ichor.exe --headless --frames 120`: it must exit cleanly and its logged scene state hash must equal `engine/tests/data/app_smoke_hash.txt`) |
 | `linux headless + sanitizers` | `linux-headless-asan` (Debug, clang, ASan/UBSan, `ENGINE_RUNTIME=OFF`) | `ctest --preset linux-headless-asan` |
 
-Both are path-filtered to `engine/`, `game/`, `data/`, `art/audio/`, `art/fonts/`, `bin/` and the workflow file. A change that touches only `docs/` or `art/` (other than audio and fonts) runs neither.
+Both required names report on every pull request; what runs behind them depends on the changed paths (see "Required checks on every PR" at the end of this file).
 
 ## Coverage table
 
@@ -139,3 +139,38 @@ The time guard has a budget per tier. Without an allowlist entry a fast case may
 - To warm the caches after they are lost or renamed: run `engine.yml` from the Actions tab on main (`workflow_dispatch`, 60 minute limits). The pull request limit is 15 minutes (search `PR_LIMIT` in `engine.yml`; main run 40204448268 on 4de0045 had warm caches and every job was under 12 minutes). After a cache eviction or a key rename a cold PR run needs about 25 minutes: raise the limit to 30 until a main run has saved the caches again, then back to 15.
 - The ccache keys are `ccache-asan-`, `ccache-gpu-` and `ccache-walk-`: restore keys match by prefix, and the old shared `ccache-linux-` prefix let an ASan job restore the newest Release GPU cache (no hits, a 15 minute cold build).
 - A new push to a pull request cancels the run of the previous commit (`cancel-in-progress` was already set for PRs and stays); runs on main queue.
+
+## Required checks on every PR (SEED-548, SEED-545)
+
+`engine.yml` has no path filter on `pull_request` any more. A PR that touched only `art/`, `docs/` or `tools/` used to start no workflow, so the two required checks never reported, GitHub showed BLOCKED and the merge needed an admin bypass (art batch 6 went in that way and broke the Exile mesh test, SEED-506). Now both names report on every PR, and a `changes` job decides the scope from `git diff HEAD^1 HEAD` of the merge commit:
+
+| Changed paths | `heavy` | `art` | What runs |
+|---|---|---|---|
+| anything in `engine/`, `game/`, `data/`, `bin/`, `art/audio/`, `art/fonts/`, the workflows, any other folder, a `.md` below the root, or one of `tools/check_smoke_hash.py`, `test_times.py`, `test_time_allowlist.json`, `ci_tiers.py` | yes | n/a | everything, as before |
+| `art/` (other than audio and fonts), maybe with `docs/` and `tools/` | no | yes | the python checks and the Windows art tests |
+| only `docs/`, other `tools/`, root `*.md` | no | no | the python checks only |
+| push to main, manual run | yes | no | everything (the push path filter is unchanged) |
+
+Anything not named as light is heavy, so a new folder runs the full suite until it is classified in the `changes` job.
+
+The required names stay: `windows runtime + tests` and `linux headless + sanitizers` are now small aggregator jobs on `ubuntu-latest`.
+
+- `linux headless + sanitizers` passes when `changes` succeeded and, if heavy, every shard and the GPU goldens succeeded; if not heavy it requires them to be `skipped`. A failed, cancelled or unexpectedly skipped job fails it.
+- `windows runtime + tests` needs `changes`, `python tools + content layout` and the job `windows build + tests`. That job runs when heavy or art; the aggregator requires it to succeed when it was needed and to be skipped when it was not.
+- `python tools + content layout` runs on every PR (about 30 s): `check_content_layout.py` (and `--self-test`), `check_data.py`, `check_deps.py`, `ci_tiers.py check`, `test_times.py --check-allowlist` and `--self-test`. These are the python tests the ctest suite registers.
+
+### The Windows art tests
+
+For an art-only PR the Windows job builds `ichor_tests_ui ichor_tests_world stage0_tests` (not the runtime) and runs `ctest -R` over the tests that open files under `art/` (with `--no-tests=error`, so a rename cannot make it vacuous), then `ichor_tests_ui "[exile]"`:
+
+| Test file | What it reads from `art/` |
+|---|---|
+| `engine/tests/test_animation_exile.cpp` | `art/exile/SK_Exile.glb`: skeleton, metric mesh, root travel, clips, props |
+| `engine/tests/test_animation_exile_avatar.cpp` | the Exile clips through the avatar (tag `[exile]`) |
+| `game/stage0/tests/test_exile_player.cpp` | the Exile and its costume GLBs |
+| `game/stage0/tests/test_bull_warden.cpp` | `art/monsters/bull_warden` |
+| `engine/tests/test_placed_settlement_kit.cpp` | "the exported GLBs cook to the sizes the kit table says": `art/settlement_kit` |
+| `engine/tests/test_cooker.cpp` | the cooker (SEED-545) on `engine/tests/data/kit.glb`, so a cooker change is covered, a bad GLB in `art/` is covered by the tests above |
+| `content_layout` | `tools/check_content_layout.py` |
+
+Audio and fonts are in the heavy set already. A new test that reads another `art/` folder must be added to the regex in the `Art tests` step of `engine.yml`.
