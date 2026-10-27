@@ -24,7 +24,7 @@ runs:
         git lfs install --local
         git lfs pull
     - name: Save the LFS cache
-      if: steps.restore.outputs.cache-hit != 'true'
+      if: ${{ steps.restore.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' }}
       uses: actions/cache/save@v4
       with:
         path: .git/lfs

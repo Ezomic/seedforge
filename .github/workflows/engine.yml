@@ -150,7 +150,7 @@ jobs:
           }
           exit 0 # the last choco run may have left a failing exit code behind
       - name: Restore sccache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .sccache
           key: sccache-windows-${{ github.sha }}
@@ -207,6 +207,13 @@ jobs:
         if: needs.changes.outputs.heavy == 'true'
         run: python ../tools/check_smoke_hash.py build/windows-ci/app/ichor.exe
         working-directory: engine
+      - name: Save sccache
+        # Only main saves a compiler cache: a per-commit entry from every PR run filled the 10 GB cache limit (SEED-688).
+        if: ${{ always() && github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .sccache
+          key: sccache-windows-${{ github.sha }}
       - name: Save vcpkg binaries
         # Saved even when a later step fails, so a failed first run still warms the cache (actions/cache only saves on success).
         if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
@@ -302,7 +309,7 @@ jobs:
         working-directory: engine
       - name: Save ccache
         # Right after the build, so a test failure or timeout does not throw away a cold compile.
-        if: success()
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
@@ -379,7 +386,7 @@ jobs:
         working-directory: engine
       - name: Save ccache
         # Right after the build, so a test failure or timeout does not throw away a cold compile.
-        if: success()
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
@@ -477,7 +484,7 @@ jobs:
         working-directory: engine
       - name: Save ccache
         # Right after the build, so a test failure or timeout does not throw away a cold compile.
-        if: success()
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
@@ -540,7 +547,7 @@ jobs:
       - name: Package and smoke run
         run: tools/package_linux.sh --smoke --out "$RUNNER_TEMP/dist/ichor-linux"
       - name: Save ccache
-        if: success()
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
