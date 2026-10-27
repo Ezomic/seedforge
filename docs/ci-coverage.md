@@ -193,3 +193,18 @@ What was checked where:
 | Building the app on Linux, the `ldd` step (unresolved libraries fail the script, vcpkg libraries are copied to `lib/`), `LD_LIBRARY_PATH` in `ichor.sh`, the real `/proc/self/exe` resolution, the smoke run of a real Linux binary | Only the CI job (it passed on a `workflow_dispatch` run of this branch: the real ELF binary linked, the tarball unpacked elsewhere and the unpacked binary logged the packaged-build line) |
 
 The tarball needs a glibc at least as new as the runner's (ubuntu-latest) and, to open a window, a Vulkan loader (`libvulkan1`) on the player's machine; `--headless` needs neither a GPU nor a display.
+
+## LFS cache (SEED-687)
+
+Every job used to check out with `lfs: true`, so each of them downloaded every LFS file (about 205 MB, about 520 MB with the batch 7 art). GitHub free allows 10 GiB of LFS bandwidth a month, and one PR run has six such jobs. The jobs now check out with `lfs: false` and call `.github/actions/lfs-cache`:
+
+1. `.lfs-assets-id` is written from `git lfs ls-files -l` (the object ids of the checked out ref, sorted).
+2. `.git/lfs` is restored from the cache key `lfs-<hash of that file>`; when the exact key is missing, the newest `lfs-` cache is restored, so a changed asset set fetches only the new objects.
+3. `git lfs pull` fetches what the cache lacks and writes real files over the pointers.
+4. On a miss the cache is saved straight away, so a later failing step does not lose it.
+
+Objects are content addressed, so Windows and Linux share one key family (`enableCrossOsArchive`). A run on a PR can read caches saved on main but not the other way round, so the first run after a merge to main seeds the cache once.
+
+To clear it: `gh cache list --key lfs-` and `gh cache delete <id>` (or `gh cache delete --all --key lfs-`). The next run downloads once and saves again.
+
+If a job shows pointer files instead of assets (a test fails on a file that starts with `version https://git-lfs`), look for the `Fetch the missing LFS objects` step: it must have run `git lfs pull` without error. Delete the `lfs-` caches and re-run; if it still fails, check the LFS bandwidth quota on github.com/settings/billing, because an exhausted quota makes the fetch fail.

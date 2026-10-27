@@ -100,3 +100,4 @@ vcpkg_installed/
 /stage0-run/
 
 dist/
+.lfs-assets-id

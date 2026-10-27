@@ -235,6 +235,447 @@
       "date_added": "2026-10-26"
     },
     {
+      "id": "batch7_kit_top_01",
+      "path": "art/settlement_kit/SM_B*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_02",
+      "path": "art/settlement_kit/SM_Ch*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_03",
+      "path": "art/settlement_kit/SM_ColonnadeBayG*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_04",
+      "path": "art/settlement_kit/SM_Cr*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_05",
+      "path": "art/settlement_kit/SM_D*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_06",
+      "path": "art/settlement_kit/SM_F*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_07",
+      "path": "art/settlement_kit/SM_GateP*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_08",
+      "path": "art/settlement_kit/SM_H*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_09",
+      "path": "art/settlement_kit/SM_L*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_10",
+      "path": "art/settlement_kit/SM_M*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_11",
+      "path": "art/settlement_kit/SM_PalisadeRunT*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_12",
+      "path": "art/settlement_kit/SM_Pi*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_13",
+      "path": "art/settlement_kit/SM_Pl*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_14",
+      "path": "art/settlement_kit/SM_Q*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_15",
+      "path": "art/settlement_kit/SM_R*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_16",
+      "path": "art/settlement_kit/SM_Sc*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_17",
+      "path": "art/settlement_kit/SM_Si*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_18",
+      "path": "art/settlement_kit/SM_St*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_19",
+      "path": "art/settlement_kit/SM_Ta*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_20",
+      "path": "art/settlement_kit/SM_TempleFrontG*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_21",
+      "path": "art/settlement_kit/SM_Ten*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_22",
+      "path": "art/settlement_kit/SM_Ti*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_23",
+      "path": "art/settlement_kit/SM_To*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_24",
+      "path": "art/settlement_kit/SM_WallC*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_25",
+      "path": "art/settlement_kit/SM_WallD*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_26",
+      "path": "art/settlement_kit/SM_WallH*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_27",
+      "path": "art/settlement_kit/SM_WallSo*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_28",
+      "path": "art/settlement_kit/SM_WallTowerB*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_29",
+      "path": "art/settlement_kit/SM_WallW*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_top_30",
+      "path": "art/settlement_kit/SM_Wo*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_kit_sub",
+      "path": "art/settlement_kit/*/*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 settlement kit buildings, harbour, defence, roads and ruins: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_props",
+      "path": "art/props/**",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 props: flora, ruins, settlement furniture and terrain rocks: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_creatures",
+      "path": "art/creatures/**",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 animals: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_items",
+      "path": "art/items/*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 items: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_bosses",
+      "path": "art/monsters/bosses/*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 bosses: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_enemies",
+      "path": "art/monsters/enemies/*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 enemies, static and rigged: generated locally by the owner with Z-Image Turbo, TRELLIS.2, UniRig, Blender. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_npcs",
+      "path": "art/npcs/*.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 NPCs (static models): generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_banners",
+      "path": "art/surfaces/banners/*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 banners: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_decals",
+      "path": "art/surfaces/decals/*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 decals: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_roofs_01",
+      "path": "art/surfaces/roofs/T_RoofP*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_roofs_02",
+      "path": "art/surfaces/roofs/T_RoofTerracottaTileV*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_roofs_03",
+      "path": "art/surfaces/roofs/T_RoofV*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_roofs_04",
+      "path": "art/surfaces/roofs/T_RoofW*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_walls_01",
+      "path": "art/surfaces/walls/T_P*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_walls_02",
+      "path": "art/surfaces/walls/T_WallBasaltE*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_walls_03",
+      "path": "art/surfaces/walls/T_WallFieldstoneM*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_walls_04",
+      "path": "art/surfaces/walls/T_WallLimestoneMortarV*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_walls_05",
+      "path": "art/surfaces/walls/T_WallP*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
+      "id": "batch7_surfaces_walls_06",
+      "path": "art/surfaces/walls/T_WallS*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-10-27"
+    },
+    {
       "id": "kenney_fantasy_town_kit",
       "path": "art/settlement_kit/SM_Kenney*",
       "source_url": "https://kenney.nl/assets/fantasy-town-kit",

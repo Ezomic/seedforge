@@ -5,10 +5,11 @@ The ledger is art/LICENSES.json: {"entries": [{id, path, source_url, author, lic
 date_added}]}. `path` is a glob relative to the repository root (`*` stays inside a folder, `**` crosses
 folders). Fails when, under art/ and the audio folders:
   1. unlisted: a file has no covering ledger entry and is not in the first-party baseline.
-  2. bad-license: an entry's licence is not allowlisted (CC0-1.0, MIT, OFL-1.1, CC-BY-3.0, CC-BY-4.0).
+  2. bad-license: an entry's licence is not allowlisted (CC0-1.0, MIT, OFL-1.1, CC-BY-3.0, CC-BY-4.0,
+     and LicenseRef-Proprietary for first-party assets the owner made and keeps all rights to).
      CC-BY-NC*, GPL* and anything unknown are rejected.
   3. bad-entry: an entry lacks a field, repeats an id, has a malformed date, or a licence that needs
-     attribution (everything but CC0-1.0) has no attribution text.
+     attribution (everything but CC0-1.0 and LicenseRef-Proprietary) has no attribution text.
   4. orphan-entry: an entry matches no file.
   5. baseline: tools/asset_license_baseline.txt lists a file that is gone or is now covered by the ledger.
      The baseline is the first-party assets that predate the ledger: shrink it, never grow it.
@@ -37,8 +38,9 @@ ALLOWED = {
     "OFL-1.1": "SIL Open Font License 1.1",
     "CC-BY-3.0": "CC BY 3.0",
     "CC-BY-4.0": "CC BY 4.0",
+    "LicenseRef-Proprietary": "Proprietary, all rights reserved (first-party)",
 }
-NEEDS_ATTRIBUTION = set(ALLOWED) - {"CC0-1.0"}
+NEEDS_ATTRIBUTION = set(ALLOWED) - {"CC0-1.0", "LicenseRef-Proprietary"}
 FIELDS = ("id", "path", "source_url", "author", "license", "attribution", "date_added")
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
@@ -221,6 +223,7 @@ def self_test():
         ("an unlisted file in an audio folder", "unlisted", lambda: rules(ok, files + ["audio/A_Hit.ogg"])),
         ("a CC-BY-NC licence", "bad-license", lambda: rules([sample_entry(license="CC-BY-NC-4.0", attribution="x")])),
         ("a GPL licence", "bad-license", lambda: rules([sample_entry(license="GPL-3.0")])),
+        ("another LicenseRef value", "bad-license", lambda: rules([sample_entry(license="LicenseRef-Other")])),
         ("an unknown licence", "bad-license", lambda: rules([sample_entry(license="Custom")])),
         ("an orphan entry", "orphan-entry", lambda: rules(ok + [sample_entry(id="gone", path="art/gone/**")])),
         ("CC-BY without attribution text", "bad-entry", lambda: rules([sample_entry(license="CC-BY-4.0", attribution=" ")])),
@@ -239,6 +242,7 @@ def self_test():
     good = [
         ("CC-BY with attribution", [sample_entry(license="CC-BY-4.0", attribution="Wall by A. Author, CC BY 4.0")]),
         ("MIT with a notice", [sample_entry(license="MIT", attribution="Copyright A. Author")]),
+        ("LicenseRef-Proprietary needs no attribution text", [sample_entry(license="LicenseRef-Proprietary")]),
         ("single-star globs", [sample_entry(path="art/pilot/*.glb"), sample_entry(id="tex", path="art/pilot/*.png")]),
     ]
     for name, entries in good:
