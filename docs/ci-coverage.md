@@ -212,3 +212,5 @@ If a job shows pointer files instead of assets (a test fails on a file that star
 ## Compiler caches (SEED-688)
 
 The sccache and ccache entries are keyed by commit and are 20 MB to 1 GB each. They used to be saved by every PR run, which filled the 10 GB Actions cache limit and made GitHub evict the vcpkg caches. Only main saves them now; PR runs restore the newest one from main. Check the total with `gh api repos/Ezomic/seedforge/actions/cache/usage` and list the biggest with `gh cache list --sort size_in_bytes --order desc`.
+
+`cache-prune.yml` runs after the engine and nightly workflows (and by hand with `gh workflow run cache-prune`). It keeps the newest main entry of each compiler and LFS cache family and deletes the caches of closed pull requests, so main's one-entry-per-commit saves cannot grow past one set.

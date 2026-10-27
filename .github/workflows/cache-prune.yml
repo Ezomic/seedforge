@@ -1,0 +1,44 @@
+name: cache-prune
+
+# The compiler and LFS caches are keyed by commit, so main adds one set per run. Keep the newest per family and drop
+# caches of closed PRs so the 10 GB Actions cache limit never evicts the vcpkg caches (SEED-689).
+on:
+  workflow_run:
+    workflows: [engine, nightly]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: cache-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Keep the newest main cache per family
+        shell: bash
+        run: |
+          for prefix in sccache-windows- ccache-asan- ccache-gpu- ccache-package- ccache-walk- lfs-; do
+            gh cache list --key "$prefix" --ref refs/heads/main --sort created_at --order desc --limit 100 --json id --jq '.[].id' \
+              | tail -n +2 | while read -r id; do gh cache delete "$id"; done
+          done
+      - name: Drop caches of closed pull requests
+        shell: bash
+        run: |
+          gh cache list --limit 100 --json id,ref --jq '.[] | select(.ref | startswith("refs/pull/")) | "\(.id) \(.ref)"' \
+            | while read -r id ref; do
+                number=${ref#refs/pull/}; number=${number%/merge}
+                state=$(gh pr view "$number" --json state --jq .state)
+                if [ "$state" != OPEN ]; then gh cache delete "$id"; fi
+              done
+      - name: Cache total
+        run: gh api "repos/$GH_REPO/actions/cache/usage" --jq '"\(.active_caches_count) caches, \(.active_caches_size_in_bytes / 1e9) GB"'
