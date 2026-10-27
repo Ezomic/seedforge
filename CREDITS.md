@@ -601,3 +601,11 @@ Generated from `art/LICENSES.json` by `tools/check_assets_licensed.py --write-cr
 - Source: https://github.com/NDISCOVER/Cinzel
 - Files: `art/fonts/Cinzel*`
 - Attribution: Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel), SIL Open Font License 1.1.
+
+## kenney_fantasy_town_kit
+
+- Author: Kenney (www.kenney.nl)
+- Licence: CC0 1.0 Universal
+- Source: https://kenney.nl/assets/fantasy-town-kit
+- Files: `art/settlement_kit/SM_Kenney*`
+- Attribution: Fantasy Town Kit 2.0 by Kenney (www.kenney.nl), CC0 1.0. The four SM_Kenney pieces are assembled from its modules by tools/build_kit_cc0.py.

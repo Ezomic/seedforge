@@ -146,7 +146,7 @@ ForgedScenery buildForgedScenery(const ForgedGame& game);
 
 // Cooks the settlement kit (the GLBs under `folder`) into the scenery bundle, only the pieces the game uses. On a
 // failure (folder missing, a file does not cook) the scenery is left as it was and the buildings stay boxes.
-bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder);
+bool addSettlementKit(ForgedScenery& scenery, const ForgedGame& game, const std::filesystem::path& folder, bool useVariants = false);
 
 // What the biome scenery keeps clear of in this game: roads (with their shoulders), the settlements' buildings and
 // open water. The guard reads `game`'s roads and water, so the game must outlive it.

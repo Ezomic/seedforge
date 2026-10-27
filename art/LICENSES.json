@@ -674,6 +674,15 @@
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
       "date_added": "2026-10-27"
+    },
+    {
+      "id": "kenney_fantasy_town_kit",
+      "path": "art/settlement_kit/SM_Kenney*",
+      "source_url": "https://kenney.nl/assets/fantasy-town-kit",
+      "author": "Kenney (www.kenney.nl)",
+      "license": "CC0-1.0",
+      "attribution": "Fantasy Town Kit 2.0 by Kenney (www.kenney.nl), CC0 1.0. The four SM_Kenney pieces are assembled from its modules by tools/build_kit_cc0.py.",
+      "date_added": "2026-10-26"
     }
   ]
 }

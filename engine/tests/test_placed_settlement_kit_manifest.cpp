@@ -72,7 +72,7 @@ TEST_CASE("the checked-in kit manifest matches the built-in one", "[bake][settle
     INFO(loaded.error);
     REQUIRE(loaded.ok());
     const KitManifest& builtin = builtinKitManifest();
-    REQUIRE(loaded.manifest.pieces.size() == builtin.pieces.size());
+    REQUIRE(loaded.manifest.pieces.size() >= builtin.pieces.size());
     for (std::size_t i = 0; i < builtin.pieces.size(); ++i) {
         const KitManifestPiece& a = loaded.manifest.pieces[i];
         const KitManifestPiece& b = builtin.pieces[i];
@@ -85,6 +85,60 @@ TEST_CASE("the checked-in kit manifest matches the built-in one", "[bake][settle
         CHECK(a.heightM == b.heightM);
         CHECK(std::filesystem::exists(kitFolder() / a.file));
     }
+}
+
+TEST_CASE("a variantOf entry must name a role and fit inside its footprint", "[bake][settlements][kit][manifest]")
+{
+    const auto variant = [](const char* of, const char* halfWidth) {
+        return std::string(R"({"id": "Hut2", "file": "Hut2.glb", "category": "building", "variantOf": ")") + of + R"(", "footprint": {"halfWidthM": )" + halfWidth
+            + R"(, "halfDepthM": 1.0, "heightM": 3.0}})";
+    };
+    const KitManifestResult fits = parseKitManifest(manifestWith(variant("SmallHouse", "1.9")));
+    INFO(fits.error);
+    REQUIRE(fits.ok());
+    CHECK(fits.manifest.pieces[kKitPieceCount].variantOf == "SmallHouse");
+    CHECK(parseKitManifest(manifestWith(variant("SmallHouse", "2.5"))).error.find("does not fit") != std::string::npos);
+    CHECK(parseKitManifest(manifestWith(variant("Hut2", "1.0"))).error.find("not a role piece") != std::string::npos);
+    CHECK(parseKitManifest(manifestWith(variant("Castle", "1.0"))).error.find("not a role piece") != std::string::npos);
+}
+
+TEST_CASE("the CC0 pilot pieces stay out of a default run and fit the material cap when asked for", "[bake][settlements][kit][manifest]")
+{
+    const KitManifestResult loaded = loadKitManifest(kitFolder() / kKitManifestFile);
+    REQUIRE(loaded.ok());
+    SettlementKitSet none;
+    const std::vector<bool> idle = kitManifestPiecesUsed(none, loaded.manifest, true);
+    CHECK(std::none_of(idle.begin(), idle.end(), [](bool b) { return b; }));
+
+    std::vector<bool> wanted(loaded.manifest.pieces.size(), false);
+    std::size_t variants = 0;
+    for (std::size_t i = 0; i < wanted.size(); ++i) {
+        wanted[i] = !loaded.manifest.pieces[i].variantOf.empty() || i < kKitPieceCount;
+        if (!loaded.manifest.pieces[i].variantOf.empty()) ++variants;
+    }
+    REQUIRE(variants >= 3);
+    SceneBundle bundle;
+    KitMeshes meshes;
+    REQUIRE(cookSettlementKit(kitFolder(), loaded.manifest, wanted, bundle, meshes));
+    CHECK(bundle.materials.size() < kMaxSceneMaterials);
+    CHECK(meshes.variants[static_cast<std::size_t>(KitPiece::SmallHouse)].size() == 2);
+    CHECK(meshes.variants[static_cast<std::size_t>(KitPiece::WallSegmentGrid)].size() == 1);
+    CHECK(meshes.variants[static_cast<std::size_t>(KitPiece::TempleFront)].empty());
+
+    KitInstance temple;
+    temple.piece = KitPiece::TempleFront;
+    CHECK(kitMeshFor(meshes, temple) == meshes.mesh[static_cast<std::size_t>(KitPiece::TempleFront)]);
+    std::set<std::uint32_t> used;
+    for (int i = 0; i < 64; ++i) {
+        KitInstance house;
+        house.piece = KitPiece::SmallHouse;
+        house.settlementId = "s1";
+        house.x = 10.0 + 7.0 * i;
+        house.z = 3.0;
+        used.insert(kitMeshFor(meshes, house));
+        CHECK(kitMeshFor(meshes, house) == kitMeshFor(meshes, house));
+    }
+    CHECK(used == std::set<std::uint32_t>(meshes.variants[static_cast<std::size_t>(KitPiece::SmallHouse)].begin(), meshes.variants[static_cast<std::size_t>(KitPiece::SmallHouse)].end()));
 }
 
 TEST_CASE("a piece added through the manifest alone is cooked and reachable by its id", "[bake][settlements][kit][manifest]")

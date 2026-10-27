@@ -6,6 +6,10 @@
     {"id": "WallTower", "file": "SM_WallTower.glb", "category": "tower", "footprint": {"halfWidthM": 2.01, "halfDepthM": 2.02, "heightM": 8.0}},
     {"id": "GateBayGrid", "file": "SM_GateBayGrid.glb", "category": "gate", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.6, "heightM": 4.5}},
     {"id": "WallSegmentGrid", "file": "SM_WallSegmentGrid.glb", "category": "wall", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.3, "heightM": 3.2}},
-    {"id": "PalisadeRunGrid", "file": "SM_PalisadeRunGrid.glb", "category": "wall", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.15, "heightM": 2.5}}
+    {"id": "PalisadeRunGrid", "file": "SM_PalisadeRunGrid.glb", "category": "wall", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.15, "heightM": 2.5}},
+    {"id": "KenneyHouseWood", "file": "SM_KenneyHouseWood.glb", "category": "building", "variantOf": "SmallHouse", "footprint": {"halfWidthM": 1.9, "halfDepthM": 1.7, "heightM": 2.8}},
+    {"id": "KenneyHouseStone", "file": "SM_KenneyHouseStone.glb", "category": "building", "variantOf": "SmallHouse", "footprint": {"halfWidthM": 1.9, "halfDepthM": 1.7, "heightM": 2.83}},
+    {"id": "KenneyWallBay", "file": "SM_KenneyWallBay.glb", "category": "wall", "variantOf": "WallSegmentGrid", "footprint": {"halfWidthM": 2.0, "halfDepthM": 0.1, "heightM": 3.0}},
+    {"id": "KenneyStall", "file": "SM_KenneyStall.glb", "category": "prop", "footprint": {"halfWidthM": 1.0, "halfDepthM": 1.0, "heightM": 2.5}}
   ]
 }

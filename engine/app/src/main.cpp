@@ -121,6 +121,7 @@ struct Options {
     std::filesystem::path exileDefault = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "exile"; // the player's model in --forged when --exile is not given
     std::filesystem::path world = std::filesystem::path(ICHOR_CONTENT_DIR) / "world"; // empty runs without terrain
     std::filesystem::path kit = std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art" / "settlement_kit"; // the --forged settlements' textured pieces
+    bool kitVariants = false; // draw the manifest's look-alike pieces (variantOf) in place of the role pieces
     float overlook = 0.0f; // --settlement: look down on the settlement from this many metres up and back, instead of standing in it
     std::string waterView; // --forged: start on the bank of a large river or the biggest lake ("river" or "lake")
     std::optional<worldforge::BiomeId> biome; // --forged --biome NAME: start inside this biome (forest, desert, ...)
@@ -209,6 +210,8 @@ bool parse(int argc, char** argv, Options& options)
             options.exile = argv[++i];
         } else if (arg == "--kit" && hasValue) {
             options.kit = argv[++i];
+        } else if (arg == "--kit-variants") {
+            options.kitVariants = true;
         } else if (arg == "--overlook" && hasValue) {
             if (!parseNumber(argv[++i], options.overlook) || !(options.overlook >= 0.0f) || options.overlook > 2000.0f) return false;
         } else if (arg == "--water-view" && hasValue) {
@@ -774,7 +777,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     bool sceneryDrawn = false;
     if (forged) {
         scenery = ichor::buildForgedScenery(*forged);
-        if (!ichor::addSettlementKit(scenery, *forged, options.kit)) {
+        if (!ichor::addSettlementKit(scenery, *forged, options.kit, options.kitVariants)) {
             ichor::logf(ichor::LogLevel::Warn, "the settlement kit could not be loaded from {}; the buildings are drawn as boxes", options.kit.string());
         }
         sceneryBase = renderer.meshCount();
@@ -1658,7 +1661,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             if (scenery.kitLoaded) {
                 for (const ichor::KitInstance& piece : forged->kit->inCell(id)) {
                     ichor::RenderInstance instance;
-                    instance.mesh = sceneryBase + scenery.kitMesh.mesh[static_cast<std::size_t>(piece.piece)];
+                    instance.mesh = sceneryBase + ichor::kitMeshFor(scenery.kitMesh, piece);
                     instance.position = {piece.x, static_cast<double>(piece.groundY), piece.z};
                     instance.basis = ichor::kitBasis(piece.quarterTurns);
                     view.instances.push_back(instance);
@@ -2068,7 +2071,7 @@ int main(int argc, char** argv)
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
     }
 
