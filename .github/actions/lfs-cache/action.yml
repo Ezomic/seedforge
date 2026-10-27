@@ -1,0 +1,32 @@
+name: lfs-cache
+description: Fetch the Git LFS objects of the checked out ref through the Actions cache instead of downloading every file in every job (SEED-687).
+
+# The caller checks out with `lfs: false`. This restores .git/lfs, fetches only the objects the cache does not hold, and
+# saves the cache right after the fetch, so a later failing step does not lose it. Objects are content addressed, so one
+# key family serves the Windows and the Linux jobs (enableCrossOsArchive).
+runs:
+  using: composite
+  steps:
+    - name: List the LFS objects
+      shell: bash
+      run: git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+    - name: Restore the LFS cache
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: .git/lfs
+        key: lfs-${{ hashFiles('.lfs-assets-id') }}
+        restore-keys: lfs-
+        enableCrossOsArchive: true
+    - name: Fetch the missing LFS objects
+      shell: bash
+      run: |
+        git lfs install --local
+        git lfs pull
+    - name: Save the LFS cache
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: .git/lfs
+        key: lfs-${{ hashFiles('.lfs-assets-id') }}
+        enableCrossOsArchive: true

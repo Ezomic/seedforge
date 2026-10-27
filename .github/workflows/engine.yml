@@ -107,7 +107,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
@@ -261,7 +262,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
@@ -341,7 +343,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
@@ -440,7 +443,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
@@ -504,7 +508,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
       - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
