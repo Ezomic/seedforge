@@ -194,6 +194,398 @@ Generated from `art/LICENSES.json` by `tools/check_assets_licensed.py --write-cr
 - Files: `art/audio/A_Step_Snow.wav`
 - Attribution: Corsica_S, extracted by Iwan Gabovitch (uploaded by qubodup), https://opengameart.org/content/42-snow-and-gravel-footsteps (CC0), cut from Corsica_S-Walking_on_snow_covered_gravel_01.flac.
 
+## batch7_bosses
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/monsters/bosses/*.glb`
+- Attribution: Batch 7 bosses: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.
+
+## batch7_creatures
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/creatures/**`
+- Attribution: Batch 7 animals: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.
+
+## batch7_enemies
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/monsters/enemies/*.glb`
+- Attribution: Batch 7 enemies, static and rigged: generated locally by the owner with Z-Image Turbo, TRELLIS.2, UniRig, Blender. First-party, all rights reserved.
+
+## batch7_items
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/items/*.glb`
+- Attribution: Batch 7 items: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.
+
+## batch7_kit_sub
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/*/*.glb`
+- Attribution: Batch 7 settlement kit buildings, harbour, defence, roads and ruins: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_01
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_B*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_02
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Ch*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_03
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_ColonnadeBayG*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_04
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Cr*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_05
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_D*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_06
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_F*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_07
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_GateP*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_08
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_H*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_09
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_L*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_10
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_M*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_11
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_PalisadeRunT*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_12
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Pi*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_13
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Pl*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_14
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Q*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_15
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_R*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_16
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Sc*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_17
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Si*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_18
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_St*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_19
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Ta*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_20
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_TempleFrontG*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_21
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Ten*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_22
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Ti*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_23
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_To*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_24
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_WallC*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_25
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_WallD*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_26
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_WallH*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_27
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_WallSo*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_28
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_WallTowerB*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_29
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_WallW*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_kit_top_30
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/settlement_kit/SM_Wo*.glb`
+- Attribution: Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.
+
+## batch7_npcs
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/npcs/*.glb`
+- Attribution: Batch 7 NPCs (static models): generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.
+
+## batch7_props
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/props/**`
+- Attribution: Batch 7 props: flora, ruins, settlement furniture and terrain rocks: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.
+
+## batch7_surfaces_banners
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/banners/*.png`
+- Attribution: Batch 7 banners: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_decals
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/decals/*.png`
+- Attribution: Batch 7 decals: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_roofs_01
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/roofs/T_RoofP*.png`
+- Attribution: Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_roofs_02
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/roofs/T_RoofTerracottaTileV*.png`
+- Attribution: Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_roofs_03
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/roofs/T_RoofV*.png`
+- Attribution: Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_roofs_04
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/roofs/T_RoofW*.png`
+- Attribution: Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_walls_01
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/walls/T_P*.png`
+- Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_walls_02
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/walls/T_WallBasaltE*.png`
+- Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_walls_03
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/walls/T_WallFieldstoneM*.png`
+- Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_walls_04
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/walls/T_WallLimestoneMortarV*.png`
+- Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_walls_05
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/walls/T_WallP*.png`
+- Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
+## batch7_surfaces_walls_06
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/surfaces/walls/T_WallS*.png`
+- Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
 ## font_alegreya_sans
 
 - Author: The Alegreya Sans Project Authors
