@@ -201,10 +201,14 @@ Every job used to check out with `lfs: true`, so each of them downloaded every L
 1. `.lfs-assets-id` is written from `git lfs ls-files -l` (the object ids of the checked out ref, sorted).
 2. `.git/lfs` is restored from the cache key `lfs-<hash of that file>`; when the exact key is missing, the newest `lfs-` cache is restored, so a changed asset set fetches only the new objects.
 3. `git lfs pull` fetches what the cache lacks and writes real files over the pointers.
-4. On a miss the cache is saved straight away, so a later failing step does not lose it.
+4. On a miss on main the cache is saved straight away, so a later failing step does not lose it. PR runs only restore.
 
 Objects are content addressed, so Windows and Linux share one key family (`enableCrossOsArchive`). A run on a PR can read caches saved on main but not the other way round, so the first run after a merge to main seeds the cache once.
 
 To clear it: `gh cache list --key lfs-` and `gh cache delete <id>` (or `gh cache delete --all --key lfs-`). The next run downloads once and saves again.
 
 If a job shows pointer files instead of assets (a test fails on a file that starts with `version https://git-lfs`), look for the `Fetch the missing LFS objects` step: it must have run `git lfs pull` without error. Delete the `lfs-` caches and re-run; if it still fails, check the LFS bandwidth quota on github.com/settings/billing, because an exhausted quota makes the fetch fail.
+
+## Compiler caches (SEED-688)
+
+The sccache and ccache entries are keyed by commit and are 20 MB to 1 GB each. They used to be saved by every PR run, which filled the 10 GB Actions cache limit and made GitHub evict the vcpkg caches. Only main saves them now; PR runs restore the newest one from main. Check the total with `gh api repos/Ezomic/seedforge/actions/cache/usage` and list the biggest with `gh cache list --sort size_in_bytes --order desc`.
