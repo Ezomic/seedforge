@@ -196,7 +196,18 @@ Verdict judgeGolden(const std::vector<std::uint8_t>& actual, const std::filesyst
 void checkAgainstGolden(const std::vector<std::uint8_t>& actual, const std::filesystem::path& goldenPath)
 {
     const std::string name = goldenPath.stem().string();
-    const Verdict verdict = judgeGolden(actual, goldenPath, toleranceFor(softwareDevice()), kOutDir / "golden-failures");
+    // TEMP SEED-704 CI proof, reverted before review: on lavapipe, kit looks for a missing golden, ui_pause is compared
+    // with the kit golden, and sky_noon gets zero tolerance.
+    std::filesystem::path tempPath = goldenPath;
+    Tolerance tempLimit = toleranceFor(softwareDevice());
+    if (softwareDevice() && name == "kit") {
+        tempPath = goldenPath.parent_path() / "kit missing on purpose.png";
+    } else if (softwareDevice() && name == "ui_pause") {
+        tempPath = kGoldenDir / "kit.png";
+    } else if (softwareDevice() && name == "sky_noon") {
+        tempLimit = {0.0, 0.0, 0};
+    }
+    const Verdict verdict = judgeGolden(actual, tempPath, tempLimit, kOutDir / "golden-failures");
     if (verdict.diff) {
         const Diff& diff = *verdict.diff;
         writePng(kOutDir / (name + ".diff.png"), kWidth, kHeight, diff.image.data());
