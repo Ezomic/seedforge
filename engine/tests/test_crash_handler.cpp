@@ -23,10 +23,12 @@ TEST_CASE("the crash test flag names its three crashes and nothing else")
 #include "test_temp.h"
 
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -49,8 +51,9 @@ std::string readFile(const fs::path& path)
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
-// The child's stdout and stderr go to a file, so Catch2's and the sanitizers' reports of the deliberate
-// crash do not land in this test's output.
+// The child's stdout and stderr go to a file, and the child drops Catch2's and the sanitizers' handlers so
+// the chain ends at the default action: their reports of the deliberate crash would only be noise here. The
+// stack is capped so the overflow case ends where the runner's stack limit is unlimited.
 Crash crashChild(const fs::path& dir, const fs::path& logs, CrashTest kind)
 {
     const fs::path errPath = dir / "stderr.txt";
@@ -59,6 +62,9 @@ Crash crashChild(const fs::path& dir, const fs::path& logs, CrashTest kind)
         const int fd = open(errPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
         dup2(fd, 1);
         dup2(fd, 2);
+        for (const int sig : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT}) signal(sig, SIG_DFL);
+        const rlimit stack{8 << 20, 8 << 20};
+        setrlimit(RLIMIT_STACK, &stack);
         installCrashHandler(logs);
         crashForTest(kind);
     }

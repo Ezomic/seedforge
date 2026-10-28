@@ -68,7 +68,9 @@ struct Paths {
 };
 
 Paths paths;
-std::atomic<bool> handling{false};
+// The thread writing the report, 0 while none is. A second crash on that thread ends the process at once;
+// one on another thread waits, so the first report is finished before the process ends.
+std::atomic<std::uint64_t> handlingThread{0};
 std::atomic<bool> crashInHandler{false};
 
 template <class Char>
@@ -169,7 +171,7 @@ bool writeDumpFromOtherThread()
     const HANDLE thread = CreateThread(nullptr, 256 * 1024, dumpThread, nullptr, 0, nullptr);
     if (thread == nullptr) return false;
     DWORD result = 1;
-    if (WaitForSingleObject(thread, 60'000) == WAIT_OBJECT_0) GetExitCodeThread(thread, &result);
+    if (WaitForSingleObject(thread, 20'000) == WAIT_OBJECT_0) GetExitCodeThread(thread, &result);
     CloseHandle(thread);
     return result == 0;
 }
@@ -177,7 +179,11 @@ bool writeDumpFromOtherThread()
 LONG WINAPI onUnhandledException(EXCEPTION_POINTERS* info)
 {
     const DWORD code = info->ExceptionRecord->ExceptionCode;
-    if (handling.exchange(true)) TerminateProcess(GetCurrentProcess(), code);
+    std::uint64_t none = 0;
+    if (!handlingThread.compare_exchange_strong(none, GetCurrentThreadId())) {
+        if (none == GetCurrentThreadId()) TerminateProcess(GetCurrentProcess(), code);
+        Sleep(INFINITE);
+    }
     crashPointers = info;
     crashThread = GetCurrentThreadId();
 
@@ -206,6 +212,8 @@ LONG WINAPI onUnhandledException(EXCEPTION_POINTERS* info)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+// The previous filter is not chained: it is the CRT's, whose path for an uncaught C++ exception ends in
+// abort() and can raise the Windows Error Reporting dialog. MSVC's ASan uses a vectored handler instead.
 void install()
 {
     SetUnhandledExceptionFilter(onUnhandledException);
@@ -258,17 +266,22 @@ void chain(int sig, siginfo_t* info, void* context)
 // and allocates, so install() calls it once to do that outside the handler.
 void onSignal(int sig, siginfo_t* info, void* context)
 {
-    if (handling.exchange(true)) {
-        signal(sig, SIG_DFL);
-        raise(sig);
-        return;
+    const auto self = static_cast<std::uint64_t>(syscall(SYS_gettid));
+    std::uint64_t none = 0;
+    if (!handlingThread.compare_exchange_strong(none, self)) {
+        if (none == self) {
+            signal(sig, SIG_DFL);
+            raise(sig);
+            return;
+        }
+        for (;;) pause();
     }
     Text cause;
     cause.add(signalName(sig));
     Text report;
     report.add("Ichor build ").add(paths.build).add("\n").add({cause.data, cause.size}).add(" (signal ").number(static_cast<std::uint64_t>(sig)).add(")");
     report.add(" at address ").number(reinterpret_cast<std::uintptr_t>(info->si_addr), 16).add("\n");
-    report.add("thread ").number(static_cast<std::uint64_t>(syscall(SYS_gettid))).add(", process ").number(static_cast<std::uint64_t>(getpid())).add("\n");
+    report.add("thread ").number(self).add(", process ").number(static_cast<std::uint64_t>(getpid())).add("\n");
     report.add("backtrace:\n");
 
     mkdir(paths.logsUtf8, 0755);
@@ -294,15 +307,13 @@ void install()
     void* frames[4];
     backtrace(frames, 4);
 
-    // Only the installing thread gets a stack to report its own overflow on; a sanitizer's is kept.
-    stack_t current{};
-    if (sigaltstack(nullptr, &current) == 0 && (current.ss_flags & SS_DISABLE)) {
-        static char altStack[256 * 1024];
-        stack_t stack{};
-        stack.ss_sp = altStack;
-        stack.ss_size = sizeof(altStack);
-        sigaltstack(&stack, nullptr);
-    }
+    // Only the installing thread gets a stack to report its own overflow on. It replaces a sanitizer's or
+    // Catch2's smaller one, so the handler and the one it chains to both fit.
+    static char altStack[256 * 1024];
+    stack_t stack{};
+    stack.ss_sp = altStack;
+    stack.ss_size = sizeof(altStack);
+    sigaltstack(&stack, nullptr);
     struct sigaction action{};
     action.sa_sigaction = onSignal;
     action.sa_flags = SA_SIGINFO | SA_ONSTACK;
