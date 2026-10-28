@@ -184,7 +184,8 @@ jobs:
         working-directory: engine
       - name: Save vcpkg binaries
         # Saved right after configure: a cold configure takes about 9 minutes, and a job killed later by its 15 minute limit saves nothing.
-        if: steps.cache1.outputs.cache-hit != 'true'
+        # always(): a configure that fails on one port still keeps the ports it built.
+        if: ${{ always() && steps.cache1.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: .vcpkg-cache
