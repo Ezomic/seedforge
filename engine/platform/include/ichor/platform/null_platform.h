@@ -26,6 +26,8 @@ public:
     void setCaptionKey(bool down) { captionKey_ = down; }
     void setHelpKey(bool down) { helpKey_ = down; }
     void setOverlayKey(bool down) { overlayKey_ = down; }
+    bool focused() const override { return focused_; }
+    void setFocused(bool focused) { focused_ = focused; }
     unsigned pumpCount() const { return pumps_; }
 
     static constexpr double kTick = 1.0 / 60.0;
@@ -38,6 +40,7 @@ private:
     bool helpKey_ = false;
     bool soundLegendKey_ = false;
     bool captionKey_ = false;
+    bool focused_ = true;
 };
 
 }

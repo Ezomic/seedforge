@@ -38,6 +38,9 @@ public:
     void setLoopGain(std::uint32_t clip, float gain);
     // Fades every playing voice of the category to silence over `seconds` and ends it; a new voice of the category is not affected.
     void fadeOutCategory(SoundCategory category, float seconds);
+    // Scales the whole mix after the reverb, ramping linearly over a tenth of a second so it never clicks and lands
+    // exactly; NaN counts as silence and the rest is clamped to 0..1.
+    void setMasterGain(float gain);
     void setListener(glm::dvec3 position, glm::vec3 forward, glm::vec3 right);
     void setReverb(const ReverbSettings& settings);
 
@@ -78,6 +81,8 @@ private:
     std::vector<Loop> loops_;
     Reverb reverb_;
     float duck_ = 1.0f;
+    float master_ = 1.0f;
+    float masterTarget_ = 1.0f;
     glm::dvec3 listenerPosition_{0.0};
     glm::vec3 listenerForward_{0.0f, 0.0f, -1.0f};
     glm::vec3 listenerRight_{1.0f, 0.0f, 0.0f};

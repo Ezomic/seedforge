@@ -57,6 +57,11 @@ public:
     void setTickGate(TickGate gate) { tickGate_ = std::move(gate); }
     bool gated() const { return gated_; }
 
+    // While set, a platform that has lost focus holds the simulation as the gate does and silences the audio
+    // until focus returns. The app sets it for a window someone plays in; headless and screenshot runs leave it off.
+    void setPauseOnFocusLoss(bool enabled) { pauseOnFocusLoss_ = enabled; }
+    bool focusPaused() const { return focusPaused_; }
+
     // Optional: receives the scene's sound events each tick and the camera as listener.
     void setAudio(AudioHost* audio) { audio_ = audio; }
 
@@ -103,6 +108,8 @@ private:
     TickGate tickGate_;
     InputSource inputSource_;
     bool gated_ = false;
+    bool pauseOnFocusLoss_ = false;
+    bool focusPaused_ = false;
     std::vector<std::string> overlay_;
     OverlayToggle overlayToggle_;
     ControlsOverlay controls_;
