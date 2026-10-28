@@ -123,6 +123,7 @@ public:
     void play(std::uint32_t sound, glm::dvec3 position, bool spatial, float gain = 1.0f, SoundCategory category = SoundCategory::None) override;
     void setAmbience(std::uint32_t sound, float gain) override;
     void fadeOutMusic(float seconds) override { inner_.fadeOutMusic(seconds); }
+    void setMasterGain(float gain) override { inner_.setMasterGain(gain); }
     void setListener(glm::dvec3 position, glm::quat rotation) override { inner_.setListener(position, rotation); }
     void setReverb(const ReverbSettings& settings) override { inner_.setReverb(settings); }
 

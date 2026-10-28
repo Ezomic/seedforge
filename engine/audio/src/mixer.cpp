@@ -12,6 +12,7 @@ namespace {
 
 constexpr float kReferenceDistance = 2.0f; // metres at which a spatial sound has fallen to half gain
 constexpr float kCentreGain = 1.41421356f;   // undoes the equal-power pan at centre so spatial and flat cues match
+constexpr float kMasterStep = 10.0f / static_cast<float>(Mixer::kRate); // the master gain crosses its whole range in a tenth of a second
 
 }
 
@@ -65,6 +66,12 @@ void Mixer::fadeOutCategory(SoundCategory category, float seconds)
             voice.fadeStep = frames < 1.0f ? voice.fade : voice.fade / frames;
         }
     }
+}
+
+void Mixer::setMasterGain(float gain)
+{
+    const std::lock_guard lock(mutex_);
+    masterTarget_ = std::isnan(gain) ? 0.0f : std::clamp(gain, 0.0f, 1.0f);
 }
 
 void Mixer::setLoopGain(std::uint32_t clip, float gain)
@@ -179,6 +186,14 @@ void Mixer::mix(float* interleaved, std::uint32_t frames)
 
     std::erase_if(voices_, [&](const Voice& voice) { return voice.cursor >= static_cast<double>(clips_[voice.clip].samples.size()); });
     reverb_.process(interleaved, frames);
+    // Skipped at full gain so the mix stays bit for bit what it was before the master gain existed.
+    if (master_ != 1.0f || masterTarget_ != 1.0f) {
+        for (std::uint32_t f = 0; f < frames; ++f) {
+            master_ = master_ < masterTarget_ ? std::min(masterTarget_, master_ + kMasterStep) : std::max(masterTarget_, master_ - kMasterStep);
+            interleaved[f * 2] *= master_;
+            interleaved[f * 2 + 1] *= master_;
+        }
+    }
     for (std::uint32_t i = 0; i < frames * kChannels; ++i) {
         interleaved[i] = std::clamp(interleaved[i], -1.0f, 1.0f);
     }

@@ -16,6 +16,7 @@ namespace {
 constexpr std::string_view kHeader = "ichor-settings 1";
 constexpr std::string_view kTrailer = "end";
 constexpr std::size_t kMaxBytes = 4096;
+constexpr float kMouseSensitivityStep = 0.1f;
 
 float clampField(float value, float low, float high, float fallback)
 {
@@ -46,6 +47,22 @@ Settings Settings::clamped() const
 {
     return {clampField(fovDegrees, kMinFovDegrees, kMaxFovDegrees, kDefaultFovDegrees),
             clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity)};
+}
+
+float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override)
+{
+    const float storedValue = stored.clamped().mouseSensitivity;
+    return override ? clampField(*override, Settings::kMinMouseSensitivity, Settings::kMaxMouseSensitivity, storedValue) : storedValue;
+}
+
+Settings stepMouseSensitivity(const Settings& stored, float current, int steps)
+{
+    if (steps == 0) {
+        return stored;
+    }
+    Settings stepped = stored;
+    stepped.mouseSensitivity = std::round((current + static_cast<float>(steps) * kMouseSensitivityStep) * 10.0f) / 10.0f;
+    return stepped.clamped();
 }
 
 std::string serializeSettings(const Settings& settings)

@@ -30,6 +30,7 @@ public:
     bool helpKey() const override { return helpKey_; }
     bool soundLegendKey() const override { return soundLegendKey_; }
     bool captionKey() const override { return captionKey_; }
+    bool focused() const override { return focused_; }
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
     void enableLook(bool enabled) override;
     void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
@@ -51,6 +52,7 @@ private:
     bool helpKey_ = false;
     bool soundLegendKey_ = false;
     bool captionKey_ = false;
+    bool focused_ = true;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
     MouseLook mouseLook_;

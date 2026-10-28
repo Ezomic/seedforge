@@ -19,15 +19,15 @@ constexpr const char* kPauseDocument = R"(<rml><head><style>
     #title { font-family: Cinzel; font-size: 36px; color: #e8d8a8; letter-spacing: 4px; text-align: center; padding-bottom: 20px; }
     .button { font-family: Alegreya Sans; font-size: 26px; text-align: center; color: #d8d8d8; padding: 10px 0px 12px 0px; margin-top: 10px; background-color: #1c222c; border: 2px #3a4252; }
     .label { font-family: Alegreya Sans; font-size: 22px; color: #a8a090; text-align: center; padding-top: 6px; }
-    #fov { height: 52px; margin-top: 6px; }
+    #fov, #sens { height: 52px; margin-top: 6px; }
     .step { float: left; width: 56px; font-family: Alegreya Sans; font-size: 28px; text-align: center; color: #d8d8d8; padding: 4px 0px 6px 0px; background-color: #1c222c; border: 2px #3a4252; }
-    #fovup { float: right; }
+    #fovup, #sensup { float: right; }
     .step:hover { color: #f4e8c0; background-color: #2a3242; border-color: #a08850; }
-    #fovvalue { font-family: Alegreya Sans; font-size: 28px; text-align: center; color: #f4e8c0; padding-top: 8px; }
+    #fovvalue, #sensvalue { font-family: Alegreya Sans; font-size: 28px; text-align: center; color: #f4e8c0; padding-top: 8px; }
     .button:hover { color: #f4e8c0; background-color: #2a3242; border-color: #a08850; }
 </style></head><body>
     <div id="veil"></div>
-    <div id="card"><div id="title">PAUSED</div><div class="label">Field of view</div><div id="fov"><div id="fovdown" class="step">-</div><div id="fovup" class="step">+</div><div id="fovvalue">45 deg</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
+    <div id="card"><div id="title">PAUSED</div><div class="label">Field of view</div><div id="fov"><div id="fovdown" class="step">-</div><div id="fovup" class="step">+</div><div id="fovvalue">45 deg</div></div><div class="label">Mouse sensitivity</div><div id="sens"><div id="sensdown" class="step">-</div><div id="sensup" class="step">+</div><div id="sensvalue">1.0</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
 </body></rml>)";
 
 }
@@ -44,7 +44,10 @@ PauseMenu::PauseMenu(UiContext& ui)
     fovDown_ = document_->GetElementById("fovdown");
     fovUp_ = document_->GetElementById("fovup");
     fovValue_ = document_->GetElementById("fovvalue");
-    if (resume_ == nullptr || quit_ == nullptr || fovDown_ == nullptr || fovUp_ == nullptr || fovValue_ == nullptr) {
+    sensDown_ = document_->GetElementById("sensdown");
+    sensUp_ = document_->GetElementById("sensup");
+    sensValue_ = document_->GetElementById("sensvalue");
+    if (resume_ == nullptr || quit_ == nullptr || fovDown_ == nullptr || fovUp_ == nullptr || fovValue_ == nullptr || sensDown_ == nullptr || sensUp_ == nullptr || sensValue_ == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
         return;
@@ -53,6 +56,8 @@ PauseMenu::PauseMenu(UiContext& ui)
     quit_->AddEventListener("click", &quitClick_);
     fovDown_->AddEventListener("click", &fovDownClicks_);
     fovUp_->AddEventListener("click", &fovUpClicks_);
+    sensDown_->AddEventListener("click", &sensDownClicks_);
+    sensUp_->AddEventListener("click", &sensUpClicks_);
 }
 
 PauseMenu::~PauseMenu()
@@ -70,6 +75,12 @@ PauseMenu::~PauseMenu()
     if (fovUp_ != nullptr) {
         fovUp_->RemoveEventListener("click", &fovUpClicks_);
     }
+    if (sensDown_ != nullptr) {
+        sensDown_->RemoveEventListener("click", &sensDownClicks_);
+    }
+    if (sensUp_ != nullptr) {
+        sensUp_->RemoveEventListener("click", &sensUpClicks_);
+    }
     if (document_ != nullptr) {
         ui_.unloadDocument(document_);
     }
@@ -86,6 +97,8 @@ void PauseMenu::setVisible(bool visible)
         quitClick_.requested = false;
         fovDownClicks_.clicks = 0;
         fovUpClicks_.clicks = 0;
+        sensDownClicks_.clicks = 0;
+        sensUpClicks_.clicks = 0;
         document_->Show();
     } else {
         document_->Hide();
@@ -118,6 +131,21 @@ int PauseMenu::takeFovSteps()
     const int steps = fovUpClicks_.clicks - fovDownClicks_.clicks;
     fovUpClicks_.clicks = 0;
     fovDownClicks_.clicks = 0;
+    return steps;
+}
+
+void PauseMenu::setMouseSensitivity(float sensitivity)
+{
+    if (sensValue_ != nullptr && std::isfinite(sensitivity)) {
+        sensValue_->SetInnerRML(std::format("{:.1f}", sensitivity));
+    }
+}
+
+int PauseMenu::takeSensitivitySteps()
+{
+    const int steps = sensUpClicks_.clicks - sensDownClicks_.clicks;
+    sensUpClicks_.clicks = 0;
+    sensDownClicks_.clicks = 0;
     return steps;
 }
 
