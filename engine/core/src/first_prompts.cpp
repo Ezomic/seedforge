@@ -3,6 +3,7 @@
 #include "ichor/core/controls_overlay.h"
 #include "ichor/core/input.h"
 
+#include <algorithm>
 #include <cmath>
 #include <format>
 
@@ -81,7 +82,7 @@ FirstPrompts stepFirstPrompts(FirstPrompts state, const FirstPromptsFrame& frame
     state.queued |= possible(frame) & ~state.seen;
     if (state.showing) {
         if (std::isfinite(dt) && dt > 0.0) {
-            state.secondsLeft -= dt;
+            state.secondsLeft -= std::min(dt, kFirstPromptMaxStep);
         }
         if (state.secondsLeft <= 0.0) {
             state.showing.reset();

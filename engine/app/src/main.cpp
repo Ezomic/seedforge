@@ -2002,7 +2002,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
         const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
-        if (prompting) {
+        // Without the screen to show them, the prompts would be marked seen unread.
+        if (prompting && promptScreen && promptScreen->ok()) {
             const ichor::InputFrame keys = platform.input();
             const std::optional<double> foe = combat ? combat->foeDistance(engine.scene()) : std::nullopt;
             promptHeld = uiFocus || engine.gated() || engine.focusPaused() || (combat && combat->playerDeath(engine.scene()));

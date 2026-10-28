@@ -12,6 +12,8 @@ enum class FirstPrompt : std::uint8_t { Move, Attack, Block, Dodge };
 constexpr int kFirstPromptCount = 4;
 constexpr std::uint32_t kAllFirstPrompts = (1u << kFirstPromptCount) - 1u;
 constexpr double kFirstPromptSeconds = 8.0;
+// The most one frame runs a prompt down, so a stall (a dungeon bake, a dragged window) cannot end it unread.
+constexpr double kFirstPromptMaxStep = 0.1;
 // Attack, block and dodge become possible once a living foe is this close, in metres along the ground.
 constexpr double kFirstPromptFoeRange = 12.0;
 

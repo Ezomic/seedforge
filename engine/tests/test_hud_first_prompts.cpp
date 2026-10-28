@@ -230,3 +230,11 @@ TEST_CASE("the prompt text is escaped", "[first_prompts]")
     CHECK(fixture.screen.markup().find("<b>") == std::string::npos);
     CHECK(fixture.screen.markup().find("&amp;") != std::string::npos);
 }
+
+TEST_CASE("one long frame, such as a stall, runs a prompt down by a short step only", "[first_prompts]")
+{
+    FirstPrompts state = stepFirstPrompts({}, kWalking, kDt);
+    state = stepFirstPrompts(state, kWalking, 9.0);
+    CHECK(state.showing == FirstPrompt::Move);
+    CHECK(state.secondsLeft >= kFirstPromptSeconds - 2 * kFirstPromptMaxStep);
+}
