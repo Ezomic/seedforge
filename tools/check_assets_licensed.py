@@ -25,6 +25,7 @@ Usage: check_assets_licensed.py [--root DIR]    check the tree (default: this re
        check_assets_licensed.py --self-test     prove every rule goes red on a deliberate violation
 """
 import argparse
+import fnmatch
 import hashlib
 import json
 import re
@@ -54,17 +55,32 @@ LFS_POINTER = re.compile(rb"version https://git-lfs\.github\.com/spec/v1\noid sh
 UPDATE_HINT = "run tools/check_assets_licensed.py --update if the change is intended"
 
 
-def file_sha256(path):
+def file_sha256(path, lfs):
     """The sha256 Git LFS stores as the oid, so a pointer checkout and a real checkout give the same answer."""
     data = Path(path).read_bytes()
-    pointer = LFS_POINTER.fullmatch(data.replace(b"\r\n", b"\n"))
+    pointer = LFS_POINTER.fullmatch(data.replace(b"\r\n", b"\n")) if len(data) < 1024 else None
     if pointer:
         return pointer.group(1).decode()
     # Non-LFS text files are CRLF on a Windows checkout and LF on CI; hash what Git stores, using Git's own
-    # binary test (a NUL in the first 8000 bytes) so binary content is never rewritten.
-    if b"\0" not in data[:8000]:
+    # binary test (a NUL in the first 8000 bytes). LFS content is stored as is, CRLF included.
+    if not lfs and b"\0" not in data[:8000]:
         data = data.replace(b"\r\n", b"\n")
     return hashlib.sha256(data).hexdigest()
+
+
+def lfs_patterns(root):
+    text = read_text(root, ".gitattributes") or ""
+    return [line.split()[0] for line in text.splitlines() if "filter=lfs" in line.split()[1:]]
+
+
+def hasher(root):
+    """digest(path) for check_tree, with LFS routing read from the root .gitattributes."""
+    patterns = lfs_patterns(root)
+
+    def digest(rel):
+        lfs = any(fnmatch.fnmatchcase(rel if "/" in p else rel.rsplit("/", 1)[-1], p.lstrip("/")) for p in patterns)
+        return file_sha256(Path(root) / rel, lfs)
+    return digest
 
 
 def glob_regex(pattern):
@@ -245,19 +261,19 @@ def check_root(root):
     if entries is None:
         return errors
     return check_tree(walk(root), entries, parse_baseline(read_text(root, BASELINE)), read_text(root, CREDITS) or "",
-                      lambda f: file_sha256(Path(root) / f))
+                      hasher(root))
 
 
 def update_hashes(root):
     """Rewrite every entry's sha256 map from the files it covers now; returns how many entries changed."""
     data = json.loads(read_text(root, LEDGER))
-    files = walk(root)
+    files, digest = walk(root), hasher(root)
     changed = 0
     for e in data["entries"]:
         if not well_formed(e):
             continue
         rx = glob_regex(e["path"])
-        hashes = {f: file_sha256(Path(root) / f) for f in files if rx.fullmatch(f)}
+        hashes = {f: digest(f) for f in files if rx.fullmatch(f)}
         changed += e.get("sha256") != hashes
         e["sha256"] = hashes
     if changed:
@@ -400,15 +416,23 @@ def hash_self_test():
         pointer = Path(tmp) / "pointer.glb"
         real.write_bytes(wall)
         pointer.write_bytes(lfs_pointer(wall))
-        ok = file_sha256(real) == file_sha256(pointer) == hashlib.sha256(wall).hexdigest()
+        ok = file_sha256(real, True) == file_sha256(pointer, True) == hashlib.sha256(wall).hexdigest()
         print(f"  a pointer and the real file agree: {'ok' if ok else 'FAILED'}")
         checks.append(ok)
 
-        lf, crlf = Path(tmp) / "lf.txt", Path(tmp) / "crlf.txt"
-        lf.write_bytes(b"SIL Open Font License\nVersion 1.1\n")
-        crlf.write_bytes(b"SIL Open Font License\r\nVersion 1.1\r\n")
-        ok = file_sha256(lf) == file_sha256(crlf)
+        text, ascii_obj = Path(tmp) / "text", b"v 0 0 0\r\nv 1 0 0\r\n"
+        files = {"art/m/lf.txt": b"SIL OFL\nVersion 1.1\n", "art/m/crlf.txt": b"SIL OFL\r\nVersion 1.1\r\n",
+                 "art/m/SM.obj": ascii_obj, "art/m/SM_Pointer.obj": lfs_pointer(ascii_obj)}
+        for rel, data in files.items():
+            (text / rel).parent.mkdir(parents=True, exist_ok=True)
+            (text / rel).write_bytes(data)
+        (text / ".gitattributes").write_text("* text=auto\n*.obj  filter=lfs diff=lfs merge=lfs -text\n")
+        digest = hasher(text)
+        ok = digest("art/m/lf.txt") == digest("art/m/crlf.txt")
         print(f"  a text file hashes the same with CRLF and LF: {'ok' if ok else 'FAILED'}")
+        checks.append(ok)
+        ok = digest("art/m/SM.obj") == digest("art/m/SM_Pointer.obj") == hashlib.sha256(ascii_obj).hexdigest()
+        print(f"  an LFS file with CRLF and no NUL keeps its bytes: {'ok' if ok else 'FAILED'}")
         checks.append(ok)
 
         root = tree(Path(tmp) / "idem", two, [sample_entry()])
