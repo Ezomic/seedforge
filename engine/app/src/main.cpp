@@ -1807,7 +1807,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         ZoneScopedN("frame");
         // F8 flags this moment for a tester (SEED-697): the screenshot is of the frame about to be drawn, before the box
         // shows, and the box holds the world still as the menu does. The editor has the keyboard to itself.
-        if (notePrompt.pressF8(platform.noteKey(), noteBox && noteBox->ok() && !editing && options.screenshot.empty())) {
+        if (notePrompt.pressF8(platform.noteKey(), ichor::feedbackNoteAvailable(noteBox && noteBox->ok(), !options.screenshot.empty(), editing))) {
             noteDraft = ichor::FeedbackNote{};
             noteDraft.time = std::chrono::system_clock::now();
             noteDraft.seed = options.seed;
@@ -1815,7 +1815,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             noteFolder = ichor::createSessionFolder(options.logs, "note", noteDraft.time);
             if (noteFolder.empty()) {
                 ichor::logf(ichor::LogLevel::Warn, "a feedback note folder could not be made under {}", options.logs.string());
-                notePrompt.feed("\x1b");
+                notePrompt.cancel();
             } else {
                 noteTail = engine.inputTail().stream();
                 renderer.requestScreenshot((noteFolder / "screenshot.png").string());
@@ -1898,7 +1898,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // press the UI still holds is let go and nothing stays hovered.
         if (ui) {
             const ichor::Pointer pointer = platform.pointer();
-            if (pointer.inside && !editing) {
+            // Under the note box a click would choose a reply or press Resume while the world is held.
+            if (pointer.inside && !editing && !notePrompt.open()) {
                 ui->mouseMove(pointer.x, pointer.y);
                 if (pointer.primary != pointerHeld) {
                     ui->mouseButton(0, pointer.primary);

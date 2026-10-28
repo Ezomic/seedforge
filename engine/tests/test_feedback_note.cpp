@@ -105,6 +105,26 @@ TEST_CASE("F8 is ignored where no box can be shown, such as a headless run", "[f
     CHECK_FALSE(prompt.open());
 }
 
+TEST_CASE("only a run with the game UI, no screenshot and no editor takes F8", "[feedback_note]")
+{
+    CHECK(feedbackNoteAvailable(true, false, false));
+    CHECK_FALSE(feedbackNoteAvailable(false, false, false)); // headless: no UI
+    CHECK_FALSE(feedbackNoteAvailable(true, true, false));
+    CHECK_FALSE(feedbackNoteAvailable(true, false, true));
+}
+
+TEST_CASE("a malformed UTF-8 byte is dropped, so the text stays valid and the count stays true", "[feedback_note]")
+{
+    FeedbackPrompt prompt;
+    prompt.pressF8(true, true);
+    prompt.feed("\xC3" "A\x80\xF5\x80\x80\x80\xE6\x97");
+    CHECK(prompt.text() == "A");
+    prompt.feed("\b");
+    CHECK(prompt.text().empty());
+    prompt.cancel();
+    CHECK_FALSE(prompt.open());
+}
+
 TEST_CASE("Enter saves the line and Esc cancels it, and either closes the box", "[feedback_note]")
 {
     FeedbackPrompt prompt;

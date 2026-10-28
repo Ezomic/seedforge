@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace ichor {
 
@@ -33,6 +32,8 @@ public:
     bool open() const { return open_; }
     // Enter or Esc closes the box, and anything after it in the same text is dropped.
     NoteOutcome feed(std::string_view typed);
+    // Closes the box without a note, as Esc does.
+    void cancel();
     const std::string& text() const { return text_; }
 
 private:
@@ -41,22 +42,11 @@ private:
     std::string text_;
 };
 
-// The last ticks of input, oldest first, kept whatever the run records. Capacity 0 keeps none.
-class InputTail {
-public:
-    explicit InputTail(std::size_t capacity = 0)
-        : capacity_(capacity)
-    {
-    }
-
-    void push(const InputFrame& frame);
-    InputStream stream() const;
-
-private:
-    std::size_t capacity_ = 0;
-    std::size_t next_ = 0;
-    std::vector<InputFrame> frames_;
-};
+// F8 needs the game UI to draw the box, and the keyboard to itself: never headless, in a --screenshot run or under the editor.
+constexpr bool feedbackNoteAvailable(bool gameUi, bool screenshot, bool editing)
+{
+    return gameUi && !screenshot && !editing;
+}
 
 struct FeedbackNote {
     std::string buildVersion = std::string(versionStamp());

@@ -4,7 +4,6 @@
 #include "ichor/core/frame_stages.h"
 #include "ichor/core/input.h"
 #include "ichor/core/controls_overlay.h"
-#include "ichor/core/feedback_note.h"
 #include "ichor/core/overlay_mode.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/sim/scene.h"

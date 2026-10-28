@@ -135,9 +135,11 @@ void SdlPlatform::pumpEvents()
     navKeys_ = {keys[SDL_SCANCODE_LEFT], keys[SDL_SCANCODE_RIGHT], keys[SDL_SCANCODE_UP], keys[SDL_SCANCODE_DOWN], keys[SDL_SCANCODE_PAGEUP], keys[SDL_SCANCODE_PAGEDOWN],
         down(SDL_SCANCODE_LSHIFT, SDL_SCANCODE_RSHIFT)};
     overlayKey_ = keys[SDL_SCANCODE_F3];
-    helpKey_ = keys[SDL_SCANCODE_F1];
-    soundLegendKey_ = keys[SDL_SCANCODE_F2];
-    captionKey_ = keys[SDL_SCANCODE_F4];
+    // While the note box has the keyboard, the card keys stay still too.
+    const bool cardKeys = !typing_.typing();
+    helpKey_ = cardKeys && keys[SDL_SCANCODE_F1];
+    soundLegendKey_ = cardKeys && keys[SDL_SCANCODE_F2];
+    captionKey_ = cardKeys && keys[SDL_SCANCODE_F4];
     noteKey_ = keys[SDL_SCANCODE_F8];
     rawInput_ = frame;
     input_ = typing_.filter(frame);

@@ -9,13 +9,24 @@ namespace ichor {
 
 namespace {
 
-std::size_t sequenceLength(unsigned char lead)
+// The length of the well-formed UTF-8 character at the start of text, or 0 for a byte that does not start one.
+std::size_t sequenceLength(std::string_view text)
 {
+    const auto lead = static_cast<unsigned char>(text[0]);
+    std::size_t length = 0;
     if (lead < 0x80) return 1;
-    if ((lead & 0xE0) == 0xC0) return 2;
-    if ((lead & 0xF0) == 0xE0) return 3;
-    if ((lead & 0xF8) == 0xF0) return 4;
-    return 0; // a stray continuation byte or not UTF-8 at all
+    if (lead >= 0xC2 && lead <= 0xDF) length = 2;
+    if (lead >= 0xE0 && lead <= 0xEF) length = 3;
+    if (lead >= 0xF0 && lead <= 0xF4) length = 4;
+    if (length == 0 || length > text.size()) {
+        return 0;
+    }
+    for (std::size_t i = 1; i < length; ++i) {
+        if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+            return 0;
+        }
+    }
+    return length;
 }
 
 std::size_t characterCount(std::string_view text)
@@ -64,8 +75,8 @@ NoteOutcome FeedbackPrompt::feed(std::string_view typed)
             ++i;
             continue;
         }
-        const std::size_t length = sequenceLength(static_cast<unsigned char>(c));
-        if (length == 0 || i + length > typed.size()) {
+        const std::size_t length = sequenceLength(typed.substr(i));
+        if (length == 0) {
             ++i;
             continue;
         }
@@ -78,28 +89,9 @@ NoteOutcome FeedbackPrompt::feed(std::string_view typed)
     return NoteOutcome::Typing;
 }
 
-void InputTail::push(const InputFrame& frame)
+void FeedbackPrompt::cancel()
 {
-    if (capacity_ == 0) {
-        return;
-    }
-    if (frames_.size() < capacity_) {
-        frames_.push_back(frame);
-    } else {
-        frames_[next_] = frame;
-    }
-    next_ = (next_ + 1) % capacity_;
-}
-
-InputStream InputTail::stream() const
-{
-    InputStream out;
-    out.frames.reserve(frames_.size());
-    const std::size_t start = frames_.size() < capacity_ ? 0 : next_;
-    for (std::size_t i = 0; i < frames_.size(); ++i) {
-        out.frames.push_back(frames_[(start + i) % frames_.size()]);
-    }
-    return out;
+    open_ = false;
 }
 
 bool writeFeedbackNote(const std::filesystem::path& folder, const FeedbackNote& note, const InputStream& tail)
