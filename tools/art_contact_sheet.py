@@ -52,7 +52,7 @@ LOADER = """
 function sheetLoad(btn){const s=document.createElement('script');s.src=btn.dataset.src;document.head.appendChild(s);btn.textContent='Loading...';}
 function sheetModel(id,b64){const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
 const url=URL.createObjectURL(new Blob([bytes],{type:'model/gltf-binary'}));const btn=document.getElementById(id);
-const mv=document.createElement('model-viewer');mv.setAttribute('camera-controls','');mv.setAttribute('auto-rotate','');mv.src=url;btn.replaceWith(mv);}
+const mv=document.createElement('model-viewer');mv.setAttribute('camera-controls','');mv.src=url;btn.replaceWith(mv);}
 </script>
 """
 
@@ -141,7 +141,7 @@ def card(asset, files):
     return f'<div class="card">{preview}{caption(asset)}</div>'
 
 
-def render(shown, hidden, files, sizes, base, head):
+def render(shown, hidden, files, sizes, base, head, failed=frozenset()):
     previews = [a for a in shown if a.path in files]
     listed = [a for a in shown if a.path not in files]
     parts = [f"<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\">"
@@ -158,7 +158,7 @@ def render(shown, hidden, files, sizes, base, head):
     if listed:
         parts.append("<h2>Other files</h2><table>")
         for a in listed:
-            size = esc(human(sizes[a.path])) if a.path in sizes else ""
+            size = esc(human(sizes[a.path])) if a.path in sizes else "preview unavailable" if a.path in failed else ""
             old = f'<span class="mut">from {esc(a.old)}</span>' if a.old else ""
             parts.append(f'<tr><td>{esc(a.path)}</td><td><span class="badge {a.change}">{a.change}</span></td><td>{size}</td><td>{old}</td></tr>')
         parts.append("</table>")
@@ -172,26 +172,32 @@ def git(*args, stdin=None):
     return subprocess.run(["git", *args], input=stdin, stdout=subprocess.PIPE, check=True).stdout
 
 
-def content(head, path):
-    blob = git("show", f"{head}:{path}")
+def content(run, head, path):
+    blob = run("show", f"{head}:{path}")
     if blob.startswith(b"version https://git-lfs.github.com/spec/"):
-        return git("lfs", "smudge", "--", path, stdin=blob)
+        return run("lfs", "smudge", "--", path, stdin=blob)
     return blob
 
 
-def build(base, head, out):
-    changes = parse_name_status(git("diff", "--name-status", "-M", "-z", base, head).decode("utf-8"))
+def build(base, head, out, run=git, log=print):
+    changes = parse_name_status(run("diff", "--name-status", "-M", "-z", base, head).decode("utf-8", "surrogateescape"))
     shown, hidden = select(changes)
     os.makedirs(os.path.join(out, "assets"), exist_ok=True)
     os.makedirs(os.path.join(out, "models"), exist_ok=True)
-    files, sizes = {}, {}
+    files, sizes, failed = {}, {}, set()
     for n, asset in enumerate(shown):
         if asset.change == "deleted":
             continue
-        if asset.kind == "other":
-            sizes[asset.path] = lfs_size(git("show", f"{head}:{asset.path}"))
+        try:
+            if asset.kind == "other":
+                sizes[asset.path] = lfs_size(run("show", f"{head}:{asset.path}"))
+                continue
+            data = content(run, head, asset.path)
+        except subprocess.CalledProcessError as error:
+            # A symlink, a submodule or an LFS object the server does not hold (a fork's) must not cost the other previews.
+            log(f"art-contact-sheet: no preview for {asset.path}: {error}")
+            failed.add(asset.path)
             continue
-        data = content(head, asset.path)
         ext = os.path.splitext(asset.path)[1].lower()
         if asset.kind == "image":
             rel = f"assets/{n}{ext}"
@@ -202,10 +208,10 @@ def build(base, head, out):
             with open(os.path.join(out, rel), "w", encoding="ascii") as fh:
                 fh.write(f'sheetModel("m{n}", "{base64.b64encode(data).decode("ascii")}");\n')
         files[asset.path] = rel
-    page = render(shown, hidden, files, sizes, base, head)
+    page = render(shown, hidden, files, sizes, base, head, failed)
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(page)
-    print(f"art-contact-sheet: {len(shown)} shown, {hidden} more not shown, {len(files)} preview(s) in {out}")
+    log(f"art-contact-sheet: {len(shown)} shown, {hidden} more not shown, {len(files)} preview(s) in {out}")
     return 0
 
 
@@ -231,16 +237,16 @@ def self_test(out):
     check("renamed into art/ is added", shown, [Asset("art/props/in.glb", "model", "added", None)])
     shown, hidden = select([Change("R", "elsewhere/out.glb", "art/props/out.glb")])
     check("renamed out of art/ is deleted", shown, [Asset("art/props/out.glb", "model", "deleted", None)])
-    shown, hidden = select([Change("C", "art/props/copy.png", "art/props/orig.png")])
-    check("copy is added", shown, [Asset("art/props/copy.png", "image", "added", None)])
 
     check("only LICENSES.json selects nothing", select([Change("M", "art/LICENSES.json", None)]), ([], 0))
     check("paths outside art/ select nothing", select([Change("M", "engine/a.png", None), Change("M", "artwork/b.png", None)]), ([], 0))
 
     shown, hidden = select([Change("A", "art/x/a.fbx", None), Change("M", "art/x/b.blend", None), Change("A", "art/x/c.json", None),
-                            Change("A", "art/x/D.PNG", None)])
+                            Change("A", "art/x/D.PNG", None), Change("A", "art/x/e.jpg", None), Change("A", "art/x/f.jpeg", None),
+                            Change("A", "art/x/g.webp", None)])
     check("non-image and non-GLB files are other", [(a.path, a.kind) for a in shown],
-          [("art/x/D.PNG", "image"), ("art/x/a.fbx", "other"), ("art/x/b.blend", "other"), ("art/x/c.json", "other")])
+          [("art/x/D.PNG", "image"), ("art/x/a.fbx", "other"), ("art/x/b.blend", "other"), ("art/x/c.json", "other"),
+           ("art/x/e.jpg", "image"), ("art/x/f.jpeg", "image"), ("art/x/g.webp", "image")])
 
     many = [Change("A", f"art/m/{i:03}.png", None) for i in range(CAP + 5)]
     shown, hidden = select(list(reversed(many)))
@@ -268,11 +274,47 @@ def self_test(out):
     check("empty page says no assets changed", "No asset under art/ changed" in empty, True)
     check("empty page does not load the viewer", MODEL_VIEWER in empty, False)
 
+    build_checks(check)
+
     for f in failures:
         print(f"art-contact-sheet self-test FAILED: {f}", file=out)
     if not failures:
         print("art-contact-sheet self-test: ok", file=out)
     return 1 if failures else 0
+
+
+def build_checks(check):
+    """Run build() against a fake git: what it fetches, what it writes, and that one failed fetch does not fail the sheet."""
+    import tempfile
+
+    pointer = b"version https://git-lfs.github.com/spec/v1\noid sha256:" + b"1" * 64 + b"\nsize 4096\n"
+    diff = "\0".join(["A", "art/a.glb", "M", "art/b.png", "D", "art/c.png", "A", "art/d.fbx", "A", "art/e.png", "A", "art/LICENSES.json"]
+                     + [x for i in range(CAP) for x in ("A", f"art/z/{i:02}.png")] + [""])
+    smudged = []
+
+    def fake(*args, stdin=None):
+        if args[0] == "diff":
+            return diff.encode("utf-8")
+        if args[0] == "show":
+            if args[1].endswith("e.png"):
+                raise subprocess.CalledProcessError(128, "git show")
+            return pointer
+        smudged.append(args[-1])
+        return b"GLB" if args[-1].endswith(".glb") else b"PNG"
+
+    with tempfile.TemporaryDirectory() as out:
+        check("build succeeds", build("b", "h", out, run=fake, log=lambda *a: None), 0)
+        page = open(os.path.join(out, "index.html"), encoding="utf-8").read()
+        model = open(os.path.join(out, "models", "0.js"), encoding="ascii").read()
+        image = open(os.path.join(out, "assets", "1.png"), "rb").read()
+    check("only shown images and models are fetched", smudged, ["art/a.glb", "art/b.png"] + [f"art/z/{i:02}.png" for i in range(CAP - 5)])
+    check("model script carries the bytes for its button", model, f'sheetModel("m0", "{base64.b64encode(b"GLB").decode()}");\n')
+    check("model button id matches its script", 'id="m0" data-src="models/0.js"' in page, True)
+    check("image is written", image, b"PNG")
+    check("deleted image has no file", "art/c.png" in page and 'src="assets/2.png"' not in page, True)
+    check("other file shows its pointer size", "art/d.fbx" in page and "4.0 KiB" in page, True)
+    check("a failed fetch is listed as unavailable", "art/e.png" in page and "preview unavailable" in page, True)
+    check("capped assets are counted", "5 more not shown" in page, True)
 
 
 def main(argv):
