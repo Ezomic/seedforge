@@ -151,30 +151,62 @@ TEST_CASE("regaining focus leaves a menu pause in place")
     CHECK(rig.engine.scene().tickCount() == 3);
 }
 
-TEST_CASE("a replay plays the same ticks with the same input whether or not focus comes and goes")
+TEST_CASE("a replay ignores focus and ends on the same frame at the same tick")
 {
     const InputStream stream = scriptedStream(90);
 
     Rig steady;
     steady.engine.replayInputs(stream);
+    std::vector<std::uint64_t> steadyTicks;
     while (!steady.engine.replayFinished()) {
         steady.frames(1);
+        steadyTicks.push_back(steady.engine.scene().tickCount());
     }
 
-    Rig interrupted;
-    interrupted.engine.replayInputs(stream);
-    int frame = 0;
-    while (!interrupted.engine.replayFinished()) {
-        interrupted.platform.setFocused(frame % 20 >= 13);
-        interrupted.frames(1);
-        ++frame;
+    Rig flickering;
+    flickering.engine.replayInputs(stream);
+    std::vector<std::uint64_t> flickeringTicks;
+    while (!flickering.engine.replayFinished()) {
+        flickering.platform.setFocused(flickeringTicks.size() % 20 >= 13);
+        flickering.frames(1);
+        CHECK_FALSE(flickering.engine.focusPaused());
+        flickeringTicks.push_back(flickering.engine.scene().tickCount());
     }
 
     REQUIRE(steady.seenMoveX.size() == stream.frames.size());
-    CHECK(interrupted.seenMoveX == steady.seenMoveX);
-    CHECK(interrupted.engine.scene().tickCount() == steady.engine.scene().tickCount());
-    CHECK(interrupted.engine.scene().stateHash() == steady.engine.scene().stateHash());
-    CHECK(frame > 90);
+    CHECK(flickering.seenMoveX == steady.seenMoveX);
+    CHECK(flickeringTicks == steadyTicks);
+}
+
+TEST_CASE("a scripted bot run ignores focus changes")
+{
+    const auto botRun = [](bool flicker) {
+        Rig rig;
+        int calls = 0;
+        rig.engine.setInputSource([&calls](Scene&) {
+            InputFrame frame;
+            frame.moveX = static_cast<float>(calls++ % 5) / 5.0f;
+            return frame;
+        });
+        for (int i = 0; i < 60; ++i) {
+            rig.platform.setFocused(!flicker || i % 9 < 4);
+            rig.frames(1);
+        }
+        return rig.seenMoveX;
+    };
+    const std::vector<float> steady = botRun(false);
+    REQUIRE(steady.size() == 60);
+    CHECK(botRun(true) == steady);
+}
+
+TEST_CASE("only an open-ended run someone plays pauses on focus loss")
+{
+    CHECK(pausesOnFocusLoss({}));
+    CHECK_FALSE(pausesOnFocusLoss({.headless = true}));
+    CHECK_FALSE(pausesOnFocusLoss({.screenshot = true}));
+    CHECK_FALSE(pausesOnFocusLoss({.frameLimit = 1}));
+    CHECK_FALSE(pausesOnFocusLoss({.frameLimit = 1500}));
+    CHECK_FALSE(pausesOnFocusLoss({.headless = true, .screenshot = true, .frameLimit = 60}));
 }
 
 TEST_CASE("audio fades to silence while unfocused and back when focus returns")

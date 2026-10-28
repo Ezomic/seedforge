@@ -900,8 +900,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         });
     }
     engine.setAudio(&audio);
-    // Alt-tabbing away mid-fight must not get the player killed; a run nobody watches never pauses.
-    engine.setPauseOnFocusLoss(!options.headless && options.screenshot.empty());
+    // Alt-tabbing away mid-fight must not get the player killed.
+    engine.setPauseOnFocusLoss(ichor::pausesOnFocusLoss({.headless = options.headless, .screenshot = !options.screenshot.empty(), .frameLimit = options.frames}));
     // The player's splashes are heard, not simulated: this reads the scene and never writes it.
     if (waterField) {
         engine.scene().addSystem("wading_splash", [&, splash = ichor::WadingSplash{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {

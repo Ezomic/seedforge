@@ -57,7 +57,7 @@ bool Engine::frame(double frameSeconds)
         // Cues raised this frame are heard from where the camera was last drawn.
         audio_->setListener(view_.camera.position, view_.camera.rotation);
     }
-    focusPaused_ = pauseOnFocusLoss_ && !platform_.focused();
+    focusPaused_ = pauseOnFocusLoss_ && !replaying_ && !inputSource_ && !platform_.focused();
     if (audio_ != nullptr) {
         // Every frame, so a host attached or swapped while unfocused is silenced too.
         audio_->setMasterGain(focusPaused_ ? 0.0f : 1.0f);

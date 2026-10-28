@@ -19,6 +19,20 @@ class AudioHost;
 class Platform;
 class Renderer;
 
+// What an executable's command line says about a run, for deciding whether it pauses when its window loses focus.
+struct RunKind {
+    bool headless = false;
+    bool screenshot = false;
+    std::uint64_t frameLimit = 0; // --frames; 0 runs until the player quits
+};
+
+// Only a run someone plays until they quit pauses on focus loss: a headless, screenshot or --frames run must end at
+// the same tick whatever the focus does. Replays and scripted input never pause either; the engine sees to those.
+constexpr bool pausesOnFocusLoss(const RunKind& run)
+{
+    return !run.headless && !run.screenshot && run.frameLimit == 0;
+}
+
 struct EngineConfig {
     std::uint64_t seed = 1;
     double fixedDt = 1.0 / 60.0;
@@ -58,7 +72,8 @@ public:
     bool gated() const { return gated_; }
 
     // While set, a platform that has lost focus holds the simulation as the gate does and silences the audio
-    // until focus returns. The app sets it for a window someone plays in; headless and screenshot runs leave it off.
+    // until focus returns. Executables set it from pausesOnFocusLoss. A replay or an input source is never held,
+    // so its run ends at the same tick whatever the focus does.
     void setPauseOnFocusLoss(bool enabled) { pauseOnFocusLoss_ = enabled; }
     bool focusPaused() const { return focusPaused_; }
 
