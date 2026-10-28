@@ -20,6 +20,7 @@
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
+#include "ichor/core/version.h"
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
@@ -2065,6 +2066,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
 
 int main(int argc, char** argv)
 {
+    ichor::log(ichor::LogLevel::Info, ichor::logHeader());
     Options options;
     if (const std::optional<ichor::AssetRoots> roots = ichor::packagedAssetRoots(ichor::executableDirectory())) {
         usePackagedRoots(options, *roots);
