@@ -101,7 +101,9 @@ std::string manifestJson(const RunOptions& options, const std::vector<SeedRecord
 {
     std::string out = "{\n  \"tool\": \"forge-cli\",\n  \"size\": " + std::to_string(options.size) + ",\n  \"phases\": [";
     for (std::size_t i = 0; i < options.phases.size(); ++i) out += (i ? ", " : "") + jsonString(options.phases[i]);
-    out += "],\n  \"runs\": [";
+    out += "],\n";
+    if (options.axioms) out += "  \"axioms\": {\"ids\": " + jsonString(options.axioms->ids) + ", \"digest\": " + jsonString(options.axioms->digest) + "},\n";
+    out += "  \"runs\": [";
     for (std::size_t i = 0; i < seeds.size(); ++i) {
         const SeedRecord& s = seeds[i];
         out += std::string(i ? ",\n" : "\n") + "    {\"seed\": " + std::to_string(s.seed);

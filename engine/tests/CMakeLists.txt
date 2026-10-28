@@ -103,6 +103,18 @@ forge_data_test(empty "no tables")
 forge_data_test(file "no data directory")
 forge_data_test(malformed "b.json")
 forge_data_test(badrecord "non-empty string id")
+# forge-cli --axioms (phase 0): the pinned set lands in the manifest, and a bad list is refused with its cause.
+foreach(axioms_case "pinned|cataclysm.flood,powers.league|\"axioms\": {\"ids\": \"cataclysm.flood,powers.league\"" "unknown|cataclysm.nope|--axioms: unknown axiom 'cataclysm.nope'"
+        "empty||--axioms: no axiom ids given" "excluded|cataclysm.flood,cataclysm.kronos|may not share a world")
+    string(REPLACE "|" ";" axioms_parts "${axioms_case}")
+    list(GET axioms_parts 0 axioms_name)
+    list(GET axioms_parts 1 axioms_ids)
+    list(GET axioms_parts 2 axioms_expect)
+    add_test(NAME forge_cli_axioms_${axioms_name} COMMAND $<TARGET_FILE:ichor_forge_cli> --seed 1 --size 64 --phase tectonics --data ${CMAKE_SOURCE_DIR}/../data --axioms "${axioms_ids}")
+    set_tests_properties(forge_cli_axioms_${axioms_name} PROPERTIES PASS_REGULAR_EXPRESSION "${axioms_expect}")
+endforeach()
+add_test(NAME forge_cli_axioms_need_data COMMAND $<TARGET_FILE:ichor_forge_cli> --seed 1 --size 64 --phase tectonics --axioms cataclysm.flood)
+set_tests_properties(forge_cli_axioms_need_data PROPERTIES PASS_REGULAR_EXPRESSION "--axioms needs --data")
 foreach(kind clean dirty)
     add_test(NAME fp_flags_check_${kind}
         COMMAND ${CMAKE_COMMAND} -DKIND=${kind} -DMODULE=${CMAKE_SOURCE_DIR}/fp_flags.cmake -DSCRATCH=${CMAKE_BINARY_DIR}/test-output
