@@ -5,15 +5,16 @@ Every job of a pull request run has 15 minutes (SEED-672). A job that gets a lit
 the day it is killed, so the nightly prints how long each job of the recent PR runs of engine.yml took and fails when
 a job's recent median passes 12 minutes.
 
-Per job name, a sample is the time from started_at to completed_at of a job that succeeded or failed. Skipped jobs
-(a few seconds, or a negative span) and cancelled ones (superseded by a newer push, or killed at the limit) are left
-out. A re-run counts once per run: the newest attempt of each job name. The recent median is over the newest RECENT
+Per job name, a sample is the time from started_at to completed_at of a job that succeeded or failed, or was
+cancelled after running for the whole 15 minute limit (killed by timeout-minutes). Skipped jobs (a few seconds, or a
+negative span) and other cancelled ones (superseded by a newer push) are left out. A re-run counts once per run: the newest attempt of each job name. The recent median is over the newest RECENT
 samples of a job; the PREVIOUS column is the median of the RECENT samples before those, for the trend.
 
 Window: the newest 40 completed PR runs (about three days at the current pace) and a median of the newest 10 samples
-per job. A median of 10 shrugs off up to 4 cold-cache runs, which take about 25 minutes, and reacts to a real slowdown
+per job. A median of 10 shrugs off up to 4 cold-cache runs, which run into the limit, and reacts to a real slowdown
 within a day of PRs. A job with fewer than MIN_SAMPLES samples is listed and never alerts. A job name that appears in
-none of the newest 3 runs (a skipped job still appears) was renamed or removed: listed as gone, never alerts.
+none of the newest 3 runs that have jobs was renamed or removed: listed as gone, never alerts. A skipped job still
+appears, a skipped matrix job under its unexpanded name (shard ${{ matrix.shard }} of 4), which matches its expansions.
 
 Usage: ci_time_trend.py --repo OWNER/NAME [--workflow engine.yml] [--runs 40] [--recent 10] [--min-samples 5]
                         [--alert-min 12]          read the GitHub API with $GITHUB_TOKEN (or $GH_TOKEN)
@@ -26,6 +27,7 @@ Exit: 0 every job under the alert, 1 a job's recent median over it, 2 usage, API
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 import urllib.error
@@ -34,6 +36,8 @@ from datetime import datetime
 from pathlib import Path
 
 COUNTED = {"success", "failure"}
+PR_LIMIT_S = 900
+EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
 SEEN_RUNS = 3
 API = "https://api.github.com"
 FIXTURES = Path(__file__).resolve().parent / "ci_time_trend_fixtures"
@@ -48,11 +52,13 @@ def parse_time(text):
 
 
 def job_seconds(job):
-    if job.get("status") != "completed" or job.get("conclusion") not in COUNTED:
+    if job.get("status") != "completed" or job.get("conclusion") not in COUNTED | {"cancelled"}:
         return None
     if not job.get("started_at") or not job.get("completed_at"):
         return None
     seconds = (parse_time(job["completed_at"]) - parse_time(job["started_at"])).total_seconds()
+    if job["conclusion"] == "cancelled" and seconds < PR_LIMIT_S:
+        return None
     return seconds if seconds >= 0 else None
 
 
@@ -71,12 +77,20 @@ def collect(runs, jobs_by_run):
     seen = []
     for run in sorted(runs, key=lambda r: r["created_at"], reverse=True):
         jobs = latest_attempts(jobs_by_run.get(run["id"], []))
-        seen.append(set(jobs))
+        if jobs:
+            seen.append(set(jobs))
         for name, job in jobs.items():
             seconds = job_seconds(job)
             if seconds is not None:
                 samples.setdefault(name, []).append(seconds)
     return samples, seen
+
+
+def seen_recently(name, recent_names):
+    if name in recent_names:
+        return True
+    templates = [n for n in recent_names if EXPRESSION.search(n)]
+    return any(re.fullmatch(".+".join(map(re.escape, EXPRESSION.split(t))), name) for t in templates)
 
 
 def evaluate(samples, seen, recent, min_samples, alert_s):
@@ -86,7 +100,7 @@ def evaluate(samples, seen, recent, min_samples, alert_s):
         newest = values[:recent]
         older = values[recent:2 * recent]
         median = statistics.median(newest)
-        if name not in recent_names:
+        if not seen_recently(name, recent_names):
             status = "gone"
         elif len(newest) < min_samples:
             status = "too few samples"
@@ -232,8 +246,8 @@ def self_test(out):
 
     runs, jobs = load_dir(FIXTURES)
     samples, seen = collect(runs, jobs)
-    expect("recorded: a re-run counts its newest attempt, a cancelled run's job is left out",
-           samples["windows build + tests"], [490.0, 717.0])
+    expect("recorded: a re-run counts its newest attempt, a job killed at the limit counts",
+           samples["windows build + tests"], [490.0, 920.0, 717.0])
     expect("recorded: a failed job counts", samples["windows runtime + tests"], [14.0, 2.0, 3.0, 4.0])
     expect("recorded: durations from started_at to completed_at", samples["linux sanitizers shard 1 of 4"],
            [400.0, 403.0, 370.0])
@@ -246,12 +260,19 @@ def self_test(out):
     expect("a median a second over 12 minutes is red", statuses([{"a": 721}] * 5), {"a": "ALERT"})
     expect("fewer than the minimum samples never alerts", statuses([{"a": 900}] * 4), {"a": "too few samples"})
     expect("skipped and cancelled jobs are not samples",
-           statuses([{"a": (5, "skipped")}] * 3 + [{"a": (900, "cancelled")}] * 3 + [{"a": 900}] * 4),
+           statuses([{"a": (5, "skipped")}] * 3 + [{"a": (600, "cancelled")}] * 3 + [{"a": 900}] * 4),
            {"a": "too few samples"})
     expect("a renamed job: the old name is gone, the new one has too few samples",
            statuses([{"new": 300}] * 3 + [{"old": 800}] * 10), {"new": "too few samples", "old": "gone"})
     expect("a skipped job in the newest runs is not gone",
            statuses([{"a": (5, "skipped")}] * 3 + [{"a": 800}] * 10), {"a": "ALERT"})
+    expect("a matrix job skipped under its unexpanded name is not gone",
+           statuses([{"shard ${{ matrix.shard }} of 4": (5, "skipped")}] * 3 + [{"shard 1 of 4": 800}] * 10),
+           {"shard 1 of 4": "ALERT"})
+    expect("runs without jobs do not make a job gone", statuses([{}] * 3 + [{"a": 800}] * 10), {"a": "ALERT"})
+    expect("a job killed at the 15 minute limit is a sample, a shorter cancelled one is not",
+           statuses([{"a": (905, "cancelled")}] * 3 + [{"a": (300, "cancelled")}] * 3 + [{"a": 700}] * 2),
+           {"a": "ALERT"})
     expect("only the newest samples count: a job that got faster is green",
            statuses([{"a": 600}] * 10 + [{"a": 900}] * 10), {"a": "ok"})
     expect("only the newest samples count: a job that got slower is red",
@@ -264,8 +285,8 @@ def self_test(out):
            evaluate(*collect(*synthetic([{"a": 700}, {"a": 760}])), 10, 1, 720.0)[0]["status"], "ALERT")
 
     fixtures = ["--from-dir", str(FIXTURES), "--min-samples", "1"]
-    expect("cli: recorded runs under the alert exit 0", run(fixtures + ["--alert-min", "11"], _Sink()), 0)
-    expect("cli: recorded runs over the alert exit 1", run(fixtures + ["--alert-min", "9"], _Sink()), 1)
+    expect("cli: recorded runs under the alert exit 0", run(fixtures + ["--alert-min", "12"], _Sink()), 0)
+    expect("cli: recorded runs over the alert exit 1", run(fixtures + ["--alert-min", "11"], _Sink()), 1)
     expect("cli: a missing directory exits 2", run(["--from-dir", str(FIXTURES / "missing")], _Sink()), 2)
     expect("cli: no source exits 2", run([], _Sink()), 2)
     expect("cli: a bad window exits 2", run(fixtures + ["--recent", "0"], _Sink()), 2)
