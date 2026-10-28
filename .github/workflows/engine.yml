@@ -87,6 +87,7 @@ jobs:
           python3 tools/ci_tiers.py --root . check
           python3 tools/test_times.py --check-allowlist --root .
           python3 tools/test_times.py --self-test
+          python3 tools/ci_time_trend.py --self-test
           python3 tools/package_size.py --self-test
 
   windows:

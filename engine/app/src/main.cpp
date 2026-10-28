@@ -20,6 +20,7 @@
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
+#include "ichor/core/session_summary.h"
 #include "ichor/core/version.h"
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
@@ -133,6 +134,8 @@ struct Options {
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
+    std::filesystem::path logs = "logs"; // the playtest session summary is written here at exit (SEED-696)
+    std::vector<std::string> runFlags;   // the command line with its paths scrubbed, for that summary
     std::filesystem::path exportChronicle; // written at exit when set
     std::string loadSlot;
     bool ironman = false;
@@ -591,10 +594,34 @@ void usePackagedRoots(Options& options, const ichor::AssetRoots& roots)
     options.world = roots.content / "world";
     options.exileDefault = roots.art / "exile";
     options.saves = roots.content.parent_path() / "saves";
+    options.logs = roots.content.parent_path() / "logs";
     options.kit = roots.art / "settlement_kit";
     options.script = roots.scripts / "main.lua";
     options.data = roots.data;
     ichor::setShaderDirectory(roots.shaders);
+}
+
+// What a playtester sends back (SEED-696). Only a run that reaches the end of its frame loop writes one:
+// a crash or a killed process leaves none.
+void writeSessionSummary(const Options& options, ichor::FrameTimes frames, double playSeconds, ichor::CombatBridge* combat)
+{
+    ichor::SessionSummary summary;
+    summary.seed = options.seed;
+    summary.flags = options.runFlags;
+    summary.playSeconds = playSeconds;
+    summary.frames = std::move(frames);
+    for (std::size_t i = 0; i < ichor::stage0::kDeathCauseCount; ++i) {
+        const auto cause = static_cast<ichor::stage0::DeathCause>(i);
+        summary.deathsByCause.emplace_back(ichor::stage0::name(cause), combat ? combat->stage().recorder().playerDeaths().count(cause) : 0);
+    }
+    summary.retries = combat ? combat->stage().retryPresses() : 0;
+    summary.quitTime = std::chrono::system_clock::now();
+    const std::filesystem::path written = ichor::writeSessionFile(options.logs, "session", summary.quitTime, ichor::sessionSummaryJson(summary));
+    if (written.empty()) {
+        ichor::logf(ichor::LogLevel::Warn, "the session summary could not be written under {}", options.logs.string());
+    } else {
+        ichor::logf(ichor::LogLevel::Info, "session summary written to {}", written.string());
+    }
 }
 
 int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
@@ -1731,6 +1758,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     watcher.watchTree(options.data, ".json");
 
     double last = platform.now();
+    const double loopStart = last;
+    double lastFrameEnd = last;
+    ichor::FrameTimes frameTimes;
     ichor::ReverbSettings lastReverb;
     bool confirmHeld = false;
     bool quickSaveHeld = false;
@@ -1938,7 +1968,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
             renderer.requestScreenshot(options.screenshot);
         }
-        if (!engine.frame(dt)) {
+        const bool running = engine.frame(dt);
+        // From one frame's end to the next, so an autosave or a reload between them counts toward its frame.
+        const double frameEnd = platform.now();
+        frameTimes.add(frameEnd - lastFrameEnd);
+        lastFrameEnd = frameEnd;
+        if (!running) {
             break;
         }
         for (const ichor::AnnouncingAudio::Fired& fired : audio.drain()) {
@@ -2040,6 +2075,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
 
     renderer.setGuiHook({}); // the panels are about to go out of scope
     renderer.setUiHooks({}, {}); // and so are the UI, the HUD and the ledger
+    writeSessionSummary(options, std::move(frameTimes), platform.now() - loopStart, combat.get());
     if (!options.screenshot.empty() && renderer.screenshotPending()) {
         ichor::logf(ichor::LogLevel::Error, "the screenshot {} was asked for and not saved", options.screenshot);
         return 1;
@@ -2074,6 +2110,7 @@ int main(int argc, char** argv)
         usePackagedRoots(options, *roots);
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
+    options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
         ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;

@@ -253,6 +253,19 @@ TEST_CASE("a scripted fight replays to the same hash and survives a snapshot")
     REQUIRE(c.scene.stateHash() == a.scene.stateHash());
 }
 
+TEST_CASE("retry presses are counted once each, and the setup reset is not one")
+{
+    Arena a(10);
+    REQUIRE(a.stage.retryPresses() == 0);
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    REQUIRE(a.stage.retryPresses() == 1);
+    a.scene.tick(kDt);
+    a.scene.tick(kDt, press(InputFrame::Confirm));
+    REQUIRE(a.stage.retryPresses() == 2);
+}
+
 TEST_CASE("retry comes from the input stream and measures hesitation")
 {
     Arena a(10);
