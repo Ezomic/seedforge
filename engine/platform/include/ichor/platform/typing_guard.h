@@ -13,15 +13,38 @@ class TypingGuard {
 public:
     void setTyping(bool typing, const InputFrame& raw)
     {
-        (void)typing;
-        (void)raw;
+        typing_ = typing;
+        held_ = typing ? InputFrame{} : raw;
     }
     bool typing() const { return typing_; }
 
-    InputFrame filter(const InputFrame& raw) { return raw; }
+    InputFrame filter(const InputFrame& raw)
+    {
+        if (typing_) {
+            return {};
+        }
+        held_.buttons &= raw.buttons;
+        InputFrame out = raw;
+        out.buttons &= ~held_.buttons;
+        hold(held_.moveX, raw.moveX, out.moveX);
+        hold(held_.moveY, raw.moveY, out.moveY);
+        hold(held_.lookX, raw.lookX, out.lookX);
+        return out;
+    }
 
 private:
+    // An axis held at close stays at rest until it comes back to rest itself.
+    static void hold(float& held, float raw, float& out)
+    {
+        if (held != 0.0f && raw != 0.0f) {
+            out = 0.0f;
+        } else {
+            held = 0.0f;
+        }
+    }
+
     bool typing_ = false;
+    InputFrame held_;
 };
 
 }

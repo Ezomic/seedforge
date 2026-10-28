@@ -57,6 +57,7 @@ std::vector<std::string> controlsOverlayLines(const ControlsOverlay& state)
             "F3             debug overlay: compact, full, off",
             "F4             sound captions on or off (on by default)",
             "F5 / F9        quick save / quick load",
+            "F8             feedback note: type a line, Enter saves it with a screenshot",
             "Esc            menu",
             std::format("Build {}", versionStamp()),
         };

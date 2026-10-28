@@ -39,6 +39,7 @@ InputFrame Engine::nextInput()
     if (recording_) {
         recorded_.frames.push_back(input);
     }
+    tail_.push(input);
     return input;
 }
 
