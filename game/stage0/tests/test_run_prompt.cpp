@@ -187,6 +187,27 @@ TEST_CASE("the retry guard leaves the other buttons alone and arms again on the 
     CHECK_FALSE(confirms(guard.filter(buttons(InputFrame::Confirm), true, 30.0)));
 }
 
+TEST_CASE("Enter held through a death and a respawn stays held back until it is let go", "[run_prompt]")
+{
+    RetryGuard guard;
+    CHECK_FALSE(confirms(guard.filter(buttons(InputFrame::Confirm), true, 0.0)));
+    CHECK_FALSE(confirms(guard.filter(buttons(InputFrame::Confirm), true, 3.0)));
+    // The host brought the player back while the key was still down: a fresh edge now would restart the new fight.
+    CHECK_FALSE(confirms(guard.filter(buttons(InputFrame::Confirm), false, 3.1)));
+    CHECK_FALSE(confirms(guard.filter(buttons(0), false, 3.2)));
+    CHECK(confirms(guard.filter(buttons(InputFrame::Confirm), false, 3.3)));
+}
+
+TEST_CASE("a death seen at an earlier time than the last one restarts the window", "[run_prompt]")
+{
+    RetryGuard guard;
+    CHECK_FALSE(confirms(guard.filter(buttons(0), true, 100.0)));
+    // A save from before the death was loaded with the player dead in it too.
+    CHECK_FALSE(confirms(guard.filter(buttons(0), true, 10.0 + RetryGuard::kArmSeconds * 0.5)));
+    CHECK_FALSE(confirms(guard.filter(buttons(0), true, 10.0 + RetryGuard::kArmSeconds * 2.0)));
+    CHECK(confirms(guard.filter(buttons(InputFrame::Confirm), true, 10.0 + RetryGuard::kArmSeconds * 2.1)));
+}
+
 TEST_CASE("Enter pressed on the frame the death shows does not restart the fight; a press after the window does", "[run_prompt]")
 {
     Scene scene(1);

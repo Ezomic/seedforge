@@ -35,19 +35,26 @@ std::vector<std::string> deathCard(DeathCause cause)
 
 InputFrame RetryGuard::filter(InputFrame input, bool playerDead, double now)
 {
+    const bool confirm = (input.buttons & InputFrame::Confirm) != 0;
     if (!playerDead) {
         diedAt_.reset();
         armed_ = false;
-        return input;
+    } else {
+        // An earlier clock than the death's is a load of an older save with the player dead in it too.
+        if (!diedAt_ || now < *diedAt_) {
+            diedAt_ = now;
+        }
+        if (!armed_ && !confirm && now - *diedAt_ >= kArmSeconds) {
+            armed_ = true;
+        }
     }
-    if (!diedAt_) {
-        diedAt_ = now;
+    // A key held back stays held back until it is let go, even past a respawn, so it never turns into a fresh press.
+    if (!confirm) {
+        heldBack_ = false;
+    } else if (playerDead && !armed_) {
+        heldBack_ = true;
     }
-    const bool confirm = (input.buttons & InputFrame::Confirm) != 0;
-    if (!armed_ && !confirm && now - *diedAt_ >= kArmSeconds) {
-        armed_ = true;
-    }
-    if (!armed_) {
+    if (heldBack_) {
         input.buttons &= ~static_cast<std::uint32_t>(InputFrame::Confirm);
     }
     return input;
