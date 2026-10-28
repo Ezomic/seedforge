@@ -157,13 +157,21 @@ jobs:
           path: .sccache
           key: sccache-windows-${{ github.sha }}
           restore-keys: sccache-windows-
+      - name: Toolchain identity for the vcpkg cache
+        # vcpkg hashes the pwsh version and cl.exe into every package ABI, so a runner image that bumps either restores 0 packages.
+        # Keying on them makes that a cache miss that saves a fresh set, instead of a hit that never re-saves (SEED-716).
+        id: toolchain
+        shell: pwsh
+        run: |
+          $cl = (Get-FileHash (Get-Command cl.exe).Source -Algorithm SHA256).Hash.Substring(0, 16)
+          "id=pwsh$($PSVersionTable.PSVersion)-cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
         with:
           path: .vcpkg-cache
-          key: vcpkg-windows-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
-          restore-keys: vcpkg-windows-v2-
+          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-
       - name: Restore forged world test cache
         id: cache2
         # Keyed on the sources the test cache digest hashes (engine/tests/forged_cache_digest.cmake), so a generator change starts cold.
@@ -174,6 +182,14 @@ jobs:
       - name: Configure
         run: cmake --preset windows-ci
         working-directory: engine
+      - name: Save vcpkg binaries
+        # Saved right after configure: a cold configure takes about 9 minutes, and a job killed later by its 15 minute limit saves nothing.
+        # always(): a configure that fails on one port still keeps the ports it built.
+        if: ${{ always() && steps.cache1.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
       - name: Build
         if: needs.changes.outputs.heavy == 'true'
         run: cmake --build --preset windows-ci
@@ -216,13 +232,6 @@ jobs:
         with:
           path: .sccache
           key: sccache-windows-${{ github.sha }}
-      - name: Save vcpkg binaries
-        # Saved even when a later step fails, so a failed first run still warms the cache (actions/cache only saves on success).
-        if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: .vcpkg-cache
-          key: vcpkg-windows-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
       - name: Save forged world test cache
         # Saved even when a later step fails, so a failed first run still warms the cache (actions/cache only saves on success).
         if: ${{ always() && steps.cache2.outputs.cache-hit != 'true' }}
