@@ -193,20 +193,21 @@ Verdict judgeGolden(const std::vector<std::uint8_t>& actual, const std::filesyst
 
 // Every case ends here: the numbers go to golden-metrics.csv when ICHOR_GOLDEN_REPORT=1 (the tolerance study), then
 // the picture must sit inside the tolerance of the device it was drawn on.
-void checkAgainstGolden(const std::vector<std::uint8_t>& actual, const std::vector<std::uint8_t>& expected, const std::filesystem::path& goldenPath)
+void checkAgainstGolden(const std::vector<std::uint8_t>& actual, const std::filesystem::path& goldenPath)
 {
     const std::string name = goldenPath.stem().string();
-    const Diff diff = compare(actual, expected, kBadThreshold);
-    writePng(kOutDir / (name + ".diff.png"), kWidth, kHeight, diff.image.data());
-    if (envFlag("ICHOR_GOLDEN_REPORT")) {
-        std::ofstream csv(kOutDir / "golden-metrics.csv", std::ios::app);
-        csv << name << ',' << diff.meanAbs << ',' << diff.fractionBad << ',' << diff.maxChannelDiff << ',' << diff.tileBad << "\n";
+    const Verdict verdict = judgeGolden(actual, goldenPath, toleranceFor(softwareDevice()), kOutDir / "golden-failures");
+    if (verdict.diff) {
+        const Diff& diff = *verdict.diff;
+        writePng(kOutDir / (name + ".diff.png"), kWidth, kHeight, diff.image.data());
+        if (envFlag("ICHOR_GOLDEN_REPORT")) {
+            std::ofstream csv(kOutDir / "golden-metrics.csv", std::ios::app);
+            csv << name << ',' << diff.meanAbs << ',' << diff.fractionBad << ',' << diff.maxChannelDiff << ',' << diff.tileBad << "\n";
+        }
     }
-    const Tolerance limit = toleranceFor(softwareDevice());
-    INFO(std::format("{}: mean abs diff {:.3f}, {:.4f}% pixels over threshold, worst tile {}, worst channel {}", name, diff.meanAbs, diff.fractionBad * 100.0, diff.tileBad, diff.maxChannelDiff));
-    CHECK(diff.meanAbs < limit.meanAbs);
-    CHECK(diff.fractionBad < limit.fractionBad);
-    CHECK(diff.tileBad < limit.tileBad);
+    if (!verdict.pass) {
+        FAIL(verdict.message);
+    }
 }
 
 }
@@ -240,17 +241,7 @@ TEST_CASE("golden image: the hoplite kit")
         return;
     }
 
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect kit.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    REQUIRE(w == kWidth);
-    REQUIRE(h == kHeight);
-
-    // Driver differences move a few edge pixels; a real regression moves many.
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the skinned arm mid-wave")
@@ -295,13 +286,7 @@ TEST_CASE("golden image: the skinned arm mid-wave")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect arm.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the forged terrain at the world's centre")
@@ -350,13 +335,7 @@ TEST_CASE("golden image: the forged terrain at the world's centre")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect terrain.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 namespace {
@@ -426,13 +405,7 @@ TEST_CASE("golden image: the game UI drawn with Vulkan")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 namespace {
@@ -517,13 +490,7 @@ void checkTerrainAtHour(float hour, const char* name, bool vegetation = false, W
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect " << name << ".actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 }
@@ -634,13 +601,7 @@ TEST_CASE("golden image: UI text in the game fonts")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_text.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the HUD over the sky")
@@ -681,13 +642,7 @@ TEST_CASE("golden image: the HUD over the sky")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the HUD pointing at a target")
@@ -729,13 +684,7 @@ TEST_CASE("golden image: the HUD pointing at a target")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud_target.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the HUD with only the compass and health")
@@ -778,13 +727,7 @@ TEST_CASE("golden image: the HUD with only the compass and health")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_hud_compass_health.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the ledger over the world")
@@ -831,13 +774,7 @@ TEST_CASE("golden image: the ledger over the world")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_ledger.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the map over the world")
@@ -881,13 +818,7 @@ TEST_CASE("golden image: the map over the world")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_map.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the default palette over the forest")
@@ -953,13 +884,7 @@ TEST_CASE("golden image: a prop that opts in blends into the terrain, one that d
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect props_grounded.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 // The biggest river of the forged world seen from `eyeOffset` metres (x, z) from its wettest sample and
@@ -1036,13 +961,7 @@ static void checkRiver(const char* name, glm::dvec2 eyeOffset, double eyeHeight)
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect " << name << ".actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the biggest river of the forged world")
@@ -1092,13 +1011,7 @@ TEST_CASE("golden image: the pause menu over the world")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_pause.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the night sky looking up")
@@ -1123,13 +1036,7 @@ TEST_CASE("golden image: the night sky looking up")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect sky_night.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the noon sky with clouds")
@@ -1154,13 +1061,7 @@ TEST_CASE("golden image: the noon sky with clouds")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect sky_noon.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image: the journal over the world")
@@ -1205,13 +1106,7 @@ TEST_CASE("golden image: the journal over the world")
         SUCCEED("golden image written");
         return;
     }
-    std::uint32_t w = 0;
-    std::uint32_t h = 0;
-    std::vector<std::uint8_t> expected;
-    if (!readPng(goldenPath, w, h, expected)) {
-        FAIL("no golden image at " << goldenPath.string() << "; inspect ui_journal.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1");
-    }
-    checkAgainstGolden(actual, expected, goldenPath);
+    checkAgainstGolden(actual, goldenPath);
 }
 
 TEST_CASE("golden image tolerance: driver noise passes, a missing element does not")
@@ -1340,8 +1235,10 @@ TEST_CASE("golden image failure output: a failed case leaves expected, actual an
         CHECK(kept == grey);
         REQUIRE(readPng(failDir / "plain.actual.png", w, h, kept));
         CHECK(kept == blotched);
-        std::ifstream reason(failDir / "plain.txt");
-        const std::string text((std::istreambuf_iterator<char>(reason)), std::istreambuf_iterator<char>());
+        const std::string text = [&] {
+            std::ifstream reason(failDir / "plain.txt");
+            return std::string((std::istreambuf_iterator<char>(reason)), std::istreambuf_iterator<char>());
+        }();
         CHECK(text.find("mean abs diff") != std::string::npos);
 
         SECTION("the same case passing on a rerun clears its stale pictures")
