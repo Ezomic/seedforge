@@ -448,6 +448,7 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
         const bool pressed = retry && !c.retryHeld;
         c.retryHeld = retry;
         if (pressed) {
+            retryPresses_ += 1;
             resetFight(scene);
             return;
         }
@@ -624,6 +625,16 @@ void Stage0::debugLines(const Scene& scene, std::vector<LineSegment>& out) const
             ring(centre, tuning_.attackRange + tuning_.attackRadius + tuning_.bodyRadius, glm::vec3(0.6f, 0.15f, 0.15f), 32);
         }
     }
+}
+
+std::optional<DeathCause> Stage0::playerDeath(const Scene& scene) const
+{
+    const entt::entity player = scene.find(player_);
+    const auto* fighter = player != entt::null ? scene.registry().try_get<Combatant>(player) : nullptr;
+    if (fighter == nullptr || fighter->alive()) {
+        return std::nullopt;
+    }
+    return static_cast<DeathCause>(fighter->deathCause);
 }
 
 void Stage0::overlay(const Scene& scene, std::vector<std::string>& lines) const

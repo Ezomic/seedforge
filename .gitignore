@@ -99,5 +99,8 @@ vcpkg_installed/
 # Stage 0 launcher output (bin/stage0)
 /stage0-run/
 
+# Playtest session summaries the app writes at exit (SEED-696)
+/logs/
+
 dist/
 .lfs-assets-id

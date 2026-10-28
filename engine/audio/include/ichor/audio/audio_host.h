@@ -32,6 +32,9 @@ public:
     virtual void setAmbience(std::uint32_t sound, float gain) = 0;
     // Fades the music voices that are playing to silence over `seconds`. Hosts without a mixer ignore it.
     virtual void fadeOutMusic(float seconds) { (void)seconds; }
+    // Scales everything heard, easing toward the gain so it never clicks; 1 is the mix as it is, 0 silence.
+    // NaN counts as silence and the rest is clamped to 0..1. Hosts without a mixer ignore it.
+    virtual void setMasterGain(float gain) { (void)gain; }
     virtual void setListener(glm::dvec3 position, glm::quat rotation) = 0;
     virtual void setReverb(const ReverbSettings& settings) = 0;
 };

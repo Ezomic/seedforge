@@ -57,11 +57,17 @@ bool Engine::frame(double frameSeconds)
         // Cues raised this frame are heard from where the camera was last drawn.
         audio_->setListener(view_.camera.position, view_.camera.rotation);
     }
+    focusPaused_ = pauseOnFocusLoss_ && !replaying_ && !inputSource_ && !platform_.focused();
+    if (audio_ != nullptr) {
+        // Every frame, so a host attached or swapped while unfocused is silenced too.
+        audio_->setMasterGain(focusPaused_ ? 0.0f : 1.0f);
+    }
     gated_ = tickGate_ && !tickGate_(scene_);
     if (gated_) {
         step_.reset();
     }
-    const int steps = gated_ ? 0 : step_.advance(frameSeconds);
+    // An unfocused frame adds no time, so nothing is owed on return and the part-tick already owed stays owed.
+    const int steps = gated_ || focusPaused_ ? 0 : step_.advance(frameSeconds);
     {
         FrameStages::Scope timer(stages_, "sim");
         for (int i = 0; i < steps && !replayFinished(); ++i) {
