@@ -58,6 +58,8 @@ public:
     virtual NavKeys navKeys() const { return {}; }
     // Whether F3, the debug overlay key, is down as of the last pump.
     virtual bool overlayKey() const { return false; }
+    // Whether the window had keyboard focus as of the last pump. Platforms without a window always do.
+    virtual bool focused() const { return true; }
     // Whether F1, the controls card key, is down as of the last pump.
     virtual bool helpKey() const { return false; }
     // Whether F2, the sound legend key, and F4, the captions key, are down as of the last pump.
