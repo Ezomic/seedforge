@@ -1,8 +1,10 @@
 // A component a snapshot saves but the state hash skips lets two runs that disagree report the same
 // hash, so a replay desyncs silently; one hashed but not saved makes every loaded game disagree with
-// the run that saved it. This probes every component storage of a scene that holds them all: each
-// is removed (or changed, where the scene needs it on every entity) in a fresh copy, and the save
-// bytes and the hash must both move or both stay put.
+// the run that saved it. This probes every component storage of a scene that holds them all: in a
+// fresh copy each is removed (unless every entity must hold it), and in another one of its fields is
+// changed, and each time the save bytes and the hash must both move or both stay put. Removal alone
+// would only check the presence bits both outputs keep, so a write of the data dropped from one of
+// them would pass; the change catches that for the field it touches.
 
 #include "ichor/core/file_io.h"
 #include "ichor/sim/scene.h"
@@ -43,7 +45,8 @@ struct Expected {
     entt::id_type id;
     const char* name;
     Kept kept;
-    void (*change)(entt::registry&); // for a component every entity must hold; null removes it instead
+    bool onEveryEntity; // the scene reads it from every entity, so it is changed but never removed
+    void (*change)(entt::registry&);
 };
 
 template <class T>
@@ -53,38 +56,59 @@ constexpr entt::id_type idOf()
 }
 
 // Every component the scene keeps. A storage missing from this table fails the test, so a new
-// component has to be classified here before it can pass. SavedOnly and HashedOnly entries are the
-// allowlist of intended differences, and each needs a comment saying why.
+// component has to be classified here before it can pass. Only storages the fixture fills can be
+// seen, so a component a system or command adds later must be put on the fixture too.
+// SavedOnly and HashedOnly entries are the allowlist of intended differences, and each needs a
+// comment saying why.
 const std::vector<Expected>& sceneComponents()
 {
     static const std::vector<Expected> table{
-        {idOf<StableId>(), "StableId", Kept::Both, [](entt::registry& r) {
+        {idOf<StableId>(), "StableId", Kept::Both, true, [](entt::registry& r) {
              for (auto [entity, id] : r.view<StableId>().each()) id.value ^= 1u;
          }},
-        {idOf<Name>(), "Name", Kept::Both, [](entt::registry& r) {
+        {idOf<Name>(), "Name", Kept::Both, true, [](entt::registry& r) {
              for (auto [entity, name] : r.view<Name>().each()) name.value += "!";
          }},
-        {idOf<Transform>(), "Transform", Kept::Both, [](entt::registry& r) {
+        {idOf<Transform>(), "Transform", Kept::Both, true, [](entt::registry& r) {
              for (auto [entity, transform] : r.view<Transform>().each()) transform.position.x += 1.0;
          }},
-        {idOf<MeshRef>(), "MeshRef", Kept::Both, nullptr},
-        {idOf<Spin>(), "Spin", Kept::Both, nullptr},
-        {idOf<Player>(), "Player", Kept::Both, nullptr},
-        {idOf<StaticBox>(), "StaticBox", Kept::Both, nullptr},
-        {idOf<CharacterBody>(), "CharacterBody", Kept::Both, nullptr},
-        {idOf<Animator>(), "Animator", Kept::Both, nullptr},
-        {idOf<MontagePlayer>(), "MontagePlayer", Kept::Both, nullptr},
+        {idOf<MeshRef>(), "MeshRef", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, mesh] : r.view<MeshRef>().each()) mesh.mesh += 1u;
+         }},
+        {idOf<Spin>(), "Spin", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, spin] : r.view<Spin>().each()) spin.radiansPerSecond += 1.0f;
+         }},
+        {idOf<Player>(), "Player", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, player] : r.view<Player>().each()) player.metresPerSecond += 1.0f;
+         }},
+        {idOf<StaticBox>(), "StaticBox", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, box] : r.view<StaticBox>().each()) box.halfExtents.x += 1.0f;
+         }},
+        {idOf<CharacterBody>(), "CharacterBody", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, body] : r.view<CharacterBody>().each()) body.fallSpeed += 1.0f;
+         }},
+        {idOf<Animator>(), "Animator", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, animator] : r.view<Animator>().each()) animator.time += 0.5f;
+         }},
+        {idOf<MontagePlayer>(), "MontagePlayer", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, montage] : r.view<MontagePlayer>().each()) montage.time += 0.25f;
+         }},
         // Stands for every registered game component: they all share the hooks registerComponent builds.
-        {idOf<Mark>(), "registered game component", Kept::Both, nullptr},
+        {idOf<Mark>(), "registered game component", Kept::Both, false, [](entt::registry& r) {
+             for (auto [entity, mark] : r.view<Mark>().each()) mark.value += 1u;
+         }},
         // Rendering interpolation only, overwritten at the start of every tick.
-        {idOf<PreviousTransform>(), "PreviousTransform", Kept::Neither, nullptr},
+        {idOf<PreviousTransform>(), "PreviousTransform", Kept::Neither, false, [](entt::registry& r) {
+             for (auto [entity, previous] : r.view<PreviousTransform>().each()) previous.position.x += 1.0;
+         }},
         // Skinning matrices rebuilt from the Animator every tick.
-        {idOf<SkinPose>(), "SkinPose", Kept::Neither, nullptr},
+        {idOf<SkinPose>(), "SkinPose", Kept::Neither, false, [](entt::registry& r) {
+             for (auto [entity, pose] : r.view<SkinPose>().each()) pose.matrices.emplace_back(1.0f);
+         }},
     };
     return table;
 }
 
-// What the probe needs from a scene: its registry, the bytes a save writes and the hash it reports.
 class Subject {
 public:
     virtual ~Subject() = default;
@@ -117,23 +141,28 @@ std::vector<std::string> coverageProblems(const MakeSubject& make, const std::ve
             problems.push_back(std::format("{} is not classified: add it to the table", storage.info().name()));
         }
     }
-    for (const Expected& expected : table) {
+    const auto probe = [&](const Expected& expected, const char* how, const std::function<void(Subject&, entt::sparse_set&)>& alter) {
         const std::unique_ptr<Subject> subject = make();
         entt::sparse_set* storage = subject->registry().storage(expected.id);
         if (storage == nullptr || storage->empty()) {
             problems.push_back(std::format("the fixture holds no {}, so it cannot be probed", expected.name));
-            continue;
+            return false;
         }
-        if (expected.change != nullptr) {
-            expected.change(subject->registry());
-        } else {
-            storage->clear();
-        }
+        alter(*subject, *storage);
         const bool saved = subject->saved() != savedBefore;
         const bool hashed = subject->hashed() != hashBefore;
         const Kept kept = saved ? (hashed ? Kept::Both : Kept::SavedOnly) : (hashed ? Kept::HashedOnly : Kept::Neither);
         if (kept != expected.kept) {
-            problems.push_back(std::format("{} is {}, expected {}", expected.name, describe(kept), describe(expected.kept)));
+            problems.push_back(std::format("{} {} is {}, expected {}", expected.name, how, describe(kept), describe(expected.kept)));
+        }
+        return true;
+    };
+    for (const Expected& expected : table) {
+        if (!probe(expected, "changed", [&](Subject& subject, entt::sparse_set&) { expected.change(subject.registry()); })) {
+            continue;
+        }
+        if (!expected.onEveryEntity) {
+            probe(expected, "removed", [](Subject&, entt::sparse_set& storage) { storage.clear(); });
         }
     }
     return problems;
@@ -166,7 +195,7 @@ public:
 
         SpawnCommand wall;
         wall.id = StableId::of("wall");
-        wall.name = {"wall"};
+        wall.name = Name{"wall"};
         wall.staticBox = StaticBox{{4.0f, 0.5f, 4.0f}};
         scene_.restore(wall);
     }
@@ -198,35 +227,58 @@ struct Stray {
     std::uint32_t value = 0;
 };
 
+struct Wiring {
+    bool saves = true;
+    bool hashes = true;
+    bool hashesValue = true; // false: the hash sees that the component is there, not what it holds
+    bool stray = false;
+};
+
 class FixtureSubject final : public Subject {
 public:
-    FixtureSubject(bool saves, bool hashes, bool stray)
-        : saves_(saves)
-        , hashes_(hashes)
+    explicit FixtureSubject(Wiring wiring)
+        : wiring_(wiring)
     {
         const entt::entity entity = registry_.create();
         registry_.emplace<Probe>(entity, 3u);
-        if (stray) registry_.emplace<Stray>(entity, 4u);
+        if (wiring.stray) registry_.emplace<Stray>(entity, 4u);
     }
 
     entt::registry& registry() override { return registry_; }
-    std::vector<std::uint8_t> saved() override { return {static_cast<std::uint8_t>(saves_ ? registry_.storage<Probe>().size() : 0u)}; }
-    std::uint64_t hashed() override { return hashes_ ? registry_.storage<Probe>().size() : 0u; }
+
+    std::vector<std::uint8_t> saved() override
+    {
+        if (!wiring_.saves) return {};
+        std::vector<std::uint8_t> bytes;
+        for (auto [entity, probe] : registry_.view<Probe>().each()) bytes.push_back(static_cast<std::uint8_t>(probe.value));
+        return bytes;
+    }
+
+    std::uint64_t hashed() override
+    {
+        if (!wiring_.hashes) return 0;
+        std::uint64_t h = registry_.storage<Probe>().size();
+        if (wiring_.hashesValue) {
+            for (auto [entity, probe] : registry_.view<Probe>().each()) h = hashCombine(h, probe.value);
+        }
+        return h;
+    }
 
 private:
     entt::registry registry_;
-    bool saves_;
-    bool hashes_;
+    Wiring wiring_;
 };
 
-MakeSubject fixture(bool saves, bool hashes, bool stray = false)
+MakeSubject fixture(Wiring wiring)
 {
-    return [=] { return std::make_unique<FixtureSubject>(saves, hashes, stray); };
+    return [=] { return std::make_unique<FixtureSubject>(wiring); };
 }
 
 std::vector<Expected> probeKept(Kept kept)
 {
-    return {{idOf<Probe>(), "Probe", kept, nullptr}};
+    return {{idOf<Probe>(), "Probe", kept, false, [](entt::registry& r) {
+                 for (auto [entity, probe] : r.view<Probe>().each()) probe.value += 1u;
+             }}};
 }
 
 }
@@ -240,39 +292,48 @@ TEST_CASE("every component the scene saves takes part in its state hash, and the
 
 TEST_CASE("the coverage probe passes a component that is both saved and hashed", "[save][hash]")
 {
-    CHECK(coverageProblems(fixture(true, true), probeKept(Kept::Both)).empty());
+    CHECK(coverageProblems(fixture({}), probeKept(Kept::Both)).empty());
 }
 
 TEST_CASE("the coverage probe goes red for a component saved but not hashed", "[save][hash]")
 {
-    const std::vector<std::string> problems = coverageProblems(fixture(true, false), probeKept(Kept::Both));
-    REQUIRE(problems.size() == 1);
-    CHECK(problems[0] == "Probe is saved but not hashed, expected saved and hashed");
+    const std::vector<std::string> problems = coverageProblems(fixture({.hashes = false}), probeKept(Kept::Both));
+    REQUIRE(problems.size() == 2);
+    CHECK(problems[0] == "Probe changed is saved but not hashed, expected saved and hashed");
+    CHECK(problems[1] == "Probe removed is saved but not hashed, expected saved and hashed");
 }
 
 TEST_CASE("the coverage probe goes red for a component hashed but not saved", "[save][hash]")
 {
-    const std::vector<std::string> problems = coverageProblems(fixture(false, true), probeKept(Kept::Both));
+    const std::vector<std::string> problems = coverageProblems(fixture({.saves = false}), probeKept(Kept::Both));
+    REQUIRE(problems.size() == 2);
+    CHECK(problems[0] == "Probe changed is hashed but not saved, expected saved and hashed");
+    CHECK(problems[1] == "Probe removed is hashed but not saved, expected saved and hashed");
+}
+
+TEST_CASE("the coverage probe goes red when the hash sees a component but not its data", "[save][hash]")
+{
+    const std::vector<std::string> problems = coverageProblems(fixture({.hashesValue = false}), probeKept(Kept::Both));
     REQUIRE(problems.size() == 1);
-    CHECK(problems[0] == "Probe is hashed but not saved, expected saved and hashed");
+    CHECK(problems[0] == "Probe changed is saved but not hashed, expected saved and hashed");
 }
 
 TEST_CASE("an allowlisted difference passes only as the difference it was listed for", "[save][hash]")
 {
-    CHECK(coverageProblems(fixture(true, false), probeKept(Kept::SavedOnly)).empty());
-    CHECK(coverageProblems(fixture(false, true), probeKept(Kept::HashedOnly)).empty());
-    CHECK_FALSE(coverageProblems(fixture(true, true), probeKept(Kept::SavedOnly)).empty());
+    CHECK(coverageProblems(fixture({.hashes = false}), probeKept(Kept::SavedOnly)).empty());
+    CHECK(coverageProblems(fixture({.saves = false}), probeKept(Kept::HashedOnly)).empty());
+    CHECK_FALSE(coverageProblems(fixture({}), probeKept(Kept::SavedOnly)).empty());
 }
 
 TEST_CASE("a component nobody classified fails by default, and so does one the fixture lacks", "[save][hash]")
 {
-    const std::vector<std::string> stray = coverageProblems(fixture(true, true, true), probeKept(Kept::Both));
+    const std::vector<std::string> stray = coverageProblems(fixture({.stray = true}), probeKept(Kept::Both));
     REQUIRE(stray.size() == 1);
     CHECK(stray[0].ends_with("is not classified: add it to the table"));
 
     std::vector<Expected> table = probeKept(Kept::Both);
-    table.push_back({idOf<Stray>(), "Stray", Kept::Neither, nullptr});
-    const std::vector<std::string> missing = coverageProblems(fixture(true, true), table);
+    table.push_back({idOf<Stray>(), "Stray", Kept::Neither, false, [](entt::registry&) {}});
+    const std::vector<std::string> missing = coverageProblems(fixture({}), table);
     REQUIRE(missing.size() == 1);
     CHECK(missing[0] == "the fixture holds no Stray, so it cannot be probed");
 }
