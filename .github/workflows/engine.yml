@@ -394,6 +394,8 @@ jobs:
       - name: GPU goldens on lavapipe
         # Software Vulkan (lavapipe), so the 28 golden image cases compare here instead of skipping. The software
         # set under tests/data/golden/software overrides a golden that a real GPU draws differently.
+        # The Khronos validation layer is loaded from the environment and only prints errors, which do not fail a test by
+        # themselves, so the step counts them per VUID in the verbose ctest log and fails if there is any.
         env:
           ICHOR_GOLDEN_SOFTWARE: "1"
           ICHOR_REQUIRE_GPU: "1"
