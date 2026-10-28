@@ -18,6 +18,8 @@ import sys
 from collections import namedtuple
 
 CAP = 48
+MAX_MODEL = 50 * 1024 * 1024
+BUDGET = 300 * 1024 * 1024
 EXCLUDED = {"art/LICENSES.json"}
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 MODEL_EXT = {".glb"}
@@ -122,8 +124,13 @@ def human(n):
         n /= 1024
 
 
+def shown_name(s):
+    """A path git gave as bytes that are not UTF-8 holds surrogates; show them as U+FFFD so the page and log stay UTF-8."""
+    return str(s).encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+
+
 def esc(s):
-    return html.escape(str(s), quote=True)
+    return html.escape(shown_name(s), quote=True)
 
 
 def caption(asset):
@@ -141,7 +148,8 @@ def card(asset, files):
     return f'<div class="card">{preview}{caption(asset)}</div>'
 
 
-def render(shown, hidden, files, sizes, base, head, failed=frozenset()):
+def render(shown, hidden, files, sizes, base, head, notes=None):
+    notes = notes or {}
     previews = [a for a in shown if a.path in files]
     listed = [a for a in shown if a.path not in files]
     parts = [f"<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\">"
@@ -158,10 +166,15 @@ def render(shown, hidden, files, sizes, base, head, failed=frozenset()):
     if listed:
         parts.append("<h2>Other files</h2><table>")
         for a in listed:
-            size = esc(human(sizes[a.path])) if a.path in sizes else "preview unavailable" if a.path in failed else ""
+            size = esc(human(sizes[a.path])) if a.path in sizes else ""
+            note = f'<span class="mut">{esc(notes[a.path])}</span> ' if a.path in notes else ""
             old = f'<span class="mut">from {esc(a.old)}</span>' if a.old else ""
-            parts.append(f'<tr><td>{esc(a.path)}</td><td><span class="badge {a.change}">{a.change}</span></td><td>{size}</td><td>{old}</td></tr>')
+            parts.append(f'<tr><td>{esc(a.path)}</td><td><span class="badge {a.change}">{a.change}</span></td><td>{size}</td><td>{note}{old}</td></tr>')
         parts.append("</table>")
+    too_big = sum(1 for n in notes.values() if n.startswith("not previewed"))
+    if too_big:
+        parts.append(f"<p><strong>{too_big} not previewed (size)</strong>: a GLB over {MAX_MODEL // 2**20} MiB, or past the "
+                     f"{BUDGET // 2**20} MiB the sheet may hold, is listed instead.</p>")
     if hidden:
         parts.append(f"<p><strong>{hidden} more not shown</strong> (the sheet stops at {CAP} assets, in path order).</p>")
     parts.append("</body></html>\n")
@@ -172,11 +185,20 @@ def git(*args, stdin=None):
     return subprocess.run(["git", *args], input=stdin, stdout=subprocess.PIPE, check=True).stdout
 
 
-def content(run, head, path):
-    blob = run("show", f"{head}:{path}")
-    if blob.startswith(b"version https://git-lfs.github.com/spec/"):
-        return run("lfs", "smudge", "--", path, stdin=blob)
-    return blob
+def is_pointer(blob):
+    return blob.startswith(b"version https://git-lfs.github.com/spec/")
+
+
+def written_size(asset, size):
+    return size * 4 // 3 if asset.kind == "model" else size
+
+
+def size_note(asset, size, used):
+    if asset.kind == "model" and size > MAX_MODEL:
+        return f"not previewed: over {MAX_MODEL // 2**20} MiB"
+    if used + written_size(asset, size) > BUDGET:
+        return f"not previewed: the sheet is at {BUDGET // 2**20} MiB"
+    return None
 
 
 def build(base, head, out, run=git, log=print):
@@ -184,20 +206,26 @@ def build(base, head, out, run=git, log=print):
     shown, hidden = select(changes)
     os.makedirs(os.path.join(out, "assets"), exist_ok=True)
     os.makedirs(os.path.join(out, "models"), exist_ok=True)
-    files, sizes, failed = {}, {}, set()
+    files, sizes, notes, used = {}, {}, {}, 0
     for n, asset in enumerate(shown):
         if asset.change == "deleted":
             continue
         try:
-            if asset.kind == "other":
-                sizes[asset.path] = lfs_size(run("show", f"{head}:{asset.path}"))
+            blob = run("show", f"{head}:{asset.path}")
+            size = lfs_size(blob)
+            note = None if asset.kind == "other" else size_note(asset, size, used)
+            if asset.kind == "other" or note:
+                sizes[asset.path] = size
+                if note:
+                    notes[asset.path] = note
                 continue
-            data = content(run, head, asset.path)
+            data = run("lfs", "smudge", "--", asset.path, stdin=blob) if is_pointer(blob) else blob
         except subprocess.CalledProcessError as error:
             # A symlink, a submodule or an LFS object the server does not hold (a fork's) must not cost the other previews.
-            log(f"art-contact-sheet: no preview for {asset.path}: {error}")
-            failed.add(asset.path)
+            log(f"art-contact-sheet: no preview for {shown_name(asset.path)}: {error}")
+            notes[asset.path] = "preview unavailable"
             continue
+        used += written_size(asset, size)
         ext = os.path.splitext(asset.path)[1].lower()
         if asset.kind == "image":
             rel = f"assets/{n}{ext}"
@@ -208,7 +236,7 @@ def build(base, head, out, run=git, log=print):
             with open(os.path.join(out, rel), "w", encoding="ascii") as fh:
                 fh.write(f'sheetModel("m{n}", "{base64.b64encode(data).decode("ascii")}");\n')
         files[asset.path] = rel
-    page = render(shown, hidden, files, sizes, base, head, failed)
+    page = render(shown, hidden, files, sizes, base, head, notes)
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(page)
     log(f"art-contact-sheet: {len(shown)} shown, {hidden} more not shown, {len(files)} preview(s) in {out}")
@@ -315,6 +343,42 @@ def build_checks(check):
     check("other file shows its pointer size", "art/d.fbx" in page and "4.0 KiB" in page, True)
     check("a failed fetch is listed as unavailable", "art/e.png" in page and "preview unavailable" in page, True)
     check("capped assets are counted", "5 more not shown" in page, True)
+
+    odd = render([Asset("art/\udcff.fbx", "other", "added", None)], 0, {}, {}, "a", "b")
+    check("a non-UTF-8 name renders as UTF-8", "art/�.fbx" in odd.encode("utf-8").decode("utf-8"), True)
+    with tempfile.TemporaryDirectory() as out:
+        logged = []
+        bad = b"A\0art/\xff.png\0"
+        built = build("b", "h", out, run=lambda *a, stdin=None: bad if a[0] == "diff" else pointer,
+                      log=lambda m: logged.append(m.encode("utf-8")))
+        check("build survives a non-UTF-8 name", built, 0)
+        check("the page names it with a replacement character",
+              "art/�.png" in open(os.path.join(out, "index.html"), encoding="utf-8").read(), True)
+
+    mib = 1024 * 1024
+
+    def sized(n):
+        return b"version https://git-lfs.github.com/spec/v1\noid sha256:" + b"2" * 64 + f"\nsize {n}\n".encode()
+
+    sizes = {"art/big.glb": 51 * mib, **{f"art/i{i}.png": 50 * mib for i in range(7)}}
+    diff = "\0".join([x for p in sizes for x in ("A", p)] + [""])
+    smudged.clear()
+
+    def big(*args, stdin=None):
+        if args[0] == "diff":
+            return diff.encode("utf-8")
+        if args[0] == "show":
+            return sized(sizes[args[1].split(":", 1)[1]])
+        smudged.append(args[-1])
+        return b"x"
+
+    with tempfile.TemporaryDirectory() as out:
+        build("b", "h", out, run=big, log=lambda *a: None)
+        page = open(os.path.join(out, "index.html"), encoding="utf-8").read()
+    check("a GLB over 50 MiB is not fetched", "art/big.glb" in smudged, False)
+    check("previews stop at the artifact budget", smudged, [f"art/i{i}.png" for i in range(6)])
+    check("the page counts what was not previewed for size", "2 not previewed (size)" in page, True)
+    check("a skipped GLB is listed with its size", "art/big.glb" in page and "51.0 MiB" in page, True)
 
 
 def main(argv):
