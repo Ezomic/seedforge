@@ -15,6 +15,7 @@
 #include "ichor/stage0/combat.h"
 #include "ichor/stage0/exile_player.h"
 #include "ichor/stage0/fight_review.h"
+#include "ichor/stage0/run_prompt.h"
 
 #include <glm/gtc/quaternion.hpp>
 #include <tracy/Tracy.hpp>
@@ -209,6 +210,18 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
         }
     });
     engine.setOverlayBuilder([&](const ichor::Scene& scene, std::vector<std::string>& lines) { stage.overlay(scene, lines); });
+    // The death card is drawn without the debug overlay too; the full overlay already has the death lines.
+    engine.setCardLinesBuilder([&](std::vector<std::string>& lines) {
+        if (engine.overlayMode() == ichor::OverlayMode::Full) {
+            return;
+        }
+        if (const auto death = stage.playerDeath(engine.scene())) {
+            lines = ichor::stage0::deathCard(*death);
+        }
+    });
+    engine.setInputSource([&platform, &stage, guard = ichor::stage0::RetryGuard{}](ichor::Scene& scene) mutable {
+        return guard.filter(platform.input(), stage.playerDeath(scene).has_value(), scene.time());
+    });
 
     double last = platform.now();
     for (;;) {
