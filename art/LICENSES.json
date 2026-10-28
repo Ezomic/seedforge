@@ -819,12 +819,11 @@
       "attribution": "Batch 7 animals: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
       "date_added": "2026-10-27",
       "sha256": {
-        "art/creatures/animals/SM_Cat.glb": "fcf78680d94f06f7fe617d50affeb1e26874eef79d7b3019aa65465f542599af",
+        "art/creatures/animals/SM_CatTmp709.glb": "fcf78680d94f06f7fe617d50affeb1e26874eef79d7b3019aa65465f542599af",
         "art/creatures/animals/SM_Crab.glb": "04c3f59931a1c2473d2ef23870e19fcb6308da7460924ad2c0d141ccd2668b67",
         "art/creatures/animals/SM_Goat.glb": "c06556ee5bd0071f6353c20319a396472cba702f1d0b122cfae04034d9dc9046",
         "art/creatures/animals/SM_Heron.glb": "def26840f77d6d189379ce7ec53f5a22a7c7a79c2f4cd2c7e7001a655661cf25",
         "art/creatures/animals/SM_Sheep.glb": "80009c3e180b1cbd028d22ae2e608ae2a67bc630117a3c5fcd43273099ad83a6",
-        "art/creatures/animals/SM_Tortoise.glb": "3bf898981eaef89c8aa1cd148ad120e4a6e877e56960b631a09fd1c83ba61649",
         "art/creatures/animals/SM_WildDog.glb": "439bed851e909ca4f5b4472206b0eedf182abaf992f8b38844c398bb59374de0"
       }
     },

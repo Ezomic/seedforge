@@ -69,7 +69,7 @@ art/exile/SM_ExileSpear.glb
 art/exile/T_ExileAnimationPack_view.png
 art/exile/T_ExileColourPass_view.png
 art/exile/T_ExileCostumes_view.png
-art/exile/T_ExileTextured_view.png
+art/exile/T_ExileTextured_view_tmp709.png
 art/export/SM_Aspis.fbx
 art/export/SM_Dory.fbx
 art/export/SM_Helmet.fbx
