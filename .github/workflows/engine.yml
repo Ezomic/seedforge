@@ -361,7 +361,7 @@ jobs:
       - name: Bootstrap vcpkg
         run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
       - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 vulkan-tools autoconf autoconf-archive automake libtool libltdl-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 vulkan-tools vulkan-validationlayers autoconf autoconf-archive automake libtool libltdl-dev pkg-config
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
@@ -398,9 +398,16 @@ jobs:
           ICHOR_GOLDEN_SOFTWARE: "1"
           ICHOR_REQUIRE_GPU: "1"
           ICHOR_GOLDEN_REPORT: "1"
+          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+          VK_LAYER_SETTINGS_PATH: ${{ runner.temp }}/vk_layer_settings.txt
         run: |
-          vulkaninfo --summary
-          ctest --preset linux-gpu
+          printf '%s\n' 'khronos_validation.report_flags = error' 'khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG' > "$VK_LAYER_SETTINGS_PATH"
+          vulkaninfo --summary | tee "$RUNNER_TEMP/vulkaninfo.txt"
+          grep -q VK_LAYER_KHRONOS_validation "$RUNNER_TEMP/vulkaninfo.txt"
+          set -o pipefail
+          ctest --preset linux-gpu -V | tee "$RUNNER_TEMP/ctest.log"
+          grep 'Validation Error' "$RUNNER_TEMP/ctest.log" | sed -E 's/.*(VUID-[A-Za-z0-9_-]+|UNASSIGNED-[A-Za-z0-9_.-]+).*/\1/' | sort | uniq -c || true
+          ! grep -q 'Validation Error' "$RUNNER_TEMP/ctest.log"
         working-directory: engine
       - name: Upload golden images
         if: always()
