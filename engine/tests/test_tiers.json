@@ -86,6 +86,7 @@
     "the trial search refuses nonsense and an empty world",
     "the walk and run clips are different poses at the same moment of the stride",
     "the wind-up lifts the axe above where it rests",
+    "version_stamp_cases",
     "walk travels about 1.05 m/s and run about 5.2 m/s along the way the body faces, from the root joint"
   ],
   "soak": [
