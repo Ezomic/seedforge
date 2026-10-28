@@ -133,6 +133,8 @@ int run(ichor::Platform& platform, ichor::Renderer& renderer, ichor::AudioHost& 
     config.seed = options.seed;
     ichor::Engine engine(platform, renderer, config);
     engine.setAudio(&audio);
+    // Alt-tabbing away mid-fight must not get the tester killed.
+    engine.setPauseOnFocusLoss(ichor::pausesOnFocusLoss({.headless = options.headless, .screenshot = !options.screenshot.empty(), .frameLimit = options.frames}));
 
     // Automated runs log elsewhere so they never pollute the protocol's dataset.
     const std::filesystem::path fights = !options.fights.empty() ? options.fights

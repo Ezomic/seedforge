@@ -29,6 +29,8 @@ bool SdlPlatform::init(const WindowDesc& desc)
         logf(LogLevel::Error, "SDL_CreateWindow failed: {}", SDL_GetError());
         return false;
     }
+    // A window opened behind another one never hears that it lost focus, so it starts from what it has.
+    focused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
     return true;
 }
 
@@ -67,6 +69,9 @@ void SdlPlatform::pumpEvents()
         }
         if (event.type == SDL_EVENT_QUIT) {
             quit_ = true;
+        }
+        if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST || event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+            focused_ = event.type == SDL_EVENT_WINDOW_FOCUS_GAINED;
         }
         if (escapeQuits_ && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
             quit_ = true;
