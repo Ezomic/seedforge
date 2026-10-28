@@ -87,6 +87,7 @@ jobs:
           python3 tools/ci_tiers.py --root . check
           python3 tools/test_times.py --check-allowlist --root .
           python3 tools/test_times.py --self-test
+          python3 tools/package_size.py --self-test
 
   windows:
     # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
@@ -559,6 +560,9 @@ jobs:
           path: ${{ runner.temp }}/dist/ichor-linux.tar.gz
           retention-days: 7
           if-no-files-found: error
+      - name: Package size budget
+        # After the upload, so a package over budget can still be downloaded and inspected (SEED-708).
+        run: python3 tools/package_size.py "$RUNNER_TEMP/dist/ichor-linux.tar.gz"
       - name: Save vcpkg binaries
         if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
