@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -18,13 +19,21 @@ struct Settings {
     static constexpr float kMaxMouseSensitivity = 5.0f;
 
     float fovDegrees = kDefaultFovDegrees; // vertical
-    float mouseSensitivity = kDefaultMouseSensitivity; // nothing reads it until the game has mouse look
+    float mouseSensitivity = kDefaultMouseSensitivity; // scales the right-button mouse look
 
     // Every field inside its range; a NaN or infinity becomes the default.
     Settings clamped() const;
 
     bool operator==(const Settings&) const = default;
 };
+
+// The sensitivity this run looks with: the --mouse-sens value when one is given, else the stored
+// one, clamped into the setting's range. The override is never written back to the file.
+float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override);
+
+// The settings after the player steps the sensitivity from the one they look with now, landing on
+// a tenth and inside the range.
+Settings stepMouseSensitivity(const Settings& stored, float current, int steps);
 
 std::string serializeSettings(const Settings& settings);
 
