@@ -142,11 +142,15 @@ void writeAll(HANDLE file, const Text& text)
     WriteFile(file, text.data, static_cast<DWORD>(text.size), &written, nullptr);
 }
 
+// Loaded at install rather than linked: the dependency policy only links vcpkg packages, and a library
+// loaded before the crash is not loaded from inside it.
+decltype(&MiniDumpWriteDump) writeMiniDump = nullptr;
 EXCEPTION_POINTERS* crashPointers = nullptr;
 DWORD crashThread = 0;
 
 bool writeDump()
 {
+    if (!writeMiniDump) return false;
     const HANDLE file = CreateFileW(paths.dump, GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return false;
     MINIDUMP_EXCEPTION_INFORMATION exception{crashThread, crashPointers, FALSE};
@@ -154,7 +158,7 @@ bool writeDump()
     strncat_s(comment, paths.build, _TRUNCATE);
     MINIDUMP_USER_STREAM stream{CommentStreamA, static_cast<ULONG>(std::strlen(comment) + 1), comment};
     MINIDUMP_USER_STREAM_INFORMATION streams{1, &stream};
-    const BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, MiniDumpNormal, &exception, &streams, nullptr);
+    const BOOL ok = writeMiniDump(GetCurrentProcess(), GetCurrentProcessId(), file, MiniDumpNormal, &exception, &streams, nullptr);
     CloseHandle(file);
     return ok != FALSE;
 }
@@ -216,6 +220,9 @@ LONG WINAPI onUnhandledException(EXCEPTION_POINTERS* info)
 // abort() and can raise the Windows Error Reporting dialog. MSVC's ASan uses a vectored handler instead.
 void install()
 {
+    if (const HMODULE dbghelp = LoadLibraryW(L"dbghelp.dll")) {
+        writeMiniDump = reinterpret_cast<decltype(&MiniDumpWriteDump)>(GetProcAddress(dbghelp, "MiniDumpWriteDump"));
+    }
     SetUnhandledExceptionFilter(onUnhandledException);
 }
 

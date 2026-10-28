@@ -10,7 +10,3 @@ ichor_version_stamp(ICHOR_VERSION_STAMP ${CMAKE_CURRENT_SOURCE_DIR} "${ICHOR_GIT
 message(STATUS "Ichor version stamp: ${ICHOR_VERSION_STAMP}")
 configure_file(version_stamp.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/version_stamp.cpp @ONLY)
 target_sources(ichor_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/version_stamp.cpp)
-
-if(WIN32)
-    target_link_libraries(ichor_core PRIVATE dbghelp) # MiniDumpWriteDump for the crash handler (SEED-698)
-endif()
