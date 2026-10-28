@@ -23,13 +23,43 @@ const char* controlsHint()
     return "Move WASD  Look mouse or arrows  E lock-on  J light  K heavy  L block  Space dodge  Enter retry  Esc quit";
 }
 
+const char* retryHint()
+{
+    return "Press Enter to try again.";
+}
+
+std::vector<std::string> deathCard(DeathCause cause)
+{
+    return {"YOU DIED", plainCause(cause), retryHint()};
+}
+
+InputFrame RetryGuard::filter(InputFrame input, bool playerDead, double now)
+{
+    if (!playerDead) {
+        diedAt_.reset();
+        armed_ = false;
+        return input;
+    }
+    if (!diedAt_) {
+        diedAt_ = now;
+    }
+    const bool confirm = (input.buttons & InputFrame::Confirm) != 0;
+    if (!armed_ && !confirm && now - *diedAt_ >= kArmSeconds) {
+        armed_ = true;
+    }
+    if (!armed_) {
+        input.buttons &= ~static_cast<std::uint32_t>(InputFrame::Confirm);
+    }
+    return input;
+}
+
 std::vector<std::string> promptLines(const PromptInput& input)
 {
     std::vector<std::string> lines;
     switch (input.outcome) {
     case FightOutcome::PlayerDied:
         lines.push_back(std::format("YOU DIED. {}", plainCause(input.cause)));
-        lines.push_back("Press Enter to try again.");
+        lines.push_back(retryHint());
         break;
     case FightOutcome::FoeDied:
         lines.push_back("YOU WON.");

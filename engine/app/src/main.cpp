@@ -25,6 +25,7 @@
 #include "ichor/editor/picking.h"
 #include "ichor/ui/caption_screen.h"
 #include "ichor/ui/combat_hud_screen.h"
+#include "ichor/ui/death_screen.h"
 #include "ichor/ui/hud.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
@@ -1049,6 +1050,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             if (!options.combatBot.empty()) {
                 combat->enableBot(*ichor::stage0::findBotSkill(options.combatBot), options.seed);
                 engine.setInputSource([&combat](ichor::Scene& scene) { return combat->botInput(scene); });
+            } else {
+                engine.setInputSource([&combat, &platform, guard = ichor::stage0::RetryGuard{}](ichor::Scene& scene) mutable {
+                    return guard.filter(platform.input(), combat->playerDeath(scene).has_value(), scene.time());
+                });
             }
         }
     } else {
@@ -1332,6 +1337,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
+    std::unique_ptr<ichor::DeathScreen> deathScreen;
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -1384,9 +1390,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
+            deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            deathScreen.reset();
             captionScreen.reset();
             combatHud.reset();
             newGameScreen.reset();
@@ -1458,6 +1466,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 if (captionScreen) {
                     captionFeed.prune(engine.scene().tickCount());
                     captionScreen->bind(soundHelp.captionsOn ? captionFeed.visible(engine.scene().tickCount()) : std::vector<std::string>{});
+                }
+                if (deathScreen) {
+                    const auto death = combat ? combat->playerDeath(engine.scene()) : std::nullopt;
+                    deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
                 }
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
