@@ -1496,7 +1496,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     captionScreen->bind(soundHelp.captionsOn ? captionFeed.visible(engine.scene().tickCount()) : std::vector<std::string>{});
                 }
                 if (deathScreen) {
-                    const auto death = combat ? combat->playerDeath(engine.scene()) : std::nullopt;
+                    // The full overlay already has the death lines.
+                    const auto death = combat && engine.overlayMode() != ichor::OverlayMode::Full ? combat->playerDeath(engine.scene()) : std::nullopt;
                     deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
                 }
                 if (ledger->visible()) {
