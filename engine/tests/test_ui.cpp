@@ -657,6 +657,33 @@ TEST_CASE("the pause menu draws nothing until shown, and its buttons report clic
     menu.setVisible(true);
     REQUIRE(menu.takeFovSteps() == 0); // a click from an earlier showing is not a click now
 
+    // The mouse sensitivity row sits under the field of view and reports its own steps, not the field of view's.
+    const auto sensDown = menu.sensitivityDownCentre();
+    const auto sensUp = menu.sensitivityUpCentre();
+    REQUIRE(sensDown.has_value());
+    REQUIRE(sensUp.has_value());
+    REQUIRE(sensDown->first < sensUp->first);
+    REQUIRE(sensDown->second > menu.fovDownCentre()->second);
+    REQUIRE(sensDown->second < menu.resumeCentre()->second);
+    REQUIRE(menu.takeSensitivitySteps() == 0);
+    click(*sensUp, 0.3955);
+    click(*sensUp, 0.3960);
+    click(*sensUp, 0.3965);
+    click(*sensDown, 0.3970);
+    REQUIRE(menu.takeFovSteps() == 0);
+    REQUIRE(menu.takeSensitivitySteps() == 2);
+    REQUIRE(menu.takeSensitivitySteps() == 0);
+    click(*fovUp, 0.3975);
+    REQUIRE(menu.takeSensitivitySteps() == 0);
+    REQUIRE(menu.takeFovSteps() == 1);
+    menu.setMouseSensitivity(std::numeric_limits<float>::infinity()); // ignored, not drawn
+    menu.setMouseSensitivity(2.5f);
+    frame(ui, renderer, 0.398);
+    click(*sensDown, 0.3985);
+    menu.setVisible(false);
+    menu.setVisible(true);
+    REQUIRE(menu.takeSensitivitySteps() == 0); // a click from an earlier showing is not a click now
+
     // A click left over from before the menu was hidden does not count when it is shown again.
     click(*quit, 0.4);
     menu.setVisible(false);
