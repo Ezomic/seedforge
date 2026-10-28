@@ -450,8 +450,18 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     for (const std::string& problem : content.problems) {
         ichor::logf(ichor::LogLevel::Warn, "forged content: {}", problem);
     }
+    // Phase 0: the seed's axioms. Nothing reads their directives yet, so they do not change the world.
+    ichor::WorldConfigResult axioms = ichor::loadRolledWorldConfig(options.seed, options.data);
+    std::shared_ptr<const ichor::WorldConfig> worldConfig;
+    if (axioms.ok()) {
+        ichor::logf(ichor::LogLevel::Info, "world axioms: {} (WorldConfig {:016x})", ichor::worldConfigIds(axioms.config), ichor::worldConfigDigest(axioms.config));
+        worldConfig = std::make_shared<const ichor::WorldConfig>(std::move(axioms.config));
+    } else {
+        ichor::logf(ichor::LogLevel::Warn, "the world's axioms could not be resolved: {}", axioms.error);
+    }
     if (options.campaignPlan.action == ichor::CampaignWorldAction::Load) {
         out = ichor::buildStoredCampaignGame(options.campaignPlan, desc, content.inputs);
+        out->worldConfig = worldConfig;
         return reportForgedGame(*out);
     }
     ichor::NewGameFlow flow(true, options.forgedGrid, content.config);
@@ -520,6 +530,7 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
         return ForgeOutcome::Failed;
     }
     out = ichor::buildForgedGame(*job->result(), desc, content.inputs);
+    out->worldConfig = worldConfig;
     return reportForgedGame(*out);
 }
 

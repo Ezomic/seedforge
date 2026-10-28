@@ -142,10 +142,10 @@ TEST_CASE("the WorldConfig of a seed is pinned so every platform agrees", "[worl
     CHECK(ids(0) == "cataclysm.n2,law.n2,powers.n1,pressure.n0,anomaly.n1");
     CHECK(ids(1) == "cataclysm.n2,law.n1,powers.n2,pressure.n2");
     CHECK(ids(std::numeric_limits<std::uint64_t>::max()) == "cataclysm.n1,law.n2,powers.n0,pressure.n0,anomaly.n1");
-    CHECK(digest(0) == 0x0ull);
-    CHECK(digest(1) == 0x0ull);
-    CHECK(digest(std::numeric_limits<std::uint64_t>::max()) == 0x0ull);
-    CHECK(worldConfigDigest(WorldConfig{}) == 0x0ull);
+    CHECK(digest(0) == 0x8db0a7352ab10d1cull);
+    CHECK(digest(1) == 0x95812a68bdcd245aull);
+    CHECK(digest(std::numeric_limits<std::uint64_t>::max()) == 0x6bdcab353c064e26ull);
+    CHECK(worldConfigDigest(WorldConfig{}) == 0xf755d131393809a1ull);
 }
 
 TEST_CASE("rolling the shipped axioms reaches every axiom and never pairs an excluded one", "[world_config]")
