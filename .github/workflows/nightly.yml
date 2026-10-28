@@ -19,6 +19,26 @@ on:
         default: "256,1024"
 
 jobs:
+  ci-time-trend:
+    # Per-job durations of the recent PR runs of engine.yml, red when a job's median passes 12 of its 15 minutes (SEED-702).
+    name: PR CI time trend
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          sparse-checkout: tools
+      - name: Job durations of recent PR runs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          python3 tools/ci_time_trend.py --repo "${{ github.repository }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
   stress-and-sanity:
     name: ctest-stress + world sanity (linux headless)
     runs-on: ubuntu-latest

@@ -448,6 +448,7 @@ void Stage0::combatSystem(Scene& scene, double dt, const InputFrame& input)
         const bool pressed = retry && !c.retryHeld;
         c.retryHeld = retry;
         if (pressed) {
+            retryPresses_ += 1;
             resetFight(scene);
             return;
         }

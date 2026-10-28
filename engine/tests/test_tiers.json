@@ -46,6 +46,7 @@
     "placeFoe swaps the live foe to the asked role and back to the configured one, and a parked foe has no brain",
     "running does not fold the torso over the hands: the lean stays near upright",
     "serialised data holds ids, never pointers or runtime handles",
+    "session_summary_app",
     "skinning the first frame of idle leaves the Exile standing on the ground",
     "streaming keeps the ring resident across every cell boundary of the 4 km world and leaks nothing",
     "tectonics: land share still differs a lot from seed to seed",
@@ -86,6 +87,7 @@
     "the trial search refuses nonsense and an empty world",
     "the walk and run clips are different poses at the same moment of the stride",
     "the wind-up lifts the axe above where it rests",
+    "version_stamp_cases",
     "walk travels about 1.05 m/s and run about 5.2 m/s along the way the body faces, from the root joint"
   ],
   "soak": [
