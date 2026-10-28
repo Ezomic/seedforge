@@ -1245,3 +1245,26 @@ TEST_CASE("golden image tolerance: driver noise passes, a missing element does n
         CHECK_FALSE(within(gone, toleranceFor(true)));
     }
 }
+
+// The lavapipe job sets ICHOR_VALIDATION_CANARY and requires exactly this one validation error, which proves the
+// Khronos layer reached the test processes and its output is still being counted.
+TEST_CASE("golden image: validation canary")
+{
+    if (!envFlag("ICHOR_VALIDATION_CANARY")) {
+        SUCCEED("canary only runs under the validation layer");
+        return;
+    }
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        NO_VULKAN_DEVICE();
+    }
+    VkSamplerCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    info.anisotropyEnable = VK_TRUE;
+    info.maxAnisotropy = 0.0f;
+    VkSampler sampler = VK_NULL_HANDLE;
+    if (vkCreateSampler(renderer.context().device(), &info, nullptr, &sampler) == VK_SUCCESS) {
+        vkDestroySampler(renderer.context().device(), sampler, nullptr);
+    }
+    SUCCEED("invalid sampler submitted to the validation layer");
+}
