@@ -278,11 +278,15 @@ TextureBudget textureBudgetFor(const CookOptions& options, const std::filesystem
         }
         TextureBudget budget;
         std::vector<std::string> problems;
-        if (std::filesystem::exists(dir / "texture_budget.json", ec) && loadTextureBudget(dir / "texture_budget.json", budget, problems)) {
+        if (std::filesystem::exists(dir / "texture_budget.json", ec)) {
+            const bool loaded = loadTextureBudget(dir / "texture_budget.json", budget, problems);
             for (const std::string& problem : problems) {
                 logf(LogLevel::Warn, "texture_budget.json: {}", problem);
             }
-            return cache.emplace(dir, std::move(budget)).first->second;
+            if (!loaded) {
+                logf(LogLevel::Warn, "{} could not be read, cooking with the default texture size cap", (dir / "texture_budget.json").string());
+            }
+            return cache.emplace(dir, loaded ? std::move(budget) : TextureBudget{}).first->second;
         }
     }
     return {};
@@ -352,8 +356,10 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, PieceDat
         if (normal != kNoTexture) asNormal[normal] = true;
     }
 
-    const TextureBudget budget = textureBudgetFor(cookOptions, source);
-    const std::uint32_t maxSize = maxTextureSize(budget, source);
+    std::error_code absoluteEc;
+    const std::filesystem::path absoluteSource = std::filesystem::absolute(source, absoluteEc).lexically_normal();
+    const TextureBudget budget = textureBudgetFor(cookOptions, absoluteSource);
+    const std::uint32_t maxSize = maxTextureSize(budget, absoluteSource);
     bool ok = true;
     bundle.textures.resize(data->images_count);
     for (cgltf_size i = 0; i < data->images_count && ok; ++i) {
