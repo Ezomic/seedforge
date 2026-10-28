@@ -68,7 +68,7 @@ Settings stepMouseSensitivity(const Settings& stored, float current, int steps)
 std::string serializeSettings(const Settings& settings)
 {
     const Settings safe = settings.clamped();
-    return std::format("{}\nfov={}\nmouseSensitivity={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, kTrailer);
+    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen, kTrailer);
 }
 
 Settings parseSettings(std::string_view text)
@@ -93,6 +93,13 @@ Settings parseSettings(std::string_view text)
             break;
         } else if (const std::size_t equals = line.find('='); equals != std::string_view::npos) {
             const std::string_view key = line.substr(0, equals);
+            if (key == "promptsSeen") {
+                const std::string_view digits = line.substr(equals + 1);
+                std::uint32_t flags = 0;
+                const auto result = std::from_chars(digits.data(), digits.data() + digits.size(), flags);
+                settings.promptsSeen = result.ec == std::errc{} && result.ptr == digits.data() + digits.size() ? flags : 0u;
+                continue;
+            }
             float value = 0.0f;
             const bool valid = parseFloat(line.substr(equals + 1), value);
             if (key == "fov") {
