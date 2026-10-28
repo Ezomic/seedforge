@@ -4,7 +4,7 @@
 
 using namespace ichor;
 
-TEST_CASE("--crash-test names its three crashes and nothing else")
+TEST_CASE("the crash test flag names its three crashes and nothing else")
 {
     CHECK(parseCrashTest("thread") == CrashTest::OtherThread);
     CHECK(parseCrashTest("handler") == CrashTest::InHandler);
