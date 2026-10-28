@@ -89,6 +89,30 @@ jobs:
           python3 tools/test_times.py --self-test
           python3 tools/ci_time_trend.py --self-test
           python3 tools/package_size.py --self-test
+          python3 tools/art_contact_sheet.py --self-test
+
+  art-sheet:
+    # A page of the changed assets under art/, uploaded as an artifact so art is reviewed without a build (SEED-709). Only the shown
+    # LFS objects are fetched; the GLB previews load <model-viewer> from a CDN when the page is opened.
+    name: art contact sheet
+    needs: changes
+    if: needs.changes.outputs.art == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          lfs: false
+      - name: Build the contact sheet
+        run: |
+          git lfs install --local
+          python3 tools/art_contact_sheet.py --base "$(git rev-parse --short HEAD^1)" --head "$(git rev-parse --short HEAD)" --out art-contact-sheet
+      - uses: actions/upload-artifact@v4
+        with:
+          name: art-contact-sheet
+          path: art-contact-sheet
+          retention-days: 14
 
   windows:
     # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
