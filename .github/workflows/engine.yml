@@ -87,6 +87,7 @@ jobs:
           python3 tools/ci_tiers.py --root . check
           python3 tools/test_times.py --check-allowlist --root .
           python3 tools/test_times.py --self-test
+          python3 tools/ci_time_trend.py --self-test
 
   windows:
     # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
