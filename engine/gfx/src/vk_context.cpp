@@ -105,6 +105,8 @@ bool VulkanContext::init(SDL_Window* window, bool validation)
     features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     features13.dynamicRendering = VK_TRUE;
     features13.synchronization2 = VK_TRUE;
+    // dxc targeting vulkan1.3 lowers HLSL discard (water.frag) to OpDemoteToHelperInvocation.
+    features13.shaderDemoteToHelperInvocation = VK_TRUE;
     VkPhysicalDeviceFeatures features{};
     features.samplerAnisotropy = VK_TRUE;
 
