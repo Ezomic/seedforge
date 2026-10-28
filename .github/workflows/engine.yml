@@ -181,12 +181,14 @@ jobs:
           path: engine/build/windows-ci/forged-world-cache
           key: forged-cache-windows-${{ hashFiles('libworldforge/include/**', 'libworldforge/src/**', 'engine/world/include/ichor/world/forged_heightfield.h', 'engine/world/src/forged_heightfield.cpp', 'engine/world/include/ichor/world/forged_world_cache.h', 'engine/world/src/forged_world_cache.cpp', 'engine/world/include/ichor/world/forged_phase_maps.h', 'engine/world/src/forged_phase_maps.cpp', 'engine/world/include/ichor/world/heightfield.h', 'engine/world/src/heightfield.cpp', 'engine/world/include/ichor/world/world_desc.h', 'engine/core/include/ichor/core/binary.h', 'engine/core/include/ichor/core/hash.h') }}
       - name: Configure
+        id: configure
         run: cmake --preset windows-ci
         working-directory: engine
       - name: Save vcpkg binaries
         # Saved right after configure: a cold configure takes about 9 minutes, and a job killed later by its 15 minute limit saves nothing.
-        # always(): a configure that fails on one port still keeps the ports it built.
-        if: ${{ always() && steps.cache1.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
+        # Only a configure that finished saves: a cancelled or failed one leaves a partial set, and a partial set under the exact key is
+        # restored as a hit, never re-saved, and makes every later run rebuild the missing ports.
+        if: ${{ !cancelled() && steps.configure.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: .vcpkg-cache
