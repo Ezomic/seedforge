@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", "tools/package_size.py", "tools/package_size_budget.json", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
+    paths: ["engine/**", "game/**", "data/**", "art/audio/**", "art/fonts/**", "bin/**", "tools/package_linux.sh", ".github/workflows/engine.yml", ".github/workflows/nightly.yml"]
   # No path filter on a pull request: the required checks must report on every PR, and the `changes` job decides what runs (SEED-548).
   pull_request:
 

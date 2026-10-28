@@ -9,8 +9,8 @@ Usage: package_size.py ARCHIVE [--budget FILE]
        package_size.py --self-test
 
 Raise the budget after an intended growth: set "bytes" in tools/package_size_budget.json to the size the
-`linux package + smoke` job printed and say why in "note". That job runs on main, not on a PR; to measure a branch
-first, run `gh workflow run engine.yml --ref BRANCH` and read its package size line.
+`linux package + smoke` job printed and say why in "note". That job runs on main (engine path changes only), not on a
+PR; to measure a branch, or main right after a budget-only change, run `gh workflow run engine.yml --ref BRANCH`.
 
 Exit: 0 within budget, 1 over budget, 2 usage or input error.
 """
@@ -63,8 +63,8 @@ def report(name, size, budget, status, out):
     if status == "over":
         print(f"package-size: FAILED, the package grew more than {MARGIN_PERCENT}% over its budget.", file=out)
         print(f"package-size: if the growth is intended, set \"bytes\": {size} in {BUDGET} and say why in \"note\",", file=out)
-        print("package-size: in its own PR so the raise is reviewed. If it is not intended, find what grew (unpack the", file=out)
-        print("package-size: ichor-linux-package artifact and compare with `du -sh */` of the previous one).", file=out)
+        print("package-size: in its own PR so the raise is reviewed, then rerun this job on main (gh workflow run engine.yml --ref main).", file=out)
+        print("package-size: if it is not intended, unpack the ichor-linux-package artifact and compare `du -sh */` with the previous one.", file=out)
     elif status == "shrink":
         print(f"package-size: note: the package is more than {SHRINK_PERCENT}% under its budget; lower it to keep the guard tight:", file=out)
         print(f"package-size: set \"bytes\": {size} in {BUDGET}", file=out)
@@ -107,6 +107,16 @@ class _Sink:
 
 
 def self_test(out):
+    # The light CI job sets GITHUB_STEP_SUMMARY; the synthetic runs below must not write into the real summary.
+    real_summary = os.environ.pop("GITHUB_STEP_SUMMARY", None)
+    try:
+        return _self_test(out)
+    finally:
+        if real_summary is not None:
+            os.environ["GITHUB_STEP_SUMMARY"] = real_summary
+
+
+def _self_test(out):
     failures = []
 
     def expect(label, got, want):
