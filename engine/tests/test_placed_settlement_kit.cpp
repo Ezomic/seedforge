@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/cooker.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/world/placed_settlements.h"

@@ -8,8 +8,9 @@ Fails when:
      a runtime-only target or package, a rules library reaches the engine, or targets
      link in a cycle.
   4. libworldforge (pure C++, zero engine dependencies) includes or links engine code.
-  5. a world, audio, anim or gfx header includes ichor/assets/bundle.h instead of
-     bundle_types.h, so a texture or bundle format change would rebuild them all.
+  5. a world, audio, anim, gfx or assets header includes ichor/assets/bundle.h instead of
+     bundle_types.h, so a texture or bundle format change would rebuild them all. Only
+     direct includes are checked.
 
 Usage: check_deps.py [--root DIR]    check the tree (default: this repository)
        check_deps.py --self-test     prove every rule goes red on a deliberate violation
@@ -107,11 +108,13 @@ WORLDFORGE_CMAKE_ENGINE = re.compile(r"\bichor_\w+|\.\./engine|\bengine/")
 CMAKE_SKIP_DIRS = {"build", "node_modules", ".git", ".claude", "vcpkg_installed"}
 
 # Module headers that must reach the bundle through bundle_types.h. The exceptions need a
-# complete SceneBundle: exile.h and forged_game.h hold bundles by value, reference_view.h walks
-# bundle.nodes inline.
-NARROW_BUNDLE_MODULES = ("world", "audio", "anim", "gfx")
+# complete SceneBundle or Texture: exile.h and forged_game.h hold bundles by value, reference_view.h
+# walks bundle.nodes inline, image.h decodes textures, and bundle.h is the full header itself.
+NARROW_BUNDLE_MODULES = ("world", "audio", "anim", "gfx", "assets")
 FULL_BUNDLE_HEADERS = {
     "engine/anim/include/ichor/anim/exile.h",
+    "engine/assets/include/ichor/assets/bundle.h",
+    "engine/assets/include/ichor/assets/image.h",
     "engine/gfx/include/ichor/gfx/reference_view.h",
     "engine/world/include/ichor/world/forged_game.h",
 }
@@ -367,6 +370,8 @@ def self_test(inp):
          set_module_header("engine/world/include/ichor/world/streamer.h", '#include "ichor/assets/bundle.h"\n')),
         ("gfx header includes the full bundle", "includes ichor/assets/bundle.h",
          set_module_header("engine/gfx/include/ichor/gfx/a.h", "#include <ichor/assets/bundle.h>\n")),
+        ("assets header includes the full bundle", "includes ichor/assets/bundle.h",
+         set_module_header("engine/assets/include/ichor/assets/material_limits.h", '#include "ichor/assets/bundle.h"\n')),
     ]
     base = check(inp)
     if base:

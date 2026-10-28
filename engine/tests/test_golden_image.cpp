@@ -2,6 +2,7 @@
 #include "ichor/world/water_mesh.h"
 #include "ichor/world/palette.h"
 #include "ichor/anim/animation.h"
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
 #include "ichor/gfx/reference_view.h"

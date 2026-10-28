@@ -1,5 +1,6 @@
 // Renders the Bull-Warden in five combat states next to the grey player body, on a headless device (no window),
 // and writes one PNG: stage0_bull_shot out.png [behind]
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/image.h"
 #include "ichor/gfx/vk_offscreen.h"
 #include "ichor/stage0/bull_warden.h"
