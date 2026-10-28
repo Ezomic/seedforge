@@ -89,6 +89,7 @@ jobs:
           python3 tools/test_times.py --self-test
           python3 tools/ci_time_trend.py --self-test
           python3 tools/package_size.py --self-test
+          python3 tools/golden_diff_page.py --self-test
 
   windows:
     # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
@@ -433,6 +434,18 @@ jobs:
           fi
           exit $status
         working-directory: engine
+      - name: Golden diff page
+        # A failed golden case leaves its expected, actual and diff pictures in test-output/golden-failures. Only on a
+        # failed job, so a green run spends nothing here, and an empty folder writes no page and uploads nothing.
+        if: failure()
+        run: python3 tools/golden_diff_page.py engine/build/linux-gpu/test-output/golden-failures
+      - name: Upload golden diff page
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diff
+          path: engine/build/linux-gpu/test-output/golden-failures
+          if-no-files-found: ignore
       - name: Upload golden images
         if: always()
         uses: actions/upload-artifact@v4
