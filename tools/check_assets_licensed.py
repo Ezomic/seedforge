@@ -29,7 +29,7 @@ from pathlib import Path
 LEDGER = "art/LICENSES.json"
 BASELINE = "tools/asset_license_baseline.txt"
 CREDITS = "CREDITS.md"
-ASSET_ROOTS = ("art", "audio", "data/audio", "engine/content/audio")
+ASSET_ROOTS = ("art", "audio", "data/audio", "engine/content/audio", "engine/assets/vendor")
 SKIP_DIRS = {".git", "node_modules", "build", "__pycache__"}
 
 ALLOWED = {

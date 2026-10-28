@@ -171,6 +171,7 @@ For an art-only PR the Windows job builds `ichor_tests_ui ichor_tests_world stag
 | `game/stage0/tests/test_bull_warden.cpp` | `art/monsters/bull_warden` |
 | `engine/tests/test_placed_settlement_kit.cpp` | "the exported GLBs cook to the sizes the kit table says": `art/settlement_kit` |
 | `engine/tests/test_cooker.cpp` | the cooker (SEED-545) on `engine/tests/data/kit.glb`, so a cooker change is covered, a bad GLB in `art/` is covered by the tests above |
+| `engine/tests/test_cooker_textures.cpp` | the texture size table `art/texture_budget.json` ("the cooker reads the shipped art/texture_budget.json"); the rest cooks synthetic glTFs |
 | `content_layout` | `tools/check_content_layout.py` |
 
 Audio and fonts are in the heavy set already. A new test that reads another `art/` folder must be added to the regex in the `Art tests` step of `engine.yml`.

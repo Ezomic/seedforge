@@ -209,6 +209,41 @@ TEST_CASE("golden image: the hoplite kit")
     checkAgainstGolden(actual, expected, goldenPath);
 }
 
+TEST_CASE("golden image: the kit looks the same when block compression is decoded on the CPU")
+{
+    SceneBundle bundle;
+    REQUIRE(readBundle(kContent, bundle));
+    REQUIRE_FALSE(bundle.textures.empty());
+    REQUIRE(isBlockCompressed(bundle.textures[0].format));
+
+    const auto render = [&](bool allowed, bool& sampledDirectly, std::vector<std::uint8_t>& pixels) {
+        setBlockCompressionAllowed(allowed);
+        OffscreenRenderer renderer;
+        const bool ok = renderer.init(kWidth, kHeight, false) && renderer.uploadBundle(bundle)
+            && renderer.render(kitReferenceView(bundle, static_cast<float>(kWidth) / kHeight), pixels);
+        sampledDirectly = renderer.context().blockCompression();
+        return ok;
+    };
+    bool directly = false;
+    bool decoded = false;
+    std::vector<std::uint8_t> viaGpu;
+    std::vector<std::uint8_t> viaCpu;
+    const bool gpuOk = render(true, directly, viaGpu);
+    const bool cpuOk = render(false, decoded, viaCpu);
+    setBlockCompressionAllowed(true);
+    if (!gpuOk) {
+        NO_VULKAN_DEVICE();
+    }
+    REQUIRE(cpuOk);
+    CHECK_FALSE(decoded);
+    INFO("device samples BC directly: " << directly);
+
+    const Diff diff = compare(viaGpu, viaCpu, kBadThreshold);
+    INFO(std::format("mean abs diff {:.4f}, {:.4f}% pixels over threshold, worst channel {}", diff.meanAbs, diff.fractionBad * 100.0, diff.maxChannelDiff));
+    CHECK(diff.meanAbs < 0.5);
+    CHECK(diff.fractionBad < 0.001);
+}
+
 TEST_CASE("golden image: the skinned arm mid-wave")
 {
     OffscreenRenderer renderer;

@@ -683,6 +683,24 @@
       "license": "CC0-1.0",
       "attribution": "Fantasy Town Kit 2.0 by Kenney (www.kenney.nl), CC0 1.0. The four SM_Kenney pieces are assembled from its modules by tools/build_kit_cc0.py.",
       "date_added": "2026-10-26"
+    },
+    {
+      "id": "bc7enc",
+      "path": "engine/assets/vendor/bc7enc/*",
+      "source_url": "https://github.com/richgel999/bc7enc",
+      "author": "Richard Geldreich, Jr.",
+      "license": "MIT",
+      "attribution": "bc7enc, rgbcx and bc7decomp by Richard Geldreich, Jr. (https://github.com/richgel999/bc7enc), Copyright 2020, MIT License (also offered as public domain). Used by ichor_cook to block-compress textures.",
+      "date_added": "2026-10-28"
+    },
+    {
+      "id": "texture_budget",
+      "path": "art/texture_budget.json",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Texture size table read by ichor_cook. First-party, all rights reserved.",
+      "date_added": "2026-10-28"
     }
   ]
 }
