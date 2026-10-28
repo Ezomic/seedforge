@@ -354,6 +354,11 @@ CombatHudState CombatBridge::hud(const Scene& scene) const
     return state;
 }
 
+std::optional<double> CombatBridge::foeDistance(const Scene&) const
+{
+    return std::nullopt;
+}
+
 bool CombatBridge::loadVisuals(Renderer& renderer, const std::filesystem::path& artDir)
 {
     bool loaded = exile_.load(artDir / "exile", renderer);

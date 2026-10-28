@@ -1,11 +1,18 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ichor {
 
 constexpr double kControlsHintSeconds = 12.0;
+
+// The keys the card lists for the actions the first-minute prompts teach, so the two never disagree.
+constexpr std::string_view kMoveKeys = "W A S D";
+constexpr std::string_view kAttackKeys = "J, Left click";
+constexpr std::string_view kBlockKeys = "L, Middle btn";
+constexpr std::string_view kDodgeKeys = "Space";
 
 // The F1 controls card and the first-run hint line. Presentation only: it never reaches the simulation or a hash.
 struct ControlsOverlay {

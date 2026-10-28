@@ -46,7 +46,7 @@ bool parseFloat(std::string_view text, float& out)
 Settings Settings::clamped() const
 {
     return {clampField(fovDegrees, kMinFovDegrees, kMaxFovDegrees, kDefaultFovDegrees),
-            clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity)};
+            clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity), promptsSeen};
 }
 
 float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override)
