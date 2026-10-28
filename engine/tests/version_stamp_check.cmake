@@ -60,7 +60,7 @@ git(checkout -q --detach ${first})
 expect_stamp(${repo} ${GIT} ${first})
 
 expect_stamp(${repo} "" unknown)
-expect_stamp(${repo} GIT_EXECUTABLE-NOTFOUND unknown)
+expect_stamp(${repo} ICHOR_GIT-NOTFOUND unknown)
 expect_stamp(${repo} ${root}/no-such-git unknown)
 
 file(MAKE_DIRECTORY ${root}/tarball)
