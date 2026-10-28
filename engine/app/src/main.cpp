@@ -173,7 +173,7 @@ struct Options {
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
-    float mouseSensitivity = 1.0f; // scales the right-button mouse look
+    std::optional<float> mouseSensitivity; // --mouse-sens: this run's look sensitivity instead of the stored one, never saved
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
@@ -204,7 +204,9 @@ bool parse(int argc, char** argv, Options& options)
         } else if (arg == "--audio-log") {
             options.audioLog = true;
         } else if (arg == "--mouse-sens" && hasValue) {
-            if (!parseNumber(argv[++i], options.mouseSensitivity)) return false;
+            float sensitivity = 0.0f;
+            if (!parseNumber(argv[++i], sensitivity)) return false;
+            options.mouseSensitivity = sensitivity;
         } else if (arg == "--frames" && hasValue) {
             if (!parseNumber(argv[++i], options.frames)) return false;
         } else if (arg == "--seed" && hasValue) {
@@ -1023,6 +1025,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     // The player's settings live beside the campaigns, not in one, and never touch the simulation.
     const std::filesystem::path settingsPath = options.saves / "settings.cfg";
     ichor::Settings settings = ichor::loadSettings(settingsPath);
+    float mouseSensitivity = ichor::effectiveMouseSensitivity(settings, options.mouseSensitivity);
     ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
@@ -1427,6 +1430,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
+            pauseMenu->setMouseSensitivity(mouseSensitivity);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
@@ -1454,7 +1458,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     if (ui) {
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
         platform.enableLook(true);
-        platform.setMouseSensitivity(options.mouseSensitivity);
+        platform.setMouseSensitivity(mouseSensitivity);
         if (options.showInventory && carry && !editing) {
             inventoryScreen->setVisible(true);
         }
@@ -1909,6 +1913,16 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 settings.fovDegrees += static_cast<float>(steps) * kFovStepDegrees;
                 settings = settings.clamped();
                 pauseMenu->setFovDegrees(settings.fovDegrees);
+                if (!ichor::saveSettings(settingsPath, settings)) {
+                    ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+                }
+            }
+            // A step starts from what the player looks with, so a --mouse-sens run saves only what the player picks here.
+            if (const int steps = pauseMenu->takeSensitivitySteps(); steps != 0) {
+                settings = ichor::stepMouseSensitivity(settings, mouseSensitivity, steps);
+                mouseSensitivity = settings.mouseSensitivity;
+                platform.setMouseSensitivity(mouseSensitivity);
+                pauseMenu->setMouseSensitivity(mouseSensitivity);
                 if (!ichor::saveSettings(settingsPath, settings)) {
                     ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
                 }
