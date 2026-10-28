@@ -12,10 +12,13 @@
 # compiler wrapper), pragmas and attributes in the source (#pragma STDC FP_CONTRACT,
 # float_control, optimize("fast-math")), explicit std::fma calls, how third-party libraries
 # were compiled by vcpkg, or imported targets that find_package made local to a subdirectory
-# (CMake gives no way to read those from here). test_fp_contract.cpp checks the emitted code for the first two.
+# (CMake gives no way to read those from here). test_fp_contract.cpp checks its own probe's
+# emitted code, which catches an environment variable or wrapper, not a pragma in engine sources.
 
 set(ichor_fp_banned_flags
     "-ffast-math" "-Ofast" "-funsafe-math-optimizations" "-fassociative-math" "-freciprocal-math"
+    "-ffinite-math-only" "-fno-signed-zeros" "-fno-honor-nans" "-fno-honor-infinities"
+    "-fapprox-func" "-fcx-limited-range" "-mrecip" "/Qfast_transcendentals"
     "-ffp-contract=fast-honor-pragmas" "-ffp-contract=fast" "-ffp-contract=on"
     "-ffp-model=fast" "-ffp-model=aggressive" "-ffp-model=precise"
     "/fp:fast" "-fp:fast" "/fp:contract" "-fp:contract")
@@ -70,6 +73,7 @@ function(ichor_check_fp_flags dir)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU" AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         set(gnu_frontend ON)
     endif()
+    message(STATUS "Ichor: floating point flags must include -ffp-contract=off: ${gnu_frontend}")
     foreach(tgt IN LISTS imported)
         if(NOT TARGET ${tgt})
             continue()

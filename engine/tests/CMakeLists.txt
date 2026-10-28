@@ -107,7 +107,7 @@ foreach(kind clean dirty)
     add_test(NAME fp_flags_check_${kind}
         COMMAND ${CMAKE_COMMAND} -DKIND=${kind} -DMODULE=${CMAKE_SOURCE_DIR}/fp_flags.cmake -DSCRATCH=${CMAKE_BINARY_DIR}/test-output
             "-DGENERATOR=${CMAKE_GENERATOR}" "-DPLATFORM=${CMAKE_GENERATOR_PLATFORM}" "-DTOOLSET=${CMAKE_GENERATOR_TOOLSET}"
-            "-DCOMPILER=${CMAKE_CXX_COMPILER}" "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" "-DGNU_FRONTEND=$<NOT:$<BOOL:${MSVC}>>"
+            "-DCOMPILER=${CMAKE_CXX_COMPILER}" "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/fp_flags_check.cmake)
     set_tests_properties(fp_flags_check_${kind} PROPERTIES LABELS medium)
 endforeach()

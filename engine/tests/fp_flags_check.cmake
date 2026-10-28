@@ -1,10 +1,10 @@
 # Configures a tiny project that calls ichor_check_fp_flags (engine/fp_flags.cmake) and checks the verdict.
-# Needs KIND, MODULE, SCRATCH, GENERATOR and GNU_FRONTEND; PLATFORM, TOOLSET, COMPILER and MAKE_PROGRAM
+# Needs KIND, MODULE, SCRATCH and GENERATOR; PLATFORM, TOOLSET, COMPILER and MAKE_PROGRAM
 # repeat the real build's choices so the fixture finds the same compiler. The fixture is configured, never built.
 #   KIND=clean   the engine's own setup plus harmless look-alikes (-fno-fast-math, /fp:precise): configures
 #   KIND=dirty   one banned flag in every place the check reads: fails and names each one
-string(RANDOM LENGTH 8 suffix)
-set(root "${SCRATCH}/fp_${KIND}_${suffix}")
+# A short fixed path: the Visual Studio generator's try_compile files sit close to MAX_PATH.
+set(root "${SCRATCH}/fp_${KIND}")
 file(REMOVE_RECURSE "${root}")
 file(WRITE "${root}/src/a.cpp" "int a() { return 1; }\n")
 file(WRITE "${root}/src/b.cpp" "int b() { return 2; }\n")
@@ -37,7 +37,7 @@ target_compile_options(lib PRIVATE $<$<CONFIG:Release>:/fp:fast>)
 target_link_options(lib PRIVATE -ffast-math)
 set_source_files_properties(b.cpp PROPERTIES COMPILE_OPTIONS -Ofast)
 add_library(iface INTERFACE)
-target_compile_options(iface INTERFACE -ffp-contract=fast)
+target_compile_options(iface INTERFACE -ffp-contract=fast /Qfast_transcendentals)
 add_library(ext::ext INTERFACE IMPORTED)
 set_target_properties(ext::ext PROPERTIES INTERFACE_COMPILE_OPTIONS -funsafe-math-optimizations)
 add_library(bare STATIC a.cpp)
@@ -56,17 +56,15 @@ set_source_files_properties(c.cpp PROPERTIES COMPILE_OPTIONS -ffp-contract=fast-
         "target lib LINK_OPTIONS: -ffast-math"
         "b.cpp of lib COMPILE_OPTIONS: -Ofast"
         "target iface INTERFACE_COMPILE_OPTIONS: -ffp-contract=fast"
+        "target iface INTERFACE_COMPILE_OPTIONS: /Qfast_transcendentals"
         "imported target ext::ext INTERFACE_COMPILE_OPTIONS: -funsafe-math-optimizations"
         "target sub_lib COMPILE_FLAGS: /fp:contract"
         "c.cpp of sub_lib COMPILE_OPTIONS: -ffp-contract=fast-honor-pragmas")
-    if(GNU_FRONTEND)
-        list(APPEND expected "target bare COMPILE_OPTIONS: no -ffp-contract=off")
-    endif()
 else()
     message(FATAL_ERROR "unknown KIND ${KIND}")
 endif()
 
-set(args -S "${root}/src" -B "${root}/build" -G "${GENERATOR}" ${cache_args})
+set(args -S "${root}/src" -B "${root}/b" -G "${GENERATOR}" ${cache_args})
 if(PLATFORM)
     list(APPEND args -A "${PLATFORM}")
 endif()
@@ -86,6 +84,9 @@ if(KIND STREQUAL "clean")
 else()
     if(code EQUAL 0 OR NOT log MATCHES "Floating point flags that break cross-platform determinism")
         message(FATAL_ERROR "the dirty fixture configured (exit ${code}) or failed for another reason:\n${log}")
+    endif()
+    if(log MATCHES "must include -ffp-contract=off: ON")
+        list(APPEND expected "target bare COMPILE_OPTIONS: no -ffp-contract=off")
     endif()
     foreach(line IN LISTS expected)
         string(FIND "${log}" "${line}" at)
