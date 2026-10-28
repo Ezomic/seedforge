@@ -1,5 +1,6 @@
 #include "ichor/audio/music_player.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/mixer.h"
 
 namespace ichor {

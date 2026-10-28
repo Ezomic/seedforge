@@ -1,5 +1,6 @@
 #include "ichor/anim/animation.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/core/log.h"
 
 #include <ozz/animation/runtime/animation.h>

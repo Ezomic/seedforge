@@ -8,6 +8,8 @@ Fails when:
      a runtime-only target or package, a rules library reaches the engine, or targets
      link in a cycle.
   4. libworldforge (pure C++, zero engine dependencies) includes or links engine code.
+  5. a world, audio, anim or gfx header includes ichor/assets/bundle.h instead of
+     bundle_types.h, so a texture or bundle format change would rebuild them all.
 
 Usage: check_deps.py [--root DIR]    check the tree (default: this repository)
        check_deps.py --self-test     prove every rule goes red on a deliberate violation
@@ -104,13 +106,25 @@ WORLDFORGE_CMAKE_ENGINE = re.compile(r"\bichor_\w+|\.\./engine|\bengine/")
 
 CMAKE_SKIP_DIRS = {"build", "node_modules", ".git", ".claude", "vcpkg_installed"}
 
+# Module headers that must reach the bundle through bundle_types.h. The exceptions need a
+# complete SceneBundle: exile.h and forged_game.h hold bundles by value, reference_view.h walks
+# bundle.nodes inline.
+NARROW_BUNDLE_MODULES = ("world", "audio", "anim", "gfx")
+FULL_BUNDLE_HEADERS = {
+    "engine/anim/include/ichor/anim/exile.h",
+    "engine/gfx/include/ichor/gfx/reference_view.h",
+    "engine/world/include/ichor/world/forged_game.h",
+}
+BUNDLE_INCLUDE = re.compile(r'#\s*include\s*[<"]ichor/assets/bundle\.h[>"]')
+
 
 class Inputs:
-    def __init__(self, manifest, doc, cmake, worldforge):
+    def __init__(self, manifest, doc, cmake, worldforge, module_headers):
         self.manifest = manifest
         self.doc = doc
         self.cmake = cmake
         self.worldforge = worldforge
+        self.module_headers = module_headers
 
 
 def load(root):
@@ -129,7 +143,11 @@ def load(root):
         for p in wf.rglob("*"):
             if p.is_file() and p.suffix in {".h", ".hpp", ".cpp", ".cc", ".cmake", ".txt"}:
                 worldforge[p.relative_to(root).as_posix()] = p.read_text(encoding="utf-8", errors="replace")
-    return Inputs(manifest, doc, cmake, worldforge)
+    module_headers = {}
+    for module in NARROW_BUNDLE_MODULES:
+        for p in (root / "engine" / module / "include").rglob("*.h"):
+            module_headers[p.relative_to(root).as_posix()] = p.read_text(encoding="utf-8", errors="replace")
+    return Inputs(manifest, doc, cmake, worldforge, module_headers)
 
 
 def manifest_ports(manifest):
@@ -288,8 +306,20 @@ def check_worldforge(inp):
     return errors
 
 
+def check_bundle_includes(inp):
+    errors = []
+    for path, text in sorted(inp.module_headers.items()):
+        if path in FULL_BUNDLE_HEADERS:
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            if BUNDLE_INCLUDE.search(line):
+                errors.append(f"{path}:{n}: includes ichor/assets/bundle.h; include ichor/assets/bundle_types.h "
+                              f"(which forward-declares Texture and SceneBundle) and leave bundle.h to the .cpp")
+    return errors
+
+
 def check(inp):
-    return check_manifest_vs_doc(inp) + check_cmake(inp) + check_worldforge(inp)
+    return check_manifest_vs_doc(inp) + check_cmake(inp) + check_worldforge(inp) + check_bundle_includes(inp)
 
 
 def self_test(inp):
@@ -300,6 +330,9 @@ def self_test(inp):
 
     def set_worldforge(path, text):
         return lambda c: c.worldforge.update({path: text})
+
+    def set_module_header(path, text):
+        return lambda c: c.module_headers.update({path: text})
 
     cases = [
         ("unrecorded vcpkg dependency", "has no record of it",
@@ -330,6 +363,10 @@ def self_test(inp):
          set_worldforge("libworldforge/src/a.cpp", "#include <SDL3/SDL.h>\n")),
         ("libworldforge links an engine target", "references the engine",
          set_worldforge("libworldforge/CMakeLists.txt", "target_link_libraries(wf PUBLIC ichor_core)\n")),
+        ("world header includes the full bundle", "includes ichor/assets/bundle.h",
+         set_module_header("engine/world/include/ichor/world/streamer.h", '#include "ichor/assets/bundle.h"\n')),
+        ("gfx header includes the full bundle", "includes ichor/assets/bundle.h",
+         set_module_header("engine/gfx/include/ichor/gfx/a.h", "#include <ichor/assets/bundle.h>\n")),
     ]
     base = check(inp)
     if base:

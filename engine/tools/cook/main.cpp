@@ -1,4 +1,5 @@
 #include "ichor/assets/audio_cook.h"
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/cooker.h"
 #include "ichor/assets/material_limits.h"

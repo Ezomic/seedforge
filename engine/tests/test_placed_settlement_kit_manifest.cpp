@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "test_temp.h"
 
 #include "ichor/assets/cooker.h"

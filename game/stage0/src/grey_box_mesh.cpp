@@ -1,5 +1,6 @@
 #include "ichor/stage0/grey_box_mesh.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/stage0/character_pose.h"
 
 #include <cmath>

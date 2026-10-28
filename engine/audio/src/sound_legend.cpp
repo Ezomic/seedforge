@@ -1,5 +1,6 @@
 #include "ichor/audio/sound_legend.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/mixer.h"
 #include "ichor/audio/music_stinger.h"
 

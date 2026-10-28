@@ -1,5 +1,6 @@
 #include "ichor/anim/animation.h"
 #include "ichor/assets/audio_cook.h"
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/cooker.h"
 #include "ichor/audio/null_audio.h"

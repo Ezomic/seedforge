@@ -1,4 +1,5 @@
 #include "ichor/anim/animation.h"
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/cooker.h"
 #include "ichor/sim/scene.h"
 #include "ichor/sim/scene_io.h"

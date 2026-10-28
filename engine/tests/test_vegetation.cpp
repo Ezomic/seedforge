@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/vegetation.h"
 
