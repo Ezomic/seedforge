@@ -21,15 +21,18 @@ Usage: ci_time_trend.py --repo OWNER/NAME [--workflow engine.yml] [--runs 40] [-
        ci_time_trend.py --from-dir DIR [...]      read recorded responses: DIR/runs.json and DIR/jobs_<run id>.json
        ci_time_trend.py --self-test               prove the rules against tools/ci_time_trend_fixtures
 
-The report is Markdown on stdout, for $GITHUB_STEP_SUMMARY.
+The report is Markdown on stdout, for $GITHUB_STEP_SUMMARY. An API call that fails on a connection error, a 5xx or a rate
+limit is tried up to 3 times, 5 s and then 10 s apart; any other error ends the run.
 Exit: 0 every job under the alert, 1 a job's recent median over it, 2 usage, API or input error.
 """
 import argparse
+import io
 import json
 import os
 import re
 import statistics
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -37,6 +40,8 @@ from pathlib import Path
 
 COUNTED = {"success", "failure"}
 PR_LIMIT_S = 900
+RETRY_ATTEMPTS = 3
+RETRY_BACKOFF_S = 5
 EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
 SEEN_RUNS = 3
 API = "https://api.github.com"
@@ -141,14 +146,25 @@ def report(rows, workflow, run_count, recent, alert_s, out):
         print(f"ci-time-trend: every job under {minutes(alert_s)}", file=out)
 
 
-def api_get(path, token):
+def retryable(error):
+    if isinstance(error, urllib.error.HTTPError):
+        headers = error.headers or {}
+        rate_limited = error.code == 403 and (headers.get("x-ratelimit-remaining") == "0" or headers.get("retry-after"))
+        return error.code >= 500 or error.code == 429 or bool(rate_limited)
+    return isinstance(error, (urllib.error.URLError, OSError))
+
+
+def api_get(path, token, opener=urllib.request.urlopen, sleep=time.sleep):
     req = urllib.request.Request(f"{API}/{path}", headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}", "X-GitHub-Api-Version": "2022-11-28"})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp)
-    except (urllib.error.URLError, OSError, ValueError) as e:
-        raise InputError(f"GET {path} failed: {e}")
+    for attempt in range(RETRY_ATTEMPTS):
+        try:
+            with opener(req, timeout=30) as resp:
+                return json.load(resp)
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            if not retryable(e) or attempt == RETRY_ATTEMPTS - 1:
+                raise InputError(f"GET {path} failed: {e}")
+        sleep(RETRY_BACKOFF_S * 2 ** attempt)
 
 
 def fetch(repo, workflow, run_count, token):
@@ -291,6 +307,41 @@ def self_test(out):
     expect("cli: no source exits 2", run([], _Sink()), 2)
     expect("cli: a bad window exits 2", run(fixtures + ["--recent", "0"], _Sink()), 2)
     expect("minutes format", minutes(720.4), "12:00")
+
+    def fake_opener(*outcomes):
+        calls = []
+
+        def opener(req, timeout):
+            outcome = outcomes[len(calls)]
+            calls.append(req.full_url)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return io.BytesIO(json.dumps(outcome).encode())
+        return opener, calls
+
+    def http_error(code, headers=None):
+        return urllib.error.HTTPError("u", code, "m", headers or {}, None)
+
+    def api_outcome(*outcomes):
+        opener, calls = fake_opener(*outcomes)
+        try:
+            result = api_get("p", "t", opener=opener, sleep=lambda s: None)
+        except InputError:
+            result = "error"
+        return result, len(calls)
+
+    expect("api: a connection error is retried", api_outcome(urllib.error.URLError("reset"), {"ok": 1}), ({"ok": 1}, 2))
+    expect("api: a 5xx is retried", api_outcome(http_error(502), http_error(503), {"ok": 1}), ({"ok": 1}, 3))
+    expect("api: a 429 is retried", api_outcome(http_error(429), {"ok": 1}), ({"ok": 1}, 2))
+    expect("api: a 403 rate limit is retried",
+           api_outcome(http_error(403, {"x-ratelimit-remaining": "0"}), {"ok": 1}), ({"ok": 1}, 2))
+    expect("api: a plain 403 is not retried", api_outcome(http_error(403), {"ok": 1}), ("error", 1))
+    expect("api: a 404 is not retried", api_outcome(http_error(404), {"ok": 1}), ("error", 1))
+    expect("api: three failures give up", api_outcome(*[TimeoutError("slow")] * 3, {"ok": 1}), ("error", 3))
+    waits = []
+    opener, _ = fake_opener(http_error(500), http_error(500), {"ok": 1})
+    api_get("p", "t", opener=opener, sleep=waits.append)
+    expect("api: the backoff doubles", waits, [RETRY_BACKOFF_S, 2 * RETRY_BACKOFF_S])
 
     for f in failures:
         print(f"ci-time-trend self-test FAILED: {f}", file=out)
