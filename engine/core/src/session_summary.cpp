@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <format>
-#include <fstream>
 #include <system_error>
 
 namespace ichor {
@@ -23,6 +23,8 @@ void appendString(std::string& out, std::string_view text)
         default:
             if (static_cast<unsigned char>(c) < 0x20) {
                 out += std::format("\\u{:04x}", static_cast<unsigned>(c));
+            } else if (static_cast<unsigned char>(c) >= 0x80) {
+                out += '?'; // Windows hands argv over in the ANSI code page, which is not UTF-8, so json would refuse it
             } else {
                 out += c;
             }
@@ -39,6 +41,16 @@ std::string fpsField(double fps)
 bool looksLikePath(std::string_view value)
 {
     return value.find_first_of("/\\:") != std::string_view::npos;
+}
+
+// Fails when the file exists, so two runs quitting in the same second never write over each other.
+std::FILE* createNew(const std::filesystem::path& path)
+{
+#ifdef _WIN32
+    return _wfopen(path.c_str(), L"wbx");
+#else
+    return std::fopen(path.c_str(), "wbx");
+#endif
 }
 
 }
@@ -116,13 +128,15 @@ std::filesystem::path writeSessionFile(const std::filesystem::path& dir, std::st
     const std::string base = std::format("{}-{:%Y%m%d-%H%M%S}Z", stem, std::chrono::floor<std::chrono::seconds>(time));
     for (int copy = 1; copy <= 1000; ++copy) {
         const std::filesystem::path path = dir / (copy == 1 ? base + ".json" : std::format("{}-{}.json", base, copy));
-        if (std::filesystem::exists(path, ec) || ec) {
-            continue;
+        std::FILE* file = createNew(path);
+        if (!file) {
+            if (std::filesystem::exists(path, ec)) {
+                continue;
+            }
+            return {};
         }
-        std::ofstream out(path, std::ios::binary);
-        out.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-        out.close();
-        return out ? path : std::filesystem::path{};
+        const bool written = std::fwrite(contents.data(), 1, contents.size(), file) == contents.size();
+        return std::fclose(file) == 0 && written ? path : std::filesystem::path{};
     }
     return {};
 }

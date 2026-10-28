@@ -137,6 +137,14 @@ TEST_CASE("strings are escaped so the summary stays valid json")
     REQUIRE(json["flags"][1] == "a\"b\\c\nd");
 }
 
+TEST_CASE("a code-page byte from a windows command line still makes valid json")
+{
+    SessionSummary summary;
+    summary.flags = {"--campaign", "Caf\xE9"};
+    const nlohmann::json json = nlohmann::json::parse(sessionSummaryJson(summary));
+    REQUIRE(json["flags"][1] == "Caf?");
+}
+
 TEST_CASE("the session file is named for the quit time and never overwrites an earlier one")
 {
     Dir dir("session_summary_files");

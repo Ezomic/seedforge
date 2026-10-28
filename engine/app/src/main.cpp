@@ -1756,6 +1756,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
 
     double last = platform.now();
     const double loopStart = last;
+    double lastFrameEnd = last;
     ichor::FrameTimes frameTimes;
     ichor::ReverbSettings lastReverb;
     bool confirmHeld = false;
@@ -1965,7 +1966,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             renderer.requestScreenshot(options.screenshot);
         }
         const bool running = engine.frame(dt);
-        frameTimes.add(platform.now() - now);
+        // From one frame's end to the next, so an autosave or a reload between them counts toward its frame.
+        const double frameEnd = platform.now();
+        frameTimes.add(frameEnd - lastFrameEnd);
+        lastFrameEnd = frameEnd;
         if (!running) {
             break;
         }
