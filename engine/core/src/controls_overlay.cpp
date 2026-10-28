@@ -1,6 +1,9 @@
 #include "ichor/core/controls_overlay.h"
 
+#include "ichor/core/version.h"
+
 #include <cmath>
+#include <format>
 
 namespace ichor {
 
@@ -55,6 +58,7 @@ std::vector<std::string> controlsOverlayLines(const ControlsOverlay& state)
             "F4             sound captions on or off (on by default)",
             "F5 / F9        quick save / quick load",
             "Esc            menu",
+            std::format("Build {}", versionStamp()),
         };
     }
     if (controlsHintVisible(state)) {

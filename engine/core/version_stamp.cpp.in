@@ -1,0 +1,10 @@
+#include "ichor/core/version.h"
+
+namespace ichor {
+
+std::string_view versionStamp()
+{
+    return "@ICHOR_VERSION_STAMP@";
+}
+
+}
