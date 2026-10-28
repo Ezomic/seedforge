@@ -109,6 +109,7 @@ foreach(kind clean dirty)
             "-DGENERATOR=${CMAKE_GENERATOR}" "-DPLATFORM=${CMAKE_GENERATOR_PLATFORM}" "-DTOOLSET=${CMAKE_GENERATOR_TOOLSET}"
             "-DCOMPILER=${CMAKE_CXX_COMPILER}" "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" "-DGNU_FRONTEND=$<NOT:$<BOOL:${MSVC}>>"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/fp_flags_check.cmake)
+    set_tests_properties(fp_flags_check_${kind} PROPERTIES LABELS medium)
 endforeach()
 add_test(NAME content_lint COMMAND $<TARGET_FILE:ichor_lint_cli> --data ${CMAKE_SOURCE_DIR}/../data)
 add_test(NAME seed_harness_cli COMMAND $<TARGET_FILE:ichor_seed_harness> 4 --size 512 --sample 16 --cell 256 --json)

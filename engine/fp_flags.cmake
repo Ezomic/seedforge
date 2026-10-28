@@ -4,14 +4,15 @@
 #
 # It reads the text of the flags, before generator expressions are evaluated, so a flag behind
 # any condition counts. It sees CMAKE_CXX_FLAGS and the per-config and linker variants, and the
-# compile and link options of every target and of every source file of those targets, including
-# imported targets' interface options. On clang and gcc every compiled target must also carry
-# -ffp-contract=off.
+# compile and link options of every target and of every source file of those targets, and the
+# interface options of imported targets visible from <dir>. On clang and gcc every compiled
+# target must also carry -ffp-contract=off.
 #
 # It does not see flags from outside CMake (the CL and _CL_ environment variables of MSVC, a
 # compiler wrapper), pragmas and attributes in the source (#pragma STDC FP_CONTRACT,
-# float_control, optimize("fast-math")), explicit std::fma calls, or how third-party libraries
-# were compiled by vcpkg. test_fp_contract.cpp checks the emitted code for the first two.
+# float_control, optimize("fast-math")), explicit std::fma calls, how third-party libraries
+# were compiled by vcpkg, or imported targets that find_package made local to a subdirectory
+# (CMake gives no way to read those from here). test_fp_contract.cpp checks the emitted code for the first two.
 
 set(ichor_fp_banned_flags
     "-ffast-math" "-Ofast" "-funsafe-math-optimizations" "-fassociative-math" "-freciprocal-math"
@@ -70,6 +71,9 @@ function(ichor_check_fp_flags dir)
         set(gnu_frontend ON)
     endif()
     foreach(tgt IN LISTS imported)
+        if(NOT TARGET ${tgt})
+            continue()
+        endif()
         foreach(property INTERFACE_COMPILE_OPTIONS INTERFACE_LINK_OPTIONS)
             get_target_property(value ${tgt} ${property})
             if(value)
