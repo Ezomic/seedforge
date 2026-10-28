@@ -411,7 +411,7 @@ jobs:
           status=0
           ctest --preset linux-gpu -V | tee "$RUNNER_TEMP/ctest.log" || status=$?
           grep 'Validation Error' "$RUNNER_TEMP/ctest.log" | sed -E 's/.*(VUID-[A-Za-z0-9_-]+|UNASSIGNED-[A-Za-z0-9_.-]+).*/\1/' | sort | uniq -c || true
-          canary='VUID-VkSamplerCreateInfo-anisotropyEnable-01071'
+          canary='VUID-VkSamplerCreateInfo-maxLod-01973'
           if [ "$(grep -c "Validation Error: \[ $canary \]" "$RUNNER_TEMP/ctest.log")" != 1 ]; then
             echo "::error::the validation canary did not report exactly once, so the layer is not reaching the tests"
             exit 1

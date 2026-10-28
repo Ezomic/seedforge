@@ -1260,8 +1260,9 @@ TEST_CASE("golden image: validation canary")
     }
     VkSamplerCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    info.anisotropyEnable = VK_TRUE;
-    info.maxAnisotropy = 0.0f;
+    // minLod above maxLod is invalid but drivers clamp it; an invalid anisotropy crashed the NVIDIA driver.
+    info.minLod = 1.0f;
+    info.maxLod = 0.0f;
     VkSampler sampler = VK_NULL_HANDLE;
     if (vkCreateSampler(renderer.context().device(), &info, nullptr, &sampler) == VK_SUCCESS) {
         vkDestroySampler(renderer.context().device(), sampler, nullptr);
