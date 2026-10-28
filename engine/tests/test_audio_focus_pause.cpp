@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/gfx/null_renderer.h"
 #include "ichor/loop/engine.h"
