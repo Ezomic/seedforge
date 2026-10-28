@@ -17,6 +17,7 @@
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/asset_roots.h"
 #include "ichor/core/controls_overlay.h"
+#include "ichor/core/crash_handler.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
@@ -179,6 +180,7 @@ struct Options {
     std::filesystem::path replay;
     std::filesystem::path load;
     std::filesystem::path save;
+    std::optional<ichor::CrashTest> crashTest; // --crash-test [thread|handler|overflow]: crash on purpose right after startup (SEED-698)
 };
 
 template <class T>
@@ -285,6 +287,14 @@ bool parse(int argc, char** argv, Options& options)
             if (i + 1 < argc) {
                 if (const std::optional<ichor::OverlayMode> mode = ichor::parseOverlayMode(argv[i + 1])) {
                     options.overlay = mode;
+                    ++i;
+                }
+            }
+        } else if (arg == "--crash-test") {
+            options.crashTest = ichor::CrashTest::MainThread;
+            if (i + 1 < argc) {
+                if (const std::optional<ichor::CrashTest> kind = ichor::parseCrashTest(argv[i + 1])) {
+                    options.crashTest = kind;
                     ++i;
                 }
             }
@@ -2131,6 +2141,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
 
 int main(int argc, char** argv)
 {
+    ichor::installCrashHandler("logs");
     ichor::log(ichor::LogLevel::Info, ichor::logHeader());
     Options options;
     if (const std::optional<ichor::AssetRoots> roots = ichor::packagedAssetRoots(ichor::executableDirectory())) {
@@ -2141,6 +2152,10 @@ int main(int argc, char** argv)
     if (!parse(argc, argv, options)) {
         ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
+    }
+    ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe
+    if (options.crashTest) {
+        ichor::crashForTest(*options.crashTest);
     }
 
     if (!options.forged && options.forgedGrid != ichor::kForgedDefaultGridSize) {
