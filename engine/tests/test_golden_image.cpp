@@ -29,6 +29,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <optional>
 #include <string>
 
 using namespace ichor;
@@ -145,6 +146,49 @@ Tolerance toleranceFor(bool software)
 bool within(const Diff& diff, const Tolerance& limit)
 {
     return diff.meanAbs < limit.meanAbs && diff.fractionBad < limit.fractionBad && diff.tileBad < limit.tileBad;
+}
+
+struct Verdict {
+    bool pass = false;
+    std::string message;
+    std::optional<Diff> diff; // absent when there is no golden or its size differs
+};
+
+// A failed case leaves NAME.expected.png, NAME.actual.png, NAME.diff.png and NAME.txt in failDir, which CI turns into one
+// page (tools/golden_diff_page.py) and uploads only when the job fails. A pass clears that case's leftovers from a rerun.
+Verdict judgeGolden(const std::vector<std::uint8_t>& actual, const std::filesystem::path& goldenPath, const Tolerance& limit, const std::filesystem::path& failDir)
+{
+    const std::string name = goldenPath.stem().string();
+    Verdict verdict;
+    std::uint32_t w = 0;
+    std::uint32_t h = 0;
+    std::vector<std::uint8_t> expected;
+    if (!readPng(goldenPath, w, h, expected)) {
+        verdict.message = std::format("no golden image at {}; inspect golden-failures/{}.actual.png and rerun with ICHOR_UPDATE_GOLDEN=1", goldenPath.string(), name);
+    } else if (w != kWidth || h != kHeight) {
+        verdict.message = std::format("{}: the golden is {}x{}, the render is {}x{}", name, w, h, kWidth, kHeight);
+    } else {
+        verdict.diff = compare(actual, expected, kBadThreshold);
+        verdict.pass = within(*verdict.diff, limit);
+        verdict.message = std::format("{}: mean abs diff {:.3f}, {:.4f}% pixels over threshold, worst tile {}, worst channel {}", name, verdict.diff->meanAbs, verdict.diff->fractionBad * 100.0, verdict.diff->tileBad, verdict.diff->maxChannelDiff);
+    }
+    std::error_code ignored;
+    for (const char* suffix : {".expected.png", ".actual.png", ".diff.png", ".txt"}) {
+        std::filesystem::remove(failDir / (name + suffix), ignored);
+    }
+    if (verdict.pass) {
+        return verdict;
+    }
+    std::filesystem::create_directories(failDir);
+    writePng(failDir / (name + ".actual.png"), kWidth, kHeight, actual.data());
+    if (std::filesystem::exists(goldenPath)) {
+        std::filesystem::copy_file(goldenPath, failDir / (name + ".expected.png"), std::filesystem::copy_options::overwrite_existing, ignored);
+    }
+    if (verdict.diff) {
+        writePng(failDir / (name + ".diff.png"), kWidth, kHeight, verdict.diff->image.data());
+    }
+    std::ofstream(failDir / (name + ".txt")) << verdict.message << "\n";
+    return verdict;
 }
 
 // Every case ends here: the numbers go to golden-metrics.csv when ICHOR_GOLDEN_REPORT=1 (the tolerance study), then
@@ -1244,6 +1288,97 @@ TEST_CASE("golden image tolerance: driver noise passes, a missing element does n
         INFO(std::format("most content in a block {}, worst tile {}, fraction {}", bestSpread, gone.tileBad, gone.fractionBad));
         CHECK_FALSE(within(gone, toleranceFor(true)));
     }
+}
+
+TEST_CASE("golden image failure output: a failed case leaves expected, actual and diff, a passing one nothing")
+{
+    // No GPU needed. A space in the folder and in a case name, because CI links these files from an HTML page.
+    const std::filesystem::path root = kOutDir / "golden failure self test";
+    const std::filesystem::path goldens = root / "goldens";
+    const std::filesystem::path failDir = root / "golden-failures";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(goldens);
+    const Tolerance limit = toleranceFor(true);
+    const auto exists = [&](const std::string& file) { return std::filesystem::exists(failDir / file); };
+
+    const std::vector<std::uint8_t> grey(static_cast<std::size_t>(kWidth) * kHeight * 4, 128);
+    std::vector<std::uint8_t> blotched = grey;
+    for (std::uint32_t y = 0; y < 64; ++y) {
+        for (std::uint32_t x = 0; x < 64; ++x) {
+            for (int c = 0; c < 3; ++c) {
+                blotched[(static_cast<std::size_t>(y) * kWidth + x) * 4 + c] = 255;
+            }
+        }
+    }
+    REQUIRE(writePng(goldens / "plain.png", kWidth, kHeight, grey.data()));
+    REQUIRE(writePng(goldens / "ui hud.png", kWidth, kHeight, grey.data()));
+    REQUIRE(writePng(goldens / "small.png", kWidth / 2, kHeight / 2, grey.data()));
+
+    SECTION("a match passes and leaves no folder, so CI has nothing to upload")
+    {
+        CHECK(judgeGolden(grey, goldens / "plain.png", limit, failDir).pass);
+        CHECK_FALSE(std::filesystem::exists(failDir));
+    }
+
+    SECTION("several failures in one run each keep their three pictures and the reason")
+    {
+        const Verdict plain = judgeGolden(blotched, goldens / "plain.png", limit, failDir);
+        const Verdict spaced = judgeGolden(blotched, goldens / "ui hud.png", limit, failDir);
+        CHECK_FALSE(plain.pass);
+        CHECK_FALSE(spaced.pass);
+        for (const std::string name : {"plain", "ui hud"}) {
+            INFO(name);
+            CHECK(exists(name + ".expected.png"));
+            CHECK(exists(name + ".actual.png"));
+            CHECK(exists(name + ".diff.png"));
+            CHECK(exists(name + ".txt"));
+        }
+        std::uint32_t w = 0;
+        std::uint32_t h = 0;
+        std::vector<std::uint8_t> kept;
+        REQUIRE(readPng(failDir / "plain.expected.png", w, h, kept));
+        CHECK(kept == grey);
+        REQUIRE(readPng(failDir / "plain.actual.png", w, h, kept));
+        CHECK(kept == blotched);
+        std::ifstream reason(failDir / "plain.txt");
+        const std::string text((std::istreambuf_iterator<char>(reason)), std::istreambuf_iterator<char>());
+        CHECK(text.find("mean abs diff") != std::string::npos);
+
+        SECTION("the same case passing on a rerun clears its stale pictures")
+        {
+            CHECK(judgeGolden(grey, goldens / "plain.png", limit, failDir).pass);
+            CHECK_FALSE(exists("plain.actual.png"));
+            CHECK_FALSE(exists("plain.expected.png"));
+            CHECK_FALSE(exists("plain.diff.png"));
+            CHECK_FALSE(exists("plain.txt"));
+            CHECK(exists("ui hud.actual.png"));
+        }
+    }
+
+    SECTION("a golden of another size fails with both sizes named and keeps expected and actual, no diff")
+    {
+        const Verdict verdict = judgeGolden(grey, goldens / "small.png", limit, failDir);
+        CHECK_FALSE(verdict.pass);
+        CHECK_FALSE(verdict.diff.has_value());
+        CHECK(verdict.message.find("320x180") != std::string::npos);
+        CHECK(verdict.message.find("640x360") != std::string::npos);
+        CHECK(exists("small.expected.png"));
+        CHECK(exists("small.actual.png"));
+        CHECK_FALSE(exists("small.diff.png"));
+    }
+
+    SECTION("a missing golden fails and keeps the actual picture only")
+    {
+        const Verdict verdict = judgeGolden(grey, goldens / "absent.png", limit, failDir);
+        CHECK_FALSE(verdict.pass);
+        CHECK(verdict.message.find("no golden image") != std::string::npos);
+        CHECK(exists("absent.actual.png"));
+        CHECK_FALSE(exists("absent.expected.png"));
+        CHECK_FALSE(exists("absent.diff.png"));
+        CHECK(exists("absent.txt"));
+    }
+
+    std::filesystem::remove_all(root);
 }
 
 // The lavapipe job sets ICHOR_VALIDATION_CANARY and requires exactly this one validation error, which proves the
