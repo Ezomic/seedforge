@@ -29,6 +29,9 @@ git(init -q)
 git(config user.email stamp@example.invalid)
 git(config user.name stamp)
 git(config core.autocrlf false)
+# A developer's global signing or hooks must not reach the throwaway commits.
+git(config commit.gpgsign false)
+git(config core.hooksPath ${root}/no-hooks)
 expect_stamp(${repo} ${GIT} unknown)
 
 file(WRITE ${repo}/a.txt "one\n")
@@ -37,17 +40,8 @@ git(commit -q -m one)
 execute_process(COMMAND ${GIT} rev-parse --short HEAD WORKING_DIRECTORY ${repo} OUTPUT_VARIABLE first OUTPUT_STRIP_TRAILING_WHITESPACE)
 expect_stamp(${repo} ${GIT} ${first})
 
-file(WRITE ${repo}/.gitignore "build/\n")
-git(add .gitignore)
-git(commit -q -m ignore)
-execute_process(COMMAND ${GIT} rev-parse --short HEAD WORKING_DIRECTORY ${repo} OUTPUT_VARIABLE first OUTPUT_STRIP_TRAILING_WHITESPACE)
-file(WRITE ${repo}/build/out.txt "ignored\n")
-expect_stamp(${repo} ${GIT} ${first})
-
-# A new untracked source is picked up by the CONFIGURE_DEPENDS globs, so it changes the build too.
-file(WRITE ${repo}/untracked.txt "new\n")
-expect_stamp(${repo} ${GIT} ${first}-dirty)
-file(REMOVE ${repo}/untracked.txt)
+# CI keeps vcpkg and its caches untracked inside the workspace, which must not mark every CI build dirty.
+file(WRITE ${repo}/vcpkg/untracked.txt "new\n")
 expect_stamp(${repo} ${GIT} ${first})
 
 file(WRITE ${repo}/a.txt "two\n")

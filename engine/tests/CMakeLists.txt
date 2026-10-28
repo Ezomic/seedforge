@@ -114,6 +114,8 @@ if(ENGINE_RUNTIME)
     set_tests_properties(forged_campaign_app PROPERTIES TIMEOUT 300)
     add_test(NAME packaged_app_smoke COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DBUILD=${CMAKE_BINARY_DIR} -DREPO=${CMAKE_SOURCE_DIR}/.. -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/packaged_app_check.cmake)
     set_tests_properties(packaged_app_smoke PROPERTIES TIMEOUT 300)
+    add_test(NAME app_log_header COMMAND $<TARGET_FILE:ichor> --headless --frames 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(app_log_header PROPERTIES PASS_REGULAR_EXPRESSION "^[[]info []] Ichor build ([0-9a-f]+(-dirty)?|unknown)\r?\n")
     set_tests_properties(forged_app_determinism forged_combat_app forged_campaign_app PROPERTIES LABELS medium)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp

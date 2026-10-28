@@ -24,7 +24,7 @@ bool SdlPlatform::init(const WindowDesc& desc)
         logf(LogLevel::Error, "SDL_Init failed: {}", SDL_GetError());
         return false;
     }
-    window_ = SDL_CreateWindow(versionedTitle(desc.title).c_str(),desc.width, desc.height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | (desc.hidden ? SDL_WINDOW_HIDDEN : 0));
+    window_ = SDL_CreateWindow(versionedTitle(desc.title).c_str(), desc.width, desc.height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | (desc.hidden ? SDL_WINDOW_HIDDEN : 0));
     if (window_ == nullptr) {
         logf(LogLevel::Error, "SDL_CreateWindow failed: {}", SDL_GetError());
         return false;
