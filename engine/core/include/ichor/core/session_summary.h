@@ -53,4 +53,8 @@ std::string utcTimestamp(std::chrono::system_clock::time_point time);
 // than replace a file already there. The path written, or empty when it could not be.
 std::filesystem::path writeSessionFile(const std::filesystem::path& dir, std::string_view stem, std::chrono::system_clock::time_point time, std::string_view contents);
 
+// Creates the folder dir/<stem>-<YYYYMMDD-HHMMSS>Z, with -2, -3 and so on rather than reuse one already there.
+// The folder made, or empty when it could not be.
+std::filesystem::path createSessionFolder(const std::filesystem::path& dir, std::string_view stem, std::chrono::system_clock::time_point time);
+
 }

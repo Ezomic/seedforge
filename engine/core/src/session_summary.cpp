@@ -141,4 +141,12 @@ std::filesystem::path writeSessionFile(const std::filesystem::path& dir, std::st
     return {};
 }
 
+std::filesystem::path createSessionFolder(const std::filesystem::path& dir, std::string_view stem, std::chrono::system_clock::time_point time)
+{
+    (void)dir;
+    (void)stem;
+    (void)time;
+    return {};
+}
+
 }

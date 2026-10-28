@@ -65,6 +65,13 @@ public:
     // Whether F2, the sound legend key, and F4, the captions key, are down as of the last pump.
     virtual bool soundLegendKey() const { return false; }
     virtual bool captionKey() const { return false; }
+    // Whether F8, the feedback note key, is down as of the last pump.
+    virtual bool noteKey() const { return false; }
+    // While on, the keyboard types into the F8 note box and input() is empty; a key still down when it goes off stays
+    // out of input() until it is let go.
+    virtual void setTextEntry(bool on) { (void)on; }
+    // What was typed since the last call, in order: UTF-8 text, '\b' for Backspace, '\r' for Enter, '\x1b' for Esc.
+    virtual std::string takeTypedText() { return {}; }
     // While set, the arrow keys are not the player's movement (the editor nudges with them).
     virtual void reserveArrowKeys(bool reserved) { (void)reserved; }
     // While set, the mouse (captured while the right button is held) and the left and right arrows turn the player (InputFrame::lookX) instead of moving.

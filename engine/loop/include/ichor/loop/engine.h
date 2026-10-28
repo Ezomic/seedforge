@@ -4,6 +4,7 @@
 #include "ichor/core/frame_stages.h"
 #include "ichor/core/input.h"
 #include "ichor/core/controls_overlay.h"
+#include "ichor/core/feedback_note.h"
 #include "ichor/core/overlay_mode.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/sim/scene.h"
@@ -82,6 +83,9 @@ public:
 
     void recordInputs(bool enabled) { recording_ = enabled; }
     const InputStream& recordedInputs() const { return recorded_; }
+    // Keeps the last ticks of input, recording or not, for an F8 feedback note. 0, the default, keeps none.
+    void keepInputTail(std::size_t ticks) { tail_ = InputTail(ticks); }
+    const InputTail& inputTail() const { return tail_; }
 
     // Feed these frames instead of the platform's, one per tick. Once the
     // stream runs out the loop reports replayFinished().
@@ -129,6 +133,7 @@ private:
     OverlayToggle overlayToggle_;
     ControlsOverlay controls_;
     InputStream recorded_;
+    InputTail tail_;
     InputStream replay_;
     std::size_t replayIndex_ = 0;
     bool recording_ = false;
