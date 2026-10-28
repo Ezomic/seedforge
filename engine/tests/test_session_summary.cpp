@@ -1,4 +1,5 @@
 #include "ichor/core/session_summary.h"
+#include "ichor/core/version.h"
 #include "test_temp.h"
 
 #include <catch2/catch_approx.hpp>
@@ -76,7 +77,8 @@ TEST_CASE("the session summary pins its field names")
 TEST_CASE("the session summary carries the run it describes")
 {
     const nlohmann::json json = nlohmann::json::parse(sessionSummaryJson(sample()));
-    REQUIRE(json["build_version"].get<std::string>() == kUnstampedBuild);
+    REQUIRE(json["build_version"].get<std::string>() == versionStamp());
+    REQUIRE_FALSE(versionStamp().empty());
     REQUIRE(json["seed"] == 22);
     REQUIRE(json["flags"] == nlohmann::json::array({"--forged", "--seed", "22", "--combat"}));
     REQUIRE(json["play_seconds"].get<double>() == Catch::Approx(12.5));

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/core/version.h"
+
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -9,9 +11,6 @@
 #include <vector>
 
 namespace ichor {
-
-// What build_version says until the build carries a version stamp (SEED-691).
-inline constexpr std::string_view kUnstampedBuild = "unstamped";
 
 // Every frame's wall time, for the fps percentiles a playtest summary reports.
 class FrameTimes {
@@ -31,7 +30,7 @@ private:
 // The JSON a playtester sends back by hand after a session (SEED-696). Nothing here is uploaded, and
 // nothing names the person or their machine: flags go through scrubRunFlags first.
 struct SessionSummary {
-    std::string buildVersion = std::string(kUnstampedBuild);
+    std::string buildVersion = std::string(versionStamp());
     std::uint64_t seed = 0;
     std::vector<std::string> flags;
     double playSeconds = 0.0;
