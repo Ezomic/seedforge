@@ -362,7 +362,7 @@ jobs:
       - name: Bootstrap vcpkg
         run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
       - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 vulkan-tools autoconf autoconf-archive automake libtool libltdl-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 vulkan-tools vulkan-validationlayers autoconf autoconf-archive automake libtool libltdl-dev pkg-config
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
@@ -395,13 +395,33 @@ jobs:
       - name: GPU goldens on lavapipe
         # Software Vulkan (lavapipe), so the 28 golden image cases compare here instead of skipping. The software
         # set under tests/data/golden/software overrides a golden that a real GPU draws differently.
+        # The Khronos validation layer is loaded from the environment and only prints errors, which do not fail a test by
+        # themselves, so the step counts them per VUID in the verbose ctest log and fails on any. The validation canary
+        # case makes exactly one deliberate error, so a layer that silently stops loading fails the step too.
         env:
           ICHOR_GOLDEN_SOFTWARE: "1"
           ICHOR_REQUIRE_GPU: "1"
           ICHOR_GOLDEN_REPORT: "1"
+          ICHOR_VALIDATION_CANARY: "1"
+          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+          VK_LAYER_SETTINGS_PATH: ${{ runner.temp }}/vk_layer_settings.txt
         run: |
+          printf '%s\n' 'khronos_validation.report_flags = error' 'khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG' > "$VK_LAYER_SETTINGS_PATH"
           vulkaninfo --summary
-          ctest --preset linux-gpu
+          set -o pipefail
+          status=0
+          ctest --preset linux-gpu -V | tee "$RUNNER_TEMP/ctest.log" || status=$?
+          grep 'Validation Error' "$RUNNER_TEMP/ctest.log" | sed -E 's/.*(VUID-[A-Za-z0-9_-]+|UNASSIGNED-[A-Za-z0-9_.-]+).*/\1/' | sort | uniq -c || true
+          canary='VUID-VkSamplerCreateInfo-maxLod-01973'
+          if [ "$(grep -c "Validation Error: \[ $canary \]" "$RUNNER_TEMP/ctest.log")" != 1 ]; then
+            echo "::error::the validation canary did not report exactly once, so the layer is not reaching the tests"
+            exit 1
+          fi
+          if grep 'Validation Error' "$RUNNER_TEMP/ctest.log" | grep -qv "$canary"; then
+            echo "::error::Vulkan validation errors (counts per VUID above)"
+            exit 1
+          fi
+          exit $status
         working-directory: engine
       - name: Upload golden images
         if: always()
