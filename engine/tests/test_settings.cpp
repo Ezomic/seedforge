@@ -159,3 +159,26 @@ TEST_CASE("a sensitivity step starts from what the player looks with and keeps t
     REQUIRE(walked.mouseSensitivity == 4.7f);
     REQUIRE(serializeSettings(walked).find("mouseSensitivity=4.7\n") != std::string::npos);
 }
+
+TEST_CASE("the first-minute prompt flags survive the file, and a file from before them has none set")
+{
+    const Settings flagged{80.0f, 2.0f, 0b1011u};
+    REQUIRE(parseSettings(serializeSettings(flagged)) == flagged);
+    REQUIRE(serializeSettings(flagged).find("promptsSeen=11\n") != std::string::npos);
+
+    const std::string head = "ichor-settings 1\n";
+    REQUIRE(parseSettings(head + "fov=80\nmouseSensitivity=2\nend\n") == Settings{80.0f, 2.0f, 0u});
+    REQUIRE(parseSettings(head + "promptsSeen=15\nend\n") == Settings{Settings::kDefaultFovDegrees, Settings::kDefaultMouseSensitivity, 15u});
+    for (const char* bad : {"abc", "-1", "1.5", "", "99999999999999999999", "3x"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "fov=80\npromptsSeen=" + bad + "\nend\n") == Settings{80.0f, Settings::kDefaultMouseSensitivity, 0u});
+    }
+    REQUIRE(parseSettings(head + "promptsSeen=0\nend\n").promptsSeen == 0u); // the reset
+
+    REQUIRE(Settings{kNaN, kNaN, 7u}.clamped() == Settings{Settings::kDefaultFovDegrees, Settings::kDefaultMouseSensitivity, 7u});
+    REQUIRE(stepMouseSensitivity(flagged, 2.0f, 1).promptsSeen == 0b1011u);
+
+    TempFile file;
+    REQUIRE(saveSettings(file.path(), flagged));
+    REQUIRE(loadSettings(file.path()) == flagged);
+}

@@ -20,6 +20,7 @@
 #include "ichor/core/crash_handler.h"
 #include "ichor/core/feedback_note.h"
 #include "ichor/core/file_watch.h"
+#include "ichor/core/first_prompts.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
 #include "ichor/core/session_summary.h"
@@ -31,6 +32,7 @@
 #include "ichor/ui/combat_hud_screen.h"
 #include "ichor/ui/death_screen.h"
 #include "ichor/ui/hud.h"
+#include "ichor/ui/prompt_screen.h"
 #include "ichor/ui/note_box.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
@@ -1394,6 +1396,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
     std::unique_ptr<ichor::DeathScreen> deathScreen;
+    std::unique_ptr<ichor::PromptScreen> promptScreen;
+    const bool prompting = ichor::firstPromptsShown({.headless = options.headless, .screenshot = !options.screenshot.empty(), .replay = !options.replay.empty(), .bot = !options.combatBot.empty()});
+    ichor::FirstPrompts firstPrompts{.seen = settings.promptsSeen};
+    bool promptHeld = true;
     std::unique_ptr<ichor::NoteBox> noteBox;
     ichor::FeedbackPrompt notePrompt;
     bool noteShown = false; // from the frame after F8, so the note's screenshot is of the game, not the box
@@ -1451,10 +1457,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
             deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
+            promptScreen = std::make_unique<ichor::PromptScreen>(*ui);
             noteBox = std::make_unique<ichor::NoteBox>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            promptScreen.reset();
             noteBox.reset();
             deathScreen.reset();
             captionScreen.reset();
@@ -1534,6 +1542,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     // The full overlay already has the death lines.
                     const auto death = combat && engine.overlayMode() != ichor::OverlayMode::Full ? combat->playerDeath(engine.scene()) : std::nullopt;
                     deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
+                }
+                if (promptScreen) {
+                    promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld));
                 }
                 if (noteBox) {
                     noteBox->bind(notePrompt.open() && noteShown ? std::optional<std::string>(notePrompt.text()) : std::nullopt);
@@ -2062,6 +2073,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
         const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || notePrompt.open() || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
+        // Without the screen to show them, the prompts would be marked seen unread.
+        if (prompting && promptScreen && promptScreen->ok()) {
+            const ichor::InputFrame keys = platform.input();
+            const std::optional<double> foe = combat ? combat->foeDistance(engine.scene()) : std::nullopt;
+            promptHeld = uiFocus || engine.gated() || engine.focusPaused() || (combat && combat->playerDeath(engine.scene()));
+            firstPrompts = ichor::stepFirstPrompts(firstPrompts, {.held = promptHeld, .canMove = true, .foeInRange = foe && *foe <= ichor::kFirstPromptFoeRange, .buttons = keys.buttons, .moveX = keys.moveX, .moveY = keys.moveY}, dt);
+            if (firstPrompts.seen != settings.promptsSeen) {
+                settings.promptsSeen = firstPrompts.seen;
+                if (!ichor::saveSettings(settingsPath, settings)) {
+                    ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+                }
+            }
+        }
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
             renderer.requestScreenshot(options.screenshot);

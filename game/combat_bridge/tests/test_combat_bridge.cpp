@@ -495,3 +495,28 @@ TEST_CASE("a death in the forged world reports its cause, and the guarded Enter 
     CHECK(setup.bridge->respawns() == 0);
     CHECK_FALSE(setup.bridge->playerDeath(setup.scene).has_value());
 }
+
+TEST_CASE("the foe's distance is known only while a living foe is in a live fight", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    Setup setup(game, 1);
+    bool ready = false;
+    setup.bridge->setGroundCheck([&](glm::dvec3) { return ready; });
+    setup.tick(4);
+    CHECK_FALSE(setup.bridge->foeDistance(setup.scene).has_value());
+
+    ready = true;
+    setup.tick(4);
+    REQUIRE(setup.bridge->live());
+    const auto distance = setup.bridge->foeDistance(setup.scene);
+    REQUIRE(distance.has_value());
+    CHECK(*distance == Catch::Approx(std::hypot(setup.enemyAt().x - setup.playerAt().x, setup.enemyAt().z - setup.playerAt().z)));
+
+    const std::uint64_t before = setup.scene.stateHash();
+    (void)setup.bridge->foeDistance(setup.scene);
+    CHECK(setup.scene.stateHash() == before);
+
+    setup.bridge->stage().receiveHit(setup.scene, setup.scene.find(setup.bridge->stage().foeId()), setup.player(), 500.0f, 0.0f, true);
+    REQUIRE_FALSE(setup.enemy().alive());
+    CHECK_FALSE(setup.bridge->foeDistance(setup.scene).has_value());
+}

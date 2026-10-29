@@ -39,12 +39,12 @@ std::vector<std::string> controlsOverlayLines(const ControlsOverlay& state)
     if (state.open) {
         return {
             "CONTROLS (F1 closes)",
-            "W A S D        move (Shift sprints)",
+            std::format("{:<15}move (Shift sprints)", kMoveKeys),
             "Right mouse    hold and move the mouse to look (or Left/Right arrows)",
-            "J, Left click  attack",
+            std::format("{:<15}attack", kAttackKeys),
             "K, Ctrl+click  heavy attack",
-            "L, Middle btn  block (hold)",
-            "Space          dodge",
+            std::format("{:<15}block (hold)", kBlockKeys),
+            std::format("{:<15}dodge", kDodgeKeys),
             "E              lock on",
             "F              interact: pick up, or talk to someone",
             "Enter          interact / confirm (also picks up)",

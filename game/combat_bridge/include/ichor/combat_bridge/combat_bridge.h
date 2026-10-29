@@ -94,6 +94,8 @@ public:
     // The cause while the player lies dead in a live fight; nothing otherwise.
     std::optional<stage0::DeathCause> playerDeath(const Scene& scene) const { return live() ? stage_.playerDeath(scene) : std::nullopt; }
     CombatHudState hud(const Scene& scene) const;
+    // How far a living foe stands from the player along the ground in a live fight; nothing otherwise.
+    std::optional<double> foeDistance(const Scene& scene) const;
     std::size_t lastSettlement() const { return lastSettlement_; }
     int respawns() const { return respawns_; }
     const CombatSite& site() const { return site_; }

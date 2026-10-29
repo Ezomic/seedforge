@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -20,6 +21,8 @@ struct Settings {
 
     float fovDegrees = kDefaultFovDegrees; // vertical
     float mouseSensitivity = kDefaultMouseSensitivity; // scales the right-button mouse look
+    // The first-minute prompts already shown, a bit per FirstPrompt. promptsSeen=0 in the file shows them all again.
+    std::uint32_t promptsSeen = 0;
 
     // Every field inside its range; a NaN or infinity becomes the default.
     Settings clamped() const;
