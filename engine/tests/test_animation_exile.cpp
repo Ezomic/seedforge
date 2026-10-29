@@ -1,6 +1,7 @@
 #include "ichor/anim/animation.h"
 #include "ichor/anim/exile.h"
 #include "ichor/assets/bundle_io.h"
+#include "ichor/assets/cooker.h"
 #include "ichor/sim/attachment.h"
 #include "ichor/sim/scene.h"
 #include "test_temp.h"
@@ -8,6 +9,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -16,6 +18,7 @@
 #include <cmath>
 #include <filesystem>
 #include <memory>
+#include <string>
 
 using namespace ichor;
 
@@ -272,6 +275,269 @@ TEST_CASE("the spear is held in the right hand and the shield in the left, on th
     REQUIRE(high.y - low.y > 2.0f);
     REQUIRE(high.x - low.x < 0.5f);
     REQUIRE(high.z - low.z < 0.5f);
+}
+
+namespace {
+
+glm::quat rotationOf(const glm::mat4& m)
+{
+    return glm::normalize(glm::quat_cast(glm::mat3(glm::normalize(glm::vec3(m[0])), glm::normalize(glm::vec3(m[1])), glm::normalize(glm::vec3(m[2])))));
+}
+
+// One arm's elbow and wrist, in degrees, read off the posed skeleton. Flex is the angle the forearm turns from the upper
+// arm's line about the elbow's hinge, the hinge being the axis the bind pose bends about, carried by the upper arm: it
+// is negative when the elbow bends backwards. Off-hinge is how far the plane the two bones lie in is turned from that
+// hinge. Wrist twist is the hand's turn about the forearm bone against the bind.
+struct Elbow {
+    float flex = 0.0f;
+    float offHinge = 0.0f;
+    float wristTwist = 0.0f;
+};
+
+class ElbowProbe {
+public:
+    explicit ElbowProbe(const char* side)
+    {
+        const std::string prefix = std::string("mixamorig:") + side;
+        arm = jointIndex(prefix + "Arm");
+        fore = jointIndex(prefix + "ForeArm");
+        hand = jointIndex(prefix + "Hand");
+        const auto& inverseBind = character().skeletons[0].inverseBind;
+        std::vector<glm::mat4> bind(inverseBind.size());
+        for (std::size_t j = 0; j < bind.size(); ++j) bind[j] = glm::inverse(inverseBind[j]);
+        const glm::vec3 up = at(bind[jointIndex("mixamorig:Spine")]) - at(bind[jointIndex("mixamorig:Hips")]);
+        const glm::vec3 left = at(bind[jointIndex("mixamorig:LeftUpLeg")]) - at(bind[jointIndex("mixamorig:RightUpLeg")]);
+        const glm::vec3 forward = glm::normalize(glm::cross(left, up));
+        const glm::quat armBind = rotationOf(bind[arm]);
+        const glm::quat foreBind = rotationOf(bind[fore]);
+        const glm::vec3 armAxis = glm::normalize(glm::inverse(armBind) * (at(bind[fore]) - at(bind[arm])));
+        foreAxis = glm::normalize(glm::inverse(foreBind) * (at(bind[hand]) - at(bind[fore])));
+        glm::vec3 front = glm::inverse(armBind) * forward;
+        front = glm::normalize(front - armAxis * glm::dot(front, armAxis));
+        hinge = glm::normalize(glm::cross(armAxis, front));
+        handBind = glm::inverse(foreBind) * rotationOf(bind[hand]);
+    }
+
+    Elbow measure(const std::vector<glm::mat4>& pose) const
+    {
+        const glm::vec3 u = glm::normalize(at(pose[fore]) - at(pose[arm]));
+        const glm::vec3 v = glm::normalize(at(pose[hand]) - at(pose[fore]));
+        const glm::vec3 axis = rotationOf(pose[arm]) * hinge;
+        const glm::vec3 c = glm::cross(u, v);
+        Elbow e;
+        e.flex = glm::degrees(std::atan2(glm::dot(c, axis), glm::dot(u, v)));
+        const float off = glm::length(c) > 1e-3f ? std::acos(std::clamp(std::abs(glm::dot(glm::normalize(c), axis)), 0.0f, 1.0f)) : 0.0f;
+        e.offHinge = glm::degrees(off);
+        const glm::quat d = glm::inverse(rotationOf(pose[fore])) * rotationOf(pose[hand]) * glm::inverse(handBind);
+        e.wristTwist = std::abs(glm::degrees(std::remainder(2.0f * std::atan2(glm::dot(glm::vec3(d.x, d.y, d.z), foreAxis), d.w), glm::two_pi<float>())));
+        return e;
+    }
+
+    std::uint32_t arm = 0;
+    std::uint32_t fore = 0;
+    std::uint32_t hand = 0;
+
+private:
+    static glm::vec3 at(const glm::mat4& m) { return glm::vec3(m[3]); }
+
+    glm::vec3 foreAxis{0.0f};
+    glm::vec3 hinge{0.0f};
+    glm::quat handBind{1.0f, 0.0f, 0.0f, 0.0f};
+};
+
+int frameCount(const AnimationSet& set, std::uint32_t clip)
+{
+    return static_cast<int>(std::ceil(set.clipDuration(clip) * 60.0f)) + 1;
+}
+
+}
+
+// Every elbow hinges: it never bends backwards, never past 150 degrees, and the two bones lie in the plane the hinge
+// makes. The turn of the forearm sits in the wrist, which saturates at 45 degrees.
+TEST_CASE("every Exile clip hinges the elbows between 0 and 150 degrees and keeps the wrist twist under 45 degrees")
+{
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
+    std::vector<glm::mat4> pose;
+    for (const char* name : kExileClipNames) {
+        const std::uint32_t clip = set.findClip(name);
+        REQUIRE(clip != AnimationSet::kNoClip);
+        for (const char* side : {"Left", "Right"}) {
+            const ElbowProbe probe(side);
+            Elbow worst{1000.0f, 0.0f, 0.0f};
+            float most = 0.0f;
+            for (int f = 0; f < frameCount(set, clip); ++f) {
+                REQUIRE(set.samplePose(clip, static_cast<float>(f) / 60.0f, pose));
+                const Elbow e = probe.measure(pose);
+                worst = {std::min(worst.flex, e.flex), std::max(worst.offHinge, e.offHinge), std::max(worst.wristTwist, e.wristTwist)};
+                most = std::max(most, e.flex);
+            }
+            INFO(name << ' ' << side << ": flex " << worst.flex << " to " << most << " deg, off the hinge " << worst.offHinge
+                      << " deg, wrist twist " << worst.wristTwist << " deg");
+            CHECK(worst.flex > -1.0f);
+            CHECK(most < 150.5f);
+            CHECK(worst.offHinge < 1.0f);
+            CHECK(worst.wristTwist < 45.5f);
+        }
+    }
+}
+
+// The solve keeps the source's shoulders, and its hands in every clip but idle, walk and run: against the same file
+// cooked without it a hand stays within a centimetre and a half. Those three hang the hands beside the thighs (over
+// 12 cm out from the hips' midline, at the hips' height or below, a running hand up to 30 cm above).
+TEST_CASE("the Exile's arm solve keeps the combat hands where the source put them and hangs the idle, walk and run hands by the thighs")
+{
+    SceneBundle plain;
+    CookStats stats;
+    CookOptions options;
+    options.rootYawDegrees = 180.0f;
+    REQUIRE(cookGltf(kExile / "SK_Exile.glb", plain, stats, options));
+    AnimationSet raw;
+    REQUIRE(raw.load(plain));
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
+    const ElbowProbe probes[] = {ElbowProbe("Left"), ElbowProbe("Right")};
+    std::vector<glm::mat4> before;
+    std::vector<glm::mat4> after;
+    for (const char* name : kExileClipNames) {
+        INFO(name);
+        const std::uint32_t clip = set.findClip(name);
+        float handMove = 0.0f;
+        float shoulderMove = 0.0f;
+        float nearest = 10.0f;
+        float lowest = -10.0f;
+        for (int f = 0; f < frameCount(set, clip); ++f) {
+            const float t = static_cast<float>(f) / 60.0f;
+            REQUIRE(raw.samplePose(raw.findClip(name), t, before));
+            REQUIRE(set.samplePose(clip, t, after));
+            const glm::vec3 hips(after[jointIndex("mixamorig:Hips")][3]);
+            const glm::vec3 lateral = glm::normalize(glm::vec3(after[jointIndex("mixamorig:LeftUpLeg")][3]) - glm::vec3(after[jointIndex("mixamorig:RightUpLeg")][3]));
+            for (const ElbowProbe& probe : probes) {
+                handMove = std::max(handMove, glm::distance(glm::vec3(before[probe.hand][3]), glm::vec3(after[probe.hand][3])));
+                shoulderMove = std::max(shoulderMove, glm::distance(glm::vec3(before[probe.arm][3]), glm::vec3(after[probe.arm][3])));
+                const glm::vec3 rel = glm::vec3(after[probe.hand][3]) - hips;
+                nearest = std::min(nearest, std::abs(glm::dot(rel, lateral)));
+                lowest = std::max(lowest, rel.y);
+            }
+        }
+        INFO("hand moved up to " << handMove << " m, shoulder " << shoulderMove << " m, hands " << nearest << " m from the midline at the nearest, " << lowest << " m above the hips at the highest");
+        CHECK(shoulderMove < 1e-4f);
+        if (std::string_view(name) == "idle" || std::string_view(name) == "walk" || std::string_view(name) == "run") {
+            CHECK(nearest > 0.12f);
+            CHECK(lowest < (std::string_view(name) == "run" ? 0.3f : 0.05f));
+            continue;
+        }
+        CHECK(handMove < 0.015f);
+    }
+}
+
+// Frame to frame the elbow and the wrist move like the source does: the pole and the saturation leave no jump.
+TEST_CASE("the Exile's elbows and wrists never jump between two samples")
+{
+    SceneBundle plain;
+    CookStats stats;
+    CookOptions options;
+    options.rootYawDegrees = 180.0f;
+    REQUIRE(cookGltf(kExile / "SK_Exile.glb", plain, stats, options));
+    AnimationSet raw;
+    REQUIRE(raw.load(plain));
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
+    const ElbowProbe probes[] = {ElbowProbe("Left"), ElbowProbe("Right")};
+    std::vector<glm::mat4> pose;
+    std::vector<glm::mat4> plainPose;
+    for (const char* name : kExileClipNames) {
+        INFO(name);
+        const std::uint32_t clip = set.findClip(name);
+        for (const ElbowProbe& probe : probes) {
+            float worstSolved = 0.0f;
+            float worstSource = 0.0f;
+            glm::vec3 lastElbow;
+            glm::vec3 lastSourceElbow;
+            for (int f = 0; f < frameCount(set, clip); ++f) {
+                const float t = static_cast<float>(f) / 60.0f;
+                REQUIRE(set.samplePose(clip, t, pose));
+                REQUIRE(raw.samplePose(raw.findClip(name), t, plainPose));
+                const glm::vec3 elbow(pose[probe.fore][3]);
+                const glm::vec3 sourceElbow(plainPose[probe.fore][3]);
+                if (f > 0) {
+                    worstSolved = std::max(worstSolved, glm::distance(elbow, lastElbow));
+                    worstSource = std::max(worstSource, glm::distance(sourceElbow, lastSourceElbow));
+                }
+                lastElbow = elbow;
+                lastSourceElbow = sourceElbow;
+            }
+            INFO("elbow moves up to " << worstSolved << " m a sample, the source " << worstSource << " m");
+            CHECK(worstSolved < worstSource * 1.5f + 0.02f);
+        }
+    }
+}
+
+namespace {
+
+// The way the body faces in a model-space pose: square to the hips' left-right and the spine's up.
+glm::vec3 hipsForward(const std::vector<glm::mat4>& pose)
+{
+    const auto at = [&](const char* name) { return glm::vec3(pose[jointIndex(name)][3]); };
+    return glm::normalize(glm::cross(at("mixamorig:LeftUpLeg") - at("mixamorig:RightUpLeg"), at("mixamorig:Spine") - at("mixamorig:Hips")));
+}
+
+// The shield's outer face is +Y in SM_ExileRoundShield.glb (art/blender/export_glb.py, prop mode).
+glm::vec3 shieldFace(const std::vector<glm::mat4>& skin)
+{
+    return glm::normalize(glm::mat3(heldMatrix(exile(), exile().sockets[1], skin)) * glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+}
+
+// Block's guard is where the left hand comes up above the hips; there the shield has to face the threat.
+TEST_CASE("the Exile's shield faces forward at the start of idle and through block's guard")
+{
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
+    std::vector<glm::mat4> pose;
+    std::vector<glm::mat4> skin;
+    REQUIRE(set.samplePose(set.findClip("idle"), 0.0f, pose));
+    REQUIRE(set.skinningMatrices(set.findClip("idle"), 0.0f, skin));
+    CHECK(glm::degrees(std::acos(glm::dot(shieldFace(skin), hipsForward(pose)))) < 35.0f);
+
+    const std::uint32_t block = set.findClip("block");
+    const std::uint32_t hand = jointIndex("mixamorig:LeftHand");
+    const std::uint32_t hips = jointIndex("mixamorig:Hips");
+    int guard = 0;
+    for (int f = 0; f < frameCount(set, block); ++f) {
+        const float t = static_cast<float>(f) / 60.0f;
+        REQUIRE(set.samplePose(block, t, pose));
+        if (pose[hand][3].y - pose[hips][3].y < 0.15f) continue;
+        REQUIRE(set.skinningMatrices(block, t, skin));
+        ++guard;
+        const float angle = glm::degrees(std::acos(std::clamp(glm::dot(shieldFace(skin), hipsForward(pose)), -1.0f, 1.0f)));
+        INFO("block at " << t << " s: the shield faces " << angle << " deg from forward");
+        CHECK(angle < 35.0f);
+    }
+    CHECK(guard > 20);
+}
+
+TEST_CASE("the Exile's shield centre stays on the left hand in every clip")
+{
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
+    const std::uint32_t hand = jointIndex("mixamorig:LeftHand");
+    std::vector<glm::mat4> pose;
+    std::vector<glm::mat4> skin;
+    for (const char* name : kExileClipNames) {
+        const std::uint32_t clip = set.findClip(name);
+        float worst = 0.0f;
+        for (int f = 0; f < frameCount(set, clip); ++f) {
+            const float t = static_cast<float>(f) / 60.0f;
+            REQUIRE(set.samplePose(clip, t, pose));
+            REQUIRE(set.skinningMatrices(clip, t, skin));
+            const glm::mat4 held = heldMatrix(exile(), exile().sockets[1], skin);
+            worst = std::max(worst, glm::distance(glm::vec3(held[3]), glm::vec3(pose[hand][3])));
+        }
+        INFO(name << ": the shield's centre is up to " << worst << " m from the left hand");
+        CHECK(worst < 0.05f);
+    }
 }
 
 TEST_CASE("the cooked Exile survives the bundle file")

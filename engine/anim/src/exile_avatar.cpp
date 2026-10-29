@@ -131,7 +131,7 @@ void ExileAvatar::append(glm::dvec3 feet, float yaw, float speed, double seconds
 
     for (const JointSocket& socket : kit_.sockets) {
         if (socket.joint >= skin.size()) continue;
-        const glm::mat4 held = skin[socket.joint] * socket.local;
+        const glm::mat4 held = heldMatrix(kit_, socket, skin);
         RenderInstance prop;
         prop.mesh = meshBase_ + socket.mesh;
         prop.position = feet + glm::dvec3(facing * glm::vec3(held[3]));

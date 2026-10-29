@@ -491,3 +491,97 @@ TEST_CASE("blending a pose with itself gives the pose, and the idle-to-run midpo
     }
     CHECK(leanOf(probe, mid) < kExileRunLean + 0.1f);
 }
+
+namespace {
+
+// The way the shield's outer face (+Y in SM_ExileRoundShield.glb) points as the player draws it, facing -Z.
+glm::vec3 drawnShieldFace(const std::vector<glm::mat4>& skin)
+{
+    RenderView view;
+    exile().appendPosed(skin, glm::dvec3(0.0), 0.0f, view);
+    REQUIRE(view.instances.size() == 3);
+    return glm::normalize(view.instances[2].basis * glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+float degreesBetween(glm::vec3 a, glm::vec3 b)
+{
+    return glm::degrees(std::acos(std::clamp(glm::dot(a, b), -1.0f, 1.0f)));
+}
+
+ExileClipChoice choiceOf(std::size_t clip, float phase)
+{
+    ExileClipChoice choice;
+    choice.clip = static_cast<ExileClip>(clip);
+    choice.locomotion = clip <= static_cast<std::size_t>(ExileClip::Run);
+    choice.progress = phase;
+    return choice;
+}
+
+glm::vec3 hipsFacing(const std::vector<glm::mat4>& skin)
+{
+    const ExileBody& body = exile().kit().body;
+    return glm::normalize(glm::mat3(skin[body.hips]) * body.forward);
+}
+
+// The worst frame of a run of poses: how much faster the shield's face turns than the hips, and its largest turn.
+struct ShieldTurn {
+    float overHips = 0.0f;
+    float largest = 0.0f;
+};
+
+void track(ShieldTurn& turn, const std::vector<glm::mat4>& before, const std::vector<glm::mat4>& after)
+{
+    const float face = degreesBetween(drawnShieldFace(before), drawnShieldFace(after));
+    turn.overHips = std::max(turn.overHips, face - degreesBetween(hipsFacing(before), hipsFacing(after)));
+    turn.largest = std::max(turn.largest, face);
+}
+
+}
+
+// The shield faces the way the hips face, so it may turn as fast as the body does (a crossfade between swing and idle
+// turns the hips 16 degrees a frame) but no faster; 25 degrees in a 60 Hz frame would be a flip whatever the body did.
+TEST_CASE("the Exile's shield never snaps round between two frames, inside a clip or across a crossfade")
+{
+    ExilePlayer& player = exile();
+    AnimationSet set;
+    REQUIRE(set.load(player.kit().bundles[0]));
+    std::vector<glm::mat4> a;
+    std::vector<glm::mat4> b;
+    std::vector<glm::mat4> last;
+    std::vector<glm::mat4> mixed;
+    const auto judge = [](const ShieldTurn& turn) {
+        CHECK(turn.overHips < 2.0f);
+        CHECK(turn.largest < 25.0f);
+    };
+    for (std::size_t clip = 0; clip < kExileClipCount; ++clip) {
+        const float step = kDt / set.clipDuration(set.findClip(name(static_cast<ExileClip>(clip))));
+        REQUIRE(player.pose(choiceOf(clip, 0.0f), 0.0f, last));
+        ShieldTurn turn;
+        for (float phase = step; phase <= 1.0f; phase += step) {
+            REQUIRE(player.pose(choiceOf(clip, phase), phase, a));
+            track(turn, last, a);
+            last = a;
+        }
+        INFO(name(static_cast<ExileClip>(clip)) << ": the shield turns up to " << turn.largest << " deg in a frame, " << turn.overHips << " deg more than the hips");
+        judge(turn);
+    }
+    const int fadeFrames = static_cast<int>(std::ceil(kExileFadeSeconds / kDt));
+    for (std::size_t from = 0; from < kExileClipCount; ++from) {
+        for (std::size_t to = 0; to < kExileClipCount; ++to) {
+            for (const float phase : {0.0f, 0.5f}) {
+                REQUIRE(player.pose(choiceOf(from, phase), phase, a));
+                REQUIRE(player.pose(choiceOf(to, 0.0f), 0.0f, b));
+                last = a;
+                ShieldTurn turn;
+                for (int k = 1; k <= fadeFrames; ++k) {
+                    blendSkin(a, b, static_cast<float>(k) / static_cast<float>(fadeFrames), mixed);
+                    track(turn, last, mixed);
+                    last = mixed;
+                }
+                INFO(name(static_cast<ExileClip>(from)) << " at " << phase << " fading into " << name(static_cast<ExileClip>(to)) << ": up to "
+                                                        << turn.largest << " deg in a frame, " << turn.overHips << " deg more than the hips");
+                judge(turn);
+            }
+        }
+    }
+}

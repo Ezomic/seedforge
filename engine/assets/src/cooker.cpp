@@ -339,7 +339,7 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, PieceDat
     for (cgltf_size a = 0; a < data->animations_count && ok; ++a) {
         for (cgltf_size s = 0; s < data->skins_count; ++s) {
             AnimationClip clip;
-            if (cookClip(*data, data->animations[a], data->skins[s], bundle.skeletons[s], static_cast<std::uint32_t>(s), clip, cookOptions.rootYawDegrees)) {
+            if (cookClip(*data, data->animations[a], data->skins[s], bundle.skeletons[s], static_cast<std::uint32_t>(s), clip, cookOptions.rootYawDegrees, cookOptions.clipPass)) {
                 bundle.clips.push_back(std::move(clip));
                 stats.clips += 1;
             }
