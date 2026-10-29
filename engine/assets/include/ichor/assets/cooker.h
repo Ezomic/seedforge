@@ -2,6 +2,7 @@
 
 #include "ichor/assets/bundle.h"
 #include "ichor/assets/piece_conventions.h"
+#include "ichor/assets/skeleton_cook.h"
 
 #include <filesystem>
 
@@ -17,6 +18,7 @@ struct CookStats {
 
 struct CookOptions {
     float rootYawDegrees = 0.0f; // see cookSkeleton
+    ClipPass clipPass; // see cookClip
 };
 
 // glTF or GLB in, bundle out. Meshes are deduplicated and reordered for the

@@ -2,6 +2,8 @@
 
 #include "ichor/sim/attachment.h"
 
+#include <glm/matrix.hpp>
+
 #include <string>
 #include <vector>
 
@@ -11,6 +13,11 @@ struct Placement {
     const char* name;
     std::uint32_t clip;
     glm::dvec3 offset;
+};
+
+struct HeldProp {
+    ichor::JointAttachment attachment;
+    const ichor::JointSocket* socket = nullptr;
 };
 
 }
@@ -37,7 +44,7 @@ bool loadExileDemo(const std::filesystem::path& folder, ichor::Renderer& rendere
 void spawnExileDemo(ichor::Scene& scene, const ExileDemo& demo, glm::dvec3 floorPoint)
 {
     const Placement placements[] = {{"exile-idle", demo.idleClip, {1.3, 0.0, -0.4}}, {"exile-walk", demo.walkClip, {0.3, 0.0, 1.4}}};
-    std::vector<ichor::JointAttachment> attachments;
+    std::vector<HeldProp> held;
     for (const Placement& placement : placements) {
         ichor::SpawnCommand exile;
         exile.id = ichor::StableId::of(placement.name);
@@ -55,11 +62,18 @@ void spawnExileDemo(ichor::Scene& scene, const ExileDemo& demo, glm::dvec3 floor
             prop.transform.position = floorPoint + placement.offset;
             prop.mesh = ichor::MeshRef{demo.meshBase + socket.mesh};
             scene.enqueue(prop);
-            attachments.push_back({exile.id, prop.id, socket.joint, socket.local});
+            held.push_back({{exile.id, prop.id, socket.joint, socket.local}, &socket});
         }
     }
-    scene.addSystem("exile_sockets", [attachments](ichor::Scene& s, double, const ichor::InputFrame&) {
-        for (const ichor::JointAttachment& attachment : attachments) {
+    // `demo` outlives the scene's systems (main keeps it), so the kit is held by pointer rather than copied.
+    scene.addSystem("exile_sockets", [held, kit = &demo.kit](ichor::Scene& s, double, const ichor::InputFrame&) {
+        for (const HeldProp& prop : held) {
+            ichor::JointAttachment attachment = prop.attachment;
+            const entt::entity holder = s.find(attachment.holder);
+            const auto* pose = holder == entt::null ? nullptr : s.registry().try_get<ichor::SkinPose>(holder);
+            if (prop.socket->facesForward && pose != nullptr && attachment.joint < pose->matrices.size()) {
+                attachment.local = glm::inverse(pose->matrices[attachment.joint]) * ichor::heldMatrix(*kit, *prop.socket, pose->matrices);
+            }
             ichor::applyAttachment(s, attachment);
         }
     });
