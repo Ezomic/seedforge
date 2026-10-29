@@ -284,12 +284,14 @@ glm::quat rotationOf(const glm::mat4& m)
     return glm::normalize(glm::quat_cast(glm::mat3(glm::normalize(glm::vec3(m[0])), glm::normalize(glm::vec3(m[1])), glm::normalize(glm::vec3(m[2])))));
 }
 
-// One arm's elbow, in degrees. Hyperextension is how far the forearm points behind the upper arm's front, the front
-// being the body's forward in the bind pose carried by the upper arm's rotation. Twist is the forearm's turn about
-// its own bone against the upper arm, measured from the bind pose.
+// One arm's elbow and wrist, in degrees, read off the posed skeleton. Flex is the angle the forearm turns from the upper
+// arm's line about the elbow's hinge, the hinge being the axis the bind pose bends about, carried by the upper arm: it
+// is negative when the elbow bends backwards. Off-hinge is how far the plane the two bones lie in is turned from that
+// hinge. Wrist twist is the hand's turn about the forearm bone against the bind.
 struct Elbow {
-    float hyperextension = 0.0f;
-    float twist = 0.0f;
+    float flex = 0.0f;
+    float offHinge = 0.0f;
+    float wristTwist = 0.0f;
 };
 
 class ElbowProbe {
@@ -310,19 +312,25 @@ public:
         const glm::quat foreBind = rotationOf(bind[fore]);
         const glm::vec3 armAxis = glm::normalize(glm::inverse(armBind) * (at(bind[fore]) - at(bind[arm])));
         foreAxis = glm::normalize(glm::inverse(foreBind) * (at(bind[hand]) - at(bind[fore])));
-        front = glm::inverse(armBind) * forward;
+        glm::vec3 front = glm::inverse(armBind) * forward;
         front = glm::normalize(front - armAxis * glm::dot(front, armAxis));
-        elbowBind = glm::inverse(armBind) * foreBind;
+        hinge = glm::normalize(glm::cross(armAxis, front));
+        handBind = glm::inverse(foreBind) * rotationOf(bind[hand]);
     }
 
     Elbow measure(const std::vector<glm::mat4>& pose) const
     {
-        const glm::quat armRot = rotationOf(pose[arm]);
-        const glm::vec3 forearm = glm::normalize(at(pose[hand]) - at(pose[fore]));
-        const float behind = -glm::dot(forearm, armRot * front);
-        const glm::quat d = glm::inverse(elbowBind) * (glm::inverse(armRot) * rotationOf(pose[fore]));
-        const float twist = std::remainder(2.0f * std::atan2(glm::dot(glm::vec3(d.x, d.y, d.z), foreAxis), d.w), glm::two_pi<float>());
-        return {glm::degrees(std::asin(std::clamp(behind, -1.0f, 1.0f))), std::abs(glm::degrees(twist))};
+        const glm::vec3 u = glm::normalize(at(pose[fore]) - at(pose[arm]));
+        const glm::vec3 v = glm::normalize(at(pose[hand]) - at(pose[fore]));
+        const glm::vec3 axis = rotationOf(pose[arm]) * hinge;
+        const glm::vec3 c = glm::cross(u, v);
+        Elbow e;
+        e.flex = glm::degrees(std::atan2(glm::dot(c, axis), glm::dot(u, v)));
+        const float off = glm::length(c) > 1e-3f ? std::acos(std::clamp(std::abs(glm::dot(glm::normalize(c), axis)), 0.0f, 1.0f)) : 0.0f;
+        e.offHinge = glm::degrees(off);
+        const glm::quat d = glm::inverse(rotationOf(pose[fore])) * rotationOf(pose[hand]) * glm::inverse(handBind);
+        e.wristTwist = std::abs(glm::degrees(std::remainder(2.0f * std::atan2(glm::dot(glm::vec3(d.x, d.y, d.z), foreAxis), d.w), glm::two_pi<float>())));
+        return e;
     }
 
     std::uint32_t arm = 0;
@@ -333,8 +341,8 @@ private:
     static glm::vec3 at(const glm::mat4& m) { return glm::vec3(m[3]); }
 
     glm::vec3 foreAxis{0.0f};
-    glm::vec3 front{0.0f};
-    glm::quat elbowBind{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 hinge{0.0f};
+    glm::quat handBind{1.0f, 0.0f, 0.0f, 0.0f};
 };
 
 int frameCount(const AnimationSet& set, std::uint32_t clip)
@@ -344,9 +352,9 @@ int frameCount(const AnimationSet& set, std::uint32_t clip)
 
 }
 
-// A healthy elbow straightens to about 0 degrees, some people a little past it; 10 is the edge of normal.
-// The forearm turns about 80 degrees each way from neutral (pronation and supination), so 90 allows it all.
-TEST_CASE("no Exile clip bends an elbow backwards past 10 degrees or twists a forearm past 90 degrees against the upper arm")
+// Every elbow hinges: it never bends backwards, never past 150 degrees, and the two bones lie in the plane the hinge
+// makes. The turn of the forearm sits in the wrist, which saturates at 45 degrees.
+TEST_CASE("every Exile clip hinges the elbows between 0 and 150 degrees and keeps the wrist twist under 45 degrees")
 {
     const auto owned = loadAnimations();
     const AnimationSet& set = *owned;
@@ -356,22 +364,28 @@ TEST_CASE("no Exile clip bends an elbow backwards past 10 degrees or twists a fo
         REQUIRE(clip != AnimationSet::kNoClip);
         for (const char* side : {"Left", "Right"}) {
             const ElbowProbe probe(side);
-            Elbow worst{-90.0f, 0.0f};
+            Elbow worst{1000.0f, 0.0f, 0.0f};
+            float most = 0.0f;
             for (int f = 0; f < frameCount(set, clip); ++f) {
                 REQUIRE(set.samplePose(clip, static_cast<float>(f) / 60.0f, pose));
                 const Elbow e = probe.measure(pose);
-                worst = {std::max(worst.hyperextension, e.hyperextension), std::max(worst.twist, e.twist)};
+                worst = {std::min(worst.flex, e.flex), std::max(worst.offHinge, e.offHinge), std::max(worst.wristTwist, e.wristTwist)};
+                most = std::max(most, e.flex);
             }
-            INFO(name << ' ' << side << ": hyperextension " << worst.hyperextension << " deg, twist " << worst.twist << " deg");
-            CHECK(worst.hyperextension < 10.5f);
-            CHECK(worst.twist < 90.5f);
+            INFO(name << ' ' << side << ": flex " << worst.flex << " to " << most << " deg, off the hinge " << worst.offHinge
+                      << " deg, wrist twist " << worst.wristTwist << " deg");
+            CHECK(worst.flex > -1.0f);
+            CHECK(most < 150.5f);
+            CHECK(worst.offHinge < 1.0f);
+            CHECK(worst.wristTwist < 45.5f);
         }
     }
 }
 
-// The clamp against the same file cooked without it: a sample inside both limits is untouched, and one past them
-// moves only the forearm and the hand, with the hand (so the prop on it) keeping its rotation.
-TEST_CASE("the Exile's elbow limit leaves samples inside it alone and keeps the hand's rotation where it acts")
+// The solve keeps the source's shoulders and hands: against the same file cooked without it a hand stays within a
+// centimetre and a half, except where the source reaches past what a 14 degree bend gives or closes further than
+// 150 degrees, which a hand then gives way to by the same amount.
+TEST_CASE("the Exile's arm solve keeps the hands where the source clips put them")
 {
     SceneBundle plain;
     CookStats stats;
@@ -383,41 +397,67 @@ TEST_CASE("the Exile's elbow limit leaves samples inside it alone and keeps the 
     const auto owned = loadAnimations();
     const AnimationSet& set = *owned;
     const ElbowProbe probes[] = {ElbowProbe("Left"), ElbowProbe("Right")};
-    const auto& names = character().skeletons[0].jointNames;
-    const auto belowElbow = [&](std::size_t j) {
-        return names[j].find("ForeArm") != std::string::npos || names[j].find("Hand") != std::string::npos;
-    };
     std::vector<glm::mat4> before;
     std::vector<glm::mat4> after;
     for (const char* name : kExileClipNames) {
         INFO(name);
         const std::uint32_t clip = set.findClip(name);
-        int changed = 0;
         float handMove = 0.0f;
+        float shoulderMove = 0.0f;
         for (int f = 0; f < frameCount(set, clip); ++f) {
             const float t = static_cast<float>(f) / 60.0f;
             REQUIRE(raw.samplePose(raw.findClip(name), t, before));
             REQUIRE(set.samplePose(clip, t, after));
-            bool inside = true;
             for (const ElbowProbe& probe : probes) {
-                const Elbow e = probe.measure(before);
-                inside = inside && e.hyperextension <= 10.0f && e.twist <= 90.0f;
-            }
-            float worst = 0.0f;
-            for (std::size_t j = 0; j < before.size(); ++j) {
-                if (!inside && belowElbow(j)) continue;
-                for (int c = 0; c < 4; ++c) worst = std::max(worst, glm::distance(before[j][c], after[j][c]));
-            }
-            CHECK(worst < 1e-4f);
-            if (inside) continue;
-            ++changed;
-            for (const ElbowProbe& probe : probes) {
-                CHECK(glm::abs(glm::dot(rotationOf(before[probe.hand]), rotationOf(after[probe.hand]))) > 0.9999f);
                 handMove = std::max(handMove, glm::distance(glm::vec3(before[probe.hand][3]), glm::vec3(after[probe.hand][3])));
+                shoulderMove = std::max(shoulderMove, glm::distance(glm::vec3(before[probe.arm][3]), glm::vec3(after[probe.arm][3])));
             }
         }
-        INFO(changed << " of " << frameCount(set, clip) << " samples past a limit, hand moved up to " << handMove << " m");
-        CHECK(handMove < 0.2f);
+        INFO("hand moved up to " << handMove << " m, shoulder " << shoulderMove << " m");
+        CHECK(shoulderMove < 1e-4f);
+        CHECK(handMove < 0.015f);
+    }
+}
+
+// Frame to frame the elbow and the wrist move like the source does: the pole and the saturation leave no jump.
+TEST_CASE("the Exile's elbows and wrists never jump between two samples")
+{
+    SceneBundle plain;
+    CookStats stats;
+    CookOptions options;
+    options.rootYawDegrees = 180.0f;
+    REQUIRE(cookGltf(kExile / "SK_Exile.glb", plain, stats, options));
+    AnimationSet raw;
+    REQUIRE(raw.load(plain));
+    const auto owned = loadAnimations();
+    const AnimationSet& set = *owned;
+    const ElbowProbe probes[] = {ElbowProbe("Left"), ElbowProbe("Right")};
+    std::vector<glm::mat4> pose;
+    std::vector<glm::mat4> plainPose;
+    for (const char* name : kExileClipNames) {
+        INFO(name);
+        const std::uint32_t clip = set.findClip(name);
+        for (const ElbowProbe& probe : probes) {
+            float worstSolved = 0.0f;
+            float worstSource = 0.0f;
+            glm::vec3 lastElbow;
+            glm::vec3 lastSourceElbow;
+            for (int f = 0; f < frameCount(set, clip); ++f) {
+                const float t = static_cast<float>(f) / 60.0f;
+                REQUIRE(set.samplePose(clip, t, pose));
+                REQUIRE(raw.samplePose(raw.findClip(name), t, plainPose));
+                const glm::vec3 elbow(pose[probe.fore][3]);
+                const glm::vec3 sourceElbow(plainPose[probe.fore][3]);
+                if (f > 0) {
+                    worstSolved = std::max(worstSolved, glm::distance(elbow, lastElbow));
+                    worstSource = std::max(worstSource, glm::distance(sourceElbow, lastSourceElbow));
+                }
+                lastElbow = elbow;
+                lastSourceElbow = sourceElbow;
+            }
+            INFO("elbow moves up to " << worstSolved << " m a sample, the source " << worstSource << " m");
+            CHECK(worstSolved < worstSource * 1.5f + 0.02f);
+        }
     }
 }
 

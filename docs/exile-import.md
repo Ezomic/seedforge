@@ -44,35 +44,22 @@ joints (largest error 0.0005 degrees; the script stops above 0.01). A clip's wor
 turned by that map, is the GLB world rotation. Afterwards every joint of every clip sits where the source FBX puts it,
 to 0.0 mm (relative to the hips). Same input bytes give the same output bytes, and a second run changes nothing.
 
-## Elbow limit
+## Arm solve
 
-Idle, Block and Hit straighten the elbows past straight in the source FBX itself, measured against
-`SK_Exile.fbx`'s BindPose (where the elbow bends 7 degrees forward): the clips were authored on the rig's neutral
-pose, whose elbows are 13 to 16 degrees past straight, not on this mesh's bind. No roll fixes that, so `cookExile`
-gives the cooker a clip pass (`CookOptions::clipPass`, run on the 60 Hz samples before compression) that limits each
-elbow: a forearm pointing more than 10 degrees behind the upper arm's front (the body's forward at the bind, carried
-by the upper arm) is turned forward to 10 degrees in its own plane, and a forearm turned more than 90 degrees about
-its bone against the upper arm (from the bind) is turned back to 90. The hand keeps its rotation, so a held prop keeps
-its angle and only moves with the wrist. A sample inside both limits is left exactly as cooked.
+The source clips straighten the elbows past straight (Idle, Block, Hit, by up to 42 degrees) and turn the forearm up to
+146 degrees about its bone against the upper arm (Thrust, Swing, Death, Run). `cookExile` gives the cooker a clip pass
+(`CookOptions::clipPass`, run on the 60 Hz samples before compression) that solves each arm again per sample as a
+two-bone chain, from the posed skeleton only:
 
-The twist limit reaches further than the elbow one: the source forearms turn up to 146 degrees in Thrust, 125 in
-Swing, 109 in Death and 98 in Run. Samples past a limit, of the 60 Hz samples cooked, and the most a hand moves:
-
-| Clip | Past a limit | Hand moved |
-|---|---|---|
-| idle | 151 of 151 | 26 mm |
-| walk | 27 of 164 | 10 mm |
-| run | 23 of 106 | under 0.1 mm |
-| thrust | 109 of 179 | under 0.1 mm |
-| hit | 162 of 179 | 144 mm |
-| swing | 43 of 179 | under 0.1 mm |
-| block | 49 of 179 | 26 mm |
-| dodge | 0 of 179 | 0 |
-| death | 26 of 239 | under 0.1 mm |
-
-Where the twist is cut, the hand keeping its rotation puts the rest of the turn (up to 56 degrees in Thrust) between
-the forearm and the hand. A source twist that crossed 180 degrees would flip the cut from one side to the other in one
-sample; none of the nine clips gets past 146.
+- The shoulder and the hand stay where the source puts them (a hand moves only where the reach asks for a bend under
+  14 degrees or over 150).
+- The elbow goes to the side of the shoulder-hand line that a pole points to: outward, a little back and down, in the
+  frame of the shoulders and the neck. The elbow never locks straight: flex is at least 14 degrees, which stands the
+  upper arm out from the ribs by about 7 degrees beyond the hand line (a larger abduction would move the hand).
+- The elbow is a pure hinge, about the axis the bind pose bends about, carried by the upper arm. The upper arm's roll
+  follows the plane of the pole, so the source's upper-arm roll is not kept.
+- The hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
+  saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.
 
 ## Sockets
 
