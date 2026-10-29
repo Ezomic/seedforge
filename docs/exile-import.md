@@ -51,14 +51,19 @@ The source clips straighten the elbows past straight (Idle, Block, Hit, by up to
 (`CookOptions::clipPass`, run on the 60 Hz samples before compression) that solves each arm again per sample as a
 two-bone chain, from the posed skeleton only:
 
-- The shoulder and the hand stay where the source puts them (a hand moves only where the reach asks for a bend under
-  14 degrees or over 150).
+- The shoulder stays where the source puts it, and so does the hand, except in Idle, Walk and Run (below). A hand moves
+  otherwise only where the reach asks for a bend under 14 degrees or over 150.
 - The elbow goes to the side of the shoulder-hand line that a pole points to: outward, a little back and down, in the
   frame of the shoulders and the neck. The elbow never locks straight: flex is at least 14 degrees, which stands the
   upper arm out from the ribs by about 7 degrees beyond the hand line (a larger abduction would move the hand).
-- The elbow is a pure hinge, about the axis the bind pose bends about, carried by the upper arm. The upper arm's roll
-  follows the plane of the pole, so the source's upper-arm roll is not kept.
-- The hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
+- The elbow is a pure hinge, about the axis the bind pose bends about, carried by the upper arm. The plane it bends in
+  is 70% the source's own (its upper arm's hinge) and 30% the pole's, so the shoulder keeps most of its source roll and
+  the cuirass is not twisted across the chest.
+- Idle, Walk and Run put the hands across the chest or flared out. Their hands hang beside the thigh instead, palm to the
+  thigh, thumb forward, fingers along the forearm: the hand's path is the source's own, offset from the clip's mean (in
+  the hips' frame), so the arm swing of Walk and Run survives. Hang is 0.93 of the arm's length (Idle, Walk), 0.8 (Run).
+  The props follow: the sockets come from the cooked Idle's hand.
+- In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
   saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.
 
 ## Sockets

@@ -330,7 +330,7 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
         }
     }
     if (pass) {
-        ClipFrames clip{skeleton.jointNames, parents, rest, poses};
+        ClipFrames clip{out.name, skeleton.jointNames, parents, rest, poses};
         pass(clip);
     }
     for (std::size_t j = 0; j < channels.size(); ++j) {

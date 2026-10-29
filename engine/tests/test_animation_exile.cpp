@@ -382,10 +382,10 @@ TEST_CASE("every Exile clip hinges the elbows between 0 and 150 degrees and keep
     }
 }
 
-// The solve keeps the source's shoulders and hands: against the same file cooked without it a hand stays within a
-// centimetre and a half, except where the source reaches past what a 14 degree bend gives or closes further than
-// 150 degrees, which a hand then gives way to by the same amount.
-TEST_CASE("the Exile's arm solve keeps the hands where the source clips put them")
+// The solve keeps the source's shoulders, and its hands in every clip but idle, walk and run: against the same file
+// cooked without it a hand stays within a centimetre and a half. Those three hang the hands beside the thighs (over
+// 12 cm out from the hips' midline, at the hips' height or below, a running hand up to 30 cm above).
+TEST_CASE("the Exile's arm solve keeps the combat hands where the source put them and hangs the idle, walk and run hands by the thighs")
 {
     SceneBundle plain;
     CookStats stats;
@@ -404,17 +404,29 @@ TEST_CASE("the Exile's arm solve keeps the hands where the source clips put them
         const std::uint32_t clip = set.findClip(name);
         float handMove = 0.0f;
         float shoulderMove = 0.0f;
+        float nearest = 10.0f;
+        float lowest = -10.0f;
         for (int f = 0; f < frameCount(set, clip); ++f) {
             const float t = static_cast<float>(f) / 60.0f;
             REQUIRE(raw.samplePose(raw.findClip(name), t, before));
             REQUIRE(set.samplePose(clip, t, after));
+            const glm::vec3 hips(after[jointIndex("mixamorig:Hips")][3]);
+            const glm::vec3 lateral = glm::normalize(glm::vec3(after[jointIndex("mixamorig:LeftUpLeg")][3]) - glm::vec3(after[jointIndex("mixamorig:RightUpLeg")][3]));
             for (const ElbowProbe& probe : probes) {
                 handMove = std::max(handMove, glm::distance(glm::vec3(before[probe.hand][3]), glm::vec3(after[probe.hand][3])));
                 shoulderMove = std::max(shoulderMove, glm::distance(glm::vec3(before[probe.arm][3]), glm::vec3(after[probe.arm][3])));
+                const glm::vec3 rel = glm::vec3(after[probe.hand][3]) - hips;
+                nearest = std::min(nearest, std::abs(glm::dot(rel, lateral)));
+                lowest = std::max(lowest, rel.y);
             }
         }
-        INFO("hand moved up to " << handMove << " m, shoulder " << shoulderMove << " m");
+        INFO("hand moved up to " << handMove << " m, shoulder " << shoulderMove << " m, hands " << nearest << " m from the midline at the nearest, " << lowest << " m above the hips at the highest");
         CHECK(shoulderMove < 1e-4f);
+        if (std::string_view(name) == "idle" || std::string_view(name) == "walk" || std::string_view(name) == "run") {
+            CHECK(nearest > 0.12f);
+            CHECK(lowest < (std::string_view(name) == "run" ? 0.3f : 0.05f));
+            continue;
+        }
         CHECK(handMove < 0.015f);
     }
 }

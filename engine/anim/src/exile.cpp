@@ -50,6 +50,17 @@ constexpr float kElbowFlexMaxDegrees = 150.0f;
 constexpr float kWristTwistDegrees = 45.0f;
 constexpr float kPoleBack = 0.4f;
 constexpr float kPoleDown = 0.25f;
+// How much of the source's own elbow plane (its upper arm roll) the plane keeps, the rest being the pole's.
+constexpr float kRollKept = 0.7f;
+// Idle, Walk and Run put the hands across the chest or flared out. Their hands are moved to hang beside the thigh with
+// the palm to it, keeping the source's own motion: the hand's path is offset from the clip's mean, not replaced.
+// `hang` is the reach used of the arm's length, `out` how far outward of the shoulder line the hand hangs.
+struct Relaxed {
+    const char* clip;
+    float hang;
+};
+constexpr Relaxed kRelaxed[] = {{"idle", 0.93f}, {"walk", 0.93f}, {"run", 0.8f}};
+constexpr float kRelaxedOut = 0.05f;
 
 struct ArmChain {
     std::size_t arm = 0;
@@ -63,6 +74,24 @@ struct ArmChain {
     glm::vec3 armHinge{0.0f};  // the elbow's hinge axis, in the upper arm's frame
     glm::vec3 foreHinge{0.0f}; // and in the forearm's frame
     glm::quat handRest{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 handFinger{0.0f}; // the hand's finger and palm directions, in the hand's frame
+    glm::vec3 handPalm{0.0f};
+    glm::vec3 hangAt{0.0f};     // where a relaxed hand hangs, and its mean source position, in the rest pose's axes
+    glm::vec3 meanAt{0.0f};
+    bool relaxed = false;
+};
+
+struct BodyAxes {
+    glm::quat hipsRest{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 hipsAt{0.0f};
+    glm::vec3 lateral{0.0f}; // rest pose: left, up, forward
+    glm::vec3 up{0.0f};
+    glm::vec3 forward{0.0f};
+};
+
+struct ArmState {
+    float twist = 0.0f;
+    glm::vec3 normal{0.0f};
 };
 
 struct BodyJoints {
@@ -98,6 +127,14 @@ bool findArm(const ClipFrames& clip, const std::vector<glm::mat4>& restWorld, co
     const glm::vec3 hinge = glm::inverse(clip.rest[chain.fore].rotation) * chain.armHinge;
     chain.foreHinge = glm::normalize(hinge - chain.foreAxis * glm::dot(hinge, chain.foreAxis));
     chain.handRest = clip.rest[chain.hand].rotation;
+    std::size_t index = 0;
+    std::size_t thumb = 0;
+    if (findJoint(clip, "mixamorig:" + side + "HandIndex1", index) && findJoint(clip, "mixamorig:" + side + "HandThumb1", thumb)) {
+        chain.handFinger = glm::normalize(clip.rest[index].translation);
+        const glm::vec3 across = clip.rest[thumb].translation - chain.handFinger * glm::dot(clip.rest[thumb].translation, chain.handFinger);
+        const glm::vec3 palm = glm::normalize(glm::cross(chain.handFinger, across));
+        chain.handPalm = palm;
+    }
     return true;
 }
 
@@ -135,8 +172,27 @@ glm::quat keepSide(glm::quat q, glm::quat previous)
     return glm::dot(q, previous) < 0.0f ? -q : q;
 }
 
-// `wristTwist` is the arm's unwrapped twist of the previous sample, so the saturation never wraps.
-void solveArm(const ArmChain& chain, const BodyJoints& body, const ClipFrames& clip, std::vector<JointPose>& pose, float& wristTwist, bool first)
+glm::vec3 across(glm::vec3 v, glm::vec3 axis)
+{
+    return v - axis * glm::dot(v, axis);
+}
+
+// Points in the rest pose's axes, the hips' motion taken out.
+glm::vec3 inRestAxes(const BodyAxes& axes, const WorldPose& world, const BodyJoints& body, glm::vec3 point)
+{
+    const glm::quat relative = world.rotation[body.hips] * glm::inverse(axes.hipsRest);
+    return glm::inverse(relative) * (point - world.position[body.hips]) + axes.hipsAt;
+}
+
+glm::vec3 fromRestAxes(const BodyAxes& axes, const WorldPose& world, const BodyJoints& body, glm::vec3 point)
+{
+    const glm::quat relative = world.rotation[body.hips] * glm::inverse(axes.hipsRest);
+    return world.position[body.hips] + relative * (point - axes.hipsAt);
+}
+
+// `state` carries the arm's unwrapped wrist twist and elbow plane from the previous sample, so neither wraps or flips.
+void solveArm(const ArmChain& chain, const BodyAxes& axes, const BodyJoints& body, const ClipFrames& clip, std::vector<JointPose>& pose,
+    ArmState& state, bool first)
 {
     const WorldPose world = worldOf(clip, pose);
     const glm::vec3 lateral = glm::normalize(world.position[body.leftArm] - world.position[body.rightArm]);
@@ -145,7 +201,12 @@ void solveArm(const ArmChain& chain, const BodyJoints& body, const ClipFrames& c
     const glm::vec3 pole = chain.side * lateral - forward * kPoleBack - up * kPoleDown;
 
     const glm::vec3 shoulder = world.position[chain.arm];
-    const glm::vec3 toWrist = world.position[chain.hand] - shoulder;
+    glm::vec3 wrist = world.position[chain.hand];
+    if (chain.relaxed) {
+        const glm::vec3 at = inRestAxes(axes, world, body, wrist);
+        wrist = fromRestAxes(axes, world, body, chain.hangAt + (at - chain.meanAt));
+    }
+    const glm::vec3 toWrist = wrist - shoulder;
     const float l1 = chain.upperLength;
     const float l2 = chain.foreLength;
     const auto reach = [&](float flexDegrees) {
@@ -155,19 +216,31 @@ void solveArm(const ArmChain& chain, const BodyJoints& body, const ClipFrames& c
     if (!(distance > 1e-6f)) return;
     const glm::vec3 s = toWrist / distance;
     const float d = std::clamp(distance, reach(kElbowFlexMaxDegrees), reach(kElbowFlexMinDegrees));
-    glm::vec3 q = pole - s * glm::dot(pole, s);
-    if (!(glm::length(q) > 1e-4f)) q = -forward - s * glm::dot(-forward, s);
+    glm::vec3 q = across(pole, s);
+    if (!(glm::length(q) > 1e-4f)) q = across(-forward, s);
     q = glm::normalize(q);
+    const glm::vec3 polePlane = glm::normalize(glm::cross(q, s));
+
+    // The elbow plane keeps most of the source's own: its upper arm's hinge, square to the new shoulder-hand line.
+    glm::vec3 plane = polePlane;
+    const glm::vec3 sourcePlane = across(world.rotation[chain.arm] * chain.armHinge, s);
+    if (glm::length(sourcePlane) > 1e-3f) {
+        glm::vec3 kept = glm::normalize(sourcePlane);
+        if (glm::dot(kept, first ? polePlane : state.normal) < 0.0f) kept = -kept;
+        state.normal = kept;
+        const glm::vec3 blended = glm::mix(polePlane, kept, kRollKept);
+        if (glm::length(blended) > 1e-3f) plane = glm::normalize(blended);
+    }
+    q = glm::cross(s, plane);
 
     const float along = (l1 * l1 - l2 * l2 + d * d) / (2.0f * d);
     const float out = std::sqrt(std::max(0.0f, l1 * l1 - along * along));
     const glm::vec3 elbow = shoulder + s * along + q * out;
-    const glm::vec3 hinge = glm::normalize(glm::cross(q, s));
     const glm::vec3 u = (elbow - shoulder) / l1;
     const glm::vec3 v = glm::normalize(shoulder + s * d - elbow);
 
-    const glm::quat armWorld = framed(u, hinge, chain.armAxis, chain.armHinge);
-    const glm::quat foreWorld = framed(v, hinge, chain.foreAxis, chain.foreHinge);
+    const glm::quat armWorld = framed(u, plane, chain.armAxis, chain.armHinge);
+    const glm::quat foreWorld = framed(v, plane, chain.foreAxis, chain.foreHinge);
     const std::int32_t parent = clip.parents[chain.arm];
     const glm::quat parentWorld = parent < 0 ? glm::quat(1.0f, 0.0f, 0.0f, 0.0f) : world.rotation[static_cast<std::size_t>(parent)];
 
@@ -177,11 +250,16 @@ void solveArm(const ArmChain& chain, const BodyJoints& body, const ClipFrames& c
     arm.rotation = keepSide(glm::normalize(glm::inverse(parentWorld) * armWorld), arm.rotation);
     fore.rotation = keepSide(glm::normalize(glm::inverse(armWorld) * foreWorld), fore.rotation);
 
-    const glm::quat swungHand = glm::inverse(foreWorld) * world.rotation[chain.hand];
+    glm::quat handWorld = world.rotation[chain.hand];
+    if (chain.relaxed) {
+        const glm::vec3 palm = across(-chain.side * lateral, v);
+        if (glm::length(palm) > 1e-3f) handWorld = framed(v, glm::normalize(palm), chain.handFinger, chain.handPalm);
+    }
+    const glm::quat swungHand = glm::inverse(foreWorld) * handWorld;
     const glm::quat delta = swungHand * glm::inverse(chain.handRest);
     const float raw = 2.0f * std::atan2(glm::dot(glm::vec3(delta.x, delta.y, delta.z), chain.foreAxis), delta.w);
-    const float twist = first ? std::remainder(raw, glm::two_pi<float>()) : raw + glm::two_pi<float>() * std::round((wristTwist - raw) / glm::two_pi<float>());
-    wristTwist = twist;
+    const float twist = first ? std::remainder(raw, glm::two_pi<float>()) : raw + glm::two_pi<float>() * std::round((state.twist - raw) / glm::two_pi<float>());
+    state.twist = twist;
     const float limit = glm::radians(kWristTwistDegrees);
     const float saturated = limit * std::tanh(twist / limit);
     hand.rotation = keepSide(glm::normalize(delta * glm::angleAxis(saturated - twist, chain.foreAxis) * chain.handRest), hand.rotation);
@@ -207,15 +285,40 @@ void solveArms(ClipFrames& clip)
         || !findJoint(clip, "mixamorig:RightArm", body.rightArm)) {
         return;
     }
-    const glm::vec3 up = at[0] - at[1];
-    const glm::vec3 left = at[2] - at[3];
-    if (glm::length(glm::cross(left, up)) < 1e-6f) return;
-    const glm::vec3 forward = glm::normalize(glm::cross(left, up));
+    BodyAxes axes;
+    axes.up = glm::normalize(at[0] - at[1]);
+    axes.lateral = glm::normalize(at[2] - at[3]);
+    if (glm::length(glm::cross(axes.lateral, axes.up)) < 1e-6f) return;
+    axes.forward = glm::normalize(glm::cross(axes.lateral, axes.up));
+    axes.hipsAt = at[1];
+    const glm::mat3 hipsAxes(restWorld[body.hips]);
+    axes.hipsRest = glm::quat_cast(glm::mat3(glm::normalize(hipsAxes[0]), glm::normalize(hipsAxes[1]), glm::normalize(hipsAxes[2])));
+    float hang = 0.0f;
+    for (const Relaxed& r : kRelaxed) {
+        if (clip.name == r.clip) hang = r.hang;
+    }
     for (const char* side : {"Left", "Right"}) {
         ArmChain chain;
-        if (!findArm(clip, restWorld, side, forward, chain)) continue;
-        float wristTwist = 0.0f;
-        for (std::size_t f = 0; f < clip.frames.size(); ++f) solveArm(chain, body, clip, clip.frames[f], wristTwist, f == 0);
+        if (!findArm(clip, restWorld, side, axes.forward, chain)) continue;
+        if (chain.handFinger != glm::vec3(0.0f)) {
+            const glm::mat3 handAxes(restWorld[chain.hand]);
+            const glm::quat handRestWorld = glm::quat_cast(glm::mat3(glm::normalize(handAxes[0]), glm::normalize(handAxes[1]), glm::normalize(handAxes[2])));
+            const glm::vec3 toward = -axes.up - chain.side * axes.lateral;
+            if (glm::dot(handRestWorld * chain.handPalm, toward) < 0.0f) chain.handPalm = -chain.handPalm;
+            chain.handPalm = glm::normalize(across(chain.handPalm, chain.handFinger));
+        }
+        chain.relaxed = hang > 0.0f && chain.handFinger != glm::vec3(0.0f);
+        if (chain.relaxed) {
+            const glm::vec3 shoulder(restWorld[chain.arm][3]);
+            chain.hangAt = shoulder + chain.side * axes.lateral * kRelaxedOut - axes.up * (hang * (chain.upperLength + chain.foreLength));
+            for (const std::vector<JointPose>& frame : clip.frames) {
+                const WorldPose world = worldOf(clip, frame);
+                chain.meanAt += inRestAxes(axes, world, body, world.position[chain.hand]);
+            }
+            chain.meanAt /= static_cast<float>(clip.frames.size());
+        }
+        ArmState state;
+        for (std::size_t f = 0; f < clip.frames.size(); ++f) solveArm(chain, axes, body, clip, clip.frames[f], state, f == 0);
     }
 }
 

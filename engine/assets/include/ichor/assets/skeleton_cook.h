@@ -22,9 +22,10 @@ struct JointPose {
     glm::vec3 scale{1.0f};
 };
 
-// A clip as the cooker samples it, before the root yaw and before ozz compresses it: frames[f][joint] are local
+// A clip as the cooker samples it, before the root yaw and before ozz compresses it: `name` is the clip's, frames[f][joint] are local
 // poses in the skeleton's joint order, `rest` the joints' node transforms (the bind pose) and `parents` -1 at a root.
 struct ClipFrames {
+    const std::string& name;
     const std::vector<std::string>& jointNames;
     const std::vector<std::int32_t>& parents;
     const std::vector<JointPose>& rest;

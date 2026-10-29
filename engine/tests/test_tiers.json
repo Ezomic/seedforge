@@ -55,7 +55,7 @@
     "the Exile loads with all nine clips and draws a body, a spear and a shield",
     "the Exile mesh is metric, upright, on the ground, facing -Z and fully skinned",
     "the Exile skeleton cooks to the root joint and 34 bones with their file names",
-    "the Exile's arm solve keeps the hands where the source clips put them",
+    "the Exile's arm solve keeps the combat hands where the source put them and hangs the idle, walk and run hands by the thighs",
     "the Exile's elbows and wrists never jump between two samples",
     "the Exile's shield centre stays on the left hand in every clip",
     "the Exile's shield faces forward at the start of idle and through block's guard",
