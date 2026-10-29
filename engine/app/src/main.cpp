@@ -18,6 +18,7 @@
 #include "ichor/core/asset_roots.h"
 #include "ichor/core/controls_overlay.h"
 #include "ichor/core/crash_handler.h"
+#include "ichor/core/feedback_note.h"
 #include "ichor/core/file_watch.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
@@ -30,6 +31,7 @@
 #include "ichor/ui/combat_hud_screen.h"
 #include "ichor/ui/death_screen.h"
 #include "ichor/ui/hud.h"
+#include "ichor/ui/note_box.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/traversal/roads.h"
@@ -1392,6 +1394,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
     std::unique_ptr<ichor::DeathScreen> deathScreen;
+    std::unique_ptr<ichor::NoteBox> noteBox;
+    ichor::FeedbackPrompt notePrompt;
+    bool noteShown = false; // from the frame after F8, so the note's screenshot is of the game, not the box
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -1446,9 +1451,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
             deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
+            noteBox = std::make_unique<ichor::NoteBox>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            noteBox.reset();
             deathScreen.reset();
             captionScreen.reset();
             combatHud.reset();
@@ -1468,6 +1475,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     }
     if (ui) {
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
+        engine.keepInputTail(ichor::kNoteTailTicks);
         platform.enableLook(true);
         platform.setMouseSensitivity(mouseSensitivity);
         if (options.showInventory && carry && !editing) {
@@ -1526,6 +1534,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     // The full overlay already has the death lines.
                     const auto death = combat && engine.overlayMode() != ichor::OverlayMode::Full ? combat->playerDeath(engine.scene()) : std::nullopt;
                     deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
+                }
+                if (noteBox) {
+                    noteBox->bind(notePrompt.open() && noteShown ? std::optional<std::string>(notePrompt.text()) : std::nullopt);
                 }
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
@@ -1814,8 +1825,46 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::NavKeys navHeld;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
+    std::filesystem::path noteFolder;
+    ichor::FeedbackNote noteDraft;
+    ichor::InputStream noteTail;
     for (;;) {
         ZoneScopedN("frame");
+        // F8 flags this moment for a tester (SEED-697): the screenshot is of the frame about to be drawn, before the box
+        // shows, and the box holds the world still as the menu does. The editor has the keyboard to itself.
+        if (notePrompt.pressF8(platform.noteKey(), ichor::feedbackNoteAvailable(noteBox && noteBox->ok(), !options.screenshot.empty(), editing))) {
+            noteDraft = ichor::FeedbackNote{};
+            noteDraft.time = std::chrono::system_clock::now();
+            noteDraft.seed = options.seed;
+            noteDraft.tick = engine.scene().tickCount();
+            noteFolder = ichor::createSessionFolder(options.logs, "note", noteDraft.time);
+            if (noteFolder.empty()) {
+                ichor::logf(ichor::LogLevel::Warn, "a feedback note folder could not be made under {}", options.logs.string());
+                notePrompt.cancel();
+            } else {
+                noteTail = engine.inputTail().stream();
+                renderer.requestScreenshot((noteFolder / "screenshot.png").string());
+                platform.setTextEntry(true);
+            }
+        }
+        if (notePrompt.open()) {
+            const ichor::NoteOutcome outcome = notePrompt.feed(platform.takeTypedText());
+            if (outcome != ichor::NoteOutcome::Typing) {
+                platform.setTextEntry(false);
+                noteShown = false;
+            }
+            if (outcome == ichor::NoteOutcome::Save) {
+                noteDraft.text = notePrompt.text();
+                if (ichor::writeFeedbackNote(noteFolder, noteDraft, noteTail)) {
+                    ichor::logf(ichor::LogLevel::Info, "feedback note saved to {}", noteFolder.string());
+                } else {
+                    ichor::logf(ichor::LogLevel::Warn, "the feedback note could not be written to {}", noteFolder.string());
+                }
+            } else if (outcome == ichor::NoteOutcome::Cancel) {
+                std::error_code ec;
+                std::filesystem::remove_all(noteFolder, ec);
+            }
+        }
         // Enter starts the light attack on the arm, with its wind-up and tell cues.
         const bool confirm = (platform.input().buttons & ichor::InputFrame::Confirm) != 0;
         if (confirm && !confirmHeld) {
@@ -1874,7 +1923,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // press the UI still holds is let go and nothing stays hovered.
         if (ui) {
             const ichor::Pointer pointer = platform.pointer();
-            if (pointer.inside && !editing) {
+            // Under the note box a click would choose a reply or press Resume while the world is held.
+            if (pointer.inside && !editing && !notePrompt.open()) {
                 ui->mouseMove(pointer.x, pointer.y);
                 if (pointer.primary != pointerHeld) {
                     ui->mouseButton(0, pointer.primary);
@@ -2006,11 +2056,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         // The mouse fights only in a live --combat fight, and only while nothing on screen wants the click.
         const auto shown = [](const auto& screen) { return screen && screen->visible(); };
-        const bool uiFocus = editing || paused || engine.controlsOverlay().open || shown(inventoryScreen) || shown(mapScreen) || shown(newGameScreen) || shown(ledger) || shown(journalScreen) || shown(characterScreen) || shown(dialogueScreen);
+        const bool uiFocus = editing || paused || notePrompt.open() || engine.controlsOverlay().open || shown(inventoryScreen) || shown(mapScreen) || shown(newGameScreen) || shown(ledger) || shown(journalScreen) || shown(characterScreen) || shown(dialogueScreen);
         platform.enableMouseAttack(combat && combat->live() && !uiFocus);
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
-        const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
+        const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || notePrompt.open() || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
@@ -2021,6 +2071,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         const double frameEnd = platform.now();
         frameTimes.add(frameEnd - lastFrameEnd);
         lastFrameEnd = frameEnd;
+        noteShown = notePrompt.open();
         if (!running) {
             break;
         }
@@ -2121,6 +2172,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
     }
 
+    if (notePrompt.open()) {
+        std::error_code ec;
+        std::filesystem::remove_all(noteFolder, ec); // quit with the box open: the note was never saved
+    }
     renderer.setGuiHook({}); // the panels are about to go out of scope
     renderer.setUiHooks({}, {}); // and so are the UI, the HUD and the ledger
     writeSessionSummary(options, std::move(frameTimes), platform.now() - loopStart, combat.get());

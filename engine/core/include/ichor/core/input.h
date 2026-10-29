@@ -55,4 +55,21 @@ struct InputStream {
     bool load(const std::filesystem::path& path);
 };
 
+// The last ticks of input, oldest first, kept whatever the run records (an F8 feedback note's replay tail). Capacity 0 keeps none.
+class InputTail {
+public:
+    explicit InputTail(std::size_t capacity = 0)
+        : capacity_(capacity)
+    {
+    }
+
+    void push(const InputFrame& frame);
+    InputStream stream() const;
+
+private:
+    std::size_t capacity_ = 0;
+    std::size_t next_ = 0;
+    std::vector<InputFrame> frames_;
+};
+
 }
