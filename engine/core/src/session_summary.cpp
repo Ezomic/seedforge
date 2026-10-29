@@ -38,6 +38,11 @@ std::string fpsField(double fps)
     return fps > 0.0 ? std::format("{:.1f}", fps) : "null";
 }
 
+std::string sessionBaseName(std::string_view stem, std::chrono::system_clock::time_point time)
+{
+    return std::format("{}-{:%Y%m%d-%H%M%S}Z", stem, std::chrono::floor<std::chrono::seconds>(time));
+}
+
 bool looksLikePath(std::string_view value)
 {
     return value.find_first_of("/\\:") != std::string_view::npos;
@@ -125,7 +130,7 @@ std::filesystem::path writeSessionFile(const std::filesystem::path& dir, std::st
     if (!std::filesystem::is_directory(dir, ec)) {
         return {};
     }
-    const std::string base = std::format("{}-{:%Y%m%d-%H%M%S}Z", stem, std::chrono::floor<std::chrono::seconds>(time));
+    const std::string base = sessionBaseName(stem, time);
     for (int copy = 1; copy <= 1000; ++copy) {
         const std::filesystem::path path = dir / (copy == 1 ? base + ".json" : std::format("{}-{}.json", base, copy));
         std::FILE* file = createNew(path);
@@ -137,6 +142,27 @@ std::filesystem::path writeSessionFile(const std::filesystem::path& dir, std::st
         }
         const bool written = std::fwrite(contents.data(), 1, contents.size(), file) == contents.size();
         return std::fclose(file) == 0 && written ? path : std::filesystem::path{};
+    }
+    return {};
+}
+
+std::filesystem::path createSessionFolder(const std::filesystem::path& dir, std::string_view stem, std::chrono::system_clock::time_point time)
+{
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    if (!std::filesystem::is_directory(dir, ec)) {
+        return {};
+    }
+    const std::string base = sessionBaseName(stem, time);
+    for (int copy = 1; copy <= 1000; ++copy) {
+        const std::filesystem::path path = dir / (copy == 1 ? base : std::format("{}-{}", base, copy));
+        // create_directory says false for one already there, so two notes in one second each get their own.
+        if (std::filesystem::create_directory(path, ec)) {
+            return path;
+        }
+        if (!std::filesystem::exists(path, ec)) {
+            return {};
+        }
     }
     return {};
 }

@@ -90,6 +90,30 @@ jobs:
           python3 tools/ci_time_trend.py --self-test
           python3 tools/package_size.py --self-test
           python3 tools/golden_diff_page.py --self-test
+          python3 tools/art_contact_sheet.py --self-test
+
+  art-sheet:
+    # A page of the changed assets under art/, uploaded as an artifact so art is reviewed without a build (SEED-709). Only the shown
+    # LFS objects are fetched; the GLB previews load <model-viewer> from a CDN when the page is opened.
+    name: art contact sheet
+    needs: changes
+    if: needs.changes.outputs.art == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          lfs: false
+      - name: Build the contact sheet
+        run: |
+          git lfs install --local
+          python3 tools/art_contact_sheet.py --base "$(git rev-parse --short HEAD^1)" --head "$(git rev-parse --short HEAD)" --out art-contact-sheet
+      - uses: actions/upload-artifact@v4
+        with:
+          name: art-contact-sheet
+          path: art-contact-sheet
+          retention-days: 14
 
   windows:
     # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
@@ -181,12 +205,14 @@ jobs:
           path: engine/build/windows-ci/forged-world-cache
           key: forged-cache-windows-${{ hashFiles('libworldforge/include/**', 'libworldforge/src/**', 'engine/world/include/ichor/world/forged_heightfield.h', 'engine/world/src/forged_heightfield.cpp', 'engine/world/include/ichor/world/forged_world_cache.h', 'engine/world/src/forged_world_cache.cpp', 'engine/world/include/ichor/world/forged_phase_maps.h', 'engine/world/src/forged_phase_maps.cpp', 'engine/world/include/ichor/world/heightfield.h', 'engine/world/src/heightfield.cpp', 'engine/world/include/ichor/world/world_desc.h', 'engine/core/include/ichor/core/binary.h', 'engine/core/include/ichor/core/hash.h') }}
       - name: Configure
+        id: configure
         run: cmake --preset windows-ci
         working-directory: engine
       - name: Save vcpkg binaries
         # Saved right after configure: a cold configure takes about 9 minutes, and a job killed later by its 15 minute limit saves nothing.
-        # always(): a configure that fails on one port still keeps the ports it built.
-        if: ${{ always() && steps.cache1.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
+        # Only a configure that finished saves: a cancelled or failed one leaves a partial set, and a partial set under the exact key is
+        # restored as a hit, never re-saved, and makes every later run rebuild the missing ports.
+        if: ${{ !cancelled() && steps.configure.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: .vcpkg-cache

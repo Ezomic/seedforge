@@ -62,4 +62,28 @@ bool InputStream::load(const std::filesystem::path& path)
     return true;
 }
 
+void InputTail::push(const InputFrame& frame)
+{
+    if (capacity_ == 0) {
+        return;
+    }
+    if (frames_.size() < capacity_) {
+        frames_.push_back(frame);
+    } else {
+        frames_[next_] = frame;
+    }
+    next_ = (next_ + 1) % capacity_;
+}
+
+InputStream InputTail::stream() const
+{
+    InputStream out;
+    out.frames.reserve(frames_.size());
+    const std::size_t start = frames_.size() < capacity_ ? 0 : next_;
+    for (std::size_t i = 0; i < frames_.size(); ++i) {
+        out.frames.push_back(frames_[(start + i) % frames_.size()]);
+    }
+    return out;
+}
+
 }
