@@ -163,6 +163,68 @@ void SdlPlatform::setTextEntry(bool on)
     }
 }
 
+std::vector<Extent> SdlPlatform::displayModes() const
+{
+    std::vector<Extent> sizes;
+    if (window_ == nullptr) {
+        return sizes;
+    }
+    int count = 0;
+    SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(SDL_GetDisplayForWindow(window_), &count);
+    if (modes == nullptr) {
+        return sizes;
+    }
+    // SDL lists them largest first, then by refresh rate, so each size's first mode is the one kept.
+    for (int i = 0; i < count; ++i) {
+        const Extent size{modes[i]->w, modes[i]->h};
+        if (size.width > 0 && size.height > 0 && std::find(sizes.begin(), sizes.end(), size) == sizes.end()) {
+            sizes.push_back(size);
+        }
+    }
+    SDL_free(modes);
+    return sizes;
+}
+
+bool SdlPlatform::setDisplay(const DisplayRequest& request)
+{
+    if (window_ == nullptr) {
+        return false;
+    }
+    const bool sized = request.size.width > 0 && request.size.height > 0;
+    bool ok = true;
+    if (request.fullscreen) {
+        SDL_DisplayMode closest{};
+        const bool exclusive = sized && SDL_GetClosestFullscreenDisplayMode(SDL_GetDisplayForWindow(window_), request.size.width, request.size.height, 0.0f, false, &closest);
+        // Without a size, or with one no mode has, the display keeps its own mode and the window fills it.
+        ok = SDL_SetWindowFullscreenMode(window_, exclusive ? &closest : nullptr) && ok;
+        ok = SDL_SetWindowFullscreen(window_, true) && ok;
+    } else {
+        ok = SDL_SetWindowFullscreen(window_, false) && ok;
+        if (sized) {
+            // A mode larger than the desktop is a fullscreen size; the window stays inside the usable screen.
+            Extent size = request.size;
+            SDL_Rect usable{};
+            if (SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(window_), &usable)) {
+                size.width = std::min(size.width, usable.w);
+                size.height = std::min(size.height, usable.h);
+            }
+            ok = SDL_SetWindowSize(window_, size.width, size.height) && ok;
+            ok = SDL_SetWindowPosition(window_, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED) && ok;
+        }
+    }
+    // Blocks until the window system has done it, so the next drawableSize() is the new one.
+    SDL_SyncWindow(window_);
+    if (!ok) {
+        logf(LogLevel::Warn, "display: the window could not be changed: {}", SDL_GetError());
+    }
+    return ok;
+}
+
+bool SdlPlatform::fullscreen() const
+{
+    return window_ != nullptr && (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
 double SdlPlatform::now() const
 {
     return static_cast<double>(SDL_GetTicksNS()) * 1e-9;

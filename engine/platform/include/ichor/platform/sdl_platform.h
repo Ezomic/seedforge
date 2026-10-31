@@ -41,6 +41,9 @@ public:
     void enableLook(bool enabled) override;
     void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
     void enableMouseAttack(bool enabled) override { mouseAttack_.setEnabled(enabled); }
+    std::vector<Extent> displayModes() const override;
+    bool setDisplay(const DisplayRequest& request) override;
+    bool fullscreen() const override;
 
     SDL_Window* window() const { return window_; }
 

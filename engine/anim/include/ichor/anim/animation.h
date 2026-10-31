@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>

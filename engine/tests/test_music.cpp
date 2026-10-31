@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/music_director.h"
 #include "ichor/audio/music_player.h"
 #include "ichor/audio/null_audio.h"

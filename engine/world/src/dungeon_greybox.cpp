@@ -1,5 +1,6 @@
 #include "ichor/world/dungeon_greybox.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/graph/mission.h"
 
 #include <algorithm>

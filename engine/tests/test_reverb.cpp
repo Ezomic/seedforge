@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/mixer.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/reverb.h"

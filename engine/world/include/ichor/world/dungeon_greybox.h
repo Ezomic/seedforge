@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/world/placed_dungeons.h"
 
 #include <glm/gtc/quaternion.hpp>

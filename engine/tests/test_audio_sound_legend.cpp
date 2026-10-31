@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/music_stinger.h"
 #include "ichor/audio/soundscape.h"

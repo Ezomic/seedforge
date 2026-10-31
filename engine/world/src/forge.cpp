@@ -1,5 +1,6 @@
 #include "ichor/world/forge.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/core/hash.h"
 
 #include <algorithm>

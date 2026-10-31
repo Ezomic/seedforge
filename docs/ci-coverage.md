@@ -6,8 +6,8 @@ Audit of the three promises SEED-272 names: determinism on every commit, golden 
 
 | Job | Preset | What runs |
 |---|---|---|
-| `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `tools/check_smoke_hash.py` (runs `ichor.exe --headless --frames 120`: it must exit cleanly and its logged scene state hash must equal `engine/tests/data/app_smoke_hash.txt`) |
-| `linux headless + sanitizers` | `linux-headless-asan` (Debug, clang, ASan/UBSan, `ENGINE_RUNTIME=OFF`) | `ctest --preset linux-headless-asan` |
+| `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `tools/check_smoke_hash.py` (runs `ichor.exe --headless --frames 120`: it must exit cleanly and its logged scene state hash must equal `engine/tests/data/app_smoke_hash.txt`), then `combat_bridge_corpus --replay` (the 20 bridge fights, see "Bridge corpus on both platforms") |
+| `linux headless + sanitizers` | `linux-headless-asan` (Debug, clang, ASan/UBSan, `ENGINE_RUNTIME=OFF`) | `ctest --preset linux-headless-asan` (fast tier only on a PR, in four shards), `combat_bridge_corpus --replay` on shard 2, and the aggregator compares the two platforms' bridge corpus reports |
 
 Both required names report on every pull request; what runs behind them depends on the changed paths (see "Required checks on every PR" at the end of this file).
 
@@ -24,6 +24,7 @@ Both required names report on every pull request; what runs behind them depends 
 | Save round-trip: whole campaign folder, crash during write, corruption | `engine/tests/test_campaign_roundtrip.cpp` (touches every save module, crash at every write stage, every file truncated or flipped, fuzzed reads) | Both jobs | The forge cache part used patterned bytes, not a forged world (closed below). |
 | Save round-trip: forged world data through the forge cache | `engine/tests/test_save_forged_world.cpp` (new, this PR) | Both jobs | Closed by this PR. |
 | Hydrology cache (a derived file of the forged world) | `engine/tests/test_hydrology_cache.cpp` | Both jobs | None found |
+| Determinism: the 20 recorded bridge fights (SEED-659) replay to the same outcome on every OS | `game/combat_bridge/tests/corpus/*.replay` through `combat_bridge_corpus --replay` in both jobs, and the diff of the two reports in `linux headless + sanitizers`; the ctest case "every recorded forged-world fight replays to its recorded outcome" (medium tier) covers the same files on Windows on every PR and on Linux on main | Both jobs, on every heavy PR and push to main (SEED-743) | None found. An art-only PR runs neither (no combat code can change there). |
 
 ## Gaps closed in this PR
 
@@ -49,6 +50,10 @@ On failure the job summary lists the flaky tests with their failure count per te
 
 Run the same commands locally: `bin/build`, then `bin/ctest-stress -n 2` and `python tools/world_sanity.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe`. The seeds are fixed on purpose so a red night means a code change, not luck; change the range in the workflow when the world generator is retuned and the set should widen. `nightly.yml` is in the path filter of `engine.yml`, so editing it runs both required checks.
 
+## Regenerating every fixture (SEED-699)
+
+`bin/regen-fixtures` runs every fixture regenerator in dependency order (`--list` names them with their files: determinism.json, forge_world_digests.json, the forge golden PNGs, forged_frame_budget.json, the forge-cli viewer fixture, the showcase seeds, app_smoke_hash.txt, both replay corpora, docs/axiom-coverage.md, the ledger hashes and CREDITS.md) and ends with `git status` of those paths, so an intended hash change is one command plus a look at each changed file. It writes only fixtures: whether the move is right is settled by review and the CI run on main. The nightly job `regen-fixtures reproduces the committed fixtures (windows)` runs `bin/regen-fixtures --no-build --check` on a clean tree, which is red when a regenerator stops reproducing what is committed. Not covered: the GPU golden images (lavapipe output, regenerate on the `linux-gpu` preset as above), the debt baselines in `tools/` and the test time allowlist, which only shrink.
+
 Why seeds 1-8 at size 128: with the SEED-416 defaults, seeds 3, 4 and 5 forge nothing usable at size 64 (`roads: no settlement sites to connect`, tracked by SEED-497), so the report would be red from day one. At sizes 128 and 256 all eight seeds are accepted, and 128 is the cheaper. Revisit the size when SEED-497 lands.
 
 ### Why the first scheduled run failed in the stress step
@@ -71,9 +76,36 @@ A seed with no second settlement 60 m or more from the spawn settlement prints `
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
 
+## Axiom pair sweep (SEED-714)
+
+A fourth nightly job, `axiom-sweep`, forges every pair of axioms that may share a world. `tools/axiom_sweep.py` reads
+`data/axioms` and `data/conflicts/conflicts.json`, lists every unordered pair, and sets aside the pairs that share a slot,
+declare each other in `conflicts` or sit on the blocklist (the rule of doc 01 and of `pinWorldConfig`, so the counts match
+`docs/axiom-coverage.md`: 231 pairs, 42 excluded, 189 forged). Each forged pair runs
+`ichor_forge_cli --seed 1 --seed-end 8 --size 128 --data data --axioms a,b --validate --out axiom-sweep/a+b`, several at a
+time (one per CPU). A pair fails when forge-cli refuses the pin, a seed errors, a seed is rejected after forge-cli's own
+rerolls (its failed gates are listed as `gate: cause`), or the manifest does not record the pair.
+
+The job summary carries the report: a counts table, every failing pair with its seeds and gates, and two folds, one with
+every forged pair (seconds and land share per seed) and one with the excluded pairs and why. The same report plus
+`sweep.json` (every pair's verdict) and the per-pair `manifest.json` and `validation.json` are uploaded as
+`nightly-axiom-sweep`, on success too. The night fails when any forged pair fails. A manual run takes `sweep_seeds`
+(default `1-8`) and `size` (shared with the sanity report, default 128).
+
+Phase 0 is carried only (SEED-713: forge-cli records the pinned axioms in the manifest, no phase reads the directives
+yet), so today every pair forges the same default world and the sweep proves two things: every non-excluded pair pins,
+and the default world under every pair passes the gates on seeds 1 to 8 (the sanity report's seeds). It starts telling pairs apart the moment the
+axiom-to-params mapping lands, with no change to the job. The build is Release without sanitizers, like `forged-walk`,
+and builds only `ichor_forge_cli`. Locally (Windows Release, 8 forge-cli runs at a time) the 189 pairs on seeds 1-8 took 98 s of wall time for 772 s of forge-cli time, about 4 s per pair; the dispatched run's figure is in the SEED-714 PR.
+
+Run it locally with `bin/build ichor_forge_cli`, then
+`python tools/axiom_sweep.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe --out out/sweep`; add
+`--shard 1/4` to forge a quarter of the pairs. `python tools/axiom_sweep.py --self-test` proves the pair rules and the
+verdicts, and runs in the `python tools + content layout` PR job.
+
 ## Memory soak (SEED-711)
 
-A fourth nightly job, `memory-soak`, runs the one case `soak: a long headless session over the forged world stops growing once the streaming ring is warm` (`engine/tests/test_forged_soak_memory.cpp`). Streaming and the per-cell payloads could leak over a session and no PR run lasts long enough to see it. The walk bot walks a serpentine over every cell of the seed 1 world at the player's pace, round and round, for `ICHOR_SOAK_MEMORY_SECONDS` of wall time (600 in the workflow, the `soak_memory_seconds` input of a manual run); the streamer follows it with the full payloads (terrain, trees, water, the placed objects), each cell's collision heights go in and out of a physics world that is stepped once per leg as in the app (Jolt frees broad-phase nodes only in a step, and aborts after about 4600 cell loads without one), and the resident set (`engine/tests/resident_memory.h`: the working set on Windows, VmRSS on Linux) is sampled once a second.
+Another nightly job, `memory-soak`, runs the one case `soak: a long headless session over the forged world stops growing once the streaming ring is warm` (`engine/tests/test_forged_soak_memory.cpp`). Streaming and the per-cell payloads could leak over a session and no PR run lasts long enough to see it. The walk bot walks a serpentine over every cell of the seed 1 world at the player's pace, round and round, for `ICHOR_SOAK_MEMORY_SECONDS` of wall time (600 in the workflow, the `soak_memory_seconds` input of a manual run); the streamer follows it with the full payloads (terrain, trees, water, the placed objects), each cell's collision heights go in and out of a physics world that is stepped once per leg as in the app (Jolt frees broad-phase nodes only in a step, and aborts after about 4600 cell loads without one), and the resident set (`engine/tests/resident_memory.h`: the working set on Windows, VmRSS on Linux) is sampled once a second.
 
 The verdict is on the shape of the curve: the mean of the last quarter of the samples must sit no more than 5 percent (at least 16 MB) above the mean of the third quarter, the session must have crossed at least 40 cell boundaries, and every load must be matched by an unload or a resident cell. The hidden case `[.soak_memory_leak_probe]` runs the same session keeping every unloaded cell and must fail the verdict, which is how the metric is known to go red. The log prints one `SOAK memory:` line with the quarter means, the slope of each half in MB a minute, the crossings, loads and unloads, then one `SOAK sample` line per second; the job summary shows the first and `soak-memory.log` is uploaded as `nightly-memory-soak-log`.
 
@@ -202,6 +234,24 @@ What was checked where:
 | Building the app on Linux, the `ldd` step (unresolved libraries fail the script, vcpkg libraries are copied to `lib/`), `LD_LIBRARY_PATH` in `ichor.sh`, the real `/proc/self/exe` resolution, the smoke run of a real Linux binary | Only the CI job (it passed on a `workflow_dispatch` run of this branch: the real ELF binary linked, the tarball unpacked elsewhere and the unpacked binary logged the packaged-build line) |
 
 The tarball needs a glibc at least as new as the runner's (ubuntu-latest) and, to open a window, a Vulkan loader (`libvulkan1`) on the player's machine; `--headless` needs neither a GPU nor a display.
+
+## Bridge corpus on both platforms (SEED-743)
+
+`game/combat_bridge/tests/corpus` holds 20 recorded bot fights in forged worlds (SEED-659, `docs/poc-combat-bridge.md`). Each file records the input frames and the outcome (winner, cause, ticks, hits, damage, scene state hash). Before SEED-743 the only check was the ctest case "every recorded forged-world fight replays to its recorded outcome", which is in the medium tier: the Windows job ran it on every PR (about 2 to 3 s in Release), but the Linux shards run the fast preset on a PR, so Linux replayed the corpus only on a push to main (shard 3, 52 s under ASan in run 40867164082). A fight that replays differently under clang on Linux could therefore reach main and turn main red, and a difference between the platforms was never compared directly: each OS only checked itself against the files.
+
+Now both jobs replay the corpus on every heavy PR and every push to main, and the platforms are compared with each other:
+
+| Where | Step | What it does |
+|---|---|---|
+| `windows build + tests`, after the smoke run | `Bridge corpus replay` | `combat_bridge_corpus --replay bridge-corpus-windows.txt` (about 3 s), uploaded as the `bridge-corpus-windows` artifact |
+| `linux sanitizers shard 2 of 4`, after its ctest shard | `Bridge corpus replay` | the same binary of the ASan build, `bridge-corpus-linux.txt` (about 60 s), uploaded as `bridge-corpus-linux` |
+| `linux headless + sanitizers` (the required aggregator) | `The bridge corpus replays the same on Windows and Linux` | downloads both reports and `diff -u`s them; any difference fails the check, and a missing report (a job that died before its replay step) fails it too |
+
+`combat_bridge_corpus --replay [report-file]` (the recorder of `bin/regen-combat-bridge-corpus`, `game/combat_bridge/tools/corpus_main.cpp`) forges the three worlds once, replays every file through `resolveEntry` and writes one line per fight: the file stem, the world hash, the scene seed, the recorded outcome and the replayed one, LF only. It exits 1 when any replayed outcome differs from its file (the same check as the ctest case, so Linux is now held to the files on a PR too), when the folder is empty or a world does not forge. A re-pick (the world hash moved, so the file no longer applies and the same slot is searched again) is a warning on stderr and is marked in the line, not a failure, as in the test; the cross-platform diff is what catches a platform that re-picks or replays differently in that state, which comparing against the files cannot. `replayCorpus` in `bridge_corpus.h` is the library side, pinned by "the replay report lists every fight beside its recorded outcome and goes red when one state hash moves" (medium tier).
+
+Cost against the 15 minute budget (PR run 40812679085, warm caches): the Windows job took 6 min 12 s and gains about 3 s. Shard 2 was the shortest Linux shard at 4 min 6 s (shard 3, the longest, 7 min 53 s) and gains about a minute. The aggregator `linux headless + sanitizers` now also waits for `windows build + tests`, because it reads its report; on the baseline PR run that job finished 1 min 41 s before the last shard, so the check reports no later than before. On main after a cache eviction the Windows job can take 25 minutes and the Linux check waits for it, which is visible but harmless (the Windows check is red or late anyway in that state).
+
+After an intended combat or worldgen change, `bin/regen-combat-bridge-corpus` rewrites the files; commit them with the change. When only the cross-platform diff fails, the files are not the fix: one platform simulates the fight differently, which is a determinism regression to find, not to record.
 
 ## LFS cache (SEED-687)
 

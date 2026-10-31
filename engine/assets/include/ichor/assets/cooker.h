@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/assets/piece_conventions.h"
 #include "ichor/assets/skeleton_cook.h"
 

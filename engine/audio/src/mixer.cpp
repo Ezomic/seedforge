@@ -1,5 +1,6 @@
 #include "ichor/audio/mixer.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/audio/ambience_layers.h"
 
 #include <algorithm>

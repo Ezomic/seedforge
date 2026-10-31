@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/gfx/render_view.h"
 #include "ichor/world/heightfield.h"
 

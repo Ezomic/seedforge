@@ -3,6 +3,7 @@
 #include "ichor/core/input.h"
 
 #include <string>
+#include <vector>
 
 namespace ichor {
 
@@ -16,6 +17,15 @@ struct WindowDesc {
 struct Extent {
     int width = 0;
     int height = 0;
+
+    bool operator==(const Extent&) const = default;
+};
+
+// What the player asks of the window from the pause menu. A 0 x 0 size is the window as it was made: the default
+// window size, or the display's own mode in fullscreen.
+struct DisplayRequest {
+    bool fullscreen = false;
+    Extent size;
 };
 
 // The mouse as of the last pump, in pixels of the drawable, origin top left.
@@ -81,6 +91,12 @@ public:
     // While set, the left button attacks (Ctrl for heavy) and the middle button blocks, as InputFrame::Attack, Heavy
     // and Block. The app turns it off whenever a UI screen has focus, so a click on the UI stays a UI click.
     virtual void enableMouseAttack(bool enabled) { (void)enabled; }
+    // The sizes the window's display offers for fullscreen, largest first and each once. Platforms without a display offer none.
+    virtual std::vector<Extent> displayModes() const { return {}; }
+    // Puts the window in the asked mode and size; false when there is no window or the display refused. Fullscreen at
+    // a size no mode has uses the closest mode; a window is kept inside the usable screen.
+    virtual bool setDisplay(const DisplayRequest& request) { (void)request; return false; }
+    virtual bool fullscreen() const { return false; }
 };
 
 }
