@@ -2,6 +2,7 @@
 
 #include "ichor/assets/bundle.h"
 #include "ichor/audio/ambience_layers.h"
+#include "ichor/core/profile.h"
 
 #include <algorithm>
 #include <cmath>
@@ -106,6 +107,7 @@ void Mixer::setReverb(const ReverbSettings& settings)
 
 void Mixer::mix(float* interleaved, std::uint32_t frames)
 {
+    ICHOR_ZONE_N("audio.mix");
     const std::lock_guard lock(mutex_);
     std::fill(interleaved, interleaved + static_cast<std::size_t>(frames) * kChannels, 0.0f);
     if (frames == 0) {
