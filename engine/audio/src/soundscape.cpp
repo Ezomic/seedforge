@@ -243,11 +243,16 @@ std::vector<BedGain> blendedBeds(const Soundscape& soundscape, std::string_view 
 
 std::optional<StepSound> footstepFor(const Soundscape& soundscape, SoundSurface surface)
 {
-    const StepSound* sound = soundscape.step(surface);
-    if (sound == nullptr || sound->clip.empty() || !(sound->gain > 0.0f)) {
+    if (surface == SoundSurface::Water) {
         return std::nullopt;
     }
-    return *sound;
+    for (const SoundSurface candidate : {surface, kFallbackSoundSurface}) {
+        const StepSound* sound = soundscape.step(candidate);
+        if (sound != nullptr && !sound->clip.empty() && sound->gain > 0.0f) {
+            return *sound;
+        }
+    }
+    return std::nullopt;
 }
 
 SettlementSoundType settlementTypeForBiome(std::string_view biome)

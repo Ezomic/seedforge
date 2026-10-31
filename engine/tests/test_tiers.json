@@ -84,6 +84,7 @@
     "the player is drawn on the terrain, faces the way it walks and keeps its facing at rest",
     "the player's stride follows the render clock and a hostile clock or tick moves nothing",
     "the real settlement kit art shares its materials under the renderer cap",
+    "the replay report lists every fight beside its recorded outcome and goes red when one state hash moves",
     "the root's travel is taken out of the pose across a whole stride",
     "the run sits the body up but leaves the arms, and so the spear and shield, at the orientation the clip gave them",
     "the spear is held in the right hand and the shield in the left, on the hand at the start of idle",
@@ -94,7 +95,8 @@
     "the walk and run clips are different poses at the same moment of the stride",
     "the wind-up lifts the axe above where it rests",
     "version_stamp_cases",
-    "walk travels about 1.05 m/s and run about 5.2 m/s along the way the body faces, from the root joint"
+    "walk travels about 1.05 m/s and run about 5.2 m/s along the way the body faces, from the root joint",
+    "walking across streaming cell boundaries never stalls a tick, and a streamer that builds on the tick thread does"
   ],
   "soak": [
     "every one of the five terrain conditions exists in a forged world, and the search is deterministic",

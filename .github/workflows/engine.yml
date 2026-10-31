@@ -82,6 +82,14 @@ jobs:
           python3 tools/check_data.py --self-test
           python3 tools/check_deps.py --root .
           python3 tools/check_deps.py --root . --self-test
+      - name: Dialogue coverage
+        run: |
+          python3 tools/dialogue_coverage.py --root . --report dialogue-coverage.md
+          python3 tools/dialogue_coverage.py --self-test
+        # The report is the readable output; it lands in the job summary even when the gate fails.
+      - name: Dialogue coverage report
+        if: always()
+        run: '[ -f dialogue-coverage.md ] && cat dialogue-coverage.md >> "$GITHUB_STEP_SUMMARY" || true'
       - name: Test tiers and time budget tools
         run: |
           python3 tools/ci_tiers.py --root . check
@@ -131,6 +139,10 @@ jobs:
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      # vcpkg hashes the version of the pwsh it runs into every package ABI. With this set it ignores the runner's pwsh (which
+      # changes with the runner image, two versions coexist during a rollout) and uses the one pinned by VCPKG_COMMIT, so the
+      # same binary cache is warm on every image (SEED-740). cmake, ninja and git are pinned the same way.
+      VCPKG_FORCE_DOWNLOADED_BINARIES: "1"
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
       - uses: actions/checkout@v4
@@ -148,6 +160,11 @@ jobs:
         run: ./vcpkg/bootstrap-vcpkg.bat -disableMetrics
       - name: MSVC developer environment
         uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: Use the vcpkg checkout, not the copy bundled with Visual Studio
+        # vcvars64 exports VCPKG_ROOT pointing at VS's own vcpkg copy and the step above forwards it, which silently replaced the
+        # checkout at VCPKG_COMMIT: that copy's tool pins (cmake 3.30.1, pwsh 7.5.3) do not match the baseline's ports (SEED-740).
+        shell: pwsh
+        run: '"VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8'
       - name: Install sccache
         # Pinned release binary from the official action; it is faster than choco. The download is the one step
         # here that depends on a service we do not run, so a failure costs speed, not correctness.
@@ -184,20 +201,24 @@ jobs:
           key: sccache-windows-${{ github.sha }}
           restore-keys: sccache-windows-
       - name: Toolchain identity for the vcpkg cache
-        # vcpkg hashes the pwsh version and cl.exe into every package ABI, so a runner image that bumps either restores 0 packages.
-        # Keying on them makes that a cache miss that saves a fresh set, instead of a hit that never re-saves (SEED-716).
+        # vcpkg hashes cl.exe into every package ABI, so a runner image with a new compiler restores 0 packages. Keying on it makes
+        # that a cache miss that saves a fresh set, instead of a hit that never re-saves (SEED-716). The pwsh version is no longer
+        # part of the key: vcpkg uses its own pinned pwsh (VCPKG_FORCE_DOWNLOADED_BINARIES above), logged here next to the runner's.
         id: toolchain
         shell: pwsh
         run: |
           $cl = (Get-FileHash (Get-Command cl.exe).Source -Algorithm SHA256).Hash.Substring(0, 16)
-          "id=pwsh$($PSVersionTable.PSVersion)-cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "id=cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "runner pwsh $($PSVersionTable.PSVersion), cl.exe $cl"
+          $vcpkgPwsh = (& ./vcpkg/vcpkg.exe fetch powershell-core | Select-Object -Last 1)
+          Write-Host "vcpkg pwsh $vcpkgPwsh ($(& $vcpkgPwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'))"
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
         with:
           path: .vcpkg-cache
-          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
-          restore-keys: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-
+          key: vcpkg-windows-v4-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-windows-v4-${{ steps.toolchain.outputs.id }}-
       - name: Restore forged world test cache
         id: cache2
         # Keyed on the sources the test cache digest hashes (engine/tests/forged_cache_digest.cmake), so a generator change starts cold.
@@ -217,7 +238,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .vcpkg-cache
-          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          key: vcpkg-windows-v4-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
       - name: Build
         if: needs.changes.outputs.heavy == 'true'
         run: cmake --build --preset windows-ci
@@ -253,6 +274,20 @@ jobs:
         if: needs.changes.outputs.heavy == 'true'
         run: python ../tools/check_smoke_hash.py build/windows-ci/app/ichor.exe
         working-directory: engine
+      - name: Bridge corpus replay
+        # The 20 recorded fights of game/combat_bridge/tests/corpus (SEED-659) replayed against their files; the report is compared with the
+        # Linux one in `linux headless + sanitizers` (SEED-743). About 3 s in Release.
+        if: needs.changes.outputs.heavy == 'true'
+        run: build/windows-ci/combat_bridge/combat_bridge_corpus.exe --replay bridge-corpus-windows.txt
+        working-directory: engine
+      - name: Upload bridge corpus report
+        if: ${{ always() && needs.changes.outputs.heavy == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-corpus-windows
+          path: engine/bridge-corpus-windows.txt
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Save sccache
         # Only main saves a compiler cache: a per-commit entry from every PR run filled the 10 GB cache limit (SEED-688).
         if: ${{ always() && github.ref == 'refs/heads/main' }}
@@ -360,6 +395,21 @@ jobs:
         if: always()
         run: python3 ../tools/test_times.py build/linux-headless-asan/Testing/Temporary/LastTest.log --profile sanitizer
         working-directory: engine
+      - name: Bridge corpus replay
+        # The 20 recorded fights of game/combat_bridge/tests/corpus replayed under the sanitizers on every PR too (the ctest case is medium
+        # tier, so the fast preset leaves it out); `linux headless + sanitizers` compares the report with the Windows one (SEED-743).
+        # About 60 s under ASan, on the shard that finished first in the baseline runs.
+        if: matrix.shard == 2
+        run: build/linux-headless-asan/combat_bridge/combat_bridge_corpus --replay bridge-corpus-linux.txt
+        working-directory: engine
+      - name: Upload bridge corpus report
+        if: ${{ always() && matrix.shard == 2 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-corpus-linux
+          path: engine/bridge-corpus-linux.txt
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Save vcpkg binaries
         # Saved even when a later step fails, so a failed first run still warms the cache (actions/cache only saves on success).
         if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
@@ -494,7 +544,8 @@ jobs:
     name: linux headless + sanitizers
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [changes, linux-shard, linux-gpu]
+    # `windows` is needed only for its bridge corpus report (SEED-743); whether that job passed stays the business of `windows runtime + tests`.
+    needs: [changes, linux-shard, linux-gpu, windows]
     if: always()
     steps:
       - name: Every Linux job passed or was not needed
@@ -507,6 +558,30 @@ jobs:
           echo "changes: $CHANGES, heavy: $HEAVY, shards: $SHARDS, gpu goldens: $GPU"
           test "$CHANGES" = success
           if [ "$HEAVY" = true ]; then test "$SHARDS" = success && test "$GPU" = success; else test "$SHARDS" = skipped && test "$GPU" = skipped; fi
+      - name: Download the bridge corpus reports
+        if: needs.changes.outputs.heavy == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bridge-corpus-*
+          path: bridge-corpus
+      - name: The bridge corpus replays the same on Windows and Linux
+        # Both reports hold one line per fight with the world hash, the recorded outcome and the replayed one. A platform whose
+        # replay disagrees with the files has already failed its own job; this step fails when the two platforms disagree with each other,
+        # which the files alone cannot show once a world moved and every fight was re-picked.
+        if: needs.changes.outputs.heavy == 'true'
+        run: |
+          windows=bridge-corpus/bridge-corpus-windows/bridge-corpus-windows.txt
+          linux=bridge-corpus/bridge-corpus-linux/bridge-corpus-linux.txt
+          for f in "$windows" "$linux"; do
+            [ -s "$f" ] || { echo "::error::$f is missing: the job that writes it did not get to its Bridge corpus replay step"; exit 1; }
+          done
+          lines=$(wc -l < "$linux")
+          if diff -u "$windows" "$linux"; then
+            echo "the $lines bridge fights replay to the same outcome on Windows and Linux"
+          else
+            echo "::error::the bridge corpus replays differently on Windows and Linux (the diff above; - is Windows, + is Linux)"
+            exit 1
+          fi
 
   linux-soak:
     # Not a PR check: the full variants of the heavy tests under the sanitizers, on every merge to main (nightly.yml runs them too).

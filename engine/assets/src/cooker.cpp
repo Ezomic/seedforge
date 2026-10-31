@@ -3,6 +3,7 @@
 #include "ichor/assets/image.h"
 #include "ichor/assets/piece_conventions.h"
 #include "ichor/assets/skeleton_cook.h"
+#include "ichor/assets/texture_cook.h"
 #include "ichor/core/log.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -17,6 +18,8 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <map>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -264,15 +267,60 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vecto
     return true;
 }
 
-bool cookTexture(const cgltf_image& image, TextureFormat format, Texture& texture)
+bool cookTexture(const cgltf_image& image, TextureUse use, std::uint32_t maxSize, Texture& texture)
 {
-    texture.name = image.name != nullptr ? image.name : "";
+    const std::string name = image.name != nullptr ? image.name : "";
     if (image.buffer_view == nullptr) {
-        logf(LogLevel::Error, "texture {}: external images are not supported, embed them in the GLB", texture.name);
+        logf(LogLevel::Error, "texture {}: external images are not supported, embed them in the GLB", name);
         return false;
     }
     const auto* bytes = static_cast<const std::uint8_t*>(image.buffer_view->buffer->data) + image.buffer_view->offset;
-    return decodeTexture(bytes, image.buffer_view->size, format, texture);
+    DecodedImage decoded;
+    if (!decodeImage(bytes, image.buffer_view->size, decoded)) {
+        logf(LogLevel::Error, "texture {}: cannot be decoded", name);
+        return false;
+    }
+    const TextureFormat format = chooseTextureFormat(use, decoded.sourceChannels == 1);
+    if (!cookCompressedTexture(std::move(decoded), format, maxSize, texture)) {
+        logf(LogLevel::Error, "texture {}: cannot be compressed", name);
+        return false;
+    }
+    texture.name = name;
+    return true;
+}
+
+// The size table to cook `source` with: the one in the options, else art/texture_budget.json from the art folder above the file.
+TextureBudget textureBudgetFor(const CookOptions& options, const std::filesystem::path& source)
+{
+    if (options.textureBudget) {
+        return *options.textureBudget;
+    }
+    static std::mutex mutex;
+    static std::map<std::filesystem::path, TextureBudget> cache;
+    std::error_code ec;
+    for (std::filesystem::path dir = std::filesystem::absolute(source, ec).parent_path(); !dir.empty() && dir != dir.parent_path(); dir = dir.parent_path()) {
+        if (dir.filename() != "art") {
+            continue;
+        }
+        const std::lock_guard lock(mutex);
+        const auto found = cache.find(dir);
+        if (found != cache.end()) {
+            return found->second;
+        }
+        TextureBudget budget;
+        std::vector<std::string> problems;
+        if (std::filesystem::exists(dir / "texture_budget.json", ec)) {
+            const bool loaded = loadTextureBudget(dir / "texture_budget.json", budget, problems);
+            for (const std::string& problem : problems) {
+                logf(LogLevel::Warn, "texture_budget.json: {}", problem);
+            }
+            if (!loaded) {
+                logf(LogLevel::Warn, "{} could not be read, cooking with the default texture size cap", (dir / "texture_budget.json").string());
+            }
+            return cache.emplace(dir, loaded ? std::move(budget) : TextureBudget{}).first->second;
+        }
+    }
+    return {};
 }
 
 // A parsed, buffer-loaded and validated glTF, or null with the reason logged.
@@ -324,20 +372,30 @@ bool cookGltf(const std::filesystem::path& source, SceneBundle& bundle, PieceDat
         return false;
     }
 
-    // A texture's format depends on how a material uses it: colour is sRGB,
-    // everything else is data.
-    std::vector<TextureFormat> formats(data->images_count, TextureFormat::Rgba8Unorm);
+    // A texture's format depends on how a material uses it: colour is sRGB, a normal map is
+    // two channels, everything else is data. An image used two ways keeps the colour or data reading.
+    std::vector<bool> asColor(data->images_count, false);
+    std::vector<bool> asData(data->images_count, false);
+    std::vector<bool> asNormal(data->images_count, false);
     for (cgltf_size m = 0; m < data->materials_count; ++m) {
-        const std::uint32_t color = textureIndex(*data, data->materials[m].pbr_metallic_roughness.base_color_texture.texture);
-        if (color != kNoTexture) {
-            formats[color] = TextureFormat::Rgba8Srgb;
-        }
+        const cgltf_material& material = data->materials[m];
+        const std::uint32_t color = textureIndex(*data, material.pbr_metallic_roughness.base_color_texture.texture);
+        const std::uint32_t metalRough = textureIndex(*data, material.pbr_metallic_roughness.metallic_roughness_texture.texture);
+        const std::uint32_t normal = textureIndex(*data, material.normal_texture.texture);
+        if (color != kNoTexture) asColor[color] = true;
+        if (metalRough != kNoTexture) asData[metalRough] = true;
+        if (normal != kNoTexture) asNormal[normal] = true;
     }
 
+    std::error_code absoluteEc;
+    const std::filesystem::path absoluteSource = std::filesystem::absolute(source, absoluteEc).lexically_normal();
+    const TextureBudget budget = textureBudgetFor(cookOptions, absoluteSource);
+    const std::uint32_t maxSize = maxTextureSize(budget, absoluteSource);
     bool ok = true;
     bundle.textures.resize(data->images_count);
     for (cgltf_size i = 0; i < data->images_count && ok; ++i) {
-        ok = cookTexture(data->images[i], formats[i], bundle.textures[i]);
+        const TextureUse use = asColor[i] ? TextureUse::Color : (asNormal[i] && !asData[i] ? TextureUse::Normal : TextureUse::Data);
+        ok = cookTexture(data->images[i], use, maxSize, bundle.textures[i]);
     }
 
     bundle.materials.resize(data->materials_count);

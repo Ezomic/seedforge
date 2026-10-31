@@ -14,6 +14,7 @@
 #include <stb_image_write.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <iterator>
@@ -24,8 +25,16 @@ namespace {
 
 float toLinear(std::uint8_t v)
 {
-    const float c = static_cast<float>(v) / 255.0f;
-    return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+    // A table, because a cooked pack averages hundreds of millions of these and std::pow dominated the cook.
+    static const std::array<float, 256> table = [] {
+        std::array<float, 256> t{};
+        for (std::size_t i = 0; i < t.size(); ++i) {
+            const float c = static_cast<float>(i) / 255.0f;
+            t[i] = c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+        }
+        return t;
+    }();
+    return table[v];
 }
 
 std::uint8_t toSrgb(float v)
@@ -63,7 +72,7 @@ void downsample(const std::uint8_t* src, std::uint32_t sw, std::uint32_t sh, std
 
 }
 
-bool decodeTexture(const std::uint8_t* bytes, std::size_t size, TextureFormat format, Texture& out)
+bool decodeImage(const std::uint8_t* bytes, std::size_t size, DecodedImage& out)
 {
     int width = 0;
     int height = 0;
@@ -73,19 +82,38 @@ bool decodeTexture(const std::uint8_t* bytes, std::size_t size, TextureFormat fo
         logf(LogLevel::Error, "image decode failed: {}", stbi_failure_reason());
         return false;
     }
-
     out.width = static_cast<std::uint32_t>(width);
     out.height = static_cast<std::uint32_t>(height);
+    out.sourceChannels = channels;
+    out.rgba.assign(pixels, pixels + static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4);
+    stbi_image_free(pixels);
+    return true;
+}
+
+void shrinkToFit(DecodedImage& image, std::uint32_t maxSize, bool srgb)
+{
+    while (std::max(image.width, image.height) > maxSize && (image.width > 1 || image.height > 1)) {
+        const std::uint32_t nw = std::max(1u, image.width / 2);
+        const std::uint32_t nh = std::max(1u, image.height / 2);
+        std::vector<std::uint8_t> next(static_cast<std::size_t>(nw) * nh * 4);
+        downsample(image.rgba.data(), image.width, image.height, next.data(), nw, nh, srgb);
+        image.rgba.swap(next);
+        image.width = nw;
+        image.height = nh;
+    }
+}
+
+void buildMipChain(const DecodedImage& image, TextureFormat format, Texture& out)
+{
+    out.width = image.width;
+    out.height = image.height;
     out.format = format;
     out.mipCount = mipLevelCount(out.width, out.height);
-    out.pixels.clear();
+    out.pixels = image.rgba;
 
     std::uint32_t w = out.width;
     std::uint32_t h = out.height;
-    std::vector<std::uint8_t> level(pixels, pixels + static_cast<std::size_t>(w) * h * 4);
-    stbi_image_free(pixels);
-    out.pixels.insert(out.pixels.end(), level.begin(), level.end());
-
+    std::vector<std::uint8_t> level = image.rgba;
     for (std::uint32_t mip = 1; mip < out.mipCount; ++mip) {
         const std::uint32_t nw = std::max(1u, w / 2);
         const std::uint32_t nh = std::max(1u, h / 2);
@@ -96,6 +124,15 @@ bool decodeTexture(const std::uint8_t* bytes, std::size_t size, TextureFormat fo
         w = nw;
         h = nh;
     }
+}
+
+bool decodeTexture(const std::uint8_t* bytes, std::size_t size, TextureFormat format, Texture& out)
+{
+    DecodedImage image;
+    if (!decodeImage(bytes, size, image)) {
+        return false;
+    }
+    buildMipChain(image, format, out);
     return true;
 }
 

@@ -5,10 +5,14 @@
 #include "ichor/stage0/fight_report.h"
 #include "ichor/world/forge_job.h"
 
+#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <cmath>
 #include <format>
+#include <fstream>
+#include <iterator>
+#include <map>
 #include <string_view>
 #include <system_error>
 #include <thread>
@@ -289,6 +293,112 @@ std::optional<Entry> decodeEntry(std::string_view text)
     entry.frames = body->frames;
     entry.expected = body->expected;
     return entry;
+}
+
+namespace {
+
+std::vector<std::filesystem::path> corpusFiles(const std::filesystem::path& dir, std::string& error)
+{
+    error.clear();
+    std::error_code code;
+    std::vector<std::filesystem::path> paths;
+    for (const auto& item : std::filesystem::directory_iterator(dir, code)) {
+        if (item.path().extension() == ".replay") paths.push_back(item.path());
+    }
+    if (code) {
+        error = std::format("cannot read {}: {}", dir.string(), code.message());
+        return {};
+    }
+    std::sort(paths.begin(), paths.end());
+    return paths;
+}
+
+std::vector<Entry> decodeFiles(std::span<const std::filesystem::path> paths, std::string& error)
+{
+    std::vector<Entry> entries;
+    for (const auto& path : paths) {
+        std::ifstream in(path, std::ios::binary);
+        const std::string text{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+        std::optional<Entry> entry = decodeEntry(text);
+        if (!entry) {
+            error = std::format("{} is not a well-formed corpus entry", path.string());
+            return {};
+        }
+        entries.push_back(std::move(*entry));
+    }
+    return entries;
+}
+
+}
+
+std::vector<Entry> loadCorpus(const std::filesystem::path& dir, std::string& error)
+{
+    const std::vector<std::filesystem::path> paths = corpusFiles(dir, error);
+    if (!error.empty()) return {};
+    return decodeFiles(paths, error);
+}
+
+bool ReplayReport::matches() const
+{
+    return std::all_of(lines.begin(), lines.end(), [](const ReplayLine& line) { return line.actual == line.expected; });
+}
+
+std::string ReplayReport::text() const
+{
+    const auto describe = [](const Outcome& outcome) {
+        if (!outcome.finished) return std::format("unfinished after {} ticks, state {:016x}", outcome.ticks, outcome.stateHash);
+        return std::format("{} wins in {} ticks ({}), hits {}, damage_tenths {}, state {:016x}", outcome.playerLost ? "foe" : "player", outcome.ticks,
+            stage0::name(outcome.cause), outcome.playerHits, outcome.damageTakenTenths, outcome.stateHash);
+    };
+    std::string out;
+    for (const ReplayLine& line : lines) {
+        out += std::format("{} world {:016x} scene {}{} | recorded: {} | replayed: {}\n", line.file, line.worldHash, line.sceneSeed, line.repicked ? " (re-picked)" : "",
+            describe(line.expected), describe(line.actual));
+    }
+    return out;
+}
+
+ReplayReport replayCorpus(const std::filesystem::path& dir)
+{
+    ReplayReport report;
+    const std::vector<std::filesystem::path> paths = corpusFiles(dir, report.error);
+    if (!report.error.empty()) return report;
+    const std::vector<Entry> entries = decodeFiles(paths, report.error);
+    if (!report.error.empty()) return report;
+    if (entries.empty()) {
+        report.error = std::format("no .replay files in {}", dir.string());
+        return report;
+    }
+    std::map<std::uint64_t, World> worlds;
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+        const Entry& stored = entries[i];
+        auto found = worlds.find(stored.worldSeed);
+        if (found == worlds.end()) {
+            std::string error;
+            World world = forgeWorld(stored.worldSeed, stored.grid, error);
+            if (!world.game) {
+                report.error = std::format("world {} did not forge: {}", stored.worldSeed, error);
+                return report;
+            }
+            found = worlds.emplace(stored.worldSeed, std::move(world)).first;
+        }
+        const World& world = found->second;
+        ReplayLine line;
+        line.file = paths[i].stem().string();
+        line.worldHash = worldHashOf(world);
+        const Resolved resolved = resolveEntry(stored, world);
+        line.repicked = resolved.repicked;
+        if (resolved.repicked) report.warnings.push_back(resolved.message);
+        if (!resolved.entry) {
+            report.error = resolved.message;
+            return report;
+        }
+        line.sceneSeed = resolved.entry->sceneSeed;
+        line.expected = resolved.entry->expected;
+        line.actual = replayFight(world, resolved.entry->sceneSeed, resolved.entry->frames);
+        report.lines.push_back(std::move(line));
+    }
+    return report;
 }
 
 }

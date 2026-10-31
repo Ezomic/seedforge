@@ -52,6 +52,9 @@ public:
     // Rebuilds pipelines from the shader files on disk. Hot reload calls this
     // when a compiled shader changes; a renderer without shaders does nothing.
     virtual bool reloadShaders() { return true; }
+    // Whether presenting waits for the display (on from the start). Off asks for a mode that does not wait; a display
+    // that offers none keeps waiting. Takes effect from the next frame.
+    virtual void setVsync(bool on) { (void)on; }
 
     // How long the GPU spent on each pass of a recent frame, in milliseconds, in draw order. Empty until a frame has
     // finished, and always empty where there is no GPU (the null renderer). Presentation only.

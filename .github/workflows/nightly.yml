@@ -20,6 +20,9 @@ on:
       sweep_seeds:
         description: axiom pair sweep seeds, N or N-M
         default: "1-8"
+      soak_memory_seconds:
+        description: wall seconds the memory soak walks for
+        default: "600"
 
 jobs:
   ci-time-trend:
@@ -263,6 +266,75 @@ jobs:
             axiom-sweep/*/validation.json
           if-no-files-found: ignore
 
+  memory-soak:
+    # SEED-711: a long headless session (the walk bot over every cell of the forged world, round and round) with the resident
+    # set sampled once a second; red when the curve keeps growing after the ring is warm. Release without sanitizers: ASan's
+    # shadow and quarantine would be most of the number. Never on a pull request: the test is skipped without the budget.
+    name: memory soak (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      ICHOR_SOAK_MEMORY_SECONDS: ${{ inputs.soak_memory_seconds || '600' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-walk-${{ github.sha }}
+          restore-keys: |
+            ccache-walk-
+            ccache-asan-
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target ichor_tests_world
+        working-directory: engine
+      - name: Memory soak
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/tests/ichor_tests_world "soak: a long headless session*" | tee soak-memory.log
+      - name: Memory curve
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Memory soak"
+            echo '```'
+            grep -E '^SOAK memory|FAILED|failed' soak-memory.log || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload soak log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-memory-soak-log
+          path: soak-memory.log
+          if-no-files-found: ignore
+
+
   soak:
     # The full variants of the heavy tests (label soak in engine/tests/test_tiers.json) under ASan/UBSan. The stress job above runs
     # every other test, so together the nightly covers the whole suite. Pull requests run the small variants only (SEED-664, SEED-672).
@@ -309,3 +381,68 @@ jobs:
       - name: Soak tests
         run: ctest --preset linux-headless-asan-soak
         working-directory: engine
+
+  regen-fixtures:
+    # bin/regen-fixtures --check on a clean tree (SEED-699): every regenerator must reproduce the fixture that is committed, so a
+    # hash change is one command, and a regenerator that drifts from its test is caught here instead of on the next intended change.
+    # Windows, like the developer machines the fixtures are regenerated on. Restores the PR caches and saves none.
+    name: regen-fixtures reproduces the committed fixtures (windows)
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+          filter: blob:none
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.bat -disableMetrics
+      - name: MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: Install sccache
+        id: sccache-action
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Enable sccache
+        if: steps.sccache-action.outcome == 'success'
+        shell: bash
+        run: |
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+      - name: Restore sccache
+        uses: actions/cache/restore@v4
+        with:
+          path: .sccache
+          key: sccache-windows-${{ github.sha }}
+          restore-keys: sccache-windows-
+      - name: Toolchain identity for the vcpkg cache
+        id: toolchain
+        shell: pwsh
+        run: |
+          $cl = (Get-FileHash (Get-Command cl.exe).Source -Algorithm SHA256).Hash.Substring(0, 16)
+          "id=pwsh$($PSVersionTable.PSVersion)-cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Restore vcpkg binaries
+        uses: actions/cache/restore@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-
+      - name: Configure
+        run: cmake --preset windows-ci
+        working-directory: engine
+      - name: Build the regenerators
+        run: cmake --build --preset windows-ci --target ichor_tests_world ichor_forge_cli ichor ichor_lint_cli combat_bridge_corpus stage0_corpus
+        working-directory: engine
+      - name: Regenerate every fixture and compare with the index
+        shell: bash
+        run: bin/regen-fixtures --no-build --check
