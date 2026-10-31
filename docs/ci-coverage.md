@@ -71,6 +71,33 @@ A seed with no second settlement 60 m or more from the spawn settlement prints `
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
 
+## Playthrough bot (SEED-748)
+
+A third nightly job, `playthrough-bot`, runs the walk bot on past the settlement: one headless run per seed over the whole errand. It builds `combat_bridge_tests` (Release, sanitizers off, like the walk job) and runs the one case `nightly: the playthrough bot talks, accepts, fights, loots, saves, quits and loads, or names the step it cannot` (`game/combat_bridge/tests/test_playthrough_bot.cpp`), which is skipped in every normal `ctest` run and only runs when `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS` is set; the workflow sets it to `1,2,3,5` (the `play_seeds` input of a manual run changes it). It never runs on a pull request.
+
+The bot itself is `game/combat_bridge/include/ichor/combat_bridge/playthrough_bot.h` (`playThrough`). It lives in the combat bridge rather than beside `forged_walk_bot.h` because the fight step needs the bridge, which depends on the world module and not the other way round. The steps, in order, and what drives each headlessly:
+
+| Step | Driver | Done when |
+|---|---|---|
+| walk | the SEED-492 walk bot over `findWalkRoute`, spawn to the quest giver | the walk arrives within 4 m |
+| talk | Interact beside the giver (`ParleySystem`) | the conversation is open |
+| accept | `ParleySystem::choose("accept")` | the quest is Active |
+| fight | the walk bot to the dungeon, Confirm at the entrance (`DungeonEntry`), the body steered room by room, the combat bridge's scripted player (`CombatBridge::botInput`, expert skill) against the nearest room with enemies (`DungeonFight`) | every enemy of that room is a kill marker (`roomCleared`); up to 3 deaths are retried from the entry room |
+| loot | the body to the item's room, Interact (`CarrySystem`) | the item is carried and the quest is Found |
+| save | `SaveSlots::save` to a temporary folder | the slot is written |
+| quit | **unsupported**: the app quits through the pause menu in `main.cpp` (`Platform::requestQuit`) and nothing below the app can be told to quit. The headless game (scene and every system) is torn down in its place | reported as UNSUPPORTED, never as done |
+| load | a fresh game, `SaveSlots::load` | the same state hash, inside the dungeon, item carried, quest Found, the room still cleared, the same journal |
+
+As in `test_parley_playthrough`, the headless scene has no terrain: the overworld legs are the walk bot's over the walking rules, and the physics body is placed where a leg ended, on a slab, before it walks the dungeon itself.
+
+One line per step: `PLAY seed 1 step fight: ok | walked trip 412 m, ...; cleared room 7 (challenge) (skirmisher and artillery) 2 room(s) in with 0 death(s), expert skill, bot seed 1, 48 s scene, wall 3.2 s`, then `PLAY seed 1: complete | walk ok, talk ok, accept ok, fight ok, loot ok, save ok, quit UNSUPPORTED, load ok, wall 12.0 s` and a `PLAY summary` line. The night fails when:
+
+- a step is FAILED (it could not be completed: no route, no errand, the item did not come up, the slot did not load, more than 3 deaths) or STALLED (the walk timed out while still moving, nothing moved in the dungeon for 15 s of scene time, a dungeon step ran over 600 s of scene time, or the body did not reach a waypoint in 25 s); the steps after it print `NOT RUN`;
+- a seed's world does not forge or build;
+- the 1500 s budget (`ICHOR_NIGHTLY_PLAYTHROUGH_BUDGET_S`) runs out before every seed ran.
+
+An UNSUPPORTED step is printed and counted in the summary but does not fail the night: it is the list of what the bot cannot drive yet, not a regression. Today that list is `quit`. The job summary lists the `PLAY` lines and `play.log` is uploaded as `nightly-playthrough-log`. Run it locally with `bin/build combat_bridge_tests`, then `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS=1,2,3,5 engine/build/windows-ci/combat_bridge/combat_bridge_tests "nightly: the playthrough bot*"`. `ICHOR_NIGHTLY_PLAYTHROUGH_SKILL` picks another bot skill (`novice`, `regular`, `expert`).
+
 ## Test-time budget (SEED-658)
 
 Main went red twice because one test ran too close to the sanitizer timeout (the SEED-492 walk test on the SEED-556 worlds, and the SEED-650 live-worlds probe, which timed out at 1500 s). `tools/test_times.py` reads the per-test durations of a ctest run, prints the 20 slowest cases, and fails when a case exceeds its budget:

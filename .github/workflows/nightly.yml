@@ -17,6 +17,9 @@ on:
       walk_grids:
         description: forged walk bot grid sizes, comma separated
         default: "256,1024"
+      play_seeds:
+        description: playthrough bot world seeds, comma separated
+        default: "1,2,3,5"
 
 jobs:
   ci-time-trend:
@@ -192,6 +195,76 @@ jobs:
         with:
           name: nightly-walk-log
           path: walk.log
+          if-no-files-found: ignore
+
+  playthrough-bot:
+    # SEED-748: the walk bot carried on into a whole errand (talk, accept, fight, loot, save, quit, load) in one headless run per
+    # seed. Nightly only, never on a pull request: a fight can run minutes of scene time. Same Release build as the walk job.
+    name: playthrough bot (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS: ${{ inputs.play_seeds || '1,2,3,5' }}
+      ICHOR_NIGHTLY_PLAYTHROUGH_BUDGET_S: "1500"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-play-${{ github.sha }}
+          restore-keys: |
+            ccache-play-
+            ccache-walk-
+            ccache-asan-
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target combat_bridge_tests
+        working-directory: engine
+      - name: Playthrough bot
+        id: play
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/combat_bridge/combat_bridge_tests "nightly: the playthrough bot*" | tee play.log
+      - name: Summarize playthrough
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Playthrough bot"
+            echo '```'
+            grep -E '^PLAY' play.log
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload playthrough log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-playthrough-log
+          path: play.log
           if-no-files-found: ignore
 
   soak:
