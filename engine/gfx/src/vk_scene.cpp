@@ -1001,10 +1001,118 @@ void SceneRenderer::destroyBundle()
     }
     materialSets_.clear();
     materials_.clear();
+    materialTextures_.clear();
     for (auto& texture : textures_) {
         ctx_.destroyImage(texture);
     }
     textures_.clear();
+    textureSources_.clear();
+    textureFull_.clear();
+    residency_ = TextureResidency(residency_.cap());
+}
+
+void SceneRenderer::writeMaterialSet(VkDescriptorSet set, const std::array<std::uint32_t, 3>& textures)
+{
+    const auto view = [&](std::uint32_t index, const GpuImage& fallback) {
+        return index != kNoTexture && index < textures_.size() ? textures_[index].view : fallback.view;
+    };
+    const std::array<VkDescriptorImageInfo, 3> images{{
+        {VK_NULL_HANDLE, view(textures[0], whiteTexture_), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+        {VK_NULL_HANDLE, view(textures[1], whiteTexture_), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+        {VK_NULL_HANDLE, view(textures[2], flatNormalTexture_), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+    }};
+    VkDescriptorImageInfo sampler{materialSampler_, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
+    std::array<VkWriteDescriptorSet, 4> writes{};
+    for (std::uint32_t i = 0; i < 3; ++i) {
+        writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, i, 0, 1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, &images[i], nullptr, nullptr};
+    }
+    writes[3] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, 3, 0, 1, VK_DESCRIPTOR_TYPE_SAMPLER, &sampler, nullptr, nullptr};
+    vkUpdateDescriptorSets(ctx_.device(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
+}
+
+// Replaces a texture's image with its full chain or its mip tail and points every material that samples it at the
+// new view. The device must be idle: the old image is destroyed and the sets rewritten at once.
+bool SceneRenderer::swapTextureImage(std::uint32_t index, bool full)
+{
+    const Texture& source = textureSources_[index];
+    Texture tail;
+    const Texture* upload = &source;
+    if (!full) {
+        const std::uint32_t tailStart = mipTailStart(source.width, source.height, source.mipCount);
+        tail.name = source.name;
+        tail.format = source.format;
+        tail.width = std::max(1u, source.width >> tailStart);
+        tail.height = std::max(1u, source.height >> tailStart);
+        tail.mipCount = source.mipCount - tailStart;
+        const std::uint64_t skipped = mipRangeByteSize(source.format, source.width, source.height, source.mipCount, 0)
+            - mipRangeByteSize(source.format, source.width, source.height, source.mipCount, tailStart);
+        tail.pixels.assign(source.pixels.begin() + static_cast<std::ptrdiff_t>(skipped), source.pixels.end());
+        upload = &tail;
+    }
+    GpuImage image;
+    if (!ctx_.createTexture(image, *upload)) {
+        ctx_.destroyImage(image);
+        logf(LogLevel::Warn, "texture budget: could not upload {} of texture {}", full ? "the full chain" : "the mip tail", source.name);
+        return false;
+    }
+    ctx_.destroyImage(textures_[index]);
+    textures_[index] = image;
+    textureFull_[index] = full;
+    for (std::size_t material = 0; material < materialSets_.size(); ++material) {
+        const std::array<std::uint32_t, 3>& textures = materialTextures_[material];
+        if (textures[0] == index || textures[1] == index || textures[2] == index) {
+            writeMaterialSet(materialSets_[material], textures);
+        }
+    }
+    return true;
+}
+
+void SceneRenderer::applyResidency(const std::vector<std::uint32_t>& changed)
+{
+    bool idle = false;
+    for (const std::uint32_t index : changed) {
+        if (index >= textures_.size() || textureFull_[index] == residency_.isFull(index)) {
+            continue;
+        }
+        if (!idle) {
+            vkDeviceWaitIdle(ctx_.device());
+            idle = true;
+        }
+        swapTextureImage(index, residency_.isFull(index));
+    }
+}
+
+// Every bundle texture the view draws this frame is touched; what the budget evicts or reloads is applied before
+// the frame records, so no set changes under a command buffer.
+void SceneRenderer::touchTextures(const RenderView& view)
+{
+    std::vector<std::uint32_t> changed;
+    const auto touchMesh = [&](std::uint32_t meshIndex) {
+        for (const auto& sub : meshes_[meshIndex].submeshes) {
+            for (const std::uint32_t texture : materialTextures_[sub[2]]) {
+                if (texture != kNoTexture && residency_.touch(texture, changed)) {
+                    changed.push_back(texture);
+                }
+            }
+        }
+    };
+    for (const RenderInstance& instance : view.instances) {
+        if (instance.mesh < meshes_.size()) {
+            touchMesh(instance.mesh);
+        }
+    }
+    for (const VegetationDraw& draw : view.vegetation) {
+        const auto found = vegetationCells_.find(draw.cell);
+        if (found == vegetationCells_.end()) {
+            continue;
+        }
+        for (std::uint32_t kind = 0; kind < vegetationKinds_; ++kind) {
+            if (found->second.count[kind] > 0 && vegetationBase_ + kind < meshes_.size()) {
+                touchMesh(vegetationBase_ + kind);
+            }
+        }
+    }
+    applyResidency(changed);
 }
 
 bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
@@ -1030,24 +1138,37 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         }
         materialSets_.resize(materialBase);
         materials_.resize(materialBase);
+        materialTextures_.resize(materialBase);
         for (std::size_t i = textureBase; i < textures_.size(); ++i) {
             ctx_.destroyImage(textures_[i]);
         }
         textures_.resize(textureBase);
+        textureSources_.resize(textureBase);
+        textureFull_.resize(textureBase);
+        residency_.truncate(textureBase);
     };
 
+    std::vector<std::uint32_t> evicted;
     for (const Texture& texture : bundle.textures) {
         GpuImage image;
         const bool uploaded = ctx_.createTexture(image, texture);
         textures_.push_back(image);
+        textureSources_.push_back(texture);
+        textureFull_.push_back(true);
         if (!uploaded) {
             rollback();
             return false;
         }
+        // A device without block compression holds the RGBA8 decode, so that is what the budget counts.
+        const TextureFormat onDevice = isBlockCompressed(texture.format) && !ctx_.blockCompression() ? TextureFormat::Rgba8Unorm : texture.format;
+        const std::uint32_t tailStart = mipTailStart(texture.width, texture.height, texture.mipCount);
+        residency_.add(mipRangeByteSize(onDevice, texture.width, texture.height, texture.mipCount, 0),
+            mipRangeByteSize(onDevice, texture.width, texture.height, texture.mipCount, tailStart), evicted);
     }
+    applyResidency(evicted); // the device is idle here, from the wait above
 
-    const auto view = [&](std::uint32_t index, const GpuImage& fallback) {
-        return index != kNoTexture && textureBase + index < textures_.size() ? textures_[textureBase + index].view : fallback.view;
+    const auto global = [&](std::uint32_t index) {
+        return index != kNoTexture && textureBase + index < textures_.size() ? textureBase + index : kNoTexture;
     };
     std::vector<Material> clamped = bundle.materials;
     logMaterialIssues("upload", clampMaterials(clamped, activeMaterialLimits()));
@@ -1061,19 +1182,10 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
             rollback();
             return false;
         }
-        const std::array<VkDescriptorImageInfo, 3> images{{
-            {VK_NULL_HANDLE, view(material.baseColorTexture, whiteTexture_), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-            {VK_NULL_HANDLE, view(material.metallicRoughnessTexture, whiteTexture_), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-            {VK_NULL_HANDLE, view(material.normalTexture, flatNormalTexture_), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-        }};
-        VkDescriptorImageInfo sampler{materialSampler_, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
-        std::array<VkWriteDescriptorSet, 4> writes{};
-        for (std::uint32_t i = 0; i < 3; ++i) {
-            writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, i, 0, 1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, &images[i], nullptr, nullptr};
-        }
-        writes[3] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, 3, 0, 1, VK_DESCRIPTOR_TYPE_SAMPLER, &sampler, nullptr, nullptr};
-        vkUpdateDescriptorSets(ctx_.device(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
+        const std::array<std::uint32_t, 3> textures{global(material.baseColorTexture), global(material.metallicRoughnessTexture), global(material.normalTexture)};
+        writeMaterialSet(set, textures);
         materialSets_.push_back(set);
+        materialTextures_.push_back(textures);
 
         MaterialConstants constants;
         constants.baseColorFactor = material.baseColorFactor;
@@ -1110,6 +1222,8 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
     ZoneScoped;
     destroyRetired(false);
     ++renderedFrames_;
+    residency_.beginFrame();
+    touchTextures(view);
     FrameSlot& frame = slots_[slot % kFrameSlots];
     const float aspect = static_cast<float>(extent.width) / static_cast<float>(std::max(1u, extent.height));
 

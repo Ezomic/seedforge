@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/gfx/render_view.h"
+#include "ichor/gfx/texture_residency.h"
 
 #include <cstdint>
 #include <functional>
@@ -48,6 +49,11 @@ public:
     virtual bool setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds = 0) = 0;
     virtual std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants) = 0;
     virtual void removeVegetationCell(std::uint32_t cell) = 0;
+
+    // The resident texture budget (SEED-690): bundle textures over this many bytes, mips included, drop to their
+    // mip tail least recently drawn first, and come back when drawn again. Set it before the first uploadBundle.
+    virtual void setTextureBudget(std::uint64_t bytes) { (void)bytes; }
+    virtual TextureResidencyStats textureStats() const { return {}; }
 
     // Rebuilds pipelines from the shader files on disk. Hot reload calls this
     // when a compiled shader changes; a renderer without shaders does nothing.
