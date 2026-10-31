@@ -1,8 +1,9 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/assets/piece_conventions.h"
-#include "ichor/assets/texture_cook.h"
+#include "ichor/assets/texture_budget.h"
+#include "ichor/assets/skeleton_cook.h"
 
 #include <filesystem>
 #include <optional>
@@ -22,6 +23,7 @@ struct CookOptions {
     // The largest edge a texture keeps, by folder. When unset the cooker reads texture_budget.json from the art/ folder
     // above the glTF, and uses a 1024 cap for everything when there is none.
     std::optional<TextureBudget> textureBudget;
+    ClipPass clipPass; // see cookClip
 };
 
 // glTF or GLB in, bundle out. Meshes are deduplicated and reordered for the

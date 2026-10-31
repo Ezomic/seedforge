@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <string>
 
 using namespace ichor;
@@ -125,4 +126,59 @@ TEST_CASE("settings files load and save, and a missing or damaged one is the def
     std::filesystem::create_directories(file.path()); // a directory where the file should be
     REQUIRE(loadSettings(file.path()) == kDefaults);
     REQUIRE_FALSE(saveSettings(file.path(), custom));
+}
+
+TEST_CASE("the --mouse-sens value overrides the stored sensitivity for the run, inside the same range")
+{
+    const Settings stored{80.0f, 2.0f};
+    REQUIRE(effectiveMouseSensitivity(stored, std::nullopt) == 2.0f);
+    REQUIRE(effectiveMouseSensitivity(kDefaults, std::nullopt) == Settings::kDefaultMouseSensitivity);
+    REQUIRE(effectiveMouseSensitivity(stored, 0.5f) == 0.5f);
+    REQUIRE(effectiveMouseSensitivity(stored, 0.0f) == Settings::kMinMouseSensitivity);
+    REQUIRE(effectiveMouseSensitivity(stored, -3.0f) == Settings::kMinMouseSensitivity);
+    REQUIRE(effectiveMouseSensitivity(stored, 50.0f) == Settings::kMaxMouseSensitivity);
+    REQUIRE(effectiveMouseSensitivity(stored, kNaN) == 2.0f); // a flag that is not a number leaves the stored value
+    REQUIRE(effectiveMouseSensitivity(Settings{80.0f, kNaN}, std::nullopt) == Settings::kDefaultMouseSensitivity);
+}
+
+TEST_CASE("a sensitivity step starts from what the player looks with and keeps the other settings")
+{
+    const Settings stored{80.0f, 1.0f};
+    REQUIRE(stepMouseSensitivity(stored, 1.0f, 1) == Settings{80.0f, 1.1f});
+    REQUIRE(stepMouseSensitivity(stored, 1.0f, -3) == Settings{80.0f, 0.7f});
+    REQUIRE(stepMouseSensitivity(stored, 2.5f, 1) == Settings{80.0f, 2.6f}); // from the --mouse-sens value, not the stored one
+    REQUIRE(stepMouseSensitivity(stored, 0.1f, -1) == Settings{80.0f, Settings::kMinMouseSensitivity});
+    REQUIRE(stepMouseSensitivity(stored, 4.95f, 2) == Settings{80.0f, Settings::kMaxMouseSensitivity});
+    REQUIRE(stepMouseSensitivity(stored, 1.0f, 0) == stored);
+
+    // Many small steps land on tenths, so the file and the menu never show 1.0000001.
+    Settings walked = stored;
+    for (int i = 0; i < 37; ++i) {
+        walked = stepMouseSensitivity(walked, walked.mouseSensitivity, 1);
+    }
+    REQUIRE(walked.mouseSensitivity == 4.7f);
+    REQUIRE(serializeSettings(walked).find("mouseSensitivity=4.7\n") != std::string::npos);
+}
+
+TEST_CASE("the first-minute prompt flags survive the file, and a file from before them has none set")
+{
+    const Settings flagged{80.0f, 2.0f, 0b1011u};
+    REQUIRE(parseSettings(serializeSettings(flagged)) == flagged);
+    REQUIRE(serializeSettings(flagged).find("promptsSeen=11\n") != std::string::npos);
+
+    const std::string head = "ichor-settings 1\n";
+    REQUIRE(parseSettings(head + "fov=80\nmouseSensitivity=2\nend\n") == Settings{80.0f, 2.0f, 0u});
+    REQUIRE(parseSettings(head + "promptsSeen=15\nend\n") == Settings{Settings::kDefaultFovDegrees, Settings::kDefaultMouseSensitivity, 15u});
+    for (const char* bad : {"abc", "-1", "1.5", "", "99999999999999999999", "3x"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "fov=80\npromptsSeen=" + bad + "\nend\n") == Settings{80.0f, Settings::kDefaultMouseSensitivity, 0u});
+    }
+    REQUIRE(parseSettings(head + "promptsSeen=0\nend\n").promptsSeen == 0u); // the reset
+
+    REQUIRE(Settings{kNaN, kNaN, 7u}.clamped() == Settings{Settings::kDefaultFovDegrees, Settings::kDefaultMouseSensitivity, 7u});
+    REQUIRE(stepMouseSensitivity(flagged, 2.0f, 1).promptsSeen == 0b1011u);
+
+    TempFile file;
+    REQUIRE(saveSettings(file.path(), flagged));
+    REQUIRE(loadSettings(file.path()) == flagged);
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/world/forged_biome.h"
 #include "ichor/world/heightfield.h"
 #include "ichor/world/hydrology.h"

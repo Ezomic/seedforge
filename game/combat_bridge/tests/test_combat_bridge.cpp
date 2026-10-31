@@ -466,3 +466,57 @@ TEST_CASE("a fight in a dungeon is logged with the dungeon as its site and the n
     CHECK(text.find("," + std::to_string(game.desc.seed) + "," + settlement + "\n") != std::string::npos);
     CHECK(stage0::parseFightLog(text).size() == 2);
 }
+
+TEST_CASE("a death in the forged world reports its cause, and the guarded Enter retries only after the window", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    Setup setup(game, 1);
+    CHECK_FALSE(setup.bridge->playerDeath(setup.scene).has_value());
+    setup.tick(4);
+    REQUIRE(setup.bridge->live());
+    CHECK_FALSE(setup.bridge->playerDeath(setup.scene).has_value());
+
+    setup.bridge->stage().receiveHit(setup.scene, setup.player(), setup.scene.find(setup.bridge->stage().foeId()), 500.0f, 0.0f, true);
+    REQUIRE(setup.bridge->playerDeath(setup.scene).has_value());
+    CHECK(*setup.bridge->playerDeath(setup.scene) == static_cast<stage0::DeathCause>(setup.fighter().deathCause));
+
+    stage0::RetryGuard guard;
+    const auto feed = [&](std::uint32_t pressed) {
+        InputFrame frame;
+        frame.buttons = pressed;
+        setup.tick(guard.filter(frame, setup.bridge->playerDeath(setup.scene).has_value(), setup.scene.time()));
+    };
+    feed(InputFrame::Confirm);
+    CHECK(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::PlayerDied);
+    feed(0);
+    for (int i = 0; i < static_cast<int>(stage0::RetryGuard::kArmSeconds / kDt) + 1; ++i) feed(0);
+    feed(InputFrame::Confirm);
+    CHECK(setup.bridge->outcome(setup.scene) == stage0::FightOutcome::Ongoing);
+    CHECK(setup.bridge->respawns() == 0);
+    CHECK_FALSE(setup.bridge->playerDeath(setup.scene).has_value());
+}
+
+TEST_CASE("the foe's distance is known only while a living foe is in a live fight", "[combat_bridge]")
+{
+    const ForgedGame& game = gameFor(1);
+    Setup setup(game, 1);
+    bool ready = false;
+    setup.bridge->setGroundCheck([&](glm::dvec3) { return ready; });
+    setup.tick(4);
+    CHECK_FALSE(setup.bridge->foeDistance(setup.scene).has_value());
+
+    ready = true;
+    setup.tick(4);
+    REQUIRE(setup.bridge->live());
+    const auto distance = setup.bridge->foeDistance(setup.scene);
+    REQUIRE(distance.has_value());
+    CHECK(*distance == Catch::Approx(std::hypot(setup.enemyAt().x - setup.playerAt().x, setup.enemyAt().z - setup.playerAt().z)));
+
+    const std::uint64_t before = setup.scene.stateHash();
+    (void)setup.bridge->foeDistance(setup.scene);
+    CHECK(setup.scene.stateHash() == before);
+
+    setup.bridge->stage().receiveHit(setup.scene, setup.scene.find(setup.bridge->stage().foeId()), setup.player(), 500.0f, 0.0f, true);
+    REQUIRE_FALSE(setup.enemy().alive());
+    CHECK_FALSE(setup.bridge->foeDistance(setup.scene).has_value());
+}

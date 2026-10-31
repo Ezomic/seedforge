@@ -19,7 +19,9 @@ endif()
 
 # The simulation must round the same way everywhere. MSVC does not contract
 # multiply-adds under its default /fp:precise; clang and gcc do, so tell them
-# not to. The spin golden test is what catches a regression here.
+# not to. ichor_check_fp_flags (fp_flags.cmake, at the end of this file) fails
+# the configure on a fast-math or contraction flag, and test_fp_contract.cpp
+# fails if a multiply-add is fused anyway.
 if(NOT MSVC)
     add_compile_options(-ffp-contract=off)
 endif()
@@ -112,3 +114,6 @@ if(MSVC AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
 elseif(MSVC)
     message(STATUS "Ichor: precompiled headers off (compiler launcher: ${CMAKE_CXX_COMPILER_LAUNCHER})")
 endif()
+
+include(fp_flags.cmake)
+ichor_check_fp_flags(${CMAKE_CURRENT_SOURCE_DIR})

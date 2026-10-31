@@ -1,5 +1,6 @@
 #include "ichor/world/vegetation.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/core/dmath.h"
 #include "ichor/core/hash.h"
 #include "ichor/core/rng.h"

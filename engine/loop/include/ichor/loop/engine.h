@@ -19,6 +19,20 @@ class AudioHost;
 class Platform;
 class Renderer;
 
+// What an executable's command line says about a run, for deciding whether it pauses when its window loses focus.
+struct RunKind {
+    bool headless = false;
+    bool screenshot = false;
+    std::uint64_t frameLimit = 0; // --frames; 0 runs until the player quits
+};
+
+// Only a run someone plays until they quit pauses on focus loss: a headless, screenshot or --frames run must end at
+// the same tick whatever the focus does. Replays and scripted input never pause either; the engine sees to those.
+constexpr bool pausesOnFocusLoss(const RunKind& run)
+{
+    return !run.headless && !run.screenshot && run.frameLimit == 0;
+}
+
 struct EngineConfig {
     std::uint64_t seed = 1;
     double fixedDt = 1.0 / 60.0;
@@ -57,11 +71,20 @@ public:
     void setTickGate(TickGate gate) { tickGate_ = std::move(gate); }
     bool gated() const { return gated_; }
 
+    // While set, a platform that has lost focus holds the simulation as the gate does and silences the audio
+    // until focus returns. Executables set it from pausesOnFocusLoss. A replay or an input source is never held,
+    // so its run ends at the same tick whatever the focus does.
+    void setPauseOnFocusLoss(bool enabled) { pauseOnFocusLoss_ = enabled; }
+    bool focusPaused() const { return focusPaused_; }
+
     // Optional: receives the scene's sound events each tick and the camera as listener.
     void setAudio(AudioHost* audio) { audio_ = audio; }
 
     void recordInputs(bool enabled) { recording_ = enabled; }
     const InputStream& recordedInputs() const { return recorded_; }
+    // Keeps the last ticks of input, recording or not, for an F8 feedback note. 0, the default, keeps none.
+    void keepInputTail(std::size_t ticks) { tail_ = InputTail(ticks); }
+    const InputTail& inputTail() const { return tail_; }
 
     // Feed these frames instead of the platform's, one per tick. Once the
     // stream runs out the loop reports replayFinished().
@@ -103,10 +126,13 @@ private:
     TickGate tickGate_;
     InputSource inputSource_;
     bool gated_ = false;
+    bool pauseOnFocusLoss_ = false;
+    bool focusPaused_ = false;
     std::vector<std::string> overlay_;
     OverlayToggle overlayToggle_;
     ControlsOverlay controls_;
     InputStream recorded_;
+    InputTail tail_;
     InputStream replay_;
     std::size_t replayIndex_ = 0;
     bool recording_ = false;

@@ -28,11 +28,7 @@ namespace {
 
 constexpr float kSampleRate = 60.0f;
 
-struct Trs {
-    glm::vec3 translation{0.0f};
-    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec3 scale{1.0f};
-};
+using Trs = JointPose;
 
 Trs decomposeMatrix(const glm::mat4& m)
 {
@@ -254,7 +250,7 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
 }
 
 bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cgltf_skin& skin, const Skeleton& skeleton,
-    std::uint32_t skeletonIndex, AnimationClip& out, float rootYawDegrees)
+    std::uint32_t skeletonIndex, AnimationClip& out, float rootYawDegrees, const ClipPass& pass)
 {
     (void)data;
     out.name = animation.name != nullptr ? animation.name : "clip";
@@ -311,13 +307,19 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
     raw.duration = duration;
     raw.tracks.resize(skeleton.jointNames.size());
     const auto frames = static_cast<int>(std::ceil(duration * kSampleRate)) + 1;
+    std::vector<Trs> rest(channels.size());
+    std::vector<std::int32_t> parents(channels.size(), -1);
+    std::vector<std::vector<Trs>> poses(static_cast<std::size_t>(frames), std::vector<Trs>(channels.size()));
     for (std::size_t j = 0; j < channels.size(); ++j) {
-        const Trs rest = jointNodes[j] != nullptr ? localTransform(*jointNodes[j]) : Trs{};
-        const bool isRoot = jointNodes[j] != nullptr && (jointNodes[j]->parent == nullptr || !isJointOf(skin, jointNodes[j]->parent));
-        auto& track = raw.tracks[j];
+        if (jointNodes[j] != nullptr) {
+            rest[j] = localTransform(*jointNodes[j]);
+            const cgltf_node* parent = jointNodes[j]->parent;
+            if (parent != nullptr && parent->name != nullptr && isJointOf(skin, parent)) parents[j] = static_cast<std::int32_t>(jointIndex.at(parent->name));
+        }
         for (int f = 0; f < frames; ++f) {
             const float t = std::min(duration, static_cast<float>(f) / kSampleRate);
-            Trs trs = rest;
+            Trs& trs = poses[static_cast<std::size_t>(f)][j];
+            trs = rest[j];
             if (channels[j].translation) sampleChannel<3>(*channels[j].translation, t, &trs.translation.x);
             if (channels[j].rotation) {
                 float q[4];
@@ -325,6 +327,18 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
                 trs.rotation = glm::normalize(glm::quat(q[3], q[0], q[1], q[2]));
             }
             if (channels[j].scale) sampleChannel<3>(*channels[j].scale, t, &trs.scale.x);
+        }
+    }
+    if (pass) {
+        ClipFrames clip{out.name, skeleton.jointNames, parents, rest, poses};
+        pass(clip);
+    }
+    for (std::size_t j = 0; j < channels.size(); ++j) {
+        const bool isRoot = jointNodes[j] != nullptr && (jointNodes[j]->parent == nullptr || !isJointOf(skin, jointNodes[j]->parent));
+        auto& track = raw.tracks[j];
+        for (int f = 0; f < frames; ++f) {
+            const float t = std::min(duration, static_cast<float>(f) / kSampleRate);
+            Trs trs = poses[static_cast<std::size_t>(f)][j];
             if (isRoot && rootYawDegrees != 0.0f) {
                 trs.rotation = yawQuat(rootYawDegrees) * trs.rotation;
                 trs.translation = yawQuat(rootYawDegrees) * trs.translation;

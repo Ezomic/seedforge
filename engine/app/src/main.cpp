@@ -17,15 +17,23 @@
 #include "ichor/audio/wading_splash.h"
 #include "ichor/core/asset_roots.h"
 #include "ichor/core/controls_overlay.h"
+#include "ichor/core/crash_handler.h"
+#include "ichor/core/feedback_note.h"
 #include "ichor/core/file_watch.h"
+#include "ichor/core/first_prompts.h"
 #include "ichor/core/log.h"
 #include "ichor/core/overlay_mode.h"
+#include "ichor/core/session_summary.h"
+#include "ichor/core/version.h"
 #include "ichor/editor/nudge.h"
 #include "ichor/editor/panels.h"
 #include "ichor/editor/picking.h"
 #include "ichor/ui/caption_screen.h"
 #include "ichor/ui/combat_hud_screen.h"
+#include "ichor/ui/death_screen.h"
 #include "ichor/ui/hud.h"
+#include "ichor/ui/prompt_screen.h"
+#include "ichor/ui/note_box.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/traversal/roads.h"
@@ -132,6 +140,8 @@ struct Options {
     std::filesystem::path script = std::filesystem::path(ICHOR_SCRIPT_DIR) / "main.lua";
     std::filesystem::path data = ICHOR_DATA_DIR;
     std::filesystem::path saves = "saves";
+    std::filesystem::path logs = "logs"; // the playtest session summary is written here at exit (SEED-696)
+    std::vector<std::string> runFlags;   // the command line with its paths scrubbed, for that summary
     std::filesystem::path exportChronicle; // written at exit when set
     std::string loadSlot;
     bool ironman = false;
@@ -167,13 +177,14 @@ struct Options {
     float startHour = 9.0f;      // hour of the day when play starts
     std::optional<float> waterLevel; // world y of a sheet of water over the whole world; none is dry
     std::optional<std::pair<double, double>> compassTarget; // world x and z the compass points at; none shows no line
-    float mouseSensitivity = 1.0f; // scales the right-button mouse look
+    std::optional<float> mouseSensitivity; // --mouse-sens: this run's look sensitivity instead of the stored one, never saved
     double daySeconds = 1200.0; // simulated seconds in a whole day
     double autosaveSeconds = 0.0; // 0 is off
     std::filesystem::path record;
     std::filesystem::path replay;
     std::filesystem::path load;
     std::filesystem::path save;
+    std::optional<ichor::CrashTest> crashTest; // --crash-test [thread|handler|overflow]: crash on purpose right after startup (SEED-698)
 };
 
 template <class T>
@@ -197,7 +208,9 @@ bool parse(int argc, char** argv, Options& options)
         } else if (arg == "--audio-log") {
             options.audioLog = true;
         } else if (arg == "--mouse-sens" && hasValue) {
-            if (!parseNumber(argv[++i], options.mouseSensitivity)) return false;
+            float sensitivity = 0.0f;
+            if (!parseNumber(argv[++i], sensitivity)) return false;
+            options.mouseSensitivity = sensitivity;
         } else if (arg == "--frames" && hasValue) {
             if (!parseNumber(argv[++i], options.frames)) return false;
         } else if (arg == "--seed" && hasValue) {
@@ -278,6 +291,14 @@ bool parse(int argc, char** argv, Options& options)
             if (i + 1 < argc) {
                 if (const std::optional<ichor::OverlayMode> mode = ichor::parseOverlayMode(argv[i + 1])) {
                     options.overlay = mode;
+                    ++i;
+                }
+            }
+        } else if (arg == "--crash-test") {
+            options.crashTest = ichor::CrashTest::MainThread;
+            if (i + 1 < argc) {
+                if (const std::optional<ichor::CrashTest> kind = ichor::parseCrashTest(argv[i + 1])) {
+                    options.crashTest = kind;
                     ++i;
                 }
             }
@@ -445,8 +466,18 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
     for (const std::string& problem : content.problems) {
         ichor::logf(ichor::LogLevel::Warn, "forged content: {}", problem);
     }
+    // Phase 0: the seed's axioms. Nothing reads their directives yet, so they do not change the world.
+    ichor::WorldConfigResult axioms = ichor::loadRolledWorldConfig(options.seed, options.data);
+    std::shared_ptr<const ichor::WorldConfig> worldConfig;
+    if (axioms.ok()) {
+        ichor::logf(ichor::LogLevel::Info, "world axioms: {} (WorldConfig {:016x})", ichor::worldConfigIds(axioms.config), ichor::worldConfigDigest(axioms.config));
+        worldConfig = std::make_shared<const ichor::WorldConfig>(std::move(axioms.config));
+    } else {
+        ichor::logf(ichor::LogLevel::Warn, "the world's axioms could not be resolved: {}", axioms.error);
+    }
     if (options.campaignPlan.action == ichor::CampaignWorldAction::Load) {
         out = ichor::buildStoredCampaignGame(options.campaignPlan, desc, content.inputs);
+        out->worldConfig = worldConfig;
         return reportForgedGame(*out);
     }
     ichor::NewGameFlow flow(true, options.forgedGrid, content.config);
@@ -515,6 +546,7 @@ ForgeOutcome forgeGame(ichor::Platform& platform, ichor::Renderer& renderer, con
         return ForgeOutcome::Failed;
     }
     out = ichor::buildForgedGame(*job->result(), desc, content.inputs);
+    out->worldConfig = worldConfig;
     return reportForgedGame(*out);
 }
 
@@ -590,10 +622,34 @@ void usePackagedRoots(Options& options, const ichor::AssetRoots& roots)
     options.world = roots.content / "world";
     options.exileDefault = roots.art / "exile";
     options.saves = roots.content.parent_path() / "saves";
+    options.logs = roots.content.parent_path() / "logs";
     options.kit = roots.art / "settlement_kit";
     options.script = roots.scripts / "main.lua";
     options.data = roots.data;
     ichor::setShaderDirectory(roots.shaders);
+}
+
+// What a playtester sends back (SEED-696). Only a run that reaches the end of its frame loop writes one:
+// a crash or a killed process leaves none.
+void writeSessionSummary(const Options& options, ichor::FrameTimes frames, double playSeconds, ichor::CombatBridge* combat)
+{
+    ichor::SessionSummary summary;
+    summary.seed = options.seed;
+    summary.flags = options.runFlags;
+    summary.playSeconds = playSeconds;
+    summary.frames = std::move(frames);
+    for (std::size_t i = 0; i < ichor::stage0::kDeathCauseCount; ++i) {
+        const auto cause = static_cast<ichor::stage0::DeathCause>(i);
+        summary.deathsByCause.emplace_back(ichor::stage0::name(cause), combat ? combat->stage().recorder().playerDeaths().count(cause) : 0);
+    }
+    summary.retries = combat ? combat->stage().retryPresses() : 0;
+    summary.quitTime = std::chrono::system_clock::now();
+    const std::filesystem::path written = ichor::writeSessionFile(options.logs, "session", summary.quitTime, ichor::sessionSummaryJson(summary));
+    if (written.empty()) {
+        ichor::logf(ichor::LogLevel::Warn, "the session summary could not be written under {}", options.logs.string());
+    } else {
+        ichor::logf(ichor::LogLevel::Info, "session summary written to {}", written.string());
+    }
 }
 
 int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& device, const Options& options)
@@ -900,6 +956,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         });
     }
     engine.setAudio(&audio);
+    // Alt-tabbing away mid-fight must not get the player killed.
+    engine.setPauseOnFocusLoss(ichor::pausesOnFocusLoss({.headless = options.headless, .screenshot = !options.screenshot.empty(), .frameLimit = options.frames}));
     // The player's splashes are heard, not simulated: this reads the scene and never writes it.
     if (waterField) {
         engine.scene().addSystem("wading_splash", [&, splash = ichor::WadingSplash{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
@@ -982,6 +1040,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     // The player's settings live beside the campaigns, not in one, and never touch the simulation.
     const std::filesystem::path settingsPath = options.saves / "settings.cfg";
     ichor::Settings settings = ichor::loadSettings(settingsPath);
+    float mouseSensitivity = ichor::effectiveMouseSensitivity(settings, options.mouseSensitivity);
     ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
@@ -1049,6 +1108,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             if (!options.combatBot.empty()) {
                 combat->enableBot(*ichor::stage0::findBotSkill(options.combatBot), options.seed);
                 engine.setInputSource([&combat](ichor::Scene& scene) { return combat->botInput(scene); });
+            } else {
+                engine.setInputSource([&combat, &platform, guard = ichor::stage0::RetryGuard{}](ichor::Scene& scene) mutable {
+                    return guard.filter(platform.input(), combat->playerDeath(scene).has_value(), scene.time());
+                });
             }
         }
     } else {
@@ -1332,6 +1395,14 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
+    std::unique_ptr<ichor::DeathScreen> deathScreen;
+    std::unique_ptr<ichor::PromptScreen> promptScreen;
+    const bool prompting = ichor::firstPromptsShown({.headless = options.headless, .screenshot = !options.screenshot.empty(), .replay = !options.replay.empty(), .bot = !options.combatBot.empty()});
+    ichor::FirstPrompts firstPrompts{.seen = settings.promptsSeen};
+    bool promptHeld = true;
+    std::unique_ptr<ichor::NoteBox> noteBox;
+    ichor::FeedbackPrompt notePrompt;
+    bool noteShown = false; // from the frame after F8, so the note's screenshot is of the game, not the box
     bool paused = false;
     float hudHeading = 0.0f;
     float hudHour = options.startHour;
@@ -1381,12 +1452,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
+            pauseMenu->setMouseSensitivity(mouseSensitivity);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
+            deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
+            promptScreen = std::make_unique<ichor::PromptScreen>(*ui);
+            noteBox = std::make_unique<ichor::NoteBox>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
+            promptScreen.reset();
+            noteBox.reset();
+            deathScreen.reset();
             captionScreen.reset();
             combatHud.reset();
             newGameScreen.reset();
@@ -1405,8 +1483,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     }
     if (ui) {
         platform.setEscapeQuits(false); // Esc opens the pause menu instead
+        engine.keepInputTail(ichor::kNoteTailTicks);
         platform.enableLook(true);
-        platform.setMouseSensitivity(options.mouseSensitivity);
+        platform.setMouseSensitivity(mouseSensitivity);
         if (options.showInventory && carry && !editing) {
             inventoryScreen->setVisible(true);
         }
@@ -1458,6 +1537,17 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 if (captionScreen) {
                     captionFeed.prune(engine.scene().tickCount());
                     captionScreen->bind(soundHelp.captionsOn ? captionFeed.visible(engine.scene().tickCount()) : std::vector<std::string>{});
+                }
+                if (deathScreen) {
+                    // The full overlay already has the death lines.
+                    const auto death = combat && engine.overlayMode() != ichor::OverlayMode::Full ? combat->playerDeath(engine.scene()) : std::nullopt;
+                    deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
+                }
+                if (promptScreen) {
+                    promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld));
+                }
+                if (noteBox) {
+                    noteBox->bind(notePrompt.open() && noteShown ? std::optional<std::string>(notePrompt.text()) : std::nullopt);
                 }
                 if (ledger->visible()) {
                     std::vector<ichor::LedgerRow> rows;
@@ -1728,6 +1818,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     watcher.watchTree(options.data, ".json");
 
     double last = platform.now();
+    const double loopStart = last;
+    double lastFrameEnd = last;
+    ichor::FrameTimes frameTimes;
     ichor::ReverbSettings lastReverb;
     bool confirmHeld = false;
     bool quickSaveHeld = false;
@@ -1743,8 +1836,46 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::NavKeys navHeld;
     const std::uint64_t autosaveTicks = options.autosaveSeconds > 0.0 ? std::max<std::uint64_t>(1, static_cast<std::uint64_t>(options.autosaveSeconds / config.fixedDt)) : 0;
     std::uint64_t lastAutosave = engine.scene().tickCount();
+    std::filesystem::path noteFolder;
+    ichor::FeedbackNote noteDraft;
+    ichor::InputStream noteTail;
     for (;;) {
         ZoneScopedN("frame");
+        // F8 flags this moment for a tester (SEED-697): the screenshot is of the frame about to be drawn, before the box
+        // shows, and the box holds the world still as the menu does. The editor has the keyboard to itself.
+        if (notePrompt.pressF8(platform.noteKey(), ichor::feedbackNoteAvailable(noteBox && noteBox->ok(), !options.screenshot.empty(), editing))) {
+            noteDraft = ichor::FeedbackNote{};
+            noteDraft.time = std::chrono::system_clock::now();
+            noteDraft.seed = options.seed;
+            noteDraft.tick = engine.scene().tickCount();
+            noteFolder = ichor::createSessionFolder(options.logs, "note", noteDraft.time);
+            if (noteFolder.empty()) {
+                ichor::logf(ichor::LogLevel::Warn, "a feedback note folder could not be made under {}", options.logs.string());
+                notePrompt.cancel();
+            } else {
+                noteTail = engine.inputTail().stream();
+                renderer.requestScreenshot((noteFolder / "screenshot.png").string());
+                platform.setTextEntry(true);
+            }
+        }
+        if (notePrompt.open()) {
+            const ichor::NoteOutcome outcome = notePrompt.feed(platform.takeTypedText());
+            if (outcome != ichor::NoteOutcome::Typing) {
+                platform.setTextEntry(false);
+                noteShown = false;
+            }
+            if (outcome == ichor::NoteOutcome::Save) {
+                noteDraft.text = notePrompt.text();
+                if (ichor::writeFeedbackNote(noteFolder, noteDraft, noteTail)) {
+                    ichor::logf(ichor::LogLevel::Info, "feedback note saved to {}", noteFolder.string());
+                } else {
+                    ichor::logf(ichor::LogLevel::Warn, "the feedback note could not be written to {}", noteFolder.string());
+                }
+            } else if (outcome == ichor::NoteOutcome::Cancel) {
+                std::error_code ec;
+                std::filesystem::remove_all(noteFolder, ec);
+            }
+        }
         // Enter starts the light attack on the arm, with its wind-up and tell cues.
         const bool confirm = (platform.input().buttons & ichor::InputFrame::Confirm) != 0;
         if (confirm && !confirmHeld) {
@@ -1803,7 +1934,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // press the UI still holds is let go and nothing stays hovered.
         if (ui) {
             const ichor::Pointer pointer = platform.pointer();
-            if (pointer.inside && !editing) {
+            // Under the note box a click would choose a reply or press Resume while the world is held.
+            if (pointer.inside && !editing && !notePrompt.open()) {
                 ui->mouseMove(pointer.x, pointer.y);
                 if (pointer.primary != pointerHeld) {
                     ui->mouseButton(0, pointer.primary);
@@ -1853,6 +1985,16 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 settings.fovDegrees += static_cast<float>(steps) * kFovStepDegrees;
                 settings = settings.clamped();
                 pauseMenu->setFovDegrees(settings.fovDegrees);
+                if (!ichor::saveSettings(settingsPath, settings)) {
+                    ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+                }
+            }
+            // A step starts from what the player looks with, so a --mouse-sens run saves only what the player picks here.
+            if (const int steps = pauseMenu->takeSensitivitySteps(); steps != 0) {
+                settings = ichor::stepMouseSensitivity(settings, mouseSensitivity, steps);
+                mouseSensitivity = settings.mouseSensitivity;
+                platform.setMouseSensitivity(mouseSensitivity);
+                pauseMenu->setMouseSensitivity(mouseSensitivity);
                 if (!ichor::saveSettings(settingsPath, settings)) {
                     ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
                 }
@@ -1925,17 +2067,36 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         // The mouse fights only in a live --combat fight, and only while nothing on screen wants the click.
         const auto shown = [](const auto& screen) { return screen && screen->visible(); };
-        const bool uiFocus = editing || paused || engine.controlsOverlay().open || shown(inventoryScreen) || shown(mapScreen) || shown(newGameScreen) || shown(ledger) || shown(journalScreen) || shown(characterScreen) || shown(dialogueScreen);
+        const bool uiFocus = editing || paused || notePrompt.open() || engine.controlsOverlay().open || shown(inventoryScreen) || shown(mapScreen) || shown(newGameScreen) || shown(ledger) || shown(journalScreen) || shown(characterScreen) || shown(dialogueScreen);
         platform.enableMouseAttack(combat && combat->live() && !uiFocus);
         const double now = platform.now();
         // A pause stops the simulation, and with it the clock, the weather and the walk, but not the picture.
-        const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
+        const double dt = options.headless || !options.screenshot.empty() ? config.fixedDt : paused || notePrompt.open() || (mapScreen && mapScreen->visible()) || (newGameScreen && newGameScreen->visible()) ? 0.0 : now - last;
         last = now;
+        // Without the screen to show them, the prompts would be marked seen unread.
+        if (prompting && promptScreen && promptScreen->ok()) {
+            const ichor::InputFrame keys = platform.input();
+            const std::optional<double> foe = combat ? combat->foeDistance(engine.scene()) : std::nullopt;
+            promptHeld = uiFocus || engine.gated() || engine.focusPaused() || (combat && combat->playerDeath(engine.scene()));
+            firstPrompts = ichor::stepFirstPrompts(firstPrompts, {.held = promptHeld, .canMove = true, .foeInRange = foe && *foe <= ichor::kFirstPromptFoeRange, .buttons = keys.buttons, .moveX = keys.moveX, .moveY = keys.moveY}, dt);
+            if (firstPrompts.seen != settings.promptsSeen) {
+                settings.promptsSeen = firstPrompts.seen;
+                if (!ichor::saveSettings(settingsPath, settings)) {
+                    ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+                }
+            }
+        }
         // With a frame count, the screenshot is of the last frame, as the player would see it.
         if (!options.screenshot.empty() && options.frames != 0 && engine.frameCount() + 1 == options.frames) {
             renderer.requestScreenshot(options.screenshot);
         }
-        if (!engine.frame(dt)) {
+        const bool running = engine.frame(dt);
+        // From one frame's end to the next, so an autosave or a reload between them counts toward its frame.
+        const double frameEnd = platform.now();
+        frameTimes.add(frameEnd - lastFrameEnd);
+        lastFrameEnd = frameEnd;
+        noteShown = notePrompt.open();
+        if (!running) {
             break;
         }
         for (const ichor::AnnouncingAudio::Fired& fired : audio.drain()) {
@@ -2035,8 +2196,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
     }
 
+    if (notePrompt.open()) {
+        std::error_code ec;
+        std::filesystem::remove_all(noteFolder, ec); // quit with the box open: the note was never saved
+    }
     renderer.setGuiHook({}); // the panels are about to go out of scope
     renderer.setUiHooks({}, {}); // and so are the UI, the HUD and the ledger
+    writeSessionSummary(options, std::move(frameTimes), platform.now() - loopStart, combat.get());
     if (!options.screenshot.empty() && renderer.screenshotPending()) {
         ichor::logf(ichor::LogLevel::Error, "the screenshot {} was asked for and not saved", options.screenshot);
         return 1;
@@ -2065,14 +2231,21 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
 
 int main(int argc, char** argv)
 {
+    ichor::installCrashHandler("logs");
+    ichor::log(ichor::LogLevel::Info, ichor::logHeader());
     Options options;
     if (const std::optional<ichor::AssetRoots> roots = ichor::packagedAssetRoots(ichor::executableDirectory())) {
         usePackagedRoots(options, *roots);
         ichor::logf(ichor::LogLevel::Info, "packaged build: assets are read from {}", ichor::executableDirectory().string());
     }
+    options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
         ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
         return 2;
+    }
+    ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe
+    if (options.crashTest) {
+        ichor::crashForTest(*options.crashTest);
     }
 
     if (!options.forged && options.forgedGrid != ichor::kForgedDefaultGridSize) {

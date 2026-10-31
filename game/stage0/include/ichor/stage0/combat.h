@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -189,6 +190,8 @@ public:
 
     void debugLines(const Scene& scene, std::vector<LineSegment>& out) const;
     void overlay(const Scene& scene, std::vector<std::string>& lines) const;
+    // The recorded cause while the player is dead; nothing while they live or before they are spawned.
+    std::optional<DeathCause> playerDeath(const Scene& scene) const;
 
     // Which brain the foe gets on the next reset; call before install or resetFight.
     void setFoeRole(FoeRole role) { role_ = role; }
@@ -214,6 +217,8 @@ public:
 
     const Tuning& tuning() const { return tuning_; }
     FightRecorder& recorder() { return recorder_; }
+    // Presses of the retry button this session, for the playtest summary; not part of the hashed state.
+    int retryPresses() const { return retryPresses_; }
     StableId playerId() const { return player_; }
     StableId foeId() const { return foe_; }
 
@@ -275,6 +280,7 @@ private:
     bool arena_ = true; // false after attach: there are no walls to be cornered against
     // Telemetry only, fed by the input stream, so a replay rebuilds it.
     float sinceInput_ = 0.0f;
+    int retryPresses_ = 0;
     bool lockOn_ = false;
     bool legacyControls_ = false;
     bool lockHeld_ = false; // edge detection for the lock-on button

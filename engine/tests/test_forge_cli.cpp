@@ -385,3 +385,23 @@ TEST_CASE("validate scores each seed, writes validation.json next to the manifes
     CHECK_FALSE(std::filesystem::exists(std::filesystem::path(plain.outDir) / "validation.json"));
     CHECK_FALSE(nlohmann::json::parse(off.manifest)["runs"][0].contains("validation"));
 }
+
+TEST_CASE("a run without axioms keeps the manifest's keys, and pinned axioms are recorded without moving a layer", "[forge_cli]")
+{
+    const auto plain = forgecli::runForge(oneSeed(9));
+    auto pinned = oneSeed(9);
+    pinned.axioms = forgecli::AxiomsRecord{"cataclysm.flood,law.oath", "00000000000000ff"};
+    const auto withAxioms = forgecli::runForge(pinned);
+    REQUIRE(plain.error.empty());
+    REQUIRE(withAxioms.error.empty());
+
+    const auto a = nlohmann::json::parse(plain.manifest);
+    std::set<std::string> keys;
+    for (const auto& [key, value] : a.items()) keys.insert(key);
+    CHECK(keys == std::set<std::string>{"tool", "size", "phases", "runs"});
+
+    const auto b = nlohmann::json::parse(withAxioms.manifest);
+    CHECK(b["axioms"]["ids"] == "cataclysm.flood,law.oath");
+    CHECK(b["axioms"]["digest"] == "00000000000000ff");
+    CHECK(b["runs"] == a["runs"]);
+}

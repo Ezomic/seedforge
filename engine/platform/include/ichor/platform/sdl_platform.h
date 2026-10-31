@@ -3,8 +3,11 @@
 #include "ichor/platform/mouse_attack.h"
 #include "ichor/platform/mouse_look.h"
 #include "ichor/platform/platform.h"
+#include "ichor/platform/typing_guard.h"
 
 #include <functional>
+#include <string>
+#include <utility>
 
 struct SDL_Window;
 union SDL_Event;
@@ -30,6 +33,10 @@ public:
     bool helpKey() const override { return helpKey_; }
     bool soundLegendKey() const override { return soundLegendKey_; }
     bool captionKey() const override { return captionKey_; }
+    bool noteKey() const override { return noteKey_; }
+    void setTextEntry(bool on) override;
+    std::string takeTypedText() override { return std::exchange(typed_, {}); }
+    bool focused() const override { return focused_; }
     void reserveArrowKeys(bool reserved) override { arrowsReserved_ = reserved; }
     void enableLook(bool enabled) override;
     void setMouseSensitivity(float sensitivity) override { mouseLook_.setSensitivity(sensitivity); }
@@ -51,6 +58,11 @@ private:
     bool helpKey_ = false;
     bool soundLegendKey_ = false;
     bool captionKey_ = false;
+    bool noteKey_ = false;
+    TypingGuard typing_;
+    InputFrame rawInput_; // before the typing guard, so closing the box knows which keys are still down
+    std::string typed_;
+    bool focused_ = true;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
     MouseLook mouseLook_;

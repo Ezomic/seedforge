@@ -1,5 +1,7 @@
 #include "ichor/world/road_surface.h"
 
+#include "ichor/assets/bundle.h"
+
 #include <worldforge/subseed.h>
 
 #include <algorithm>

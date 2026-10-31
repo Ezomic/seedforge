@@ -354,6 +354,26 @@ CombatHudState CombatBridge::hud(const Scene& scene) const
     return state;
 }
 
+std::optional<double> CombatBridge::foeDistance(const Scene& scene) const
+{
+    if (!live()) {
+        return std::nullopt;
+    }
+    const auto& registry = scene.registry();
+    const entt::entity player = scene.find(stage_.playerId());
+    const entt::entity foe = scene.find(stage_.foeId());
+    if (player == entt::null || foe == entt::null || !registry.all_of<Transform>(player) || !registry.all_of<Transform>(foe)) {
+        return std::nullopt;
+    }
+    const auto* enemy = registry.try_get<stage0::Combatant>(foe);
+    if (enemy == nullptr || !enemy->alive()) {
+        return std::nullopt;
+    }
+    const glm::dvec3 from = registry.get<Transform>(player).position;
+    const glm::dvec3 to = registry.get<Transform>(foe).position;
+    return std::hypot(to.x - from.x, to.z - from.z);
+}
+
 bool CombatBridge::loadVisuals(Renderer& renderer, const std::filesystem::path& artDir)
 {
     bool loaded = exile_.load(artDir / "exile", renderer);

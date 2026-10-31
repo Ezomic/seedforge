@@ -9,9 +9,9 @@ include(Catch)
 # test_editor_panels.cpp and test_golden_image.cpp have their own executables, since they need the runtime build.
 set(ichor_test_groups world ui sim core)
 set(ichor_test_group_world "^test_(hostile_|placed_|campaign_roundtrip|worldforge_|forge_|forged_|hydrology|terrain|roads|water_|golden|world_|featured_seeds|seed_harness|save_forged_world|codec_fuzz|vegetation|placement_clear|dungeon_|corridor_caps|cooker|debug_images|map_image|ue_export|minor_site|poleis|territory$|tension_sampling|shaft_sightline|verticality|silhouette_check|material_limits|rebuild|dark_age_ecology|wading_splash|cloud_shadow|road_encounter|trade_routes|phase_pipeline|determinism|temenos_field|vantage_reveal|lost$|snapshot_tail|fast_travel|travel_cost|traversal_|climb_rules|diving|physics|carry|parley)")
-set(ichor_test_group_ui "^test_(ui$|editor|picking|subtitle|loading_|nudge|journal|map_|inventory_model|inventory_screen|dialogue_screen|quest_journal|player_messages|waypoint|hub_shortcut|guide_light|settings|bundle_render|lighting|atmosphere|animation|boat|headless_boot|overlay_mode|controls_overlay|main_spine|spine_cast|ambience|audio|music|ducking|reverb|rain|weather|settlement_audio|territory_audio|territory_politics_audio|oneshot|outdoor|room_reverb|file_watch|standing_display|new_game|death_markers|chronicle_export|failure_states|character_screen|combat_hud|hud_|contract_board|cooker_|landmark_compass|world_screen|world_title|merchant_service|stash)")
+set(ichor_test_group_ui "^test_(ui$|editor|feedback_note|picking|subtitle|loading_|nudge|journal|map_|inventory_model|inventory_screen|dialogue_screen|quest_journal|player_messages|waypoint|hub_shortcut|guide_light|settings|bundle_render|lighting|atmosphere|animation|boat|headless_boot|overlay_mode|controls_overlay|main_spine|spine_cast|ambience|audio|music|ducking|reverb|rain|weather|settlement_audio|territory_audio|territory_politics_audio|oneshot|outdoor|room_reverb|file_watch|standing_display|new_game|death_markers|chronicle_export|failure_states|character_screen|combat_hud|hud_|contract_board|cooker_|landmark_compass|world_screen|world_title|merchant_service|stash)")
 set(ichor_test_group_sim "^test_(npc_|faction|incumbent|hostility|standing|contested|conflicts|consequence|ledger_|economy|law_|synergy|quest|setpiece|notable_|axiom|campaign|dialogue|encounter|enemy|challenger|custodian|herald|parasite|refusenik|catalogue|capabilit|capability|loot|info_loot|discovery_xp|milestones|power_growth|stat_growth|respec|trainers|wallet|merchant|access_fees|abilities|incompatible_wants|last_favour|directive_merge|downed_revive|coop|ironman|wants_fears|slot_roll)")
-set(ichor_test_group_core "^test_(asset_roots|atomic_file|autosave_policy|codex_|data|delta_store|dmath|embedding|entity_id|file_io|fixed_step|frame_budget|graph_rewrite|hash|id_audit|lint|reflect_binary|rng|routing|save|script|unordered_audit|validation|world$|xref)")
+set(ichor_test_group_core "^test_(asset_roots|atomic_file|autosave_policy|codex_|crash_handler|data|delta_store|dmath|fp_contract|embedding|entity_id|file_io|fixed_step|frame_budget|graph_rewrite|hash|id_audit|lint|reflect_binary|rng|routing|save|script|session_summary|unordered_audit|validation|version_stamp|world$|xref)")
 
 file(GLOB ichor_test_sources CONFIGURE_DEPENDS test_*.cpp)
 list(FILTER ichor_test_sources EXCLUDE REGEX "/test_(editor_panels|golden_image)[.]cpp$")
@@ -62,6 +62,12 @@ foreach(group IN LISTS ichor_test_groups)
 endforeach()
 add_custom_target(ichor_tests DEPENDS ${ichor_test_targets})
 
+# test_fp_contract.cpp's probe gets the instruction set of sim/src/physics.cpp, the one engine file with FMA
+# instructions available, so a contraction flag would fuse it. No PCH: it must not share one built without them.
+target_sources(ichor_tests_core PRIVATE fp_contract_probe.cpp)
+set_source_files_properties(fp_contract_probe.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+    COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/arch:AVX2,-mavx2;-mfma>")
+
 # Doc 17: the manifest, the stack table, the module layering and libworldforge's purity.
 # --self-test feeds the checker deliberate violations and fails if any stays green.
 find_package(Python3 COMPONENTS Interpreter)
@@ -97,9 +103,32 @@ forge_data_test(empty "no tables")
 forge_data_test(file "no data directory")
 forge_data_test(malformed "b.json")
 forge_data_test(badrecord "non-empty string id")
+# forge-cli --axioms (phase 0): the pinned set lands in the manifest, and a bad list is refused with its cause.
+foreach(axioms_case "pinned|cataclysm.flood,powers.league|\"axioms\": {\"ids\": \"cataclysm.flood,powers.league\"" "unknown|cataclysm.nope|--axioms: unknown axiom 'cataclysm.nope'"
+        "empty||--axioms: no axiom ids given" "excluded|cataclysm.flood,cataclysm.kronos|may not share a world")
+    string(REPLACE "|" ";" axioms_parts "${axioms_case}")
+    list(GET axioms_parts 0 axioms_name)
+    list(GET axioms_parts 1 axioms_ids)
+    list(GET axioms_parts 2 axioms_expect)
+    add_test(NAME forge_cli_axioms_${axioms_name} COMMAND $<TARGET_FILE:ichor_forge_cli> --seed 1 --size 64 --phase tectonics --data ${CMAKE_SOURCE_DIR}/../data --axioms "${axioms_ids}")
+    set_tests_properties(forge_cli_axioms_${axioms_name} PROPERTIES PASS_REGULAR_EXPRESSION "${axioms_expect}")
+endforeach()
+add_test(NAME forge_cli_axioms_need_data COMMAND $<TARGET_FILE:ichor_forge_cli> --seed 1 --size 64 --phase tectonics --axioms cataclysm.flood)
+set_tests_properties(forge_cli_axioms_need_data PROPERTIES PASS_REGULAR_EXPRESSION "--axioms needs --data")
+foreach(kind clean dirty)
+    add_test(NAME fp_flags_check_${kind}
+        COMMAND ${CMAKE_COMMAND} -DKIND=${kind} -DMODULE=${CMAKE_SOURCE_DIR}/fp_flags.cmake -DSCRATCH=${CMAKE_BINARY_DIR}/test-output
+            "-DGENERATOR=${CMAKE_GENERATOR}" "-DPLATFORM=${CMAKE_GENERATOR_PLATFORM}" "-DTOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DCOMPILER=${CMAKE_CXX_COMPILER}" "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/fp_flags_check.cmake)
+    set_tests_properties(fp_flags_check_${kind} PROPERTIES LABELS medium)
+endforeach()
 add_test(NAME content_lint COMMAND $<TARGET_FILE:ichor_lint_cli> --data ${CMAKE_SOURCE_DIR}/../data)
 add_test(NAME seed_harness_cli COMMAND $<TARGET_FILE:ichor_seed_harness> 4 --size 512 --sample 16 --cell 256 --json)
 set_tests_properties(seed_harness_cli PROPERTIES PASS_REGULAR_EXPRESSION "\"count\":4,")
+if(ICHOR_GIT)
+    add_test(NAME version_stamp_cases COMMAND ${CMAKE_COMMAND} -DGIT=${ICHOR_GIT} -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/version_stamp_check.cmake)
+endif()
 
 if(ENGINE_RUNTIME)
     add_test(NAME forged_app_determinism COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -P ${CMAKE_CURRENT_SOURCE_DIR}/forged_app_check.cmake)
@@ -110,6 +139,15 @@ if(ENGINE_RUNTIME)
     set_tests_properties(forged_campaign_app PROPERTIES TIMEOUT 300)
     add_test(NAME packaged_app_smoke COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DBUILD=${CMAKE_BINARY_DIR} -DREPO=${CMAKE_SOURCE_DIR}/.. -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/packaged_app_check.cmake)
     set_tests_properties(packaged_app_smoke PROPERTIES TIMEOUT 300)
+    add_test(NAME session_summary_app COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/session_summary_app_check.cmake)
+    set_tests_properties(session_summary_app PROPERTIES TIMEOUT 300)
+    # Windows only: it expects a minidump. Linux crashes the handler in forked children (test_crash_handler.cpp).
+    if(WIN32)
+        add_test(NAME crash_handler_app COMMAND ${CMAKE_COMMAND} -DICHOR=$<TARGET_FILE:ichor> -DSCRATCH=${CMAKE_BINARY_DIR}/test-output -P ${CMAKE_CURRENT_SOURCE_DIR}/crash_handler_app_check.cmake)
+        set_tests_properties(crash_handler_app PROPERTIES TIMEOUT 120)
+    endif()
+    add_test(NAME app_log_header COMMAND $<TARGET_FILE:ichor> --headless --frames 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(app_log_header PROPERTIES PASS_REGULAR_EXPRESSION "^[[]info []] Ichor build ([0-9a-f]+(-dirty)?|unknown)\r?\n")
     set_tests_properties(forged_app_determinism forged_combat_app forged_campaign_app PROPERTIES LABELS medium)
     add_executable(ichor_editor_ui_tests
         test_editor_panels.cpp

@@ -7,7 +7,11 @@
       "author": "The Cinzel Project Authors",
       "license": "OFL-1.1",
       "attribution": "Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel), SIL Open Font License 1.1.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/fonts/Cinzel-OFL.txt": "f2b3029aba64c378bf0963b62945eee15e564fe4330b934c8f2eb058282b5e83",
+        "art/fonts/Cinzel.ttf": "f4d83d34d1f6c741193e4acf4b3dff9531e5a67b6aa65228d00a7db72a4e0f34"
+      }
     },
     {
       "id": "font_alegreya_sans",
@@ -16,7 +20,12 @@
       "author": "The Alegreya Sans Project Authors",
       "license": "OFL-1.1",
       "attribution": "Copyright 2013 The Alegreya Sans Project Authors (https://github.com/huertatipografica/Alegreya-Sans), SIL Open Font License 1.1.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/fonts/AlegreyaSans-Bold.ttf": "a3055a1893759bdbd7504bb22abc583769e7974c49353176eac0b03792c9fb8e",
+        "art/fonts/AlegreyaSans-OFL.txt": "0677891e6a143f297350d260ad766ad33bfc18ed5fa4f213acf648d6b597ec1a",
+        "art/fonts/AlegreyaSans-Regular.ttf": "8fab634196007afca839f1e5a6fb300976daff55d8528b590ef032f01b14ea10"
+      }
     },
     {
       "id": "audio_step_grass",
@@ -25,7 +34,10 @@
       "author": "Raassh (uploaded by qubodup)",
       "license": "CC0-1.0",
       "attribution": "Raassh (uploaded by qubodup), https://opengameart.org/content/fantozzis-footsteps-grasssand-stone (CC0), cut from Fantozzi-SandL1.flac.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Step_Grass.wav": "3984577a6c469c312b3d03e5fbe5becfe1384eec5cd9d5b3d0d1e4267e61fb36"
+      }
     },
     {
       "id": "audio_step_rock",
@@ -34,7 +46,10 @@
       "author": "Raassh (uploaded by qubodup)",
       "license": "CC0-1.0",
       "attribution": "Raassh (uploaded by qubodup), https://opengameart.org/content/fantozzis-footsteps-grasssand-stone (CC0), cut from Fantozzi-StoneL1.flac.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Step_Rock.wav": "8cc4aaf6810be7155e3cdb35b8d9ad76f28d49f31bcd1c6dd4177a807bf92068"
+      }
     },
     {
       "id": "audio_step_road",
@@ -43,7 +58,10 @@
       "author": "Raassh (uploaded by qubodup)",
       "license": "CC0-1.0",
       "attribution": "Raassh (uploaded by qubodup), https://opengameart.org/content/fantozzis-footsteps-grasssand-stone (CC0), cut from Fantozzi-StoneR2.flac.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Step_Road.wav": "6cf838f84a3a6e89f72d3f8657b479b19345c6586c261957c7b8b7dc784a9af8"
+      }
     },
     {
       "id": "audio_step_snow",
@@ -52,7 +70,10 @@
       "author": "Corsica_S, extracted by Iwan Gabovitch (uploaded by qubodup)",
       "license": "CC0-1.0",
       "attribution": "Corsica_S, extracted by Iwan Gabovitch (uploaded by qubodup), https://opengameart.org/content/42-snow-and-gravel-footsteps (CC0), cut from Corsica_S-Walking_on_snow_covered_gravel_01.flac.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Step_Snow.wav": "c82280b6cd9dfd5396d1ef20a2658caad71623b6e26d6f8ec9b26594fe211ecf"
+      }
     },
     {
       "id": "audio_bed_surf",
@@ -61,7 +82,10 @@
       "author": "Four Bidden, from a Freesound CC0 recording by jasinski",
       "license": "CC0-1.0",
       "attribution": "Four Bidden, from a Freesound CC0 recording by jasinski, https://opengameart.org/content/beach-ocean-waves (CC0), cut from wave_01, wave_02, wave_03 (alkaibeach .flac).",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Surf.wav": "2212942f1c0de79b48463aa1b186e21e123d80a21de28f33cc53277085fc4cdc"
+      }
     },
     {
       "id": "audio_bed_lake",
@@ -70,7 +94,10 @@
       "author": "RandomMind (uploaded by Snabisch)",
       "license": "CC0-1.0",
       "attribution": "RandomMind (uploaded by Snabisch), https://opengameart.org/content/sea-and-river-wave-sounds (CC0), cut from Vistula.mp3, 1200 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Lake.wav": "89b881f0e428781ba67850d6ccb939cb3eaa4be6df57dd6d85551c7a3d286ced"
+      }
     },
     {
       "id": "audio_bed_taiga",
@@ -79,7 +106,10 @@
       "author": "Some Weirdo",
       "license": "CC0-1.0",
       "attribution": "Some Weirdo, https://opengameart.org/content/windy-ambient-noise (CC0), cut from windy_ambiance_0.ogg, 30 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Taiga.wav": "d611087303db0785ff9b515d784caa8c1a7476481cd295c7c2337844b7b4c927"
+      }
     },
     {
       "id": "audio_bed_forest",
@@ -88,7 +118,10 @@
       "author": "Kresiek The Furry",
       "license": "CC0-1.0",
       "attribution": "Kresiek The Furry, https://opengameart.org/content/amb-outside-1 (CC0), cut from amb_outdoor1_loop.wav.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Forest.wav": "862d384d25ea2ecb5fdfa2c324ef641fcd2cb4105e97ff4b565fcf4c77aa2702"
+      }
     },
     {
       "id": "audio_bed_grassland",
@@ -97,7 +130,10 @@
       "author": "Bashar3A",
       "license": "CC0-1.0",
       "attribution": "Bashar3A, https://opengameart.org/content/mild-wind-background-noise (CC0), cut from wind background noise 2.wav, 10 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Grassland.wav": "f96ac1cf78c55085fdb949af3d90c9971913b8c243ecfeb9decffaa71441f023"
+      }
     },
     {
       "id": "audio_bed_marsh",
@@ -106,7 +142,10 @@
       "author": "Jorge Avila (uploaded by LokiF)",
       "license": "CC0-1.0",
       "attribution": "Jorge Avila (uploaded by LokiF), https://opengameart.org/content/swamp-environment-audio (CC0), cut from swamp.ogg, 40 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Marsh.wav": "e1e488857ade19ac8e4cfe19782ed1bda2f98a25f9f1ee50d1b886e7c3239e3c"
+      }
     },
     {
       "id": "audio_bed_rainforest",
@@ -115,7 +154,10 @@
       "author": "supergamez2014 (uploaded by qubodup)",
       "license": "CC0-1.0",
       "attribution": "supergamez2014 (uploaded by qubodup), https://opengameart.org/content/dripping-water-loop (CC0), cut from atmosbasement.mp3_.flac.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Rainforest.wav": "dc7cbcff5a9a5020fd6e065a4109a31d584ac20ccb5a672113892264c6c073c7"
+      }
     },
     {
       "id": "audio_bed_savanna",
@@ -124,7 +166,10 @@
       "author": "syncopika",
       "license": "CC0-1.0",
       "attribution": "syncopika, https://opengameart.org/content/cicada-sounds (CC0), cut from 082526-cicadasounds_0.ogg, 5 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Savanna.wav": "e1b99736e8a29e77330374de24c697a3eebd1554c91bf7ae68d183443e2f1d56"
+      }
     },
     {
       "id": "audio_bed_blight",
@@ -133,7 +178,10 @@
       "author": "johndh (uploaded by Ogrebane)",
       "license": "CC0-1.0",
       "attribution": "johndh (uploaded by Ogrebane), https://opengameart.org/content/dark-ambiences (CC0), cut from ambience-1.wav.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Blight.wav": "54eb4352c6a612c97c58be1bb492405254ad420609cd842172199923e1ee6a71"
+      }
     },
     {
       "id": "audio_bed_farmland",
@@ -142,7 +190,10 @@
       "author": "Kresiek The Furry",
       "license": "CC0-1.0",
       "attribution": "Kresiek The Furry, https://opengameart.org/content/amb-morning-sounds-perfect-loop (CC0), cut from amb_morning.wav, 10 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Bed_Farmland.wav": "32eee75f26debad7d6e9d8d37ad15a91d09f38ca40fcada74272d8d575838125"
+      }
     },
     {
       "id": "audio_dawn_birds",
@@ -151,7 +202,10 @@
       "author": "Thimras",
       "license": "CC0-1.0",
       "attribution": "Thimras, https://opengameart.org/content/park-ambiences (CC0), cut from park_ambience_birds.wav, 60 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Dawn_Birds.wav": "030b667629706b510ae6b834afcd15316660acce97ae8997426978d7ecb034e4"
+      }
     },
     {
       "id": "audio_day_insects",
@@ -160,7 +214,10 @@
       "author": "syncopika",
       "license": "CC0-1.0",
       "attribution": "syncopika, https://opengameart.org/content/cicada-sounds (CC0), cut from 082526-cicadasounds2_0.ogg, 10 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Day_Insects.wav": "c9a45691469f126530fcbda59ee90f2dc0e3ddf2e55f7cc5edfebeffb9a59b75"
+      }
     },
     {
       "id": "audio_dusk_crickets",
@@ -169,7 +226,10 @@
       "author": "2DPIXX (uploaded by Wolfgang_)",
       "license": "CC0-1.0",
       "attribution": "2DPIXX (uploaded by Wolfgang_), https://opengameart.org/content/crickets-ambient-noise-loopable (CC0), cut from crickets_1.mp3.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Dusk_Crickets.wav": "de9a3e177a9bb6d69a558d8a09b5628022da16e0aa79a0c7f02b89e095337e57"
+      }
     },
     {
       "id": "audio_night_insects",
@@ -178,7 +238,10 @@
       "author": "Aj_",
       "license": "CC0-1.0",
       "attribution": "Aj_, https://opengameart.org/content/birdcricketfrog-and-mosquito-sounds (CC0), cut from cricket2.wav.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Night_Insects.wav": "84ba548e7ae031dbe26b954c5c11a72f64c6a0d535b09cf91e462b5bd305c8ec"
+      }
     },
     {
       "id": "audio_night_wolves",
@@ -187,7 +250,10 @@
       "author": "CaveboyTup",
       "license": "CC0-1.0",
       "attribution": "CaveboyTup, https://opengameart.org/content/wolf-monster-sound (CC0), cut from wolf_monster_6.mp3.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Night_Wolves.wav": "9f1b349eb2bc41383954f0ea17b4a8e35a9915dec6f6a7ef5c8b822ad28a3a5d"
+      }
     },
     {
       "id": "audio_settlement_chatter",
@@ -196,7 +262,10 @@
       "author": "StarNinjas",
       "license": "CC0-1.0",
       "attribution": "StarNinjas, https://opengameart.org/content/crowd-shoutingspeaking-ambience (CC0), cut from crowd_shouting_0.ogg, 5 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Settlement_Chatter.wav": "400cb7eb7cc4fb6a4395a497965ec3335b1e071d09268d3a151b8dc029991950"
+      }
     },
     {
       "id": "audio_settlement_bell",
@@ -205,7 +274,10 @@
       "author": "PWL",
       "license": "CC0-1.0",
       "attribution": "PWL, https://opengameart.org/content/bell-dingschimes (CC0), cut from bell_ding3.wav.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Settlement_Bell.wav": "092d4817da05dfc09f908c0bbac43d7ad0328bcf23a8ddec8fb1cdaf27e9ca50"
+      }
     },
     {
       "id": "audio_settlement_mill",
@@ -214,7 +286,10 @@
       "author": "Thimras",
       "license": "CC0-1.0",
       "attribution": "Thimras, https://opengameart.org/content/park-ambiences (CC0), cut from park_ambience_river.wav, 100 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Settlement_Mill.wav": "ee87fb88d50b832752fe2ea78fe4b37a08f303a3d8cbad4f8afdbbdb0930e84d"
+      }
     },
     {
       "id": "audio_settlement_surf",
@@ -223,7 +298,10 @@
       "author": "Four Bidden / jasinski, with a seagull by Rango Mango (solo-seagull-sound-effects)",
       "license": "CC0-1.0",
       "attribution": "Four Bidden / jasinski, with a seagull by Rango Mango (solo-seagull-sound-effects), https://opengameart.org/content/beach-ocean-waves (CC0), cut from beach waves mixed with Seagull Ambient 1.wav.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Settlement_Surf.wav": "d367831607810fdea35678dc6b5f897d57157e3ad69ace3d5a018a6bc4f1b7dd"
+      }
     },
     {
       "id": "audio_settlement_machinery",
@@ -232,7 +310,10 @@
       "author": "bart",
       "license": "CC0-1.0",
       "attribution": "bart, https://opengameart.org/content/steam-boiler-sound-loop (CC0), cut from generator_loop.wav, 4 s in.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/audio/A_Settlement_Machinery.wav": "64b61b25fcde5b45327eeb9ad268125dc188c434007594a5f449f9b055d97f8c"
+      }
     },
     {
       "id": "batch7_kit_top_01",
@@ -241,7 +322,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_BannerPoleAlert.glb": "29c91fecccd98597e203e43dfae5c2f4e7d2db0f013dbfe1787ceafdf8937a38",
+        "art/settlement_kit/SM_BannerPoleCalm.glb": "b280643de71415556dab2799d6f10424a413c8859391add59fc87272452c84e3"
+      }
     },
     {
       "id": "batch7_kit_top_02",
@@ -250,7 +335,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_ChestKit.glb": "68dcd272772e1eb8812818d1a4881b8ed0febe731108b52fda18c12dfd828317"
+      }
     },
     {
       "id": "batch7_kit_top_03",
@@ -259,7 +347,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_ColonnadeBayGrid.glb": "022f1df5deafadecefd094408423c6648e7341e59762c6cef0059dcbba868803"
+      }
     },
     {
       "id": "batch7_kit_top_04",
@@ -268,7 +359,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_CraneGrid.glb": "b020aaa6cbd8d0c56f6f2e915ee60ac7ee8b2f59656f8f23333c04f24c2bd614",
+        "art/settlement_kit/SM_CrateKit.glb": "f6a3c4b9fb4ae10dbf43d801612f99b990f7ae641ad4a9e8cf76371a3a0d4183"
+      }
     },
     {
       "id": "batch7_kit_top_05",
@@ -277,7 +372,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_DryingRackGrid.glb": "425326db32370652582906ee80bff5c263722d2e85cd586fc9361013d6914a47",
+        "art/settlement_kit/SM_DyeVatGrid.glb": "a983a8c75471deb6fe7679d6677b3f6b4d2c08516755c2cd6aa6176f04824c64"
+      }
     },
     {
       "id": "batch7_kit_top_06",
@@ -286,7 +385,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_FirePit.glb": "9b991eff85c2fbced9e7646c80c0987dd4c6918079965d29658d0799b5034114",
+        "art/settlement_kit/SM_FloorSlabGrid.glb": "d7abe7f3c5f7c680b768c123499e71caefc2f0c2d74daf36d12fea1b4112b067",
+        "art/settlement_kit/SM_ForgeGrid.glb": "b4c2cc506ddd14b9da6afc480b272b1d943fa9a3410d306acc2bef67c147e548"
+      }
     },
     {
       "id": "batch7_kit_top_07",
@@ -295,7 +399,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_GatePortcullisFitGrid.glb": "69e110577f766b2d4eb219a54575122ca339427d01e3e9903c6cd4f25b087f0e",
+        "art/settlement_kit/SM_GatePortcullisGrid.glb": "6ee1116dc5fb61be0c82a82fc0ce5647be9186543a903fa99dcc2b2943bb0584"
+      }
     },
     {
       "id": "batch7_kit_top_08",
@@ -304,7 +412,13 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_HearthKitchenGrid.glb": "9b463f6308fdef113965ad6a26f0ccbd01ed53b36f31fc4888b55ec3b22dd632",
+        "art/settlement_kit/SM_HipRoof4x4Grid.glb": "3354669904028e486e802e3b19ebdb98250ab2b61cf95d62f519ed3bd4f33568",
+        "art/settlement_kit/SM_HouseSmallGrid.glb": "e546b3852c463ad06ce272d367f88269e2c7ec596cd901afd91e6f23c71dcdb8",
+        "art/settlement_kit/SM_HouseTwoStoreyGrid.glb": "d37a1d65645ddc1a7656f614e429b4d2d0d235fa7460229fb9776cdf52d93a9a"
+      }
     },
     {
       "id": "batch7_kit_top_09",
@@ -313,7 +427,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_LadderGrid.glb": "404493789d2cd35f63c037ecad7d0880f855970e56929f014431cb555e667a31",
+        "art/settlement_kit/SM_LeanToGrid.glb": "df60d18a337cabf9b222ff890fd1c86cd32576eacab9ba67f6bf1d353fab3d0e",
+        "art/settlement_kit/SM_LoomGrid.glb": "aaebd7d8114d01b1a59429b1d995688237c20a21c3b1a4ab98974be774616ea9"
+      }
     },
     {
       "id": "batch7_kit_top_10",
@@ -322,7 +441,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_MerlonTopGrid.glb": "6235d8ab29308fa14b03dc6a1fcd872ec7bd86a724a30b008ab1aec51fd176f3"
+      }
     },
     {
       "id": "batch7_kit_top_11",
@@ -331,7 +453,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_PalisadeRunTimberGrid.glb": "9959eca26938b0264870db1754c2292a11642d2aca0bf5d06b05811981bc2ac7"
+      }
     },
     {
       "id": "batch7_kit_top_12",
@@ -340,7 +465,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_PithosKit.glb": "efcfaceaade4ef9b025a9c0321098c4fba0b31efb70ffb48b67ebb2f00bd9cfe"
+      }
     },
     {
       "id": "batch7_kit_top_13",
@@ -349,7 +477,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_PlinthCoreGrid.glb": "f62aa5670cde64362a4809db81dbf30c08daf57e443f78f36e4a2677bcf9fe08",
+        "art/settlement_kit/SM_PlinthCornerSkirtGrid.glb": "ae05c01f66cad8fc9e7a5d2c5c494a11004a7c5e64249ca893f59702ca565849",
+        "art/settlement_kit/SM_PlinthEdgeSkirtGrid.glb": "5e0b5f64c7c1017b93d140831fc0d4c97e70a547fe317b29ad6f5b0165a20b0e"
+      }
     },
     {
       "id": "batch7_kit_top_14",
@@ -358,7 +491,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_QuayBayGrid.glb": "268de01b6f2cf27659b9e1b5982c9391e17385c8bec8bc49191d5890b8d92d33"
+      }
     },
     {
       "id": "batch7_kit_top_15",
@@ -367,7 +503,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_RoofGable4x4Grid.glb": "e96f2ded0543d02ed085aaa8f3daa80791a57cb6af948bf84c4a3af58c5abbbc",
+        "art/settlement_kit/SM_RooflineCrossedPoles.glb": "3c05cd816c523c9c0699ccfa436c55ed946271d5d857e39f1da8df3116a43fd0"
+      }
     },
     {
       "id": "batch7_kit_top_16",
@@ -376,7 +516,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_ScaffoldGridV3.glb": "6daa53b839bbae39e6b15066b6f8009b60a68846b522fb33e6cdcb10631bc9fa"
+      }
     },
     {
       "id": "batch7_kit_top_17",
@@ -385,7 +528,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_SignalBasket.glb": "7d859f392c1cbb5773d3f6a24b7e66e1d7bb0fabca64810fa2ea19854e92d306",
+        "art/settlement_kit/SM_SignalBasketPost.glb": "9314db4124ace9022fcd91caf40d3af61af52f23133674577dab95d713213f97"
+      }
     },
     {
       "id": "batch7_kit_top_18",
@@ -394,7 +541,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_StairsGrid.glb": "3bd0f5d067a6f661979a5d69c6bbde7b44bebca8e15bf0ba850c9b80b1b6bacf"
+      }
     },
     {
       "id": "batch7_kit_top_19",
@@ -403,7 +553,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_TanningRackGrid.glb": "461b1203d62f7b998ea549b0ae25570afdfd802be94e2beab1242ea44b5f472d"
+      }
     },
     {
       "id": "batch7_kit_top_20",
@@ -412,7 +565,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_TempleFrontGrid.glb": "5369bdd845bb71cae2ecd855914aa9fcd8d2b58a970bfc3523c06b752446ecd4"
+      }
     },
     {
       "id": "batch7_kit_top_21",
@@ -421,7 +577,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_TentHide.glb": "8f556fdd69abc62d153d7555cd4fe8d3376f4e87fac7722311e59d6d9ee43f37"
+      }
     },
     {
       "id": "batch7_kit_top_22",
@@ -430,7 +589,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_TimberHoardingGridV2.glb": "2054591c78832b987149275aaa2825e147b8d5c67619ec32472c0734de6a3df9"
+      }
     },
     {
       "id": "batch7_kit_top_23",
@@ -439,7 +601,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_TowerBaseGrid.glb": "5c21994752a022853c55fb08d333980f4db10ff0dfc240a491487cbb6d5d4eaf",
+        "art/settlement_kit/SM_TowerConeCapGridV2.glb": "806aa5e26d65bf3ca470eb949f5d926f975c456232ff65d6705bb59bd6b35856"
+      }
     },
     {
       "id": "batch7_kit_top_24",
@@ -448,7 +614,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WallCornerGrid.glb": "6fd217ead572d101a82d87ccba75e1c1f7b5a4db7bbcd41509024d02faeb4c0f"
+      }
     },
     {
       "id": "batch7_kit_top_25",
@@ -457,7 +626,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WallDoorGrid.glb": "108ea325493fdea88eb9d3c4c0eea43af0e40988df48c43f634b181a6330dd11"
+      }
     },
     {
       "id": "batch7_kit_top_26",
@@ -466,7 +638,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WallHalfGrid.glb": "5c0a205021004cda8ab6b7d54a222cbd640ebf8e1720e567b50555886a70a0dc"
+      }
     },
     {
       "id": "batch7_kit_top_27",
@@ -475,7 +650,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WallSolidGrid.glb": "9b6ce38a1928f529c19b148c00074168a3e3760a8379e365a081e69e890ad349"
+      }
     },
     {
       "id": "batch7_kit_top_28",
@@ -484,7 +662,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WallTowerBaseNoCapGrid.glb": "a70c08b54ca66182ba3c1308adfa99e427973281f84155661ba976feea57a848"
+      }
     },
     {
       "id": "batch7_kit_top_29",
@@ -493,7 +674,11 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WallWalkGrid.glb": "dc46a7640392d7e2cf6e7e31b19296601f75158f3cac0979cc046e5c51884581",
+        "art/settlement_kit/SM_WallWindowGrid.glb": "8da9e33c9f3de83aed198015a6806b92a16880bbcc1be3e8ea2d1bee559f22a4"
+      }
     },
     {
       "id": "batch7_kit_top_30",
@@ -502,7 +687,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit pieces: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/SM_WorkbenchGrid.glb": "71f2ffe7e11c8a64bc25f1719fda1b146c10922007e5e791de4a2b1a3e770c18"
+      }
     },
     {
       "id": "batch7_kit_sub",
@@ -511,7 +699,59 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 settlement kit buildings, harbour, defence, roads and ruins: generated locally by the owner with Blender (procedural scripts, fixed seed). First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/settlement_kit/buildings/SM_BarracksTwoStorey.glb": "ba164c1a6db9c853d334d782944eb36c65959a7592a73e3ceb1e45a00401d4ce",
+        "art/settlement_kit/buildings/SM_Granary.glb": "9d1b98ff404fc2f85f7769e35b31d448555c0ba9caea7791eb5c65ffb69f49fd",
+        "art/settlement_kit/buildings/SM_Hall.glb": "4f7d59861b087517b50e327053cc7c4039c8402a27777ef034a5233fed31a523",
+        "art/settlement_kit/buildings/SM_HealerHut.glb": "c2faa4389aadf9878002622948dd28161211f5f747365616cbfc926c78d9007b",
+        "art/settlement_kit/buildings/SM_ShrineStage1.glb": "66833055447e42ad99e631d0ea12681a296757b0eb6ae4494451d6ae284c071c",
+        "art/settlement_kit/buildings/SM_ShrineStage3.glb": "4cff253bc650bab6f120ff8c936a3e81a174ffdc1e553243249a519e67db2e80",
+        "art/settlement_kit/buildings/SM_ShrineStage5.glb": "044e7df40899e003443d8a107c6738eee95254c38b2408f0c233c02e4216d1c9",
+        "art/settlement_kit/compound_pieces/SM_GateLeafPairFitGrid.glb": "cb363cdb45956c01b2a6472859378cfb40fe49028ace6a1211c45320aab2879c",
+        "art/settlement_kit/compound_pieces/SM_GateLeafPairGrid.glb": "2432adf7a03af715d766b29dd934fc3f70114feede61bf132574571bfcf59f35",
+        "art/settlement_kit/compound_pieces/SM_LashingSet.glb": "2f99c4776a64c426d3e16eeba4065a7b4662125e28f9d2ccb76984502d6bd1d4",
+        "art/settlement_kit/compound_pieces/SM_Plinth2x2Grid.glb": "c3b88c804f0734617d9a22ad9b2078db7a035f42308505cbaab7a441b3059d8e",
+        "art/settlement_kit/compound_pieces/SM_PlinthGrid.glb": "ccba2fb3c61522d43e4bc92a0f2e1a8d2168ee5b877bcfd899ee3030d0b507aa",
+        "art/settlement_kit/defence/SM_BallistaMounted.glb": "6a5630423b63cc39f3ad1aac690cc3601cc3b0df19d50207516689aa3848bcf4",
+        "art/settlement_kit/defence/SM_BarricadeTimber.glb": "cfa4f83c93b5b149705fe3f088a061af41b69659b2e338bc22f5fc4729c55c8e",
+        "art/settlement_kit/defence/SM_CaltropsPatch.glb": "ae2eebc4c227b7911b5438998f3f46cf6ebc8a23125c850f8d9e78f67b1980c1",
+        "art/settlement_kit/defence/SM_SpikeTrapPit.glb": "ffd4c36a4ac2338d24b545a408b1cc9d1c171bfabbe7354a4df071a06b455c3e",
+        "art/settlement_kit/defence/SM_WardTotem.glb": "a4a69a179bbab7e0d987f7fc1623274563ae41a20a2e2205d0bd13311e57e05b",
+        "art/settlement_kit/defence/SM_WatchtowerTimber.glb": "9420083e9a70898baaf206e3ae37caf3d218748730af32f11c31199d1c94b159",
+        "art/settlement_kit/harbour_farm/SM_BoatShedGrid.glb": "c507c5ebcd16a4269152d10fe0c4d07109d6816bceee85e29aee86dc721dab48",
+        "art/settlement_kit/harbour_farm/SM_FieldPlotBlightedGrid.glb": "c0d568f57475d7c642b4203e73b1e2b4a14daa95e0618101599e36c921044a81",
+        "art/settlement_kit/harbour_farm/SM_FieldPlotHarvestedGrid.glb": "43edcb4daff2f493485776a7dfe11cb600c7df4b3b088a45a501ff278c6de826",
+        "art/settlement_kit/harbour_farm/SM_FieldPlotMatureGrid.glb": "d9717f6be854165f32b3648bd006ae925bbd0f6ee709475e17e79735a288e723",
+        "art/settlement_kit/harbour_farm/SM_FieldPlotSproutGrid.glb": "33335f17a1ba4aff00b6438ab48e679f7e4b55f9add4b4cca803d99e85b33f6e",
+        "art/settlement_kit/harbour_farm/SM_FishDryingRackGrid.glb": "15e5af8b946a0219299241a0efd59d3258c33f4b287809879fadb39e6498f051",
+        "art/settlement_kit/harbour_farm/SM_GardenFenceCornerGrid.glb": "30782f1f2fc9ce5f0d056f52f3e62e8969d796860b1853f284b502e81b637c74",
+        "art/settlement_kit/harbour_farm/SM_GardenFenceGrid.glb": "5e2365f4060b88bd4942f459852208121673ee4009fc297b69023b642d279909",
+        "art/settlement_kit/harbour_farm/SM_IrrigationChannelCornerGrid.glb": "fb040a54f47c4474c45115423382363024a6e3b5717bbf0a8e54211bf0e0b3d8",
+        "art/settlement_kit/harbour_farm/SM_IrrigationChannelGrid.glb": "ee885362e91e6a9faad5f21ef8b9503093252b4c6c9709f11798c5a3a4204696",
+        "art/settlement_kit/harbour_farm/SM_IrrigationSluiceGrid.glb": "6fb217a4cd9a385dc999060746215ce48810b610bdb19e07d56cf65648b7a824",
+        "art/settlement_kit/harbour_farm/SM_NetRackGrid.glb": "0d3db2695a94e016ecaef1072471fda54dcfad192a76c5b974044e2173c64f24",
+        "art/settlement_kit/harbour_farm/SM_PierSegmentGrid.glb": "cc33253aecc4af144138b97098075023613f89ea5b3ba2bad35fcb8171de3a25",
+        "art/settlement_kit/harbour_farm/SM_PileKit.glb": "dcd4fb3f83b5c6d41ba81fdb2b42da6813c5e36d602a1ffd5074b6000780c99a",
+        "art/settlement_kit/harbour_farm/SM_SlipwayGrid.glb": "3a98b8e0c12d7c049e2b09c55bdcbac34d84b94289334ef509a6f889178f85e0",
+        "art/settlement_kit/roads/SM_RoadGravelCorner.glb": "009d466912c1d44e032b1117b57047230f655081d0df35107f5acdf07515f099",
+        "art/settlement_kit/roads/SM_RoadGravelEnd.glb": "ef838b3858a2456736c1f300d1e757c4a0edfc18b0cc8b1e4aa8a2ee1504fb53",
+        "art/settlement_kit/roads/SM_RoadGravelGateStraight.glb": "35aee94b29e0026a039a48d4816d44ebe705b222ae13f8b65765a757134b48ef",
+        "art/settlement_kit/roads/SM_RoadGravelStraight.glb": "01943b8ec332344df0cb16403bfcb29711af85a2a5a484352119832649edb097",
+        "art/settlement_kit/roads/SM_RoadGravelTJunction.glb": "ce1a8f25d6e29acbe94a77f10107542a267471d436ba4ba36ccbf002c780aa57",
+        "art/settlement_kit/ruins/SM_ColonnadeBayRuin30.glb": "18707747ea9e3b2b5614bfc8e05e147fdaff5fd7b73c60c9739218512ee85e21",
+        "art/settlement_kit/ruins/SM_ColonnadeBayRuin60.glb": "b12569780142d43992e8757259afea110c90c37e63ed0a181156e9273ddb69f7",
+        "art/settlement_kit/ruins/SM_ColonnadeBayRuin90.glb": "eae3ec809e1969da6357541c5643793c4ae6382e1bcd3a80898b0c72e3fef5cc",
+        "art/settlement_kit/ruins/SM_HouseSmallRuin30.glb": "cae97b774b72311a6e689fae2efda3cd13d4c36fd7a77c6050e4c7606a47d106",
+        "art/settlement_kit/ruins/SM_HouseSmallRuin60.glb": "3db554cc08c28476d37999a3f9c418fe74ebde7f9e33622c0b264805443c157c",
+        "art/settlement_kit/ruins/SM_HouseSmallRuin90.glb": "9b068b8936e24f2eb7d28ecebccbe3e69061f7c3deeed48254441b883389468a",
+        "art/settlement_kit/ruins/SM_WallDoorRuin30.glb": "4e64cc47ede074981a48e4dcc0866aaedcbcf4ad44c3159c726b4a9f6d0a962f",
+        "art/settlement_kit/ruins/SM_WallDoorRuin60.glb": "b566fa3814619185a1e53bc31eca9b7cf014d5c0637d94c456a1331b93febb3d",
+        "art/settlement_kit/ruins/SM_WallDoorRuin90.glb": "bbf619f2c31b383983380caa1b49a92460db9be6088172f82cda4637a3e23fbb",
+        "art/settlement_kit/ruins/SM_WallTowerBaseRuin30.glb": "62defcf07cc8c088586aa2794d0210effb54edf6b28e9613cd3d18b893d335ed",
+        "art/settlement_kit/ruins/SM_WallTowerBaseRuin60.glb": "bc321b278f5a3a39a38c4793c107e9a8f6714bbee8c7cc799b3d44f04c73f610",
+        "art/settlement_kit/ruins/SM_WallTowerBaseRuin90.glb": "e12be61a6d6bd47252e6486c6363ed691311cf7fcf68a69cd764ef4602544cc5"
+      }
     },
     {
       "id": "batch7_props",
@@ -520,7 +760,55 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 props: flora, ruins, settlement furniture and terrain rocks: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/props/flora/SM_AshShrub.glb": "f777637eb34e14dc43d7dbbff1fd0582b49efbd4f6a47f28ccd6ac0ac4d7743a",
+        "art/props/flora/SM_Asphodel.glb": "dabaa23e925dc058247a65938df11a8bd92634aca00c68f5d7b516a71456e3c9",
+        "art/props/flora/SM_BlightedWheatClump.glb": "e442822b75a62587b07334aeaa8d734e4f80c4bbb6d962b0acd25fcde51db9f3",
+        "art/props/flora/SM_BoneStalkBundle.glb": "21653be4945843a69a3126e3d168498865c0f326d07ae8e23c811710a3cd4f40",
+        "art/props/flora/SM_BrokenWeaponGrassTuft.glb": "5dd1087f34146cbf295f01636d99dd891a32e9d020396fd3fdd8920e161a1ebe",
+        "art/props/flora/SM_CharredStump.glb": "b9e8df3e658e061b31749538f3809e5c60599fe5552c03b83cea177144b6036b",
+        "art/props/flora/SM_Cypress.glb": "0de43a415790717211343fa1b59e9a6b2ee9af579d87fbd1334a1e0431816ce7",
+        "art/props/flora/SM_Driftwood.glb": "6c2fa64a803a06329c94824045a8112133110aade9637047215a1625e857b318",
+        "art/props/flora/SM_DryThornBush.glb": "4ba875761e88c39881423aa655d1cec0ed48b4f0dc547d43fc648425d921fa72",
+        "art/props/flora/SM_GoldenWheatClump.glb": "1027c410336d12bc7de6babfa7e2243301e34faa3f4413a0e1381ff1cccd1e7f",
+        "art/props/flora/SM_Oleander.glb": "afce9ede54e69e3500f8e2ed782a542c20e965a308b6ee0ae4615f77370ba80b",
+        "art/props/flora/SM_ReedsCoast.glb": "93017412bdeb7e9cb13f20ca5101f2452f0ee5ee30d966a0bd1cd3d4328d20f2",
+        "art/props/flora/SM_SaltGrassTuft.glb": "070daad56d920123117afca687ca03dc8680f5b9675b8454e329bd4ca015c8b4",
+        "art/props/flora/SM_ScorchedOlive.glb": "2f2e6956bdc09a864586a6fd5f9efa00948ec4d1fa2834a2be12c40a6223072c",
+        "art/props/flora/SM_SeaPine.glb": "a11e3ae475fbbb874ed0c17b87f0bb7df1ff8c4e22ce2231c7c9ce3c7c836901",
+        "art/props/flora/SM_StonePine.glb": "54ddb2656fa66af9a39ee9ce3ea2e9df4d166117b619a4243243231a6e2a2aeb",
+        "art/props/flora/SM_WildGrassTuft.glb": "d0903efbd20c1e873fc6487700a7d7b9c3667d1db16723f8467f32665790c3cd",
+        "art/props/flora/SM_WitheredOlive.glb": "4c59a3b6b65b9556ac4f861c41ce2ba70e554f01f72a2c4ca29f129b1c82da89",
+        "art/props/ruins/SM_Pedestal.glb": "d4511152ae28121fabdd250d2ddc1e4020597a473874961dd7e2335f4a712cc6",
+        "art/props/ruins/SM_SealMonolith.glb": "70422a11e8331645f99b60be70b60cabe63862740c31bc205a60bc57af4802bc",
+        "art/props/ruins/SM_StatueHeadBuried.glb": "25d3d69eebac219efcc81f9316dcbd1dfd1a62e1270f61ef0ea90de7322ee65b",
+        "art/props/ruins/SM_StoneAltar.glb": "02a2b267577f617915410217a69540ed5f563d060415b8a63678aedebf806f8f",
+        "art/props/ruins/SM_ToppledColumn.glb": "8a99c1b0a438e847d512bf5d6147b552e6fe6fbd6d80003fc52d6326f9c0a66b",
+        "art/props/settlement/SM_AmphoraSet.glb": "b82d95f06daa81b55a8215db5b87540f28cf783bafdc3718c50ff0d3bb8893da",
+        "art/props/settlement/SM_AnvilBellows.glb": "1313f3b3ddc436314544345122fe515a9ae5101472393dc23d06c846b8c4fe28",
+        "art/props/settlement/SM_BannerPole.glb": "2bca3234f5a8b2f5bf8f7934ba9cc73bdaf6ebc1c6c76f7deaa2db3b6847540b",
+        "art/props/settlement/SM_Barrel.glb": "bcc382f7349deaa4d68380a5b60a2d2db2732876c7515fa3148363cf27c021bf",
+        "art/props/settlement/SM_BedRoll.glb": "32d51e19c8c64d7f898c8c85b399d340f63019d13caad280a55ce31f263d267d",
+        "art/props/settlement/SM_Cart.glb": "77fa6e5a07d0e84c56857322df0370b607afe3463e98d7a7f62f558e85eab181",
+        "art/props/settlement/SM_CookingRack.glb": "0432432f19c51a589e02c5d0f6e6322b3d0c970f05977b1d7596a02d17838d4e",
+        "art/props/settlement/SM_Crate.glb": "321518237f47b0acdd101dd18a2c4d5e91514b41587793ff64a87c99e9fdd902",
+        "art/props/settlement/SM_DryingFishRack.glb": "52510c7363eab685d7498787430eaaf93aff1ec8052ca1308e1a2b2c18072e19",
+        "art/props/settlement/SM_FishingNetRack.glb": "903918c03ca49d83edf60de1926ae66dff70f3f12499973b9e15044e0b1a406d",
+        "art/props/settlement/SM_GrainSacks.glb": "acfe95e027dc414fbc733605b89c50c79285632ac8938084e52ad2c69c7bb47e",
+        "art/props/settlement/SM_HayBale.glb": "001f088fb0cc183f9431ebf6fb0bd7aec9e023c300ce60796d5a785ed60a3c8a",
+        "art/props/settlement/SM_LanternPost.glb": "0bf4f4431ce2403d09364d0279d637a3d00102d48e1e89b0e10d04da4f253822",
+        "art/props/settlement/SM_Loom.glb": "c96cda1eac29b25aae433898133fd927bbd999e5ec7565a5ab5baabd25f6664d",
+        "art/props/settlement/SM_SignalFireBasket.glb": "d0b2a39e809d81408eee4060851b738913cf144e80f845a36f5881d7940b0e99",
+        "art/props/settlement/SM_TableStool.glb": "a8ddbaa2e8d0cce901509cfeb289aa6abc178562eb8e9271a906558bcc94f14e",
+        "art/props/settlement/SM_WeaponRack.glb": "96c23f06da5aa9ad9a5ab04fc9d8c4b95ba2123b20266b32250570480e4de0f2",
+        "art/props/settlement/SM_Well.glb": "9807286abc721552f24707c101a1141940c875de2fd9c88dd46e03ebd7ad80d1",
+        "art/props/settlement/SM_Workbench.glb": "62f5426580512e2a4137ca1c6f4dddc8aeeb8012e73827320997cb21b48a78e6",
+        "art/props/terrain/SM_BoulderA.glb": "9b84e3c44a45982fa5ccca525fe4f166fa29a59a75e29458bb9425d06b968990",
+        "art/props/terrain/SM_BoulderB.glb": "67c8449f5565170aca350e0809911d0a88bba4bf3ec45ed9fa718ccbd4e68772",
+        "art/props/terrain/SM_CliffChunk.glb": "137062163b7dcf0d002ed32567489750749981c41ff84c0c50d6d3ce5be8aed3",
+        "art/props/terrain/SM_GlowingVentRock.glb": "269068080caa154f4c14e31d29c40ca4aacb0b4e7fdf80562416e63c0acbc5b4"
+      }
     },
     {
       "id": "batch7_creatures",
@@ -529,7 +817,16 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 animals: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/creatures/animals/SM_Cat.glb": "fcf78680d94f06f7fe617d50affeb1e26874eef79d7b3019aa65465f542599af",
+        "art/creatures/animals/SM_Crab.glb": "04c3f59931a1c2473d2ef23870e19fcb6308da7460924ad2c0d141ccd2668b67",
+        "art/creatures/animals/SM_Goat.glb": "c06556ee5bd0071f6353c20319a396472cba702f1d0b122cfae04034d9dc9046",
+        "art/creatures/animals/SM_Heron.glb": "def26840f77d6d189379ce7ec53f5a22a7c7a79c2f4cd2c7e7001a655661cf25",
+        "art/creatures/animals/SM_Sheep.glb": "80009c3e180b1cbd028d22ae2e608ae2a67bc630117a3c5fcd43273099ad83a6",
+        "art/creatures/animals/SM_Tortoise.glb": "3bf898981eaef89c8aa1cd148ad120e4a6e877e56960b631a09fd1c83ba61649",
+        "art/creatures/animals/SM_WildDog.glb": "439bed851e909ca4f5b4472206b0eedf182abaf992f8b38844c398bb59374de0"
+      }
     },
     {
       "id": "batch7_items",
@@ -538,7 +835,14 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 items: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/items/SM_FireDrillTinder.glb": "3887d995bbb0f47e1d7dfb34dea28eaa5c0ad95afcdf5b57762b420751a28984",
+        "art/items/SM_IronXiphos.glb": "316ba6408380d07fdf7c7f5d216c3223972d6e7c6a0496d149c58bc0ba260529",
+        "art/items/SM_Linothorax.glb": "c10f0b2a633cb9371a91ccd4cefbde45b18bb08c4839a1757b63f4d15f2ae300",
+        "art/items/SM_ScrapHelm.glb": "6dad079cc805586dede90b27c4efae1b0ee7267ddb610806488e4a9343298df3",
+        "art/items/SM_StoneMaul.glb": "b28a2089a8db5929126121c1da1a93506c242551a6ed3e0fee65fd511a7b8eae"
+      }
     },
     {
       "id": "batch7_bosses",
@@ -547,7 +851,14 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 bosses: generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/monsters/bosses/SM_AresWarColossus.glb": "1622a1de799343cbe7f3061914c53d6abd9f2bde97b250b7210815d0f4855039",
+        "art/monsters/bosses/SM_AthenaMarbleSentinel.glb": "9d82e80c42b50c1baf2147373b53b2d96fa967b8ee09321f3156bb064591695c",
+        "art/monsters/bosses/SM_DemeterBlightReaper.glb": "6da1192d920ac87baedc26b4bc76a74c37b78688dd27b7ca54d18e58ec05c8a6",
+        "art/monsters/bosses/SM_HeraArgusPanoptes.glb": "2abc4ecea3d4242c4698f73926a2793c5c7e7c3a0fa0a9391aeebc5fa455b8d7",
+        "art/monsters/bosses/SM_ZeusThunderEagle.glb": "53127a7c820f1b392a217e4ab6411b6e040e2b79000dd099ce0e66f6bec29a06"
+      }
     },
     {
       "id": "batch7_enemies",
@@ -556,7 +867,27 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 enemies, static and rigged: generated locally by the owner with Z-Image Turbo, TRELLIS.2, UniRig, Blender. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/monsters/enemies/SK_BrineHound.glb": "2107da0631c6724ba724a76147ee9f6d3176897e47e299bad4ece2b9e275d80f",
+        "art/monsters/enemies/SK_FamineWolf.glb": "c95530108816b2cc33375d1672900c2595cf8aab9ffdc95ce24c19a889604c62",
+        "art/monsters/enemies/SK_WarBoar.glb": "c92dc15d3b7aa19ef3b93ec76dd25f0e515848eb9e94775401ae6ac4e6c62980",
+        "art/monsters/enemies/SM_BoneWheatHost.glb": "2738fea2d53b52e1689a2cf82d72cfa5b0662654920f4009cf55419ddc114efb",
+        "art/monsters/enemies/SM_BrineHound.glb": "e95d6a944d7671ae29fb617356e38ef3b783519e4c8d50ec3977fb23eaf7e1a0",
+        "art/monsters/enemies/SM_BronzeAutomatonSentry.glb": "874f1317b676cdaa65dc616b25a9dd85c361d0fb9dc3baba89762a5b5ec6f393",
+        "art/monsters/enemies/SM_DrownedHoplite.glb": "5e8fdb825cca30c698470dd03d97f0470729062ebf57c1a43d3d52af9b51d13c",
+        "art/monsters/enemies/SM_FamineWolf.glb": "c1ad7a18d66fe2aca850d9dff5f9b803c40708d93506314d884c0b5b2640b42d",
+        "art/monsters/enemies/SM_HecatombRamBearer.glb": "d3d876e5c688c24301b542162ad4f9780500991a343acef96d0f76b21a70b8fe",
+        "art/monsters/enemies/SM_KelpStalker.glb": "67a2b1693f024379108853dbc7d242be014fbc638b7e4f5fee05413a6570bef9",
+        "art/monsters/enemies/SM_MarbleOwlSentinel.glb": "be48c744abcbcff4a0f31700edf99f273c7a73b49349cea9364c870cb3f42665",
+        "art/monsters/enemies/SM_PeacockEyeWatcher.glb": "88487db1c6c544bf8a2f944c0a11fdb542ca44a17efc598b553007d2e0699658",
+        "art/monsters/enemies/SM_RustLegionaryShade.glb": "e6b13d7379f0ee8afe225c4ef4182ea375d921dce8470fbae6cdc77cd1488cbe",
+        "art/monsters/enemies/SM_ScrollWisp.glb": "65e19c4d38dd65fed3ade14f2a8d867c90ebd9872dc595a6bbcd70858c9a3527",
+        "art/monsters/enemies/SM_SerpentHandmaiden.glb": "f8f7b148dc2bbf5469f5c321ec6adc58d8421edd8df63b89835955e3721b1671",
+        "art/monsters/enemies/SM_SlagCrawler.glb": "1fca8a3beabb3ef024588334e7cb1a14f9b5fc55294a3483f3051317326ca663",
+        "art/monsters/enemies/SM_VeiledCourtGuard.glb": "38af57e787a0d450925717e211443ade28e18377d4f05ecccb853c3be7eebde5",
+        "art/monsters/enemies/SM_WarBoar.glb": "bee6330689d7fa5a04c884767d404c209f6cb587ec954e5cbdf94ffcbfc827f7"
+      }
     },
     {
       "id": "batch7_npcs",
@@ -565,7 +896,17 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 NPCs (static models): generated locally by the owner with Z-Image Turbo, TRELLIS.2, Blender. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/npcs/SM_NpcAthena.glb": "48b82e09907d1d89b21849c77e4594eb508979df97433651a4fa87611762357d",
+        "art/npcs/SM_NpcBlacksmith.glb": "44ed5e72a1ea30062f8f4c98a9f610106018a5ff6a9e82031ea508e231211b5f",
+        "art/npcs/SM_NpcFarmer.glb": "a6ce7a6a42ef5d235f736aa36236e8fd95ba7f24dd40ae2f21cf31e295dbf678",
+        "art/npcs/SM_NpcFisher.glb": "823b9048fb60abc17f79325bcf08616737479b787fad649a4082ebd0ea5c604b",
+        "art/npcs/SM_NpcHera.glb": "8c3566c9dd954b28ed0a66312badd1e102ede51f2fe295b54013bc1e0fb62246",
+        "art/npcs/SM_NpcMerchant.glb": "7c17227e96f26bab19b536776e4cc5b8fc1ac1fa48be0e421695d9ffdd377f1b",
+        "art/npcs/SM_NpcPriest.glb": "d07cba7725a39224d50cfa175abb24b5778c95ae77547345cf4fe08c20ce38e7",
+        "art/npcs/SM_NpcWeaponmaster.glb": "ce932e22776fbe105c1f2e1a34ed2c53331804afedd1f0bab87dcdeac8be2f39"
+      }
     },
     {
       "id": "batch7_surfaces_banners",
@@ -574,7 +915,23 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 banners: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/banners/T_BannerAresSpearRow.png": "a8dbbd137ce9f27dabe56d13d4ccaa410b67ffa903a875c57641b5cbc4e1b11c",
+        "art/surfaces/banners/T_BannerAresSpearRow_N.png": "563fac8e54bfeac3904a501118124a6514cd838ec68ad854e04fb18f8a8be1ce",
+        "art/surfaces/banners/T_BannerAthenaHelmCrest.png": "ac364b1c54112c893c54225290944a148ab87c700d13b8611448d9c9e61a445b",
+        "art/surfaces/banners/T_BannerAthenaHelmCrest_N.png": "28d4b61d442dd712bf694bfa6dad85b1b68a70c22fc68ff890ccb34ce98789f0",
+        "art/surfaces/banners/T_BannerDemeterSheafFan.png": "4954c6d73edacf6fcc3263e6501526ebbe85d1992676965a3490f457f6693d97",
+        "art/surfaces/banners/T_BannerDemeterSheafFan_N.png": "c2dfcb97baa4886383db520aabf72acce535ea72d00a827427be693edfebfe2b",
+        "art/surfaces/banners/T_BannerHephaestusSmokingStack.png": "74f2d2fde4f4d8dcbeb6be4b8e17113847ad7ab92887a8ae681245403dfff4c1",
+        "art/surfaces/banners/T_BannerHephaestusSmokingStack_N.png": "4d77734a4b423b54e607ff37fee54f29562f29fc50b5d9982b36410267e17fa5",
+        "art/surfaces/banners/T_BannerHeraPeacockFan.png": "812e8c8c672e48e78c97cae44a9f53da8fbf1340de8d5e0c0927cc20a40bbe08",
+        "art/surfaces/banners/T_BannerHeraPeacockFan_N.png": "d2816745a3d5d6b851e8206cb82aaa02654caec49c5d9e6e0ef8400fdcf3b380",
+        "art/surfaces/banners/T_BannerPlayerCrossedPoles.png": "f12bc85c28b26894e895e3b3896d02ec4b508cad91b84541daeeab4211576d82",
+        "art/surfaces/banners/T_BannerPlayerCrossedPoles_N.png": "ea253509468d31aed12c1b9517c36d39722d8f8861ec9a1208b800bdcf37ee35",
+        "art/surfaces/banners/T_BannerPoseidonTrident.png": "741c4b14ec33dd6eb70b6773a5ed923b5b0eb970f7dc6aa454a2608c0efa2025",
+        "art/surfaces/banners/T_BannerPoseidonTrident_N.png": "4ce9d3d3250f79c47bb05be25fdb9688653701a362ab6744918edb9cb8282dc3"
+      }
     },
     {
       "id": "batch7_surfaces_decals",
@@ -583,7 +940,40 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 decals: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/decals/T_BlightCrustPatch.png": "45551305712111502ed316bdb7300685a1377beb47a82a41831cc41baca9885d",
+        "art/surfaces/decals/T_BlightCrustPatch_N.png": "9dedf4a79eeb6f0992aa50cef2176bb178af93b7efe4fc785b854bccc6a65be9",
+        "art/surfaces/decals/T_BlightCrustScatter.png": "2e1cc3312f06e403566ec135d6453aa1171578db49e389cdc999e1bbcd1258c8",
+        "art/surfaces/decals/T_BlightCrustScatter_N.png": "c541a358ba97ea0c6553af324ff549a59894d5528188cb87c27eedd9220c394f",
+        "art/surfaces/decals/T_IchorDripStreaks.png": "9fbbf5ecd1ec7c107fc46ccd8972dcff8a2c6496bee8072949a4b227337da9e2",
+        "art/surfaces/decals/T_IchorStainPool.png": "0fa8f8830c34c613806c291aabf90272046e4b1ad4bf76a88b287f34beb383ad",
+        "art/surfaces/decals/T_MossBasePatch.png": "7b8ea5b1ad990d30882f962e2884ec69fa7afbc9b0a31284d7b34b63416a8327",
+        "art/surfaces/decals/T_MossBasePatch_N.png": "19c2b63f262e9d149b938edc4e263bae9bdd166dadead5a09f4147f17bde220c",
+        "art/surfaces/decals/T_MossLichenRosettes.png": "0b8034966470c72d2c2a0d732945b40cf80fcc61087a8d95441041e3f751af78",
+        "art/surfaces/decals/T_MossLichenRosettes_N.png": "da39148aaff941717d5b52694359d8378e2b1c9fa557806f5afe0c9b85745e50",
+        "art/surfaces/decals/T_MossSeamRibbon.png": "f997cecbb42c601b3c24eacad41391f34fcc837c779579a5d6dbf9ddc2883a0b",
+        "art/surfaces/decals/T_MossSeamRibbon_N.png": "96b7bdd2f22369f7543e901bcdb6b71fad86aa8bfe59c2a6e7234c8d4b425992",
+        "art/surfaces/decals/T_MudSplashImpact.png": "0d86382e0baaf746cc2c657bd54830155ea5bc50f9d5bb41e6eda5f96509949f",
+        "art/surfaces/decals/T_MudSplashWallBase.png": "1f4e5745b464ebe50b0b6e2350deac883ff7161a64363f6fd4c949cd41806191",
+        "art/surfaces/decals/T_ScorchAshSmear.png": "357259f139e1e47fee81b083eef8d7d238f775c15648f9bab2260a28c09e6ba4",
+        "art/surfaces/decals/T_ScorchBurst.png": "61c0bbae92bb74fbf005b0cd6311a0d232b84aec0b31fabe0fe3ef2f0b441dd1",
+        "art/surfaces/decals/T_SealGlyphRingA.png": "424ca7c489f9fad968ff33a86658ac865d153aa565b21ed36412ec39a39b3e04",
+        "art/surfaces/decals/T_SealGlyphRingA_E.png": "283f6ac32946510873b0a7ce6414229ae90ffeb4d418056e109ae22c90dc451c",
+        "art/surfaces/decals/T_SealGlyphRingB.png": "61cf34afbe33a9405c207f44da0b1e41d2805a32a83fd801ae9e1dbe493527e3",
+        "art/surfaces/decals/T_SealGlyphRingB_E.png": "978c447c7ff07f83bb84401502ca83c51458c668c03b877ec7ff9d1ea6a96b74",
+        "art/surfaces/decals/T_SootEaveStreaks.png": "68e6a00d53db3509dd16ad5bd31eb531c8fb30b507a7af75647500f130daa872",
+        "art/surfaces/decals/T_SootOpeningPlume.png": "dad70bb33e91823f1627a09bd2500b9adbc04d44bdd8bc95ac2189bdab6aad04",
+        "art/surfaces/decals/T_SootWindGrime.png": "f81573e3eadf35c7fc4defe6926cc35a15ea48fbb6bc4f6e6e3a2590632e81dd",
+        "art/surfaces/decals/T_TideLineBand.png": "bdce95d54767d2b31048578b7dc0c4ecd75a9626af265db69c42896eef0e3dc7",
+        "art/surfaces/decals/T_WallCrackA.png": "c63abdcf9e37df92f78360822025592c79f4415bcbd3dd5ae8422ff72f855583",
+        "art/surfaces/decals/T_WallCrackA_N.png": "47132f31d39833e23fd9e6f61d61eba0d633bb7dc1bf860d9bef93a10454a099",
+        "art/surfaces/decals/T_WallCrackB.png": "5b41693dbe01df8ff6cd63a1d516e747d5d710dd6d9f1eea288765c11457ebb2",
+        "art/surfaces/decals/T_WallCrackB_N.png": "e3e542edee14aa84c0c467f8b74394d4148f919d86f88c461c9f6a7ab3bdfd24",
+        "art/surfaces/decals/T_WallCrackC.png": "814cbc4efd1200188110c89e40892a3ef54b2434359795ae6a7ea0f7dc5054c1",
+        "art/surfaces/decals/T_WallCrackC_N.png": "a45ed782e2c1a59b8d2b9ba5cc13158ca9d619f6743868eb7200067a7e79e7f2",
+        "art/surfaces/decals/T_WaterStainStreaks.png": "2b231a96402a196e782157e9ec001e19bbb017637ffd167f42275a4012a9c072"
+      }
     },
     {
       "id": "batch7_surfaces_roofs_01",
@@ -592,7 +982,15 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/roofs/T_RoofPlayerThatchFresh.png": "3ca649a27b4e193cf968e050dd82d5843154ef3cd40e90262528f6a43335cd94",
+        "art/surfaces/roofs/T_RoofPlayerThatchFresh_N.png": "d3ceaa44c46f6afd001d668aa95b3927cc341fe482cbaefd39f97424674626ef",
+        "art/surfaces/roofs/T_RoofPlayerThatchFresh_R.png": "f8ac318c8b318a7bc955d4c66f4bf57692f3622ebf0279be0600d9c0ff9637c4",
+        "art/surfaces/roofs/T_RoofPlayerThatchWeathered.png": "b7b937051007ad24c75e25a44d49315b4727508632dfb366bd33645e78d206e8",
+        "art/surfaces/roofs/T_RoofPlayerThatchWeathered_N.png": "c88ad31e212ae517d31cd6d2a030d849cf6a066a12105e55012128e01e9c344b",
+        "art/surfaces/roofs/T_RoofPlayerThatchWeathered_R.png": "3081f692e56b95a77db8e785b4d1a53feff8cda8c253ca78093322eb2054a9b7"
+      }
     },
     {
       "id": "batch7_surfaces_roofs_02",
@@ -601,7 +999,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/roofs/T_RoofTerracottaTileV2.png": "b36948ccdc649cdccec222d2052a716f3c78efd2e54018fbfda56f6ed64518bb",
+        "art/surfaces/roofs/T_RoofTerracottaTileV2_N.png": "055ea367dcc8b7a005cbf2273f3120660758f6ef7830d33f8180b129735e0180",
+        "art/surfaces/roofs/T_RoofTerracottaTileV2_R.png": "7b62345ac04772f33a250d50ca6b84f359a2163f2784f3532c7d30e90b023f87"
+      }
     },
     {
       "id": "batch7_surfaces_roofs_03",
@@ -610,7 +1013,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/roofs/T_RoofVerdigrisCopper.png": "0fa3bfbab5c7e52db953aa223693cc253fc5aeb82d7bd6da5331accade4e6092",
+        "art/surfaces/roofs/T_RoofVerdigrisCopper_N.png": "f67551ae352ce57bc74d36e323177252bed759eb4af1b357c1961fc960f410eb",
+        "art/surfaces/roofs/T_RoofVerdigrisCopper_R.png": "2dff435cfef4a2fda07a54f2f7deaf5794cedc200817a7ef1d74a7655eaaf445"
+      }
     },
     {
       "id": "batch7_surfaces_roofs_04",
@@ -619,7 +1027,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 roof surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/roofs/T_RoofWheatThatch.png": "578243159e498d1880bea4061be3da72b440894262792bde85329eb6bc71965e",
+        "art/surfaces/roofs/T_RoofWheatThatch_N.png": "5bcc9abec06936a8c9ede67d70b2a56b9470fae9c422526941a68a6066866c92",
+        "art/surfaces/roofs/T_RoofWheatThatch_R.png": "67b3962022bd4c8bb0948b022941024333434a9bf53d68c8e5173f360c4c96ab"
+      }
     },
     {
       "id": "batch7_surfaces_walls_01",
@@ -628,7 +1041,18 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/walls/T_PlasterMurexPurple.png": "82439b8d80d3c4a7b51909439686924a83051401ab1423eda677e1b008600e58",
+        "art/surfaces/walls/T_PlasterMurexPurple_N.png": "1947c1c57cd83d1ec7fd2dc8285ae5f09fc209fe67bd935f4a087a0a1b53ba91",
+        "art/surfaces/walls/T_PlasterMurexPurple_R.png": "c317b1e3efab628f87bc8c4d3571fafd735146ec37404bdba6d055c993e14062",
+        "art/surfaces/walls/T_PlasterSaltWhite.png": "c1bac84e556eefc306ccc528d3c2c532bbff24eb178d4f199cd1628eb17bdcdf",
+        "art/surfaces/walls/T_PlasterSaltWhite_N.png": "bf02b060bf8ba0c301739e50a087f99450d5a89871675ec787ad2741459bc0b9",
+        "art/surfaces/walls/T_PlasterSaltWhite_R.png": "c03987ec56f7251321f5a6f047039572cac1b21e0a211f643eeac9b4c0624716",
+        "art/surfaces/walls/T_PlateOxbloodIron.png": "7459b9a58af04499c5ab0d9bd248c8d94dbdc0fb22db99600bbae554be6cdeb9",
+        "art/surfaces/walls/T_PlateOxbloodIron_N.png": "6e63daac37dfbb7dc7aa100adaf317a56544577bc4d97861b69d707842ab637e",
+        "art/surfaces/walls/T_PlateOxbloodIron_R.png": "7b60d4cfbf7cfb4f06821b31b6d23ff002aa0d7576586ba5a8847fcec835e25f"
+      }
     },
     {
       "id": "batch7_surfaces_walls_02",
@@ -637,7 +1061,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/walls/T_WallBasaltEmberSeams.png": "8aeda4464c5fbda240c799c8cddbf36db4783b5adc6c28af9feddc76e9f5a853",
+        "art/surfaces/walls/T_WallBasaltEmberSeams_N.png": "023035673db0b3812ff8473bbf570f22a44be10aab33a85da08e2207c3174ef5",
+        "art/surfaces/walls/T_WallBasaltEmberSeams_R.png": "24e75afb7cbf9a2f255d3bcbdaff0b85814fd4252fdb0a83b189d9a0af29c7c7"
+      }
     },
     {
       "id": "batch7_surfaces_walls_03",
@@ -646,7 +1075,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/walls/T_WallFieldstoneMortar.png": "a90b125250cacb15464475408e381d1044023940a14f0ba0b4664a834776a6de",
+        "art/surfaces/walls/T_WallFieldstoneMortar_N.png": "994c45806d94f5c36705950b13aec22b97506622cb1618970b5f8d6ec8957330",
+        "art/surfaces/walls/T_WallFieldstoneMortar_R.png": "0aed8d8a09e867935ac46f8c975a5cacb77aed38756f2f59fb94133fd48b44a3"
+      }
     },
     {
       "id": "batch7_surfaces_walls_04",
@@ -655,7 +1089,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/walls/T_WallLimestoneMortarV2.png": "9310d821a1590569d2a34d6c11669b386b75960178eb155f2717372d193745f8",
+        "art/surfaces/walls/T_WallLimestoneMortarV2_N.png": "688a50da61953114957061b80a79cdb3bec38074eaa82fab4c327c0dbc587e8c",
+        "art/surfaces/walls/T_WallLimestoneMortarV2_R.png": "40ddb31de160f5b2a66ec4388434ed455e3aa28b35c68e517a29ad61173a55b2"
+      }
     },
     {
       "id": "batch7_surfaces_walls_05",
@@ -664,7 +1103,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/walls/T_WallPlayerLashedTimber.png": "25fc2d94254bf4c7dc4e1335b44aae779c9373dc93e52af39b18d093a9e7221b",
+        "art/surfaces/walls/T_WallPlayerLashedTimber_N.png": "6df0fca5cf3d9705e6e41a42964f2f346d9929d7465d640966a4449458210577",
+        "art/surfaces/walls/T_WallPlayerLashedTimber_R.png": "5a0570969906f6d7efdc3a41b833fe31149eeca92b57c82f23137594edab8a9e"
+      }
     },
     {
       "id": "batch7_surfaces_walls_06",
@@ -673,7 +1117,12 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
-      "date_added": "2026-10-27"
+      "date_added": "2026-10-27",
+      "sha256": {
+        "art/surfaces/walls/T_WallSandstoneBlock.png": "4d2f8b69413231098654feec4431a2c44c672ce46119d3b07f82007a1167569b",
+        "art/surfaces/walls/T_WallSandstoneBlock_N.png": "52c16b52a0662edb77218b1c8640ae01d8253e142a7ef47b5261321f29996f63",
+        "art/surfaces/walls/T_WallSandstoneBlock_R.png": "3ac06b771b0b20c9609c7af8fb0587b970844e36b77904bd15f41b24b9fdc0f5"
+      }
     },
     {
       "id": "kenney_fantasy_town_kit",
@@ -682,7 +1131,13 @@
       "author": "Kenney (www.kenney.nl)",
       "license": "CC0-1.0",
       "attribution": "Fantasy Town Kit 2.0 by Kenney (www.kenney.nl), CC0 1.0. The four SM_Kenney pieces are assembled from its modules by tools/build_kit_cc0.py.",
-      "date_added": "2026-10-26"
+      "date_added": "2026-10-26",
+      "sha256": {
+        "art/settlement_kit/SM_KenneyHouseStone.glb": "6f66e07d93b3d2a341bb9c3b2bd5c7a7c8ef369c59d01d1eb90d08ed833bd2e1",
+        "art/settlement_kit/SM_KenneyHouseWood.glb": "8f0fedbbf02634727425782a7825f71214d93af5ce71ec5055f6cf5f4d41a483",
+        "art/settlement_kit/SM_KenneyStall.glb": "fb871f07af7935a7471d290ed1c55658a46813e827f1d80a58f0435a65437c84",
+        "art/settlement_kit/SM_KenneyWallBay.glb": "fccf57f232cf132e2ccdc0e30c828c2dd7b19f87ccc160a92297b3c38df67133"
+      }
     },
     {
       "id": "bc7enc",
@@ -691,7 +1146,16 @@
       "author": "Richard Geldreich, Jr.",
       "license": "MIT",
       "attribution": "bc7enc, rgbcx and bc7decomp by Richard Geldreich, Jr. (https://github.com/richgel999/bc7enc), Copyright 2020, MIT License (also offered as public domain). Used by ichor_cook to block-compress textures.",
-      "date_added": "2026-10-28"
+      "date_added": "2026-10-28",
+      "sha256": {
+        "engine/assets/vendor/bc7enc/LICENSE": "51aad8f8a068b782671f9277631ec721b72c0b34624c38a684ff46df8bc780c9",
+        "engine/assets/vendor/bc7enc/bc7decomp.cpp": "3739b1c5dcae7c46ea960fdc1b226ff83d284a3bc7e0d444c2c87d936ebb92ef",
+        "engine/assets/vendor/bc7enc/bc7decomp.h": "9e04c814b6f7f8813181570b3878ac6485feed4999fff6ba76fa7b5dbe4de739",
+        "engine/assets/vendor/bc7enc/bc7enc.c": "817bfa5d30a2c4702e8c387ebb5a69398034c95905f580a6b8cd4261da901058",
+        "engine/assets/vendor/bc7enc/bc7enc.h": "6a129cd608eebf9f2796dd1ad4659f8c4fbe2a2ace371b728fc4ece92f449c90",
+        "engine/assets/vendor/bc7enc/rgbcx.h": "0f71984084336191cbe5406450a072b312bea6021ed9e00c720ed00ddb75fb93",
+        "engine/assets/vendor/bc7enc/rgbcx_impl.cpp": "3bd223c741923dbe70d112fcbe25236a4618a690fe3d791cc0a087f911f523c8"
+      }
     },
     {
       "id": "texture_budget",
@@ -700,7 +1164,10 @@
       "author": "Ezomic",
       "license": "LicenseRef-Proprietary",
       "attribution": "Texture size table read by ichor_cook. First-party, all rights reserved.",
-      "date_added": "2026-10-28"
+      "date_added": "2026-10-28",
+      "sha256": {
+        "art/texture_budget.json": "db07048f5ee55f0bc21755ce5d44da9bc15fad862f3be687f4183594ecf1789d"
+      }
     }
   ]
 }

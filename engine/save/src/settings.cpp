@@ -16,6 +16,7 @@ namespace {
 constexpr std::string_view kHeader = "ichor-settings 1";
 constexpr std::string_view kTrailer = "end";
 constexpr std::size_t kMaxBytes = 4096;
+constexpr float kMouseSensitivityStep = 0.1f;
 
 float clampField(float value, float low, float high, float fallback)
 {
@@ -45,13 +46,29 @@ bool parseFloat(std::string_view text, float& out)
 Settings Settings::clamped() const
 {
     return {clampField(fovDegrees, kMinFovDegrees, kMaxFovDegrees, kDefaultFovDegrees),
-            clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity)};
+            clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity), promptsSeen};
+}
+
+float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override)
+{
+    const float storedValue = stored.clamped().mouseSensitivity;
+    return override ? clampField(*override, Settings::kMinMouseSensitivity, Settings::kMaxMouseSensitivity, storedValue) : storedValue;
+}
+
+Settings stepMouseSensitivity(const Settings& stored, float current, int steps)
+{
+    if (steps == 0) {
+        return stored;
+    }
+    Settings stepped = stored;
+    stepped.mouseSensitivity = std::round((current + static_cast<float>(steps) * kMouseSensitivityStep) * 10.0f) / 10.0f;
+    return stepped.clamped();
 }
 
 std::string serializeSettings(const Settings& settings)
 {
     const Settings safe = settings.clamped();
-    return std::format("{}\nfov={}\nmouseSensitivity={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, kTrailer);
+    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen, kTrailer);
 }
 
 Settings parseSettings(std::string_view text)
@@ -76,6 +93,13 @@ Settings parseSettings(std::string_view text)
             break;
         } else if (const std::size_t equals = line.find('='); equals != std::string_view::npos) {
             const std::string_view key = line.substr(0, equals);
+            if (key == "promptsSeen") {
+                const std::string_view digits = line.substr(equals + 1);
+                std::uint32_t flags = 0;
+                const auto result = std::from_chars(digits.data(), digits.data() + digits.size(), flags);
+                settings.promptsSeen = result.ec == std::errc{} && result.ptr == digits.data() + digits.size() ? flags : 0u;
+                continue;
+            }
             float value = 0.0f;
             const bool valid = parseFloat(line.substr(equals + 1), value);
             if (key == "fov") {

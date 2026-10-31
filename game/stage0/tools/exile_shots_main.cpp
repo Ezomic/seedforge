@@ -2,6 +2,7 @@
 // headless Vulkan device: no window is created. Writes one PNG with the three side by side.
 // With `--sheets` as the third argument it instead writes one contact sheet per clip into the
 // folder named by the first argument: eight poses across the clip, front view above side view.
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/image.h"
 #include "ichor/core/log.h"

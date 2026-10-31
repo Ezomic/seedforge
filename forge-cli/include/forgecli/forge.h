@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -92,6 +93,12 @@ struct SeedRecord {
     std::int64_t landSharePermille = -1;  // the last attempt's land share; -1 when the world could not be scored
 };
 
+// Phase 0 as the manifest records it: the axiom ids in slot order and the WorldConfig digest as 16 hex digits.
+struct AxiomsRecord {
+    std::string ids;
+    std::string digest;
+};
+
 struct RunOptions {
     std::uint64_t seedBegin = 0;
     std::uint64_t seedEnd = 0; // inclusive
@@ -100,6 +107,7 @@ struct RunOptions {
     std::string outDir;              // empty means compute and hash only, write nothing
     bool validate = false;           // score each seed with forgeValidated (reroll included) and write validation.json
     std::string dataDir;             // empty means phase 11 binds an empty item and NPC pool
+    std::optional<AxiomsRecord> axioms; // --axioms; absent leaves the manifest as it was before phase 0. Carried only: no phase reads it yet
 };
 
 constexpr std::uint64_t kMaxBatchSeeds = 100000;

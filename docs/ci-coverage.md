@@ -133,6 +133,7 @@ The time guard has a budget per tier. Without an allowlist entry a fast case may
 ### Cache and cancel changes (SEED-671)
 
 - vcpkg is checked out at the `builtin-baseline` commit (`VCPKG_COMMIT` in `engine.yml`; change it together with the baseline in `engine/vcpkg.json`) so the binary cache can hit. Cache keys carry `v2` to leave the stale entries behind.
+- vcpkg also hashes the PowerShell version and `cl.exe` into every package ABI, so a Windows runner image that updates either restores 0 packages from an older cache (SEED-716: image 20261025.346.1 moved PowerShell from 7.6.8 to 7.6.9). The Windows key therefore carries both (`vcpkg-windows-v3-pwsh<version>-cl<hash>-...`), and the job saves it right after configure, so a cold run that later hits the 15 minute limit still warms it.
 - The Linux GPU golden steps are their own job and share nothing with the sanitizer shards, so they overlap them.
 - The forged world test cache (SEED-665, `<build>/forged-world-cache`) is restored by `actions/cache`, keyed on the sources its generator digest hashes (and on the shard number, since each shard forges different worlds and a cache key is written once). A cold run is slower for the tests that use it (the cache stores whole forges), so the first run after a generator change is the slow one.
 - The 15 minute limit applies to pull requests only. A run on main (push, or a manual `workflow_dispatch`) starts with cold caches, because a cache saved on a PR branch is not visible to main, and a job killed by its limit saves no cache; so on main the Windows, shard and GPU jobs get 60 minutes and the soak job 90. The first main run after a cache eviction is therefore slow (about 35 minutes for the whole run) and the next ones are warm. Run `engine.yml` by hand from the Actions tab to warm main on purpose.
@@ -213,3 +214,5 @@ If a job shows pointer files instead of assets (a test fails on a file that star
 ## Compiler caches (SEED-688)
 
 The sccache and ccache entries are keyed by commit and are 20 MB to 1 GB each. They used to be saved by every PR run, which filled the 10 GB Actions cache limit and made GitHub evict the vcpkg caches. Only main saves them now; PR runs restore the newest one from main. Check the total with `gh api repos/Ezomic/seedforge/actions/cache/usage` and list the biggest with `gh cache list --sort size_in_bytes --order desc`.
+
+`cache-prune.yml` runs after the engine and nightly workflows (and by hand with `gh workflow run cache-prune`). It keeps the newest main entry of each compiler and LFS cache family and deletes the caches of closed pull requests, so main's one-entry-per-commit saves cannot grow past one set.

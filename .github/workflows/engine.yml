@@ -87,6 +87,33 @@ jobs:
           python3 tools/ci_tiers.py --root . check
           python3 tools/test_times.py --check-allowlist --root .
           python3 tools/test_times.py --self-test
+          python3 tools/ci_time_trend.py --self-test
+          python3 tools/package_size.py --self-test
+          python3 tools/golden_diff_page.py --self-test
+          python3 tools/art_contact_sheet.py --self-test
+
+  art-sheet:
+    # A page of the changed assets under art/, uploaded as an artifact so art is reviewed without a build (SEED-709). Only the shown
+    # LFS objects are fetched; the GLB previews load <model-viewer> from a CDN when the page is opened.
+    name: art contact sheet
+    needs: changes
+    if: needs.changes.outputs.art == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          lfs: false
+      - name: Build the contact sheet
+        run: |
+          git lfs install --local
+          python3 tools/art_contact_sheet.py --base "$(git rev-parse --short HEAD^1)" --head "$(git rev-parse --short HEAD)" --out art-contact-sheet
+      - uses: actions/upload-artifact@v4
+        with:
+          name: art-contact-sheet
+          path: art-contact-sheet
+          retention-days: 14
 
   windows:
     # Not the required name: `windows runtime + tests` below is the aggregator. This job runs the whole suite when `heavy`, and only the
@@ -155,13 +182,21 @@ jobs:
           path: .sccache
           key: sccache-windows-${{ github.sha }}
           restore-keys: sccache-windows-
+      - name: Toolchain identity for the vcpkg cache
+        # vcpkg hashes the pwsh version and cl.exe into every package ABI, so a runner image that bumps either restores 0 packages.
+        # Keying on them makes that a cache miss that saves a fresh set, instead of a hit that never re-saves (SEED-716).
+        id: toolchain
+        shell: pwsh
+        run: |
+          $cl = (Get-FileHash (Get-Command cl.exe).Source -Algorithm SHA256).Hash.Substring(0, 16)
+          "id=pwsh$($PSVersionTable.PSVersion)-cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
         with:
           path: .vcpkg-cache
-          key: vcpkg-windows-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
-          restore-keys: vcpkg-windows-v2-
+          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-
       - name: Restore forged world test cache
         id: cache2
         # Keyed on the sources the test cache digest hashes (engine/tests/forged_cache_digest.cmake), so a generator change starts cold.
@@ -170,8 +205,18 @@ jobs:
           path: engine/build/windows-ci/forged-world-cache
           key: forged-cache-windows-${{ hashFiles('libworldforge/include/**', 'libworldforge/src/**', 'engine/world/include/ichor/world/forged_heightfield.h', 'engine/world/src/forged_heightfield.cpp', 'engine/world/include/ichor/world/forged_world_cache.h', 'engine/world/src/forged_world_cache.cpp', 'engine/world/include/ichor/world/forged_phase_maps.h', 'engine/world/src/forged_phase_maps.cpp', 'engine/world/include/ichor/world/heightfield.h', 'engine/world/src/heightfield.cpp', 'engine/world/include/ichor/world/world_desc.h', 'engine/core/include/ichor/core/binary.h', 'engine/core/include/ichor/core/hash.h') }}
       - name: Configure
+        id: configure
         run: cmake --preset windows-ci
         working-directory: engine
+      - name: Save vcpkg binaries
+        # Saved right after configure: a cold configure takes about 9 minutes, and a job killed later by its 15 minute limit saves nothing.
+        # Only a configure that finished saves: a cancelled or failed one leaves a partial set, and a partial set under the exact key is
+        # restored as a hit, never re-saved, and makes every later run rebuild the missing ports.
+        if: ${{ !cancelled() && steps.configure.outcome == 'success' && steps.cache1.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
       - name: Build
         if: needs.changes.outputs.heavy == 'true'
         run: cmake --build --preset windows-ci
@@ -214,13 +259,6 @@ jobs:
         with:
           path: .sccache
           key: sccache-windows-${{ github.sha }}
-      - name: Save vcpkg binaries
-        # Saved even when a later step fails, so a failed first run still warms the cache (actions/cache only saves on success).
-        if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: .vcpkg-cache
-          key: vcpkg-windows-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
       - name: Save forged world test cache
         # Saved even when a later step fails, so a failed first run still warms the cache (actions/cache only saves on success).
         if: ${{ always() && steps.cache2.outputs.cache-hit != 'true' }}
@@ -361,7 +399,7 @@ jobs:
       - name: Bootstrap vcpkg
         run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
       - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 vulkan-tools autoconf autoconf-archive automake libtool libltdl-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache mesa-vulkan-drivers libvulkan1 vulkan-tools vulkan-validationlayers autoconf autoconf-archive automake libtool libltdl-dev pkg-config
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
@@ -394,14 +432,46 @@ jobs:
       - name: GPU goldens on lavapipe
         # Software Vulkan (lavapipe), so the 28 golden image cases compare here instead of skipping. The software
         # set under tests/data/golden/software overrides a golden that a real GPU draws differently.
+        # The Khronos validation layer is loaded from the environment and only prints errors, which do not fail a test by
+        # themselves, so the step counts them per VUID in the verbose ctest log and fails on any. The validation canary
+        # case makes exactly one deliberate error, so a layer that silently stops loading fails the step too.
         env:
           ICHOR_GOLDEN_SOFTWARE: "1"
           ICHOR_REQUIRE_GPU: "1"
           ICHOR_GOLDEN_REPORT: "1"
+          ICHOR_VALIDATION_CANARY: "1"
+          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+          VK_LAYER_SETTINGS_PATH: ${{ runner.temp }}/vk_layer_settings.txt
         run: |
+          printf '%s\n' 'khronos_validation.report_flags = error' 'khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG' > "$VK_LAYER_SETTINGS_PATH"
           vulkaninfo --summary
-          ctest --preset linux-gpu
+          set -o pipefail
+          status=0
+          ctest --preset linux-gpu -V | tee "$RUNNER_TEMP/ctest.log" || status=$?
+          grep 'Validation Error' "$RUNNER_TEMP/ctest.log" | sed -E 's/.*(VUID-[A-Za-z0-9_-]+|UNASSIGNED-[A-Za-z0-9_.-]+).*/\1/' | sort | uniq -c || true
+          canary='VUID-VkSamplerCreateInfo-maxLod-01973'
+          if [ "$(grep -c "Validation Error: \[ $canary \]" "$RUNNER_TEMP/ctest.log")" != 1 ]; then
+            echo "::error::the validation canary did not report exactly once, so the layer is not reaching the tests"
+            exit 1
+          fi
+          if grep 'Validation Error' "$RUNNER_TEMP/ctest.log" | grep -qv "$canary"; then
+            echo "::error::Vulkan validation errors (counts per VUID above)"
+            exit 1
+          fi
+          exit $status
         working-directory: engine
+      - name: Golden diff page
+        # A failed golden case leaves its expected, actual and diff pictures in test-output/golden-failures. Only on a
+        # failed job, so a green run spends nothing here, and an empty folder writes no page and uploads nothing.
+        if: failure()
+        run: python3 tools/golden_diff_page.py engine/build/linux-gpu/test-output/golden-failures
+      - name: Upload golden diff page
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diff
+          path: engine/build/linux-gpu/test-output/golden-failures
+          if-no-files-found: ignore
       - name: Upload golden images
         if: always()
         uses: actions/upload-artifact@v4
@@ -559,6 +629,9 @@ jobs:
           path: ${{ runner.temp }}/dist/ichor-linux.tar.gz
           retention-days: 7
           if-no-files-found: error
+      - name: Package size budget
+        # After the upload, so a package over budget can still be downloaded and inspected (SEED-708).
+        run: python3 tools/package_size.py "$RUNNER_TEMP/dist/ichor-linux.tar.gz"
       - name: Save vcpkg binaries
         if: ${{ always() && steps.cache1.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4

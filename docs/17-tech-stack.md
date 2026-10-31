@@ -13,8 +13,8 @@
 > - into the **engine** for the shipped forge step
 
 Same code, two hosts. Today only the first host is wired up: `forge-cli` and the engine's tests
-include `libworldforge`, but the engine's own forge still draws a stand-in terrain
-(`engine/world/forge.h`) until SEED-449 swaps in the real phases. Two-second compile cycles and image-diffable output while designing
+include `libworldforge`, and the engine's forged world is built from it behind `--forged` (SEED-449 to 460, SEED-475);
+the default scene still draws a stand-in terrain (`engine/world/forge.h`). Two-second compile cycles and image-diffable output while designing
 world generation, and a single implementation at ship time. This rule predates the engine
 decision and survives it untouched, which is the best argument for it.
 
@@ -233,16 +233,16 @@ engine. Each is gated on its tests, not on a feeling.
 Status: E1 through E6 are merged apart from the pieces listed here, and E7 is mostly done.
 The Stage 0 gate has not been run by a human yet. Still open:
 
-- E6: RmlUi screens in the window (no font chosen, so no text), and the doc 18 500 m slice itself.
-- E5: the terrain is still the stand-in noise (see the layout note above); impostors are not built.
+- E6: the doc 18 500 m slice itself. The fonts (Alegreya Sans and Cinzel, SEED-353) and the RmlUi screens in the window (SEED-354, 443 to 447) are merged.
+- E5: the real terrain is wired in behind `--forged` (SEED-449 to 460, SEED-475), but the default scene is still the stand-in noise (`engine/world/forge.h`); impostors are not built.
 - E7: volumetric fog, vegetation impostors, and editor tools for kits and dungeons.
-- The window paths (`--editor`, time of day and weather in the app, the UI renderer) are covered by offscreen golden images and headless tests but have never been run in a real window.
+- `--editor` is covered by offscreen golden images and headless tests but has not been confirmed in a real window. The UI renderer and the forged world in the app are run in the window (SEED-354, SEED-475, SEED-486).
 
 Engine-independent work that already landed: libworldforge phases 1 to 11 in C++ (the NumPy
 prototype step was skipped for them), the web viewer, and the batch seed harness
 (`ichor_forge_cli --validate`, plus `engine/tools/seed_harness`). Still open on that side: phase 0
-(axioms into a `WorldConfig`) and wiring the real phases into the engine's forge (SEED-449), then the
-phase 12 bake in doc 08.
+(axioms into a `WorldConfig`), then the remaining phase 12 bake pieces in doc 08
+(the real phases are wired in and baked to terrain, water, roads, POIs, settlements and navmesh, SEED-449 to 460; impostors are not).
 
 E1 through E4 is a general 3D engine. E5 through E7 is where the open-world cost lives and
 each is a multi-month effort for one person. The Stage 0 gate sits at the end of E4

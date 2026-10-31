@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/world/placed_settlements.h"
 
 #include <glm/mat3x3.hpp>

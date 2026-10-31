@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/assets/bundle.h"
 #include "ichor/world/forge_job.h"
 #include "ichor/world/forged_biome.h"
 #include "ichor/world/forged_heightfield.h"
@@ -10,6 +11,7 @@
 #include "ichor/world/forged_water.h"
 #include "ichor/world/heightfield.h"
 #include "ichor/data/data_set.h"
+#include "ichor/data/world_config.h"
 #include "ichor/graph/quest_expansion.h"
 #include "ichor/world/map_layers.h"
 #include "ichor/world/placed_cast.h"
@@ -97,6 +99,7 @@ struct ForgedGame {
     ForgedGame& operator=(const ForgedGame&) = delete;
 
     WorldDesc desc; // forgedWorldDesc of the requested one: the height range and water level of the forge
+    std::shared_ptr<const WorldConfig> worldConfig; // doc 08 phase 0, the seed's axioms; carried only, so it is not in stateHash. Null when they did not load
     std::shared_ptr<const worldforge::ForgedWorld> world;
     Heightfield heightfield; // the roads phase's terrain
     std::shared_ptr<const ForgedBiomeField> biomes;
