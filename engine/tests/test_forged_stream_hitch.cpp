@@ -30,8 +30,10 @@ using namespace ichor;
 // plus a floor, so a slow or noisy runner moves both sides while a streamer that blocks the tick blows the worst tick alone.
 // The same walk with synchronous streaming is that broken streamer, and the budget must turn it red.
 //
-// Calibration (five local Release runs and a CI run, the PR of SEED-710 has the table): the median tick is about 0.01 ms,
-// the asynchronous worst crossing tick 0.4 to 1.8 ms, the synchronous one 146 to 193 ms (the five cells of a new column).
+// Calibration (five local Release runs and one CI run, the PR of SEED-710 has the table). Local: median tick 0.009 ms,
+// asynchronous worst crossing tick 0.4 to 1.8 ms, synchronous 146 to 206 ms (the five cells of a new column on one tick).
+// CI Windows Release: median 0.012 ms, asynchronous 7.1 ms, synchronous 210 ms, budget 45.8 ms. CI Linux ASan/UBSan:
+// median 0.24 ms, asynchronous 0.83 ms, synchronous 2732 ms, budget 161 ms.
 
 namespace {
 
