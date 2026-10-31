@@ -1159,14 +1159,17 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         ResidentCell cell;
         cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
         {
+            ZoneScopedN("up.terrain");
             ichor::FrameStages::Scope timer(engine.stages(), "up.terrain", true);
             cell.handle = renderer.uploadTerrainCell(payload.lods);
         }
         if (!payload.plants.empty()) {
+            ZoneScopedN("up.trees");
             ichor::FrameStages::Scope timer(engine.stages(), "up.trees", true);
             cell.grove = renderer.uploadVegetationCell(payload.plants);
         }
         {
+            ZoneScopedN("up.water");
             ichor::FrameStages::Scope timer(engine.stages(), "up.water", true);
             cell.water = renderer.uploadWaterCell(payload.water);
         }
@@ -1176,11 +1179,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         cell.loot = payload.loot;
         cell.cast = payload.cast;
         {
+            ZoneScopedN("up.physics");
             ichor::FrameStages::Scope timer(engine.stages(), "up.physics", true);
             engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
                 static_cast<float>(heightfield.desc().metresPerSample));
         }
         cells[payload.cell.id] = cell;
+        ZoneScopedN("up.nav");
         ichor::FrameStages::Scope navTimer(engine.stages(), "up.nav", true);
         ichor::NavTile tile = payload.nav;
         if (!tile.empty() && !navigation.addTile(payload.cell.id, std::move(tile))) {
@@ -1253,6 +1258,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // Inside a dungeon the player is outside the world: the cells around the entrance stay as they were.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
             if (ichor::inDungeonPocket(playerPosition(scene))) return;
+            ZoneScopedN("stream");
             ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(playerPosition(scene));
         });
@@ -1261,6 +1267,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             if (ichor::inDungeonPocket(position) || streamer.ready(position)) {
                 return true;
             }
+            ZoneScopedN("stream");
             ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(position);
             return streamer.ready(position);

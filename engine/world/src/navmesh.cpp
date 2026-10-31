@@ -1,5 +1,7 @@
 #include "ichor/world/navmesh.h"
 
+#include "ichor/core/profile.h"
+
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
@@ -252,6 +254,7 @@ bool NavWorld::init(const WorldDesc& desc, std::uint32_t maxTiles)
 
 bool NavWorld::addTile(CellId id, NavTile&& tile)
 {
+    ICHOR_ZONE_N("nav.addTile");
     if (mesh_ == nullptr || tile.empty()) {
         return false;
     }
@@ -270,6 +273,7 @@ bool NavWorld::addTile(CellId id, NavTile&& tile)
 
 void NavWorld::removeTile(CellId id)
 {
+    ICHOR_ZONE_N("nav.removeTile");
     if (mesh_ == nullptr) {
         return;
     }
@@ -281,6 +285,7 @@ void NavWorld::removeTile(CellId id)
 
 bool NavWorld::findPath(glm::dvec3 from, glm::dvec3 to, std::vector<glm::dvec3>& path) const
 {
+    ICHOR_ZONE_N("nav.findPath");
     path.clear();
     if (mesh_ == nullptr || query_ == nullptr) {
         return false;

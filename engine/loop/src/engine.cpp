@@ -1,6 +1,7 @@
 #include "ichor/loop/engine.h"
 
 #include "ichor/audio/audio_host.h"
+#include "ichor/core/profile.h"
 #include "ichor/gfx/renderer.h"
 #include "ichor/platform/platform.h"
 
@@ -70,8 +71,10 @@ bool Engine::frame(double frameSeconds)
     // An unfocused frame adds no time, so nothing is owed on return and the part-tick already owed stays owed.
     const int steps = gated_ || focusPaused_ ? 0 : step_.advance(frameSeconds);
     {
+        ICHOR_ZONE_N("sim");
         FrameStages::Scope timer(stages_, "sim");
         for (int i = 0; i < steps && !replayFinished(); ++i) {
+            ICHOR_ZONE_N("sim.tick");
             scene_.tick(step_.dt(), nextInput());
             if (audio_ != nullptr) {
                 for (const SoundEvent& event : scene_.soundEvents()) {
@@ -82,6 +85,7 @@ bool Engine::frame(double frameSeconds)
     }
 
     {
+        ICHOR_ZONE_N("begin");
         FrameStages::Scope timer(stages_, "begin");
         renderer_.beginFrame();
     }
@@ -93,9 +97,11 @@ bool Engine::frame(double frameSeconds)
         view_.vegetation.clear();
         view_.waterCells.clear();
         {
+            ICHOR_ZONE_N("view");
             FrameStages::Scope timer(stages_, "view");
             viewBuilder_(scene_, step_.alpha(), view_);
         }
+        ICHOR_ZONE_N("submit");
         FrameStages::Scope timer(stages_, "submit");
         renderer_.submit(view_);
     }
@@ -128,6 +134,7 @@ bool Engine::frame(double frameSeconds)
         }
     }
     {
+        ICHOR_ZONE_N("present");
         FrameStages::Scope timer(stages_, "present");
         renderer_.endFrame();
     }
