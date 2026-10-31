@@ -17,7 +17,8 @@ namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'C', 'N'};
 // 4: a texture may be block-compressed (BC7, BC5, BC4), its mips stored as whole blocks. Version 3 bundles are refused, not converted.
-constexpr std::uint32_t kVersion = 4;
+// 5: a Submesh carries the body region it covers. Version 4 bundles are refused, not converted.
+constexpr std::uint32_t kVersion = 5;
 // Sockets, LOD groups and collision follow the nodes under this tag, and only when there are any,
 // so a bundle without them is the same bytes it always was.
 constexpr std::array<char, 4> kPieceTag{'I', 'P', 'C', '1'};

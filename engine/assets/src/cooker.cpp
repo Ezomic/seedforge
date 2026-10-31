@@ -12,12 +12,15 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <meshoptimizer.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <map>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
 namespace ichor {
@@ -125,6 +128,29 @@ void optimizeMesh(Mesh& mesh, CookStats& stats)
     stats.triangles += static_cast<std::uint32_t>(mesh.indices.size() / 3);
 }
 
+// The primitive's `extras.region` into the submesh; false when it is not a string that fits.
+bool readRegion(const cgltf_data& data, const cgltf_primitive& prim, Submesh& sub)
+{
+    if (prim.extras.start_offset == prim.extras.end_offset) {
+        return true;
+    }
+    cgltf_size size = 0;
+    cgltf_copy_extras_json(&data, &prim.extras, nullptr, &size);
+    std::string text(size, ' ');
+    cgltf_copy_extras_json(&data, &prim.extras, text.data(), &size);
+    text.resize(strlen(text.c_str()));
+    const nlohmann::json extras = nlohmann::json::parse(text, nullptr, false);
+    if (!extras.is_object() || !extras.contains("region")) {
+        return true;
+    }
+    const nlohmann::json& region = extras["region"];
+    if (!region.is_string() || region.get_ref<const std::string&>().size() >= kRegionNameSize) {
+        return false;
+    }
+    std::strncpy(sub.region, region.get_ref<const std::string&>().c_str(), kRegionNameSize - 1);
+    return true;
+}
+
 // `jointRemap` maps glTF skin joint slots (what JOINTS_0 indexes) to ozz joint indices.
 bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vector<std::uint16_t>* jointRemap, Mesh& mesh, CookStats& stats)
 {
@@ -219,6 +245,10 @@ bool cookMesh(const cgltf_data& data, const cgltf_mesh& source, const std::vecto
         sub.firstIndex = static_cast<std::uint32_t>(mesh.indices.size());
         sub.indexCount = static_cast<std::uint32_t>(prim.indices->count);
         sub.material = prim.material != nullptr ? static_cast<std::uint32_t>(prim.material - data.materials) : 0;
+        if (!readRegion(data, prim, sub)) {
+            logf(LogLevel::Error, "mesh {}: extras.region must be a string of at most {} characters", mesh.name, kRegionNameSize - 1);
+            return false;
+        }
         for (cgltf_size i = 0; i < prim.indices->count; ++i) {
             mesh.indices.push_back(base + static_cast<std::uint32_t>(cgltf_accessor_read_index(prim.indices, i)));
         }
