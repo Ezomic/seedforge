@@ -82,6 +82,14 @@ jobs:
           python3 tools/check_data.py --self-test
           python3 tools/check_deps.py --root .
           python3 tools/check_deps.py --root . --self-test
+      - name: Dialogue coverage
+        run: |
+          python3 tools/dialogue_coverage.py --root . --report dialogue-coverage.md
+          python3 tools/dialogue_coverage.py --self-test
+        # The report is the readable output; it lands in the job summary even when the gate fails.
+      - name: Dialogue coverage report
+        if: always()
+        run: '[ -f dialogue-coverage.md ] && cat dialogue-coverage.md >> "$GITHUB_STEP_SUMMARY" || true'
       - name: Test tiers and time budget tools
         run: |
           python3 tools/ci_tiers.py --root . check
