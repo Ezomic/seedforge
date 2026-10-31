@@ -84,6 +84,7 @@
     "the player is drawn on the terrain, faces the way it walks and keeps its facing at rest",
     "the player's stride follows the render clock and a hostile clock or tick moves nothing",
     "the real settlement kit art shares its materials under the renderer cap",
+    "the replay report lists every fight beside its recorded outcome and goes red when one state hash moves",
     "the root's travel is taken out of the pose across a whole stride",
     "the run sits the body up but leaves the arms, and so the spear and shield, at the orientation the clip gave them",
     "the spear is held in the right hand and the shield in the left, on the hand at the start of idle",

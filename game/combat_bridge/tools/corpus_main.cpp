@@ -6,17 +6,62 @@
 #include <fstream>
 #include <map>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
 
+namespace {
+
+// Replays the checked-in corpus and writes one line per fight to `out` (SEED-743). CI runs this on Windows and Linux and compares the two
+// files, so the exit code says whether this build agrees with the files, and the files say whether the platforms agree with each other.
+int replay(const std::filesystem::path& out)
+{
+    using namespace ichor::bridge_corpus;
+    const ReplayReport report = replayCorpus(ICHOR_BRIDGE_CORPUS_DIR);
+    for (const std::string& warning : report.warnings) std::fprintf(stderr, "combat_bridge_corpus: %s\n", warning.c_str());
+    const std::string text = report.text();
+    std::fputs(text.c_str(), stdout);
+    if (!out.empty()) {
+        std::ofstream file(out, std::ios::binary);
+        file << text;
+        if (!file) {
+            std::fprintf(stderr, "combat_bridge_corpus: cannot write %s\n", out.string().c_str());
+            return 1;
+        }
+    }
+    if (!report.error.empty()) {
+        std::fprintf(stderr, "combat_bridge_corpus: %s\n", report.error.c_str());
+        return 1;
+    }
+    if (!report.matches()) {
+        std::fputs("combat_bridge_corpus: a fight replays to another outcome than its file records (the lines above whose recorded and replayed parts differ).\n"
+                   "If a combat knob or the world forge was changed on purpose, run bin/regen-combat-bridge-corpus and commit the files; "
+                   "otherwise this is a determinism regression.\n",
+            stderr);
+        return 1;
+    }
+    std::printf("%zu fights replay to their recorded outcome\n", report.lines.size());
+    return 0;
+}
+
+}
+
 // Re-records the combat bridge replay corpus: one file per fight in the plan, replacing the folder's *.replay files.
 // Run it through bin/regen-combat-bridge-corpus after a combat knob or the world forge is changed on purpose.
+// With --replay it replays the checked-in corpus instead and writes the report file CI compares across platforms.
 int main(int argc, char** argv)
 {
     using namespace ichor::bridge_corpus;
+    if (argc >= 2 && std::string_view(argv[1]) == "--replay") {
+        if (argc > 3) {
+            std::fputs("usage: combat_bridge_corpus --replay [report-file]\n", stderr);
+            return 2;
+        }
+        return replay(argc == 3 ? argv[2] : "");
+    }
     if (argc > 2) {
-        std::fputs("usage: combat_bridge_corpus [output-dir]\n", stderr);
+        std::fputs("usage: combat_bridge_corpus [output-dir] | --replay [report-file]\n", stderr);
         return 2;
     }
     const std::filesystem::path dir = argc == 2 ? argv[1] : ICHOR_BRIDGE_CORPUS_DIR;
