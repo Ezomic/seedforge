@@ -6,6 +6,27 @@ namespace ichor {
 
 bool NullRenderer::uploadBundle(const SceneBundle& bundle)
 {
+    std::vector<std::uint32_t> evicted;
+    std::vector<std::uint32_t> ids;
+    for (const Texture& texture : bundle.textures) {
+        const std::uint32_t tailStart = mipTailStart(texture.width, texture.height, texture.mipCount);
+        ids.push_back(residency_.add(texture.pixels.size(), mipRangeByteSize(texture.format, texture.width, texture.height, texture.mipCount, tailStart), evicted));
+    }
+    for (const Mesh& mesh : bundle.meshes) {
+        std::vector<std::uint32_t> textures;
+        for (const Submesh& sub : mesh.submeshes) {
+            if (sub.material >= bundle.materials.size()) {
+                continue;
+            }
+            const Material& material = bundle.materials[sub.material];
+            for (const std::uint32_t local : {material.baseColorTexture, material.metallicRoughnessTexture, material.normalTexture}) {
+                if (local < ids.size()) {
+                    textures.push_back(ids[local]);
+                }
+            }
+        }
+        meshTextures_.push_back(std::move(textures));
+    }
     meshes_ += static_cast<std::uint32_t>(bundle.meshes.size());
     return true;
 }
@@ -51,13 +72,20 @@ void NullRenderer::removeVegetationCell(std::uint32_t cell)
 void NullRenderer::beginFrame()
 {
     ++begun_;
+    residency_.beginFrame();
 }
 
 void NullRenderer::submit(const RenderView& view)
 {
     instances_ += view.instances.size();
+    std::vector<std::uint32_t> evicted;
     for (const RenderInstance& instance : view.instances) {
         skinned_ += instance.jointCount > 0 ? 1 : 0;
+        if (instance.mesh < meshTextures_.size()) {
+            for (const std::uint32_t texture : meshTextures_[instance.mesh]) {
+                residency_.touch(texture, evicted);
+            }
+        }
     }
     terrainDraws_ += view.terrain.size();
     vegetationDraws_ += view.vegetation.size();

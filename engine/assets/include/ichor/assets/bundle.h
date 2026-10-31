@@ -94,6 +94,36 @@ inline std::uint64_t textureByteSize(TextureFormat format, std::uint32_t width, 
     return total;
 }
 
+// The mip tail stays resident whatever the texture budget (SEED-690): every level from the first whose larger edge
+// is at most this.
+constexpr std::uint32_t kMipTailMaxEdge = 64;
+
+// The first mip level of the tail, never past the last level, so every texture keeps at least its smallest mip.
+inline std::uint32_t mipTailStart(std::uint32_t width, std::uint32_t height, std::uint32_t mipCount)
+{
+    std::uint32_t level = 0;
+    while (level + 1 < mipCount && (width > kMipTailMaxEdge || height > kMipTailMaxEdge)) {
+        width = width > 1 ? width / 2 : 1;
+        height = height > 1 ? height / 2 : 1;
+        ++level;
+    }
+    return level;
+}
+
+// Bytes of the levels from `firstMip` down, as stored.
+inline std::uint64_t mipRangeByteSize(TextureFormat format, std::uint32_t width, std::uint32_t height, std::uint32_t mipCount, std::uint32_t firstMip)
+{
+    std::uint64_t total = 0;
+    for (std::uint32_t mip = 0; mip < mipCount; ++mip) {
+        if (mip >= firstMip) {
+            total += mipByteSize(format, width, height);
+        }
+        width = width > 1 ? width / 2 : 1;
+        height = height > 1 ? height / 2 : 1;
+    }
+    return total;
+}
+
 constexpr std::uint32_t kMaxTextureEdge = 16384;
 
 // A known format, sane dimensions, the mip count those dimensions give and exactly the bytes that layout needs.
