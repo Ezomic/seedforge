@@ -6,8 +6,8 @@ Audit of the three promises SEED-272 names: determinism on every commit, golden 
 
 | Job | Preset | What runs |
 |---|---|---|
-| `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `tools/check_smoke_hash.py` (runs `ichor.exe --headless --frames 120`: it must exit cleanly and its logged scene state hash must equal `engine/tests/data/app_smoke_hash.txt`) |
-| `linux headless + sanitizers` | `linux-headless-asan` (Debug, clang, ASan/UBSan, `ENGINE_RUNTIME=OFF`) | `ctest --preset linux-headless-asan` |
+| `windows runtime + tests` | `windows-ci` (Release, Vulkan runtime on) | `ctest --preset windows-ci`, then `tools/check_smoke_hash.py` (runs `ichor.exe --headless --frames 120`: it must exit cleanly and its logged scene state hash must equal `engine/tests/data/app_smoke_hash.txt`), then `combat_bridge_corpus --replay` (the 20 bridge fights, see "Bridge corpus on both platforms") |
+| `linux headless + sanitizers` | `linux-headless-asan` (Debug, clang, ASan/UBSan, `ENGINE_RUNTIME=OFF`) | `ctest --preset linux-headless-asan` (fast tier only on a PR, in four shards), `combat_bridge_corpus --replay` on shard 2, and the aggregator compares the two platforms' bridge corpus reports |
 
 Both required names report on every pull request; what runs behind them depends on the changed paths (see "Required checks on every PR" at the end of this file).
 
@@ -24,6 +24,7 @@ Both required names report on every pull request; what runs behind them depends 
 | Save round-trip: whole campaign folder, crash during write, corruption | `engine/tests/test_campaign_roundtrip.cpp` (touches every save module, crash at every write stage, every file truncated or flipped, fuzzed reads) | Both jobs | The forge cache part used patterned bytes, not a forged world (closed below). |
 | Save round-trip: forged world data through the forge cache | `engine/tests/test_save_forged_world.cpp` (new, this PR) | Both jobs | Closed by this PR. |
 | Hydrology cache (a derived file of the forged world) | `engine/tests/test_hydrology_cache.cpp` | Both jobs | None found |
+| Determinism: the 20 recorded bridge fights (SEED-659) replay to the same outcome on every OS | `game/combat_bridge/tests/corpus/*.replay` through `combat_bridge_corpus --replay` in both jobs, and the diff of the two reports in `linux headless + sanitizers`; the ctest case "every recorded forged-world fight replays to its recorded outcome" (medium tier) covers the same files on Windows on every PR and on Linux on main | Both jobs, on every heavy PR and push to main (SEED-743) | None found. An art-only PR runs neither (no combat code can change there). |
 
 ## Gaps closed in this PR
 
@@ -194,6 +195,24 @@ What was checked where:
 | Building the app on Linux, the `ldd` step (unresolved libraries fail the script, vcpkg libraries are copied to `lib/`), `LD_LIBRARY_PATH` in `ichor.sh`, the real `/proc/self/exe` resolution, the smoke run of a real Linux binary | Only the CI job (it passed on a `workflow_dispatch` run of this branch: the real ELF binary linked, the tarball unpacked elsewhere and the unpacked binary logged the packaged-build line) |
 
 The tarball needs a glibc at least as new as the runner's (ubuntu-latest) and, to open a window, a Vulkan loader (`libvulkan1`) on the player's machine; `--headless` needs neither a GPU nor a display.
+
+## Bridge corpus on both platforms (SEED-743)
+
+`game/combat_bridge/tests/corpus` holds 20 recorded bot fights in forged worlds (SEED-659, `docs/poc-combat-bridge.md`). Each file records the input frames and the outcome (winner, cause, ticks, hits, damage, scene state hash). Before SEED-743 the only check was the ctest case "every recorded forged-world fight replays to its recorded outcome", which is in the medium tier: the Windows job ran it on every PR (about 2 to 3 s in Release), but the Linux shards run the fast preset on a PR, so Linux replayed the corpus only on a push to main (shard 3, 52 s under ASan in run 40867164082). A fight that replays differently under clang on Linux could therefore reach main and turn main red, and a difference between the platforms was never compared directly: each OS only checked itself against the files.
+
+Now both jobs replay the corpus on every heavy PR and every push to main, and the platforms are compared with each other:
+
+| Where | Step | What it does |
+|---|---|---|
+| `windows build + tests`, after the smoke run | `Bridge corpus replay` | `combat_bridge_corpus --replay bridge-corpus-windows.txt` (about 3 s), uploaded as the `bridge-corpus-windows` artifact |
+| `linux sanitizers shard 2 of 4`, after its ctest shard | `Bridge corpus replay` | the same binary of the ASan build, `bridge-corpus-linux.txt` (about 60 s), uploaded as `bridge-corpus-linux` |
+| `linux headless + sanitizers` (the required aggregator) | `The bridge corpus replays the same on Windows and Linux` | downloads both reports and `diff -u`s them; any difference fails the check, and a missing report (a job that died before its replay step) fails it too |
+
+`combat_bridge_corpus --replay [report-file]` (the recorder of `bin/regen-combat-bridge-corpus`, `game/combat_bridge/tools/corpus_main.cpp`) forges the three worlds once, replays every file through `resolveEntry` and writes one line per fight: the file stem, the world hash, the scene seed, the recorded outcome and the replayed one, LF only. It exits 1 when any replayed outcome differs from its file (the same check as the ctest case, so Linux is now held to the files on a PR too), when the folder is empty or a world does not forge. A re-pick (the world hash moved, so the file no longer applies and the same slot is searched again) is a warning on stderr and is marked in the line, not a failure, as in the test; the cross-platform diff is what catches a platform that re-picks or replays differently in that state, which comparing against the files cannot. `replayCorpus` in `bridge_corpus.h` is the library side, pinned by "the replay report lists every fight beside its recorded outcome and goes red when one state hash moves" (medium tier).
+
+Cost against the 15 minute budget (PR run 40812679085, warm caches): the Windows job took 6 min 12 s and gains about 3 s. Shard 2 was the shortest Linux shard at 4 min 6 s (shard 3, the longest, 7 min 53 s) and gains about a minute. The aggregator `linux headless + sanitizers` now also waits for `windows build + tests`, because it reads its report; on the baseline PR run that job finished 1 min 41 s before the last shard, so the check reports no later than before. On main after a cache eviction the Windows job can take 25 minutes and the Linux check waits for it, which is visible but harmless (the Windows check is red or late anyway in that state).
+
+After an intended combat or worldgen change, `bin/regen-combat-bridge-corpus` rewrites the files; commit them with the change. When only the cross-platform diff fails, the files are not the fix: one platform simulates the fight differently, which is a determinism regression to find, not to record.
 
 ## LFS cache (SEED-687)
 
