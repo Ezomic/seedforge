@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,9 @@ struct WalkBotParams {
     double waypointMetres = 2.0;
     double maxSeconds = 3600.0;
     StuckParams stuck;
+    // Called after every step with where the walker stands and the seconds walked so far, so a test or tool can
+    // stream the world under the walker tick by tick. Empty by default, which changes nothing about the walk.
+    std::function<void(const glm::dvec3& position, double seconds)> onStep;
 };
 
 enum class WalkOutcome : std::uint8_t {
