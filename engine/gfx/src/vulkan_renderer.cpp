@@ -66,6 +66,8 @@ struct VulkanRenderer::Impl {
     }
 
     bool canScreenshot = false;
+    bool vsync = true;
+    bool presentModeStale = false; // the swapchain was built for the other vsync setting
     bool createSwapchain();
     void destroySwapchain();
     bool recreateSwapchain();
@@ -88,8 +90,12 @@ bool VulkanRenderer::Impl::createSwapchain()
     if (screenshotUsage) {
         builder.add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     }
+    // FIFO is the one mode every display has, so vsync on is exactly what it was; off prefers mailbox (no tearing), then immediate.
+    builder.set_desired_present_mode(vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR);
+    if (!vsync) {
+        builder.add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR);
+    }
     auto result = builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-                      .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
                       .set_desired_extent(static_cast<std::uint32_t>(size.width), static_cast<std::uint32_t>(size.height))
                       .set_old_swapchain(swapchain)
                       .build();
@@ -106,6 +112,7 @@ bool VulkanRenderer::Impl::createSwapchain()
     destroySwapchain();
     vkb::destroy_swapchain(swapchain);
     swapchain = result.value();
+    presentModeStale = false;
     canScreenshot = screenshotUsage;
     swapchainImages = swapchain.get_images().value();
     swapchainViews = swapchain.get_image_views().value();
@@ -254,6 +261,15 @@ bool VulkanRenderer::init()
     return true;
 }
 
+void VulkanRenderer::setVsync(bool on)
+{
+    Impl& v = *impl_;
+    if (v.vsync != on) {
+        v.vsync = on;
+        v.presentModeStale = true;
+    }
+}
+
 Rml::RenderInterface* VulkanRenderer::uiRenderInterface()
 {
     return impl_->ui.get();
@@ -333,6 +349,10 @@ void VulkanRenderer::beginFrame()
         return;
     }
     if (!vkCheck(vkWaitForFences(v.ctx.device(), 1, &v.inFlight[v.frame], VK_TRUE, UINT64_MAX), "vkWaitForFences")) {
+        return;
+    }
+    if (v.presentModeStale && !v.recreateSwapchain()) {
+        log(LogLevel::Warn, "vulkan: swapchain recreation for vsync failed, skipping frame");
         return;
     }
 

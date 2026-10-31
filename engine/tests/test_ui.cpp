@@ -684,6 +684,52 @@ TEST_CASE("the pause menu draws nothing until shown, and its buttons report clic
     menu.setVisible(true);
     REQUIRE(menu.takeSensitivitySteps() == 0); // a click from an earlier showing is not a click now
 
+    // The display rows sit between the sensitivity and Resume: a mode toggle, resolution steps and a vsync toggle,
+    // each counting its own clicks.
+    const auto mode = menu.displayModeCentre();
+    const auto resDown = menu.resolutionDownCentre();
+    const auto resUp = menu.resolutionUpCentre();
+    const auto vsync = menu.vsyncCentre();
+    REQUIRE(mode.has_value());
+    REQUIRE(resDown.has_value());
+    REQUIRE(resUp.has_value());
+    REQUIRE(vsync.has_value());
+    REQUIRE(mode->second > menu.sensitivityDownCentre()->second);
+    REQUIRE(resDown->second > mode->second);
+    REQUIRE(vsync->second > resDown->second);
+    REQUIRE(vsync->second < menu.resumeCentre()->second);
+    REQUIRE(resDown->first < resUp->first);
+    REQUIRE(menu.takeDisplayModeClicks() == 0);
+    REQUIRE(menu.takeResolutionSteps() == 0);
+    REQUIRE(menu.takeVsyncClicks() == 0);
+    click(*mode, 0.3990);
+    click(*resUp, 0.3991);
+    click(*resUp, 0.3992);
+    click(*resDown, 0.3993);
+    click(*vsync, 0.3994);
+    click(*vsync, 0.3995);
+    REQUIRE(menu.takeDisplayModeClicks() == 1);
+    REQUIRE(menu.takeDisplayModeClicks() == 0);
+    REQUIRE(menu.takeResolutionSteps() == 1);
+    REQUIRE(menu.takeResolutionSteps() == 0);
+    REQUIRE(menu.takeVsyncClicks() == 2);
+    REQUIRE(menu.takeVsyncClicks() == 0);
+    REQUIRE(menu.takeFovSteps() == 0);
+    REQUIRE(menu.takeSensitivitySteps() == 0);
+    menu.setFullscreen(true);
+    menu.setResolution(0, 0); // ignored, not drawn
+    menu.setResolution(1920, 1080);
+    menu.setVsync(false);
+    frame(ui, renderer, 0.3996);
+    click(*mode, 0.3997);
+    click(*resUp, 0.3998);
+    click(*vsync, 0.3999);
+    menu.setVisible(false);
+    menu.setVisible(true);
+    REQUIRE(menu.takeDisplayModeClicks() == 0); // a click from an earlier showing is not a click now
+    REQUIRE(menu.takeResolutionSteps() == 0);
+    REQUIRE(menu.takeVsyncClicks() == 0);
+
     // A click left over from before the menu was hidden does not count when it is shown again.
     click(*quit, 0.4);
     menu.setVisible(false);
