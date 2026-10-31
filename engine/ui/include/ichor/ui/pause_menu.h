@@ -15,7 +15,7 @@ class ElementDocument;
 namespace ichor {
 
 // The menu Esc opens: a veil over the world and a card with the field of view, the mouse
-// sensitivity, Resume and Quit.
+// sensitivity, the display mode, resolution and vsync, Resume and Quit.
 // Hidden until shown.
 // The context must have the Cinzel and Alegreya Sans faces loaded.
 class PauseMenu {
@@ -44,6 +44,15 @@ public:
     void setMouseSensitivity(float sensitivity);
     int takeSensitivitySteps();
 
+    // The display rows: the owner shows what the window is and hears the clicks. A toggle clicked
+    // twice since the last call is no change, so the count comes back, not a flag.
+    void setFullscreen(bool fullscreen);
+    int takeDisplayModeClicks();
+    void setResolution(int width, int height);
+    int takeResolutionSteps();
+    void setVsync(bool on);
+    int takeVsyncClicks();
+
     // Where the buttons sit on screen once laid out, for tests and for anything that wants to
     // point at them. Nothing while the menu is hidden.
     std::optional<std::pair<float, float>> resumeCentre() const { return centreOf(resume_); }
@@ -52,6 +61,10 @@ public:
     std::optional<std::pair<float, float>> fovUpCentre() const { return centreOf(fovUp_); }
     std::optional<std::pair<float, float>> sensitivityDownCentre() const { return centreOf(sensDown_); }
     std::optional<std::pair<float, float>> sensitivityUpCentre() const { return centreOf(sensUp_); }
+    std::optional<std::pair<float, float>> displayModeCentre() const { return centreOf(mode_); }
+    std::optional<std::pair<float, float>> resolutionDownCentre() const { return centreOf(resDown_); }
+    std::optional<std::pair<float, float>> resolutionUpCentre() const { return centreOf(resUp_); }
+    std::optional<std::pair<float, float>> vsyncCentre() const { return centreOf(vsync_); }
 
 private:
     struct Click final : Rml::EventListener {
@@ -73,6 +86,10 @@ private:
     Count fovUpClicks_;
     Count sensDownClicks_;
     Count sensUpClicks_;
+    Count modeClicks_;
+    Count resDownClicks_;
+    Count resUpClicks_;
+    Count vsyncClicks_;
     Rml::Element* resume_ = nullptr;
     Rml::Element* quit_ = nullptr;
     Rml::Element* fovDown_ = nullptr;
@@ -81,6 +98,11 @@ private:
     Rml::Element* sensDown_ = nullptr;
     Rml::Element* sensUp_ = nullptr;
     Rml::Element* sensValue_ = nullptr;
+    Rml::Element* mode_ = nullptr;
+    Rml::Element* resDown_ = nullptr;
+    Rml::Element* resUp_ = nullptr;
+    Rml::Element* resValue_ = nullptr;
+    Rml::Element* vsync_ = nullptr;
     Rml::ElementDocument* document_ = nullptr;
     bool visible_ = false;
 };

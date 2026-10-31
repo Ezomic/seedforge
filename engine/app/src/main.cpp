@@ -1041,6 +1041,25 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const std::filesystem::path settingsPath = options.saves / "settings.cfg";
     ichor::Settings settings = ichor::loadSettings(settingsPath);
     float mouseSensitivity = ichor::effectiveMouseSensitivity(settings, options.mouseSensitivity);
+    const auto persistSettings = [&] {
+        if (!ichor::saveSettings(settingsPath, settings)) {
+            ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
+        }
+    };
+    // The stored display settings go to the window once; a headless run has none and a screenshot run keeps its hidden one.
+    const bool displayFromSettings = !options.headless && options.screenshot.empty();
+    const auto displayRequest = [&] { return ichor::DisplayRequest{settings.displayMode == ichor::DisplayMode::Fullscreen, {settings.resolution.width, settings.resolution.height}}; };
+    // The menu shows the size the window has, which is the stored one when the display allowed it.
+    const auto shownResolution = [&] {
+        const ichor::Extent drawable = platform.drawableSize();
+        return ichor::Resolution{drawable.width, drawable.height};
+    };
+    if (displayFromSettings) {
+        if (settings.displayMode == ichor::DisplayMode::Fullscreen || settings.resolution.set()) {
+            platform.setDisplay(displayRequest());
+        }
+        renderer.setVsync(settings.vsync);
+    }
     ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
@@ -1453,6 +1472,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             pauseMenu->setMouseSensitivity(mouseSensitivity);
+            pauseMenu->setFullscreen(platform.fullscreen());
+            pauseMenu->setResolution(shownResolution().width, shownResolution().height);
+            pauseMenu->setVsync(settings.vsync);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
@@ -1998,6 +2020,37 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 if (!ichor::saveSettings(settingsPath, settings)) {
                     ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
                 }
+            }
+            // The display rows show the window as it is after the change, so a refused mode stays visible as such.
+            if (pauseMenu->takeDisplayModeClicks() % 2 == 1) {
+                settings.displayMode = settings.displayMode == ichor::DisplayMode::Fullscreen ? ichor::DisplayMode::Windowed : ichor::DisplayMode::Fullscreen;
+                if (displayFromSettings) {
+                    platform.setDisplay(displayRequest());
+                }
+                pauseMenu->setFullscreen(platform.fullscreen());
+                pauseMenu->setResolution(shownResolution().width, shownResolution().height);
+                persistSettings();
+            }
+            if (const int steps = pauseMenu->takeResolutionSteps(); steps != 0) {
+                std::vector<ichor::Resolution> modes;
+                for (const ichor::Extent& mode : platform.displayModes()) {
+                    modes.push_back({mode.width, mode.height});
+                }
+                const ichor::Resolution shown = shownResolution();
+                settings = ichor::stepResolution(settings, modes, shown, steps);
+                if (settings.resolution != shown) {
+                    if (displayFromSettings) {
+                        platform.setDisplay(displayRequest());
+                    }
+                    pauseMenu->setResolution(shownResolution().width, shownResolution().height);
+                    persistSettings();
+                }
+            }
+            if (pauseMenu->takeVsyncClicks() % 2 == 1) {
+                settings.vsync = !settings.vsync;
+                renderer.setVsync(settings.vsync);
+                pauseMenu->setVsync(settings.vsync);
+                persistSettings();
             }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
