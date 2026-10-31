@@ -151,6 +151,11 @@ jobs:
         run: ./vcpkg/bootstrap-vcpkg.bat -disableMetrics
       - name: MSVC developer environment
         uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: Use the vcpkg checkout, not the copy bundled with Visual Studio
+        # vcvars64 exports VCPKG_ROOT pointing at VS's own vcpkg copy and the step above forwards it, which silently replaced the
+        # checkout at VCPKG_COMMIT: that copy's tool pins (cmake 3.30.1, pwsh 7.5.3) do not match the baseline's ports (SEED-740).
+        shell: pwsh
+        run: '"VCPKG_ROOT=$env:GITHUB_WORKSPACEcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8'
       - name: Install sccache
         # Pinned release binary from the official action; it is faster than choco. The download is the one step
         # here that depends on a service we do not run, so a failure costs speed, not correctness.
