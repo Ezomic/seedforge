@@ -264,4 +264,5 @@ TEST_CASE("walking across streaming cell boundaries never stalls a tick, and a s
     INFO(describe("synchronous", blocking));
     REQUIRE(blocking.crossings.size() >= kMinCrossings);
     CHECK(worstCrossing(blocking) > budgetMs(median(blocking.ticksMs)));
+    CHECK(false); // SEED-710 calibration only: fail on purpose so the CI log prints both walks' ticks. Reverted in the next commit.
 }
