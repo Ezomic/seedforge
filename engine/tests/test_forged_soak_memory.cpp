@@ -41,6 +41,7 @@ constexpr int kGrid = 129;
 constexpr std::uint64_t kSeed = 1;
 constexpr double kSampleSeconds = 1.0;      // wall time between two resident-memory samples
 constexpr double kLegSeconds = 4.0;         // simulated seconds the bot walks before the streamer sees where it got to
+constexpr double kTickSeconds = 1.0 / 60.0; // one engine tick of physics per leg, the app's fixed step
 constexpr double kGrowthFraction = 0.05;    // the last quarter's mean may sit this far above the third quarter's...
 constexpr double kGrowthFloorBytes = 16.0 * 1024.0 * 1024.0; // ...or this many bytes above it, whichever is more: quarter means of a 90 MB process differ by up to 6 MB from allocator noise alone
 constexpr int kMinCrossings = 40;           // fewer and the session did not stream enough to say anything
@@ -231,6 +232,9 @@ SoakCurve soak(double budgetSeconds, bool leak)
             lastCell = cell;
         }
         streamer.update(position);
+        // The app steps physics every frame, and only a step lets Jolt free the broad-phase nodes of the cells that
+        // left: without one the quad tree runs out of nodes after about 4600 cell loads and Jolt aborts the process.
+        scene.tick(kTickSeconds);
     }
     curve.loads = streamer.loads();
     curve.unloads = streamer.unloads();
