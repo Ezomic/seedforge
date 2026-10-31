@@ -73,7 +73,7 @@ On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as
 
 ## Playthrough bot (SEED-748)
 
-A third nightly job, `playthrough-bot`, runs the walk bot on past the settlement: one headless run per seed over the whole errand. It builds `combat_bridge_tests` (Release, sanitizers off, like the walk job) and runs the one case `nightly: the playthrough bot talks, accepts, fights, loots, saves, quits and loads, or names the step it cannot` (`game/combat_bridge/tests/test_playthrough_bot.cpp`), which is skipped in every normal `ctest` run and only runs when `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS` is set; the workflow sets it to `1,2,3,5` (the `play_seeds` input of a manual run changes it). It never runs on a pull request.
+A third nightly job, `playthrough-bot`, runs the walk bot on past the settlement: one headless run per seed over the whole errand. It builds `combat_bridge_tests` (Release, sanitizers off, like the walk job) and runs the one case `nightly: the playthrough bot talks, accepts, fights, loots, saves, quits and loads, or names the step it cannot` (`game/combat_bridge/tests/test_playthrough_bot.cpp`), which is skipped in every normal `ctest` run and only runs when `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS` is set; the workflow sets it to `2` (the `play_seeds` input of a manual run changes it). It never runs on a pull request.
 
 The bot itself is `game/combat_bridge/include/ichor/combat_bridge/playthrough_bot.h` (`playThrough`). It lives in the combat bridge rather than beside `forged_walk_bot.h` because the fight step needs the bridge, which depends on the world module and not the other way round. The steps, in order, and what drives each headlessly:
 
@@ -96,7 +96,19 @@ One line per step: `PLAY seed 1 step fight: ok | walked trip 412 m, ...; cleared
 - a seed's world does not forge or build;
 - the 1500 s budget (`ICHOR_NIGHTLY_PLAYTHROUGH_BUDGET_S`) runs out before every seed ran.
 
-An UNSUPPORTED step is printed and counted in the summary but does not fail the night: it is the list of what the bot cannot drive yet, not a regression. Today that list is `quit`. The job summary lists the `PLAY` lines and `play.log` is uploaded as `nightly-playthrough-log`. Run it locally with `bin/build combat_bridge_tests`, then `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS=1,2,3,5 engine/build/windows-ci/combat_bridge/combat_bridge_tests "nightly: the playthrough bot*"`. `ICHOR_NIGHTLY_PLAYTHROUGH_SKILL` picks another bot skill (`novice`, `regular`, `expert`).
+Why seed 2 alone: a survey of seeds 1 to 30 at grid 128 (Windows Release, 90 s wall in all) finished only seed 2. The rest are findings the bot reports, not things it works around:
+
+| Seeds | Step | What the bot reports |
+|---|---|---|
+| 1, 7, 25, 29 | fight | STALLED: after the skirmisher of a challenge room dies, the artillery stands in Reposition against the room's wall (its 7 m minimum range does not fit a 10 m room, so it backs away into the wall) 1.9 to 6.9 m from the player, and `roleBotInput` waits for it to aim, which it never does. The two deadlock. |
+| 3, 5, 19, 28 | fight | STALLED: the player dies once, respawns at the entry room's centre alive and Idle, and steering frames leave the body's intent at 0 m/s for 15 s. Not diagnosed yet. |
+| 15 | loot | STALLED: on the way to the item's room the body stops at a junction room's wall with intent 4 m/s, so the room-to-room waypoints miss a doorway there. |
+| 4, 6, 8, 9, 11, 14, 18, 23, 24, 26, 27 | walk | FAILED: no walking route from the spawn to the giver (cliffs or deep water cut it off, or no walkable ground at the goal). |
+| 10, 12, 13, 16, 17, 20, 21, 22, 30 | fight | FAILED: no walking route from the giver to the dungeon. |
+
+Add a seed to `play_seeds` once its stall is fixed; the two fight stalls are the follow-ups filed with SEED-748.
+
+An UNSUPPORTED step is printed and counted in the summary but does not fail the night: it is the list of what the bot cannot drive yet, not a regression. Today that list is `quit`. The job summary lists the `PLAY` lines and `play.log` is uploaded as `nightly-playthrough-log`. Run it locally with `bin/build combat_bridge_tests`, then `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS=2 engine/build/windows-ci/combat_bridge/combat_bridge_tests "nightly: the playthrough bot*"`. `ICHOR_NIGHTLY_PLAYTHROUGH_SKILL` picks another bot skill (`novice`, `regular`, `expert`).
 
 ## Test-time budget (SEED-658)
 

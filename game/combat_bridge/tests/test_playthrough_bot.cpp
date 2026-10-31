@@ -80,7 +80,7 @@ TEST_CASE("nightly: the playthrough bot talks, accepts, fights, loots, saves, qu
 {
     const char* seedsText = std::getenv("ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS");
     if (seedsText == nullptr || seedsText[0] == '\0') {
-        SKIP("set ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS (for example 1,2,3,5) to run the nightly playthrough");
+        SKIP("set ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS (for example 2) to run the nightly playthrough");
     }
     const std::vector<std::uint64_t> seeds = seedsFromEnv(seedsText);
     REQUIRE_FALSE(seeds.empty());
