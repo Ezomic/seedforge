@@ -130,6 +130,10 @@ jobs:
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      # vcpkg hashes the version of the pwsh it runs into every package ABI. With this set it ignores the runner's pwsh (which
+      # changes with the runner image, two versions coexist during a rollout) and uses the one pinned by VCPKG_COMMIT, so the
+      # same binary cache is warm on every image (SEED-740). cmake, ninja and git are pinned the same way.
+      VCPKG_FORCE_DOWNLOADED_BINARIES: "1"
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
       - uses: actions/checkout@v4
@@ -183,20 +187,24 @@ jobs:
           key: sccache-windows-${{ github.sha }}
           restore-keys: sccache-windows-
       - name: Toolchain identity for the vcpkg cache
-        # vcpkg hashes the pwsh version and cl.exe into every package ABI, so a runner image that bumps either restores 0 packages.
-        # Keying on them makes that a cache miss that saves a fresh set, instead of a hit that never re-saves (SEED-716).
+        # vcpkg hashes cl.exe into every package ABI, so a runner image with a new compiler restores 0 packages. Keying on it makes
+        # that a cache miss that saves a fresh set, instead of a hit that never re-saves (SEED-716). The pwsh version is no longer
+        # part of the key: vcpkg uses its own pinned pwsh (VCPKG_FORCE_DOWNLOADED_BINARIES above), logged here next to the runner's.
         id: toolchain
         shell: pwsh
         run: |
           $cl = (Get-FileHash (Get-Command cl.exe).Source -Algorithm SHA256).Hash.Substring(0, 16)
-          "id=pwsh$($PSVersionTable.PSVersion)-cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "id=cl$cl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "runner pwsh $($PSVersionTable.PSVersion), cl.exe $cl"
+          $vcpkgPwsh = (& ./vcpkg/vcpkg.exe fetch powershell-core | Select-Object -Last 1)
+          Write-Host "vcpkg pwsh $vcpkgPwsh ($(& $vcpkgPwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'))"
       - name: Restore vcpkg binaries
         id: cache1
         uses: actions/cache/restore@v4
         with:
           path: .vcpkg-cache
-          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
-          restore-keys: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-
+          key: vcpkg-windows-v4-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-windows-v4-${{ steps.toolchain.outputs.id }}-
       - name: Restore forged world test cache
         id: cache2
         # Keyed on the sources the test cache digest hashes (engine/tests/forged_cache_digest.cmake), so a generator change starts cold.
@@ -216,7 +224,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .vcpkg-cache
-          key: vcpkg-windows-v3-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          key: vcpkg-windows-v4-${{ steps.toolchain.outputs.id }}-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
       - name: Build
         if: needs.changes.outputs.heavy == 'true'
         run: cmake --build --preset windows-ci
