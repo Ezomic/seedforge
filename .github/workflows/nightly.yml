@@ -12,11 +12,14 @@ on:
         description: ctest-stress rounds
         default: "3"
       size:
-        description: forge-cli grid size for the sanity report
+        description: forge-cli grid size for the sanity report and the axiom pair sweep
         default: "128"
       walk_grids:
         description: forged walk bot grid sizes, comma separated
         default: "256,1024"
+      sweep_seeds:
+        description: axiom pair sweep seeds, N or N-M
+        default: "1-8"
 
 jobs:
   ci-time-trend:
@@ -192,6 +195,72 @@ jobs:
         with:
           name: nightly-walk-log
           path: walk.log
+          if-no-files-found: ignore
+
+  axiom-sweep:
+    # Every pair of axioms that may share a world, forged at size 128 with --axioms and --validate (SEED-714). Phase 0 is
+    # carried only today (no phase reads the directives yet), so this is red when a pair cannot be pinned or when the default
+    # world under it fails a gate; it starts biting the moment the axiom-to-params mapping lands. Release without sanitizers,
+    # like forged-walk: the sweep is about the gates, the sanitizer jobs cover memory errors on the PR suite.
+    name: axiom pair sweep (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      SWEEP_SEEDS: ${{ inputs.sweep_seeds || '1-8' }}
+      SWEEP_SIZE: ${{ inputs.size || '128' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-sweep-${{ github.sha }}
+          restore-keys: |
+            ccache-sweep-
+            ccache-walk-
+            ccache-asan-
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target ichor_forge_cli
+        working-directory: engine
+      - name: Sweep every axiom pair
+        id: sweep
+        run: |
+          set -o pipefail
+          python3 tools/axiom_sweep.py engine/build/linux-headless-asan/forge-cli/ichor_forge_cli             --size "$SWEEP_SIZE" --seeds "$SWEEP_SEEDS" --out axiom-sweep --json axiom-sweep/sweep.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload the sweep report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-axiom-sweep
+          path: |
+            axiom-sweep/sweep.json
+            axiom-sweep/*/manifest.json
+            axiom-sweep/*/validation.json
           if-no-files-found: ignore
 
   soak:

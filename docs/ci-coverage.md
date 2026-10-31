@@ -71,6 +71,33 @@ A seed with no second settlement 60 m or more from the spawn settlement prints `
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
 
+## Axiom pair sweep (SEED-714)
+
+A fourth nightly job, `axiom-sweep`, forges every pair of axioms that may share a world. `tools/axiom_sweep.py` reads
+`data/axioms` and `data/conflicts/conflicts.json`, lists every unordered pair, and sets aside the pairs that share a slot,
+declare each other in `conflicts` or sit on the blocklist (the rule of doc 01 and of `pinWorldConfig`, so the counts match
+`docs/axiom-coverage.md`: 231 pairs, 42 excluded, 189 forged). Each forged pair runs
+`ichor_forge_cli --seed 1 --seed-end 8 --size 128 --data data --axioms a,b --validate --out axiom-sweep/a+b`, several at a
+time (one per CPU). A pair fails when forge-cli refuses the pin, a seed errors, a seed is rejected after forge-cli's own
+rerolls (its failed gates are listed as `gate: cause`), or the manifest does not record the pair.
+
+The job summary carries the report: a counts table, every failing pair with its seeds and gates, and two folds, one with
+every forged pair (seconds and land share per seed) and one with the excluded pairs and why. The same report plus
+`sweep.json` (every pair's verdict) and the per-pair `manifest.json` and `validation.json` are uploaded as
+`nightly-axiom-sweep`, on success too. The night fails when any forged pair fails. A manual run takes `sweep_seeds`
+(default `1-8`) and `size` (shared with the sanity report, default 128).
+
+Phase 0 is carried only (SEED-713: forge-cli records the pinned axioms in the manifest, no phase reads the directives
+yet), so today every pair forges the same default world and the sweep proves two things: every non-excluded pair pins,
+and the default world under every pair passes the gates on seeds 1 to 8 (the sanity report's seeds). It starts telling pairs apart the moment the
+axiom-to-params mapping lands, with no change to the job. The build is Release without sanitizers, like `forged-walk`,
+and builds only `ichor_forge_cli`. Locally (Windows Release, 8 forge-cli runs at a time) the 189 pairs on seeds 1-8 took 98 s of wall time for 772 s of forge-cli time, about 4 s per pair; the dispatched run's figure is in the SEED-714 PR.
+
+Run it locally with `bin/build ichor_forge_cli`, then
+`python tools/axiom_sweep.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe --out out/sweep`; add
+`--shard 1/4` to forge a quarter of the pairs. `python tools/axiom_sweep.py --self-test` proves the pair rules and the
+verdicts, and runs in the `python tools + content layout` PR job.
+
 ## Test-time budget (SEED-658)
 
 Main went red twice because one test ran too close to the sanitizer timeout (the SEED-492 walk test on the SEED-556 worlds, and the SEED-650 live-worlds probe, which timed out at 1500 s). `tools/test_times.py` reads the per-test durations of a ctest run, prints the 20 slowest cases, and fails when a case exceeds its budget:
