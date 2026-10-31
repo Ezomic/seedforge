@@ -1,0 +1,69 @@
+name: fixture comment
+
+# SEED-700: one comment per PR naming the changed digest, corpus and golden files, so the reviewer sees that the
+# "wait for main CI before the next merge" rule of CLAUDE.md applies. The fixture paths come from `bin/regen-fixtures --list`.
+# Not a required check and not a build: it lists the PR's files through the API and needs no toolchain.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: fixture-comment-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: fixture comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A fork PR gets a read-only token and could not post; the rule is about our own merges.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post, update or remove the comment
+        run: |
+          marker='<!-- seed-700-fixture-comment -->'
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' | sort -u > changed.txt
+
+          : > hits.txt
+          while read -r name paths; do
+            for p in $paths; do
+              grep -E "^${p//./\.}(/|$)" changed.txt | sed "s|^|$name\t|" >> hits.txt || true
+            done
+          done < <(bash bin/regen-fixtures --list)
+          sort -u hits.txt -o hits.txt
+
+          existing=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.body | contains(\"$marker\")) | .id" | head -n 1)
+
+          if [ ! -s hits.txt ]; then
+            echo "No fixture changed."
+            [ -z "$existing" ] || gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/comments/$existing"
+            exit 0
+          fi
+
+          {
+            echo "$marker"
+            echo "### Fixtures changed in this PR"
+            echo
+            echo "This PR changes checked-in digests, corpora or goldens, so the CLAUDE.md rule applies: a change to hashes or defaults waits for green CI on main before the next merge. Until then the new values are a proposal."
+            echo
+            echo "| Regenerator | File |"
+            echo "| --- | --- |"
+            while IFS=$'\t' read -r name file; do echo "| \`$name\` | \`$file\` |"; done < hits.txt
+            echo
+            echo "Fixture list from \`bin/regen-fixtures --list\`. This comment is updated in place on every push."
+          } > body.md
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F body=@body.md
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@body.md
+          fi
