@@ -91,6 +91,7 @@ jobs:
           python3 tools/package_size.py --self-test
           python3 tools/golden_diff_page.py --self-test
           python3 tools/art_contact_sheet.py --self-test
+          python3 tools/axiom_sweep.py --self-test
 
   art-sheet:
     # A page of the changed assets under art/, uploaded as an artifact so art is reviewed without a build (SEED-709). Only the shown
