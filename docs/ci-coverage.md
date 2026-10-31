@@ -49,6 +49,10 @@ On failure the job summary lists the flaky tests with their failure count per te
 
 Run the same commands locally: `bin/build`, then `bin/ctest-stress -n 2` and `python tools/world_sanity.py engine/build/windows-ci/forge-cli/ichor_forge_cli.exe`. The seeds are fixed on purpose so a red night means a code change, not luck; change the range in the workflow when the world generator is retuned and the set should widen. `nightly.yml` is in the path filter of `engine.yml`, so editing it runs both required checks.
 
+## Regenerating every fixture (SEED-699)
+
+`bin/regen-fixtures` runs every fixture regenerator in dependency order (`--list` names them with their files: determinism.json, forge_world_digests.json, the forge golden PNGs, forged_frame_budget.json, the forge-cli viewer fixture, the showcase seeds, app_smoke_hash.txt, both replay corpora, docs/axiom-coverage.md, the ledger hashes and CREDITS.md) and ends with `git status` of those paths, so an intended hash change is one command plus a look at each changed file. It writes only fixtures: whether the move is right is settled by review and the CI run on main. The nightly job `regen-fixtures reproduces the committed fixtures (windows)` runs `bin/regen-fixtures --no-build --check` on a clean tree, which is red when a regenerator stops reproducing what is committed. Not covered: the GPU golden images (lavapipe output, regenerate on the `linux-gpu` preset as above), the debt baselines in `tools/` and the test time allowlist, which only shrink.
+
 Why seeds 1-8 at size 128: with the SEED-416 defaults, seeds 3, 4 and 5 forge nothing usable at size 64 (`roads: no settlement sites to connect`, tracked by SEED-497), so the report would be red from day one. At sizes 128 and 256 all eight seeds are accepted, and 128 is the cheaper. Revisit the size when SEED-497 lands.
 
 ### Why the first scheduled run failed in the stress step
