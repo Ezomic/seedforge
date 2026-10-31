@@ -1,6 +1,7 @@
 {
   "medium": [
     "a cache that is empty, cut short or has any bit flipped is recomputed and rewritten",
+    "a flipped byte anywhere in a real cache file is dropped by the cache, never served",
     "a flipped byte in the phase blob is rejected, in the campaign and in the decoder",
     "a missing, truncated or damaged entry is forged again and repaired",
     "a non-finite foe position draws nothing",
@@ -14,6 +15,7 @@
     "an endless death time ends on the last frame of the death clip, and a reversed swing window stays in order",
     "blending a pose with itself gives the pose, and the idle-to-run midpoint is a valid skeleton",
     "blending two poses keeps each end exact and the joints rigid in between",
+    "content_layout",
     "coverage is deterministic and bounded",
     "drawing the Bull-Warden does not move the simulation",
     "drawing the Exile does not touch the simulation",
