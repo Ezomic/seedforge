@@ -18,6 +18,10 @@ namespace ichor {
 void setShaderDirectory(std::filesystem::path directory);
 const std::filesystem::path& shaderDirectory();
 
+// Contexts created after this call with `false` decode block-compressed textures to RGBA8 even on a device that could
+// sample them. ICHOR_NO_BC=1 in the environment does the same; it is how the fallback is tried on a machine that has BC.
+void setBlockCompressionAllowed(bool allowed);
+
 struct Texture;
 
 struct GpuBuffer {
@@ -73,10 +77,17 @@ public:
     bool uploadBuffer(GpuBuffer& dst, const void* data, VkDeviceSize size);
 
     GpuImage createImage(VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect,
-        std::uint32_t mipLevels = 1, std::uint32_t layers = 1);
+        std::uint32_t mipLevels = 1, std::uint32_t layers = 1, VkComponentMapping swizzle = {});
     VkImageView createLayerView(const GpuImage& image, VkImageAspectFlags aspect, std::uint32_t layer);
     void destroyImage(GpuImage& image);
+    // `dst` must already match `texture`'s format and size; every mip is copied as stored.
     bool uploadTexture(GpuImage& dst, const Texture& texture);
+    // Creates `dst` for `texture` and uploads it. A block-compressed texture is decoded to RGBA8 first when the device
+    // cannot sample those formats. `dst` is set even when the upload fails, so the caller can destroy it.
+    bool createTexture(GpuImage& dst, const Texture& texture);
+
+    // Whether BC7, BC5 and BC4 textures are sampled as they are stored.
+    bool blockCompression() const { return blockCompression_; }
 
     bool immediate(const std::function<void(VkCommandBuffer)>& record);
     VkShaderModule loadShader(std::string_view name);
@@ -90,6 +101,7 @@ private:
     VmaAllocator allocator_ = VK_NULL_HANDLE;
     VkCommandPool pool_ = VK_NULL_HANDLE;
     VkFence immediateFence_ = VK_NULL_HANDLE;
+    bool blockCompression_ = false;
 };
 
 }

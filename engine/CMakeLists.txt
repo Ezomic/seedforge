@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(ichor-engine LANGUAGES CXX)
+project(ichor-engine LANGUAGES CXX C)
 
 option(ENGINE_RUNTIME "Build the SDL3/Vulkan runtime and the app" ON)
 option(ENGINE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)

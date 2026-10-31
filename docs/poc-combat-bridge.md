@@ -99,6 +99,8 @@ touched.
   the fixtures are refreshed on purpose with the command below.
 - Regenerate after a combat knob or a worldgen change: `bin/regen-combat-bridge-corpus` (builds and runs
   `combat_bridge_corpus`, about 15 seconds). Commit the changed fixtures with the change.
+- CI replays the corpus on Windows and Linux on every heavy PR (`combat_bridge_corpus --replay`) and fails when the two
+  platforms' reports differ (SEED-743, "Bridge corpus on both platforms" in `docs/ci-coverage.md`).
 
 ## Anchor and Artillery (SEED-661)
 

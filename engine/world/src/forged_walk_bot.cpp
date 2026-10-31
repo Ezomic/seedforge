@@ -66,6 +66,9 @@ WalkResult walkTo(const ForgedWalking& walking, const glm::dvec3& from, const gl
         position.z += allowed.z * params.dt;
         result.metresWalked += flatDistance(before, position);
         result.seconds += params.dt;
+        if (params.onStep) {
+            params.onStep(position, result.seconds);
+        }
 
         const StuckReport stuck = detector.step(position, true, walking.assess(position.x, position.z), ahead.block, params.dt);
         if (stuck.stuck) {

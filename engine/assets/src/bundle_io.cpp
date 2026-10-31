@@ -16,7 +16,8 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'C', 'N'};
-constexpr std::uint32_t kVersion = 3;
+// 4: a texture may be block-compressed (BC7, BC5, BC4), its mips stored as whole blocks. Version 3 bundles are refused, not converted.
+constexpr std::uint32_t kVersion = 4;
 // Sockets, LOD groups and collision follow the nodes under this tag, and only when there are any,
 // so a bundle without them is the same bytes it always was.
 constexpr std::array<char, 4> kPieceTag{'I', 'P', 'C', '1'};
@@ -133,13 +134,9 @@ bool validate(const SceneBundle& bundle, const PieceData& pieces, const std::str
         return false;
     };
     for (const Texture& t : bundle.textures) {
-        if (t.width == 0 || t.height == 0 || t.mipCount != mipLevelCount(t.width, t.height)) return fail("texture dimensions");
-        if (t.format != TextureFormat::Rgba8Srgb && t.format != TextureFormat::Rgba8Unorm) return fail("texture format");
-        std::size_t expected = 0;
-        for (std::uint32_t w = t.width, h = t.height, mip = 0; mip < t.mipCount; ++mip, w = std::max(1u, w / 2), h = std::max(1u, h / 2)) {
-            expected += static_cast<std::size_t>(w) * h * 4;
-        }
-        if (t.pixels.size() != expected) return fail("texture pixel size");
+        if (t.width == 0 || t.height == 0 || t.width > kMaxTextureEdge || t.height > kMaxTextureEdge || t.mipCount != mipLevelCount(t.width, t.height)) return fail("texture dimensions");
+        if (!isKnownTextureFormat(t.format)) return fail("texture format");
+        if (!isTextureLayoutValid(t)) return fail("texture pixel size");
     }
     if (bundle.materials.empty()) return fail("no materials");
     const auto textureOk = [&](std::uint32_t index) { return index == kNoTexture || index < bundle.textures.size(); };
@@ -335,7 +332,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle, PieceDat
     std::array<char, 4> magic{};
     std::uint32_t version = 0;
     if (!r.pod(magic) || magic != kMagic || !r.pod(version) || version != kVersion) {
-        logf(LogLevel::Error, "{} is not a version {} scene bundle", path.string(), kVersion);
+        logf(LogLevel::Error, "{} is not a version {} scene bundle; cook it again with ichor_cook", path.string(), kVersion);
         return false;
     }
 

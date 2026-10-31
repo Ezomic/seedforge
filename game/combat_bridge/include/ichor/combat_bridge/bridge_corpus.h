@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
@@ -96,5 +97,31 @@ std::string encodeEntry(const Entry& entry);
 
 // Nullopt for anything that is not a well-formed version 1 entry (see stage0::decodeCorpusEntry for the body).
 std::optional<Entry> decodeEntry(std::string_view text);
+
+// Every *.replay file of the folder in file name order. Empty with `error` set when the folder cannot be read or a file is malformed.
+std::vector<Entry> loadCorpus(const std::filesystem::path& dir, std::string& error);
+
+struct ReplayLine {
+    std::string file; // the file's stem, "01-novice-world-1-scene-1"
+    std::uint64_t worldHash = 0;
+    std::uint64_t sceneSeed = 0;
+    bool repicked = false;
+    Outcome expected;
+    Outcome actual;
+};
+
+// What replaying the whole corpus on this build came to, fight by fight (SEED-743). CI runs it on every platform and compares the
+// texts, so a fight that replays differently on one OS is caught even when the world moved and every file was re-picked.
+struct ReplayReport {
+    std::vector<ReplayLine> lines;
+    std::vector<std::string> warnings; // the re-pick messages of resolveEntry
+    std::string error;                 // set when the folder did not load, held no fight or a world did not forge; the lines are then incomplete
+
+    bool matches() const; // every replayed outcome equals the recorded one
+    std::string text() const; // one line per fight in file order, LF only, the same on every platform when the fights agree
+};
+
+// Forges each world of the corpus once and replays every fight against its file (through resolveEntry).
+ReplayReport replayCorpus(const std::filesystem::path& dir);
 
 }

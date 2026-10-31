@@ -9,6 +9,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <vector>
 
 using namespace ichor;
 
@@ -158,6 +159,80 @@ TEST_CASE("a sensitivity step starts from what the player looks with and keeps t
     }
     REQUIRE(walked.mouseSensitivity == 4.7f);
     REQUIRE(serializeSettings(walked).find("mouseSensitivity=4.7\n") != std::string::npos);
+}
+
+TEST_CASE("the display mode, resolution and vsync survive the file, and a bad value reads as the default")
+{
+    Settings display;
+    display.displayMode = DisplayMode::Fullscreen;
+    display.resolution = {1920, 1080};
+    display.vsync = false;
+    REQUIRE(parseSettings(serializeSettings(display)) == display);
+    const std::string text = serializeSettings(display);
+    REQUIRE(text.find("display=fullscreen\n") != std::string::npos);
+    REQUIRE(text.find("resolution=1920x1080\n") != std::string::npos);
+    REQUIRE(text.find("vsync=0\n") != std::string::npos);
+    REQUIRE(serializeSettings(kDefaults).find("display=windowed\nresolution=0x0\nvsync=1\n") != std::string::npos);
+
+    // A file from before these keys, and one that leaves them out, is the stand-in default: windowed, the window as made, vsync on.
+    const std::string head = "ichor-settings 1\n";
+    REQUIRE(parseSettings(head + "fov=80\nmouseSensitivity=2\nend\n") == Settings{80.0f, 2.0f});
+    REQUIRE(kDefaults.displayMode == DisplayMode::Windowed);
+    REQUIRE_FALSE(kDefaults.resolution.set());
+    REQUIRE(kDefaults.vsync);
+
+    for (const char* bad : {"", "Fullscreen", "borderless", "1"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "display=" + bad + "\nend\n").displayMode == DisplayMode::Windowed);
+    }
+    REQUIRE(parseSettings(head + "display=fullscreen\nend\n").displayMode == DisplayMode::Fullscreen);
+    REQUIRE(parseSettings(head + "display=windowed\nend\n").displayMode == DisplayMode::Windowed);
+
+    for (const char* bad : {"", "abc", "1920", "1920x", "x1080", "1920x1080x60", "1920 x 1080", "-1920x1080", "0x1080", "1920x0", "99999x99999", "1e3x1e3", "1920.0x1080"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "resolution=" + bad + "\nend\n").resolution == Resolution{});
+    }
+    REQUIRE(parseSettings(head + "resolution=2560x1440\nend\n").resolution == Resolution{2560, 1440});
+    REQUIRE(parseSettings(head + "resolution=16384x16384\nend\n").resolution == Resolution{16384, 16384});
+
+    for (const char* bad : {"", "2", "on", "true", "-1", "01"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "vsync=" + bad + "\nend\n").vsync);
+    }
+    REQUIRE_FALSE(parseSettings(head + "vsync=0\nend\n").vsync);
+    REQUIRE(parseSettings(head + "vsync=1\nend\n").vsync);
+
+    // A bad display value costs only its field.
+    const Settings mixed = parseSettings(head + "fov=80\ndisplay=nope\nresolution=800x600\nvsync=0\nend\n");
+    REQUIRE(mixed.fovDegrees == 80.0f);
+    REQUIRE(mixed.displayMode == DisplayMode::Windowed);
+    REQUIRE(mixed.resolution == Resolution{800, 600});
+    REQUIRE_FALSE(mixed.vsync);
+
+    Settings absurd;
+    absurd.resolution = {-5, 20000};
+    REQUIRE(absurd.clamped().resolution == Resolution{});
+    absurd.resolution = {640, 480};
+    REQUIRE(absurd.clamped().resolution == Resolution{640, 480});
+
+    TempFile file;
+    REQUIRE(saveSettings(file.path(), display));
+    REQUIRE(loadSettings(file.path()) == display);
+}
+
+TEST_CASE("a resolution step walks the display's sizes from the one shown and stops at the ends")
+{
+    const std::vector<Resolution> modes{{3840, 2160}, {2560, 1440}, {1920, 1080}, {1280, 720}};
+    Settings stored;
+    stored.fovDegrees = 80.0f;
+    REQUIRE(stepResolution(stored, modes, {1920, 1080}, 1).resolution == Resolution{1280, 720});
+    REQUIRE(stepResolution(stored, modes, {1920, 1080}, -1).resolution == Resolution{2560, 1440});
+    REQUIRE(stepResolution(stored, modes, {1920, 1080}, -5).resolution == Resolution{3840, 2160});
+    REQUIRE(stepResolution(stored, modes, {1280, 720}, 3).resolution == Resolution{1280, 720});
+    REQUIRE(stepResolution(stored, modes, {1900, 1000}, 1).resolution == Resolution{1280, 720}); // a window size no mode has starts from the nearest
+    REQUIRE(stepResolution(stored, modes, {1920, 1080}, 1).fovDegrees == 80.0f);
+    REQUIRE(stepResolution(stored, modes, {1920, 1080}, 0) == stored);
+    REQUIRE(stepResolution(stored, {}, {1920, 1080}, 1) == stored);
 }
 
 TEST_CASE("the first-minute prompt flags survive the file, and a file from before them has none set")
