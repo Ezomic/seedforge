@@ -4,8 +4,7 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <iterator>
+#include <format>
 #include <map>
 #include <set>
 #include <string>
@@ -16,27 +15,13 @@ using namespace ichor::bridge_corpus;
 
 namespace {
 
-std::string slurp(const std::filesystem::path& path)
-{
-    std::ifstream in(path, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
 // Fixtures are read-only inputs checked into the repo, so parallel ctest processes can share them.
 std::vector<Entry> loadCorpus()
 {
-    std::vector<std::filesystem::path> paths;
-    for (const auto& item : std::filesystem::directory_iterator(ICHOR_BRIDGE_CORPUS_DIR)) {
-        if (item.path().extension() == ".replay") paths.push_back(item.path());
-    }
-    std::sort(paths.begin(), paths.end());
-    std::vector<Entry> entries;
-    for (const auto& path : paths) {
-        const auto entry = decodeEntry(slurp(path));
-        INFO(path.string());
-        REQUIRE(entry.has_value());
-        entries.push_back(*entry);
-    }
+    std::string error;
+    std::vector<Entry> entries = bridge_corpus::loadCorpus(ICHOR_BRIDGE_CORPUS_DIR, error);
+    INFO(error);
+    REQUIRE(error.empty());
     return entries;
 }
 
@@ -91,6 +76,42 @@ TEST_CASE("every recorded forged-world fight replays to its recorded outcome", "
         CHECK(actual.damageTakenTenths == entry.expected.damageTakenTenths);
         CHECK(actual.stateHash == entry.expected.stateHash);
     }
+}
+
+TEST_CASE("the replay report lists every fight beside its recorded outcome and goes red when one state hash moves", "[bridge_corpus]")
+{
+    const ReplayReport report = replayCorpus(ICHOR_BRIDGE_CORPUS_DIR);
+    INFO(report.error);
+    REQUIRE(report.error.empty());
+    REQUIRE(report.lines.size() == plan().size());
+    CHECK(report.matches());
+    CHECK(report.warnings.empty());
+    const std::string text = report.text();
+    CHECK(static_cast<std::size_t>(std::count(text.begin(), text.end(), '\n')) == report.lines.size());
+    CHECK(text.find('\r') == std::string::npos);
+    for (std::size_t i = 0; i < report.lines.size(); ++i) {
+        const ReplayLine& line = report.lines[i];
+        INFO(line.file);
+        CHECK(line.file.starts_with(std::format("{:02}-", i + 1)));
+        CHECK(line.worldHash != 0);
+        CHECK_FALSE(line.repicked);
+        CHECK(line.actual == line.expected);
+        CHECK(text.find(line.file + " world ") != std::string::npos);
+        CHECK(text.find(std::format("state {:016x}", line.expected.stateHash)) != std::string::npos);
+    }
+
+    ReplayReport moved = report;
+    moved.lines.front().actual.stateHash ^= 1;
+    CHECK_FALSE(moved.matches());
+    CHECK(moved.text() != text);
+
+    CHECK_FALSE(replayCorpus("no-such-corpus-folder").error.empty());
+    const std::filesystem::path empty = std::filesystem::temp_directory_path() / "ichor-bridge-corpus-empty";
+    std::filesystem::create_directories(empty);
+    CHECK_FALSE(replayCorpus(empty).error.empty());
+    std::string error;
+    CHECK(bridge_corpus::loadCorpus(empty, error).empty());
+    CHECK(error.empty());
 }
 
 TEST_CASE("the corpus is the plan: skills, worlds and both winners", "[bridge_corpus]")

@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Regenerates every checked-in fixture in one go, in dependency order, then lists what changed according to git.
+# Run it after an intended worldgen, sim or combat change, LOOK at every changed file, and commit the fixtures with
+# the change. The script writes the fixtures and nothing else: whether a hash move is right is decided by the review
+# and by the CI run on main, not here.
+#
+#   bin/regen-fixtures [--check] [--no-build] [--skip NAME]...
+#
+# --check    exit 1 when any fixture differs from the index afterwards (CI runs this on a clean tree: the regenerators
+#            must reproduce what is committed). --no-build  use the already built preset instead of calling bin/build.
+# --skip     leave one regenerator out (its NAME from --list); repeatable. --list prints the regenerators and their files.
+# Env: ICHOR_PRESET (default windows-ci). A full run takes about 10 minutes after the build, 9 of them the showcase ranking.
+#
+# Not covered, on purpose: the GPU golden images (engine/tests/data/golden/*.png except forge_*.png) are lavapipe output and
+# regenerate only on Linux with ICHOR_GOLDEN_SOFTWARE=1 ICHOR_UPDATE_GOLDEN=1 ctest --preset linux-gpu; the debt baselines
+# (tools/*_baseline.txt) and the test time allowlist (tools/test_time_allowlist.json) only shrink and are edited by hand.
+set -u
+
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+preset=${ICHOR_PRESET:-windows-ci}
+bdir=$repo/engine/build/$preset
+check=0
+build=1
+skip=()
+
+names=(determinism forge-digests forge-goldens frame-budget viewer-fixture showcase smoke-hash combat-bridge-corpus stage0-corpus axiom-coverage licence-hashes credits)
+declare -A files=(
+  [determinism]="engine/tests/data/determinism.json"
+  [forge-digests]="engine/tests/data/forge_world_digests.json"
+  [forge-goldens]="engine/tests/data/golden/forge_height.png engine/tests/data/golden/forge_flow.png engine/tests/data/golden/forge_water.png"
+  [frame-budget]="engine/tests/data/forged_frame_budget.json"
+  [viewer-fixture]="forge-cli/viewer/fixture"
+  [showcase]="data/showcase/seeds.json"
+  [smoke-hash]="engine/tests/data/app_smoke_hash.txt"
+  [combat-bridge-corpus]="game/combat_bridge/tests/corpus"
+  [stage0-corpus]="game/stage0/tests/corpus"
+  [axiom-coverage]="docs/axiom-coverage.md"
+  [licence-hashes]="art/LICENSES.json"
+  [credits]="CREDITS.md"
+)
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) check=1; shift ;;
+    --no-build) build=0; shift ;;
+    --skip) [ $# -ge 2 ] || { echo "regen-fixtures: --skip needs a name" >&2; exit 2; }; skip+=("$2"); shift 2 ;;
+    --list) for n in "${names[@]}"; do printf '%-22s %s\n' "$n" "${files[$n]}"; done; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "regen-fixtures: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+for s in "${skip[@]}"; do
+  [ -n "${files[$s]+x}" ] || { echo "regen-fixtures: no regenerator named '$s' (see --list)" >&2; exit 2; }
+done
+
+log() { echo "[regen-fixtures] $*" >&2; }
+skipped() { local s; for s in "${skip[@]}"; do [ "$s" = "$1" ] && return 0; done; return 1; }
+exe() { # executable name -> its path under the build dir
+  local found
+  found=$(find "$bdir" -type f \( -name "$1" -o -name "$1.exe" \) -not -path '*/CMakeFiles/*' 2>/dev/null | head -n 1)
+  [ -n "$found" ] || { log "$1 not found under engine/build/$preset (build it first, or drop --no-build)"; return 1; }
+  echo "$found"
+}
+step() { # name command... : runs one regenerator from the repo root and stops on its first failure
+  local name=$1; shift
+  if skipped "$name"; then log "skip $name"; return 0; fi
+  log "$name -> ${files[$name]}"
+  (cd "$repo" && "$@") || { log "$name failed ($?)"; exit 1; }
+}
+
+py=$(command -v python 2>/dev/null || command -v python3 2>/dev/null) || { log "python not found"; exit 1; }
+
+if [ $build -eq 1 ]; then
+  "$repo/bin/build" -p "$preset" ichor_tests_world ichor_forge_cli ichor ichor_lint_cli combat_bridge_corpus stage0_corpus ||
+    { log "build failed"; exit 1; }
+fi
+tests_world=$(exe ichor_tests_world) || exit 1
+forge_cli=$(exe ichor_forge_cli) || exit 1
+app=$(exe ichor) || exit 1
+lint=$(exe ichor_lint) || exit 1
+bridge_corpus=$(exe combat_bridge_corpus) || exit 1
+stage0_corpus=$(exe stage0_corpus) || exit 1
+
+# The world fixtures first: every later fixture is recorded on the world these pin.
+step determinism env ICHOR_UPDATE_DETERMINISM=1 "$tests_world" \
+  "determinism: the forged world and the simulation match the checked-in values on every platform"
+step forge-digests env ICHOR_UPDATE_FORGE_DIGESTS=1 "$tests_world" \
+  "forge world digests: every phase of the forge matches the checked-in table on every platform"
+step forge-goldens env ICHOR_UPDATE_GOLDEN=1 "$tests_world" "forge golden: the *"
+step frame-budget "$tests_world" "regenerate the forged frame budget"
+step viewer-fixture "$forge_cli" --seed 1 --size 64 --out forge-cli/viewer/fixture
+step showcase "$forge_cli" showcase --seeds 1..200 --size 256 --top 5 --out "$bdir/regen-showcase" --json data/showcase/seeds.json
+# The app and the fights on top of that world.
+step smoke-hash "$py" tools/check_smoke_hash.py "$app" --update
+step combat-bridge-corpus "$bridge_corpus"
+step stage0-corpus "$stage0_corpus"
+# Generated documents.
+step axiom-coverage "$lint" --data data --coverage-out docs/axiom-coverage.md
+step licence-hashes "$py" tools/check_assets_licensed.py --root . --update
+step credits "$py" tools/check_assets_licensed.py --root . --write-credits
+
+paths=()
+for n in "${names[@]}"; do for f in ${files[$n]}; do paths+=("$f"); done; done
+# git diff compares content after line-ending normalisation; git status would list every LF file a Windows checkout
+# wrote as CRLF, which is noise here. Untracked files under the fixture paths are listed as well.
+changed=$(cd "$repo" && { git diff --name-status -- "${paths[@]}"; git ls-files --others --exclude-standard -- "${paths[@]}" | sed 's/^/?\t/'; })
+if [ -z "$changed" ]; then
+  log "no fixture changed: the tree reproduces every checked-in fixture"
+  exit 0
+fi
+echo
+echo "Changed fixtures (git diff --name-status, ? = new file):"
+echo "$changed"
+echo
+echo "LOOK at each one, then commit them with the change that moved them. A moved hash or default is only"
+echo "settled once the CI run on main is green with these files; until then it is a proposal."
+[ $check -eq 0 ] || { log "--check: fixtures differ from the index"; exit 1; }

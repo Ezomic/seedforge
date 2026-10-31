@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <fstream>
 #include <iterator>
@@ -31,6 +32,30 @@ std::string_view trim(std::string_view text)
     return text;
 }
 
+Resolution clampResolution(Resolution resolution)
+{
+    const auto sane = [](int side) { return side > 0 && side <= Settings::kMaxResolutionSide; };
+    return sane(resolution.width) && sane(resolution.height) ? resolution : Resolution{};
+}
+
+bool parseInt(std::string_view text, int& out)
+{
+    const auto result = std::from_chars(text.data(), text.data() + text.size(), out);
+    return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+}
+
+// "WxH"; anything else is false.
+bool parseResolution(std::string_view text, Resolution& out)
+{
+    const std::size_t x = text.find('x');
+    return x != std::string_view::npos && parseInt(text.substr(0, x), out.width) && parseInt(text.substr(x + 1), out.height);
+}
+
+std::string_view displayModeName(DisplayMode mode)
+{
+    return mode == DisplayMode::Fullscreen ? "fullscreen" : "windowed";
+}
+
 bool parseFloat(std::string_view text, float& out)
 {
     const auto result = std::from_chars(text.data(), text.data() + text.size(), out);
@@ -46,7 +71,8 @@ bool parseFloat(std::string_view text, float& out)
 Settings Settings::clamped() const
 {
     return {clampField(fovDegrees, kMinFovDegrees, kMaxFovDegrees, kDefaultFovDegrees),
-            clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity), promptsSeen};
+            clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity), promptsSeen,
+            displayMode == DisplayMode::Fullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed, clampResolution(resolution), vsync};
 }
 
 float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override)
@@ -65,10 +91,28 @@ Settings stepMouseSensitivity(const Settings& stored, float current, int steps)
     return stepped.clamped();
 }
 
+Settings stepResolution(const Settings& stored, const std::vector<Resolution>& modes, Resolution current, int steps)
+{
+    if (modes.empty() || steps == 0) {
+        return stored;
+    }
+    const auto distance = [&](const Resolution& mode) {
+        return std::abs(static_cast<long long>(mode.width) * mode.height - static_cast<long long>(current.width) * current.height)
+            + std::abs(static_cast<long long>(mode.width) - current.width);
+    };
+    const auto nearest = std::min_element(modes.begin(), modes.end(), [&](const Resolution& a, const Resolution& b) { return distance(a) < distance(b); });
+    const long long from = nearest - modes.begin();
+    const long long to = std::clamp(from + steps, 0LL, static_cast<long long>(modes.size()) - 1);
+    Settings stepped = stored;
+    stepped.resolution = modes[static_cast<std::size_t>(to)];
+    return stepped.clamped();
+}
+
 std::string serializeSettings(const Settings& settings)
 {
     const Settings safe = settings.clamped();
-    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen, kTrailer);
+    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\ndisplay={}\nresolution={}x{}\nvsync={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen,
+        displayModeName(safe.displayMode), safe.resolution.width, safe.resolution.height, safe.vsync ? 1 : 0, kTrailer);
 }
 
 Settings parseSettings(std::string_view text)
@@ -93,6 +137,20 @@ Settings parseSettings(std::string_view text)
             break;
         } else if (const std::size_t equals = line.find('='); equals != std::string_view::npos) {
             const std::string_view key = line.substr(0, equals);
+            const std::string_view rest = line.substr(equals + 1);
+            if (key == "display") {
+                settings.displayMode = rest == "fullscreen" ? DisplayMode::Fullscreen : DisplayMode::Windowed;
+                continue;
+            }
+            if (key == "resolution") {
+                Resolution resolution;
+                settings.resolution = parseResolution(rest, resolution) ? resolution : Resolution{};
+                continue;
+            }
+            if (key == "vsync") {
+                settings.vsync = rest == "1" ? true : rest == "0" ? false : Settings::kDefaultVsync;
+                continue;
+            }
             if (key == "promptsSeen") {
                 const std::string_view digits = line.substr(equals + 1);
                 std::uint32_t flags = 0;
