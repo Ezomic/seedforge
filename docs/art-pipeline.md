@@ -48,4 +48,26 @@ For each file this prints how many sockets, LOD groups and collision shapes it h
 
 ## What a bundle looks like
 
-A bundle without any of these nodes is byte for byte what the cooker wrote before. One that has them carries an extra block after the nodes, tagged `IPC1`: sockets, LOD groups, collision shapes. The format version stays 3.
+A bundle without any of these nodes carries no extra block. One that has them carries one after the nodes, tagged `IPC1`: sockets, LOD groups, collision shapes.
+
+The format version is 4. Version 3 (uncompressed textures) bundles are refused with a message to cook again; nothing converts them.
+
+## Textures: size caps and compression
+
+The cooker keeps no texture at full source size. Every embedded image goes through three steps, in this order:
+
+1. **Size cap.** `art/texture_budget.json` maps folder prefixes to the largest edge a texture may keep: `art/props/` 1024, `art/props/terrain/` 512, `art/exile/` and the boss, Bull-Warden and Hill Cyclops folders 2048, and 1024 for any path no prefix matches. The longest matching prefix wins. A bigger texture is box-filtered down by halves until its larger edge fits; a smaller one is never upscaled. The cooker finds the file in the `art/` folder above the glTF, so the app and `ichor_cook` agree. Change a cap by editing that one file; a texture that must stay sharp belongs under a prefix with a higher number.
+2. **Mip chain.** The full chain is built from the capped size, averaging colour in linear light.
+3. **Block compression** (vendored `bc7enc` and `rgbcx`, see `CREDITS.md`). The format follows how a material uses the image:
+
+| Use | Format |
+|---|---|
+| base colour | BC7 sRGB |
+| normal map | BC5 (red and green; the shader rebuilds blue) |
+| metallic and roughness, occlusion, anything else | BC7 unorm |
+| the same, when the source PNG has one grey channel | BC4 (read as grey) |
+
+An image used as colour and as data keeps the colour format; one used as normal and as data keeps the data format. Sizes that are not a multiple of four are padded to whole blocks by repeating the edge.
+
+A device without `textureCompressionBC` gets the RGBA8 decode of each texture at upload time and renders the same scene at the old memory cost. Set `ICHOR_NO_BC=1` to force that path on any machine.
+

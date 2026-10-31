@@ -1,0 +1,11 @@
+{
+  "default": 1024,
+  "prefixes": [
+    { "prefix": "art/props/", "max": 1024 },
+    { "prefix": "art/props/terrain/", "max": 512 },
+    { "prefix": "art/exile/", "max": 2048 },
+    { "prefix": "art/monsters/bosses/", "max": 2048 },
+    { "prefix": "art/monsters/bull_warden/", "max": 2048 },
+    { "prefix": "art/monsters/hill_cyclops/", "max": 2048 }
+  ]
+}

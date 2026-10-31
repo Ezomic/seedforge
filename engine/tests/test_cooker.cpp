@@ -51,14 +51,15 @@ TEST_CASE("cooker turns the hoplite kit into a bundle")
     }
     for (const Material& material : bundle.materials) {
         REQUIRE(material.baseColorTexture < bundle.textures.size());
-        REQUIRE(bundle.textures[material.baseColorTexture].format == TextureFormat::Rgba8Srgb);
+        REQUIRE(bundle.textures[material.baseColorTexture].format == TextureFormat::Bc7Srgb);
     }
     for (const Texture& texture : bundle.textures) {
         REQUIRE(texture.width == 64);
         REQUIRE(texture.mipCount == 7);
+        // BC7 is 16 bytes a 4x4 block, and the 2x2 and 1x1 mips still take a whole block each.
         std::size_t expected = 0;
         for (std::uint32_t w = 64, h = 64;; w = std::max(1u, w / 2), h = std::max(1u, h / 2)) {
-            expected += static_cast<std::size_t>(w) * h * 4;
+            expected += static_cast<std::size_t>((w + 3) / 4) * ((h + 3) / 4) * 16;
             if (w == 1 && h == 1) break;
         }
         REQUIRE(texture.pixels.size() == expected);

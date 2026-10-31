@@ -1138,6 +1138,36 @@
         "art/settlement_kit/SM_KenneyStall.glb": "fb871f07af7935a7471d290ed1c55658a46813e827f1d80a58f0435a65437c84",
         "art/settlement_kit/SM_KenneyWallBay.glb": "fccf57f232cf132e2ccdc0e30c828c2dd7b19f87ccc160a92297b3c38df67133"
       }
+    },
+    {
+      "id": "bc7enc",
+      "path": "engine/assets/vendor/bc7enc/*",
+      "source_url": "https://github.com/richgel999/bc7enc",
+      "author": "Richard Geldreich, Jr.",
+      "license": "MIT",
+      "attribution": "bc7enc, rgbcx and bc7decomp by Richard Geldreich, Jr. (https://github.com/richgel999/bc7enc), Copyright 2020, MIT License (also offered as public domain). Used by ichor_cook to block-compress textures.",
+      "date_added": "2026-10-28",
+      "sha256": {
+        "engine/assets/vendor/bc7enc/LICENSE": "51aad8f8a068b782671f9277631ec721b72c0b34624c38a684ff46df8bc780c9",
+        "engine/assets/vendor/bc7enc/bc7decomp.cpp": "3739b1c5dcae7c46ea960fdc1b226ff83d284a3bc7e0d444c2c87d936ebb92ef",
+        "engine/assets/vendor/bc7enc/bc7decomp.h": "9e04c814b6f7f8813181570b3878ac6485feed4999fff6ba76fa7b5dbe4de739",
+        "engine/assets/vendor/bc7enc/bc7enc.c": "817bfa5d30a2c4702e8c387ebb5a69398034c95905f580a6b8cd4261da901058",
+        "engine/assets/vendor/bc7enc/bc7enc.h": "6a129cd608eebf9f2796dd1ad4659f8c4fbe2a2ace371b728fc4ece92f449c90",
+        "engine/assets/vendor/bc7enc/rgbcx.h": "0f71984084336191cbe5406450a072b312bea6021ed9e00c720ed00ddb75fb93",
+        "engine/assets/vendor/bc7enc/rgbcx_impl.cpp": "3bd223c741923dbe70d112fcbe25236a4618a690fe3d791cc0a087f911f523c8"
+      }
+    },
+    {
+      "id": "texture_budget",
+      "path": "art/texture_budget.json",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Texture size table read by ichor_cook. First-party, all rights reserved.",
+      "date_added": "2026-10-28",
+      "sha256": {
+        "art/texture_budget.json": "db07048f5ee55f0bc21755ce5d44da9bc15fad862f3be687f4183594ecf1789d"
+      }
     }
   ]
 }

@@ -826,10 +826,10 @@ bool SceneRenderer::setTerrainMaterials(const SceneBundle& layers)
     terrainTextures_.clear();
     for (std::uint32_t i = 0; i < 3; ++i) {
         const Texture& texture = layers.textures[i];
-        GpuImage image = ctx_.createImage({texture.width, texture.height}, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT, texture.mipCount);
+        GpuImage image;
+        const bool uploaded = ctx_.createTexture(image, texture);
         terrainTextures_.push_back(image);
-        if (image.image == VK_NULL_HANDLE || !ctx_.uploadTexture(terrainTextures_.back(), texture)) {
+        if (!uploaded) {
             return false;
         }
     }
@@ -1037,11 +1037,10 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
     };
 
     for (const Texture& texture : bundle.textures) {
-        const VkFormat format = texture.format == TextureFormat::Rgba8Srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
-        GpuImage image = ctx_.createImage({texture.width, texture.height}, format,
-            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT, texture.mipCount);
+        GpuImage image;
+        const bool uploaded = ctx_.createTexture(image, texture);
         textures_.push_back(image);
-        if (image.image == VK_NULL_HANDLE || !ctx_.uploadTexture(textures_.back(), texture)) {
+        if (!uploaded) {
             rollback();
             return false;
         }

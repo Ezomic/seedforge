@@ -586,6 +586,14 @@ Generated from `art/LICENSES.json` by `tools/check_assets_licensed.py --write-cr
 - Files: `art/surfaces/walls/T_WallS*.png`
 - Attribution: Batch 7 wall surfaces: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
 
+## bc7enc
+
+- Author: Richard Geldreich, Jr.
+- Licence: MIT
+- Source: https://github.com/richgel999/bc7enc
+- Files: `engine/assets/vendor/bc7enc/*`
+- Attribution: bc7enc, rgbcx and bc7decomp by Richard Geldreich, Jr. (https://github.com/richgel999/bc7enc), Copyright 2020, MIT License (also offered as public domain). Used by ichor_cook to block-compress textures.
+
 ## font_alegreya_sans
 
 - Author: The Alegreya Sans Project Authors
@@ -609,3 +617,11 @@ Generated from `art/LICENSES.json` by `tools/check_assets_licensed.py --write-cr
 - Source: https://kenney.nl/assets/fantasy-town-kit
 - Files: `art/settlement_kit/SM_Kenney*`
 - Attribution: Fantasy Town Kit 2.0 by Kenney (www.kenney.nl), CC0 1.0. The four SM_Kenney pieces are assembled from its modules by tools/build_kit_cc0.py.
+
+## texture_budget
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/texture_budget.json`
+- Attribution: Texture size table read by ichor_cook. First-party, all rights reserved.

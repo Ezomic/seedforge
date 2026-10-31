@@ -35,7 +35,9 @@ float4 main(PSIn i) : SV_Target
     if (push.params.z > 0.5) {
         const float3 t = normalize(i.tangent.xyz - n * dot(n, i.tangent.xyz));
         const float3 b = cross(n, t) * i.tangent.w;
-        const float3 tn = normalTex.Sample(materialSampler, i.uv).xyz * 2.0 - 1.0;
+        // Normal maps are stored as two channels (BC5), so the third is rebuilt from the first two.
+        const float2 tnXy = normalTex.Sample(materialSampler, i.uv).xy * 2.0 - 1.0;
+        const float3 tn = float3(tnXy, sqrt(saturate(1.0 - dot(tnXy, tnXy))));
         n = normalize(mul(tn, float3x3(t, b, n)));
     }
     return toneMap(applyFog(shade(i.worldPos, n, normalize(i.normal), baseColor, metallic, roughness), i.worldPos, i.clip.xy));

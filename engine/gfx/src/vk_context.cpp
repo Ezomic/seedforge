@@ -1,6 +1,7 @@
 #include "ichor/gfx/vk_context.h"
 
 #include "ichor/assets/bundle.h"
+#include "ichor/assets/texture_cook.h"
 #include "ichor/core/log.h"
 
 #include <SDL3/SDL.h>
@@ -15,6 +16,7 @@ namespace ichor {
 
 namespace {
 std::filesystem::path g_shaderDirectory = ICHOR_SHADER_DIR;
+bool g_blockCompressionAllowed = true;
 }
 
 void setShaderDirectory(std::filesystem::path directory)
@@ -25,6 +27,11 @@ void setShaderDirectory(std::filesystem::path directory)
 const std::filesystem::path& shaderDirectory()
 {
     return g_shaderDirectory;
+}
+
+void setBlockCompressionAllowed(bool allowed)
+{
+    g_blockCompressionAllowed = allowed;
 }
 
 bool vkCheck(VkResult result, const char* what)
@@ -123,13 +130,22 @@ bool VulkanContext::init(SDL_Window* window, bool validation)
         return false;
     }
 
+    // BC7, BC5 and BC4 are optional: without them the renderer decodes compressed textures to RGBA8 before upload.
+    VkPhysicalDeviceFeatures optionalFeatures{};
+    optionalFeatures.textureCompressionBC = VK_TRUE;
+    blockCompression_ = physicalResult.value().enable_features_if_present(optionalFeatures);
+    if (const char* off = SDL_getenv("ICHOR_NO_BC"); !g_blockCompressionAllowed || (off != nullptr && off[0] == '1')) {
+        blockCompression_ = false;
+    }
+
     auto deviceResult = vkb::DeviceBuilder{physicalResult.value()}.build();
     if (!deviceResult) {
         logf(LogLevel::Error, "vulkan device: {}", deviceResult.error().message());
         return false;
     }
     device_ = deviceResult.value();
-    logf(LogLevel::Info, "vulkan device: {}{}", device_.physical_device.name, headless ? " (headless)" : "");
+    logf(LogLevel::Info, "vulkan device: {}{}, block-compressed textures {}", device_.physical_device.name, headless ? " (headless)" : "",
+        blockCompression_ ? "sampled directly" : "decoded to RGBA8");
 
     auto queueResult = device_.get_queue(vkb::QueueType::graphics);
     auto familyResult = device_.get_queue_index(vkb::QueueType::graphics);
@@ -206,7 +222,7 @@ bool VulkanContext::uploadBuffer(GpuBuffer& dst, const void* data, VkDeviceSize 
 }
 
 GpuImage VulkanContext::createImage(VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect,
-    std::uint32_t mipLevels, std::uint32_t layers)
+    std::uint32_t mipLevels, std::uint32_t layers, VkComponentMapping swizzle)
 {
     GpuImage image;
     image.format = format;
@@ -234,6 +250,7 @@ GpuImage VulkanContext::createImage(VkExtent2D extent, VkFormat format, VkImageU
     viewInfo.image = image.image;
     viewInfo.viewType = layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
+    viewInfo.components = swizzle;
     viewInfo.subresourceRange = {aspect, 0, mipLevels, 0, layers};
     if (!vkCheck(vkCreateImageView(device_.device, &viewInfo, nullptr, &image.view), "vkCreateImageView")) {
         destroyImage(image);
@@ -284,7 +301,7 @@ bool VulkanContext::uploadTexture(GpuImage& dst, const Texture& texture)
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip, 0, 1};
         region.imageExtent = {w, h, 1};
         regions.push_back(region);
-        offset += static_cast<VkDeviceSize>(w) * h * 4;
+        offset += mipByteSize(texture.format, w, h);
         w = std::max(1u, w / 2);
         h = std::max(1u, h / 2);
     }
@@ -299,6 +316,31 @@ bool VulkanContext::uploadTexture(GpuImage& dst, const Texture& texture)
     });
     destroyBuffer(staging);
     return ok;
+}
+
+bool VulkanContext::createTexture(GpuImage& dst, const Texture& source)
+{
+    Texture decoded;
+    const Texture* texture = textureForDevice(source, blockCompression_, decoded);
+    if (texture == nullptr) {
+        return false;
+    }
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkComponentMapping swizzle{};
+    switch (texture->format) {
+    case TextureFormat::Rgba8Srgb: format = VK_FORMAT_R8G8B8A8_SRGB; break;
+    case TextureFormat::Bc7Srgb: format = VK_FORMAT_BC7_SRGB_BLOCK; break;
+    case TextureFormat::Bc7Unorm: format = VK_FORMAT_BC7_UNORM_BLOCK; break;
+    case TextureFormat::Bc5Unorm: format = VK_FORMAT_BC5_UNORM_BLOCK; break;
+    case TextureFormat::Bc4Unorm:
+        format = VK_FORMAT_BC4_UNORM_BLOCK;
+        swizzle = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE};
+        break;
+    default: break;
+    }
+    dst = createImage({texture->width, texture->height}, format, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
+        texture->mipCount, 1, swizzle);
+    return dst.image != VK_NULL_HANDLE && uploadTexture(dst, *texture);
 }
 
 bool VulkanContext::immediate(const std::function<void(VkCommandBuffer)>& record)
