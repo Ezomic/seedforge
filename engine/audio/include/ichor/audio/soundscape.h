@@ -24,6 +24,9 @@ enum class SoundSurface : std::uint8_t { Grass, Rock, Road, Water, Snow };
 
 constexpr std::size_t kSoundSurfaceCount = 5;
 
+// The step set a surface without one of its own falls back to.
+constexpr SoundSurface kFallbackSoundSurface = SoundSurface::Grass;
+
 constexpr float kWaterSurfaceDepth = 0.05f;
 constexpr float kRoadSurfaceCoverage = 0.5f;
 
@@ -96,7 +99,9 @@ std::vector<BedGain> biomeBeds(const Soundscape& soundscape, std::string_view bi
 // steps a gain.
 std::vector<BedGain> blendedBeds(const Soundscape& soundscape, std::string_view primary, std::string_view secondary, float weight, float hour);
 
-// The footstep for a surface, nullopt when the soundscape has none (silence).
+// The footstep for a surface. Water is always silent (wading has its own splash). A surface with no
+// usable step of its own (missing, or an unknown value) plays the kFallbackSoundSurface set instead;
+// nullopt only when that set is missing too.
 std::optional<StepSound> footstepFor(const Soundscape& soundscape, SoundSurface surface);
 
 // The settlement type a biome gives its settlements; an unknown biome is Inland.

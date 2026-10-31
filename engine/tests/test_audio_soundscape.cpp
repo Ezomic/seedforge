@@ -145,7 +145,8 @@ TEST_CASE("the selection is a pure table of biome, surface and hour")
     REQUIRE(biomeBeds(Soundscape{}, "forest", 12.0f).empty());
 
     REQUIRE(footstepFor(soundscape, SoundSurface::Grass)->clip == "step_grass");
-    REQUIRE_FALSE(footstepFor(soundscape, SoundSurface::Rock).has_value());
+    REQUIRE(footstepFor(soundscape, SoundSurface::Rock)->clip == "step_grass");
+    REQUIRE_FALSE(footstepFor(soundscape, SoundSurface::Water).has_value());
 }
 
 TEST_CASE("a clip named by two slots adds up and stays in range")
