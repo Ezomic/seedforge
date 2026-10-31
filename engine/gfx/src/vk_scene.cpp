@@ -3,6 +3,7 @@
 #include "ichor/gfx/cloud_shadow.h"
 #include "ichor/gfx/renderer.h"
 
+#include "ichor/assets/body_regions.h"
 #include "ichor/assets/bundle.h"
 #include "ichor/core/log.h"
 
@@ -1091,7 +1092,7 @@ bool SceneRenderer::uploadBundle(const SceneBundle& bundle)
         gpu.vertices = ctx_.createBuffer(vertexBytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VulkanContext::HostAccess::None);
         gpu.indices = ctx_.createBuffer(indexBytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VulkanContext::HostAccess::None);
         for (const Submesh& sub : mesh.submeshes) {
-            gpu.submeshes.push_back({sub.firstIndex, sub.indexCount, std::min<std::uint32_t>(materialBase + sub.material, static_cast<std::uint32_t>(materials_.size()) - 1)});
+            gpu.submeshes.push_back({sub.firstIndex, sub.indexCount, std::min<std::uint32_t>(materialBase + sub.material, static_cast<std::uint32_t>(materials_.size()) - 1), regionBit(regionName(sub))});
         }
         gpu.jointCount = mesh.skeleton != kNoSkeleton ? static_cast<std::uint32_t>(bundle.skeletons[mesh.skeleton].jointNames.size()) : 0u;
         meshes_.push_back(std::move(gpu));
@@ -1284,6 +1285,9 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices.buffer, &offset);
             vkCmdBindIndexBuffer(cmd, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
             for (const auto& sub : mesh.submeshes) {
+                if ((sub[3] & instance.hiddenRegions) != 0) {
+                    continue;
+                }
                 const MaterialConstants& material = materials_[sub[2]];
                 push.baseColorFactor = material.baseColorFactor;
                 push.params = glm::vec4(material.metallic, material.roughness, material.hasNormalMap ? 1.0f : 0.0f, static_cast<float>(cascade));

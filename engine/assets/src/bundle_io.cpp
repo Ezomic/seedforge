@@ -16,7 +16,7 @@ namespace ichor {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'C', 'N'};
-constexpr std::uint32_t kVersion = 3;
+constexpr std::uint32_t kVersion = 4;
 // Sockets, LOD groups and collision follow the nodes under this tag, and only when there are any,
 // so a bundle without them is the same bytes it always was.
 constexpr std::array<char, 4> kPieceTag{'I', 'P', 'C', '1'};
