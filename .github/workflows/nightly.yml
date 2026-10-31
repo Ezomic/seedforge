@@ -20,6 +20,9 @@ on:
       sweep_seeds:
         description: axiom pair sweep seeds, N or N-M
         default: "1-8"
+      soak_memory_seconds:
+        description: wall seconds the memory soak walks for
+        default: "600"
       play_seeds:
         description: playthrough bot world seeds, comma separated
         default: "2"
@@ -265,6 +268,75 @@ jobs:
             axiom-sweep/*/manifest.json
             axiom-sweep/*/validation.json
           if-no-files-found: ignore
+
+  memory-soak:
+    # SEED-711: a long headless session (the walk bot over every cell of the forged world, round and round) with the resident
+    # set sampled once a second; red when the curve keeps growing after the ring is warm. Release without sanitizers: ASan's
+    # shadow and quarantine would be most of the number. Never on a pull request: the test is skipped without the budget.
+    name: memory soak (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      ICHOR_SOAK_MEMORY_SECONDS: ${{ inputs.soak_memory_seconds || '600' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-walk-${{ github.sha }}
+          restore-keys: |
+            ccache-walk-
+            ccache-asan-
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target ichor_tests_world
+        working-directory: engine
+      - name: Memory soak
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/tests/ichor_tests_world "soak: a long headless session*" | tee soak-memory.log
+      - name: Memory curve
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Memory soak"
+            echo '```'
+            grep -E '^SOAK memory|FAILED|failed' soak-memory.log || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload soak log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-memory-soak-log
+          path: soak-memory.log
+          if-no-files-found: ignore
+
 
   playthrough-bot:
     # SEED-748: the walk bot carried on into a whole errand (talk, accept, fight, loot, save, quit, load) in one headless run per
