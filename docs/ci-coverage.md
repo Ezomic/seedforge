@@ -71,6 +71,14 @@ A seed with no second settlement 60 m or more from the spawn settlement prints `
 
 On failure the job summary lists the `WALK` lines, and `walk.log` is uploaded as `nightly-walk-log` (also on success). Run it locally with `bin/build ichor_tests_world`, then `ICHOR_NIGHTLY_WALK_GRIDS=256,1024 engine/build/windows-ci/tests/ichor_tests_world "nightly: the walk bot*"`.
 
+## Memory soak (SEED-711)
+
+A fourth nightly job, `memory-soak`, runs the one case `soak: a long headless session over the forged world stops growing once the streaming ring is warm` (`engine/tests/test_forged_soak_memory.cpp`). Streaming and the per-cell payloads could leak over a session and no PR run lasts long enough to see it. The walk bot walks a serpentine over every cell of the seed 1 world at the player's pace, round and round, for `ICHOR_SOAK_MEMORY_SECONDS` of wall time (600 in the workflow, the `soak_memory_seconds` input of a manual run); the streamer follows it with the full payloads (terrain, trees, water, the placed objects), each cell's collision heights go in and out of a physics world as in the app, and the resident set (`engine/tests/resident_memory.h`: the working set on Windows, VmRSS on Linux) is sampled once a second.
+
+The verdict is on the shape of the curve: the mean of the last quarter of the samples must sit no more than 5 percent (at least 16 MB) above the mean of the third quarter, the session must have crossed at least 40 cell boundaries, and every load must be matched by an unload or a resident cell. The hidden case `[.soak_memory_leak_probe]` runs the same session keeping every unloaded cell and must fail the verdict, which is how the metric is known to go red. The log prints one `SOAK memory:` line with the quarter means, the slope of each half in MB a minute, the crossings, loads and unloads, then one `SOAK sample` line per second; the job summary shows the first and `soak-memory.log` is uploaded as `nightly-memory-soak-log`.
+
+Like the walk job it builds Release without sanitizers, because under ASan the shadow and quarantine are most of the number. The case is skipped in every normal `ctest` run and never runs on a pull request. Run it locally with `bin/build ichor_tests_world`, then `ICHOR_SOAK_MEMORY_SECONDS=300 engine/build/windows-ci/tests/ichor_tests_world "soak: a long headless session*"`.
+
 ## Test-time budget (SEED-658)
 
 Main went red twice because one test ran too close to the sanitizer timeout (the SEED-492 walk test on the SEED-556 worlds, and the SEED-650 live-worlds probe, which timed out at 1500 s). `tools/test_times.py` reads the per-test durations of a ctest run, prints the 20 slowest cases, and fails when a case exceeds its budget:
