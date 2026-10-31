@@ -60,3 +60,6 @@
 
 # Build wrapper must keep LF endings for bash
 bin/* text eol=lf
+
+# Save slot fixtures are binary, whatever git detects
+*.sav     binary

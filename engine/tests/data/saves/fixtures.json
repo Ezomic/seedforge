@@ -1,0 +1,23 @@
+{
+  "format1.sav": {
+    "format": 1,
+    "refused": "corrupt",
+    "note": "The current reader checks the 64-byte format 2 header and its checksum before it trusts the format field, so a real format 1 file (56-byte header) reads as corrupt rather than as an unsupported version. Change to \"unsupported\" once the reader recognises the format 1 layout.",
+    "made": "ichor_tests built from commit 392724e6 (the first slot writer, format 1: 56-byte header, snapshot only, checksum over the payload), through a throwaway test_fixture_writer.cpp in a worktree of that commit",
+    "seed": 5,
+    "tick": 30,
+    "stateHash": "1ab099dbc66745f7",
+    "chronicle": []
+  },
+  "format2.sav": {
+    "format": 2,
+    "made": "SaveSlots::save of this build, through ICHOR_UPDATE_SAVE_FIXTURES=1 in test_save_fixtures.cpp",
+    "seed": 5,
+    "tick": 30,
+    "stateHash": "1ab099dbc66745f7",
+    "chronicle": [
+      "0 founded The well was dug",
+      "12 arrival A cart came up the road"
+    ]
+  }
+}
