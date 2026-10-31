@@ -1,5 +1,6 @@
 #include "forged_world_fixture.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/data/data_set.h"
 #include "ichor/save/campaign.h"
 #include "ichor/save/save_slots.h"

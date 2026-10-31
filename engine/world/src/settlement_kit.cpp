@@ -1,5 +1,6 @@
 #include "ichor/world/settlement_kit.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/cooker.h"
 #include "ichor/core/log.h"
 #include "ichor/world/settlement_streets.h"

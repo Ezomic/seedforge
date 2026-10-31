@@ -1,3 +1,4 @@
+#include "ichor/assets/bundle.h"
 #include "ichor/stage0/audio_cue_audit.h"
 
 #include "ichor/audio/mixer.h"

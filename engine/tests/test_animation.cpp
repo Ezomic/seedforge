@@ -1,4 +1,5 @@
 #include "ichor/anim/animation.h"
+#include "ichor/assets/bundle.h"
 #include "ichor/assets/bundle_io.h"
 #include "ichor/assets/cooker.h"
 #include "test_temp.h"

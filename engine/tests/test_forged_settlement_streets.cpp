@@ -1,5 +1,6 @@
 #include "forged_world_fixture.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/world/forged_game.h"
 #include "ichor/world/forged_roads.h"
 #include "ichor/world/placed_settlements.h"

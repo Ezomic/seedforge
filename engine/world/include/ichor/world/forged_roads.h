@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ichor/assets/bundle.h"
+#include "ichor/assets/bundle_types.h"
 #include "ichor/traversal/roads.h"
 #include "ichor/world/heightfield.h"
 

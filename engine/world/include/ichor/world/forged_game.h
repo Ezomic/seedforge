@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ichor/assets/bundle.h"
 #include "ichor/world/forge_job.h"
 #include "ichor/world/forged_biome.h"
 #include "ichor/world/forged_heightfield.h"

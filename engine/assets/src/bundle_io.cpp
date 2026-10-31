@@ -1,5 +1,6 @@
 #include "ichor/assets/bundle_io.h"
 
+#include "ichor/assets/bundle.h"
 #include "ichor/core/log.h"
 
 #include <algorithm>
