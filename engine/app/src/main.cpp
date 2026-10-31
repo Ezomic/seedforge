@@ -1211,10 +1211,6 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 }
                 const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
                 const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
-                // Wading has its own splash.
-                if (surface == ichor::SoundSurface::Water) {
-                    continue;
-                }
                 if (const auto step = ichor::footstepFor(soundscape, surface)) {
                     const std::uint32_t clip = audio.findSound(step->clip);
                     if (clip != ichor::Mixer::kNoSound) {
