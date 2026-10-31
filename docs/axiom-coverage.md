@@ -250,4 +250,3 @@ Axioms: 22. Triple synergies: 1.
 ## Triples
 
 - `flood_orichalcum_league` (flagship): `cataclysm.flood` + `law.orichalcum` + `powers.league`
-
