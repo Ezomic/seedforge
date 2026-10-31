@@ -1,5 +1,6 @@
 #include "ichor/ui/hud.h"
 
+#include "ichor/core/profile.h"
 #include "ichor/core/wading.h"
 
 #include <RmlUi/Core/Element.h>
@@ -190,6 +191,7 @@ void Hud::setGuide(const std::string& text)
 
 void Hud::update(float headingRadians, float hour, float wadingDepth, float health, float maxHealth)
 {
+    ICHOR_ZONE_N("ui.hud");
     if (compass_ != nullptr) {
         const std::string compass = compassLabel(headingRadians);
         if (compass != compassText_) {

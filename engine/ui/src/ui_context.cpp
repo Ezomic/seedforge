@@ -1,6 +1,7 @@
 #include "ichor/ui/ui_context.h"
 
 #include "ichor/core/log.h"
+#include "ichor/core/profile.h"
 
 #include <RmlUi/Core.h>
 
@@ -101,6 +102,7 @@ void UiContext::setSize(std::uint32_t width, std::uint32_t height)
 
 void UiContext::update(double elapsedSeconds)
 {
+    ICHOR_ZONE_N("ui.update");
     clock_ = elapsedSeconds;
     g_uiClock = clock_;
     if (context_ != nullptr) {
@@ -110,6 +112,7 @@ void UiContext::update(double elapsedSeconds)
 
 void UiContext::render()
 {
+    ICHOR_ZONE_N("ui.render");
     g_uiClock = clock_;
     if (context_ != nullptr) {
         context_->Render();
