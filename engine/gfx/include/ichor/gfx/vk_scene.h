@@ -31,6 +31,10 @@ public:
     bool uploadBundle(const SceneBundle& bundle);
     std::uint32_t meshCount() const { return static_cast<std::uint32_t>(meshes_.size()); }
 
+    // The resident texture budget over the bundle textures; see Renderer::setTextureBudget.
+    void setTextureBudget(std::uint64_t bytes) { residency_.setCap(bytes); }
+    TextureResidencyStats textureStats() const { return residency_.stats(); }
+
     bool setTerrainMaterials(const SceneBundle& layers);
     bool setVegetationMeshes(const SceneBundle& trees, std::uint32_t unblendedKinds = 0);
     std::uint32_t uploadVegetationCell(const std::vector<PlantInstance>& plants);
@@ -107,6 +111,16 @@ private:
     GpuImage whiteTexture_;
     GpuImage flatNormalTexture_;
     std::vector<GpuImage> textures_;
+    // The budget (SEED-690): each bundle texture is kept on the CPU to upload again after an eviction, and is on the
+    // device either in full or as its mip tail. Materials remember their textures so their sets can be rewritten.
+    std::vector<Texture> textureSources_;
+    std::vector<bool> textureFull_;
+    std::vector<std::array<std::uint32_t, 3>> materialTextures_;
+    TextureResidency residency_;
+    void writeMaterialSet(VkDescriptorSet set, const std::array<std::uint32_t, 3>& textures);
+    bool swapTextureImage(std::uint32_t texture, bool full);
+    void applyResidency(const std::vector<std::uint32_t>& changed);
+    void touchTextures(const RenderView& view);
     std::vector<VkDescriptorSet> materialSets_;
     struct MaterialConstants {
         glm::vec4 baseColorFactor{1.0f};

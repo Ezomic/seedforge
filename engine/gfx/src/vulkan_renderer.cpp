@@ -330,6 +330,18 @@ const std::vector<Renderer::GpuPassTime>& VulkanRenderer::gpuPasses() const
     return impl_->scene->gpuPasses();
 }
 
+void VulkanRenderer::setTextureBudget(std::uint64_t bytes)
+{
+    if (impl_->scene) {
+        impl_->scene->setTextureBudget(bytes);
+    }
+}
+
+TextureResidencyStats VulkanRenderer::textureStats() const
+{
+    return impl_->scene ? impl_->scene->textureStats() : TextureResidencyStats{};
+}
+
 bool VulkanRenderer::reloadShaders()
 {
     return impl_->scene->reloadPipelines();

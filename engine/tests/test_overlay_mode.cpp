@@ -98,7 +98,7 @@ TEST_CASE("the engine draws no overlay lines when off, one when compact and the 
     engine.setOverlayMode(OverlayMode::Compact);
     REQUIRE(linesInOneFrame() == 1);
     engine.setOverlayMode(OverlayMode::Full);
-    REQUIRE(linesInOneFrame() == 4);
+    REQUIRE(linesInOneFrame() == 5);
 }
 
 TEST_CASE("pressing F3 in the engine steps the overlay and a held key steps it once")

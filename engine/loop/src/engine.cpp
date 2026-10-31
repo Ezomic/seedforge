@@ -119,6 +119,9 @@ bool Engine::frame(double frameSeconds)
             replaying_ ? "  [replay]" : recording_ ? "  [rec]" : "", gated_ ? "  [loading]" : ""));
         renderer_.debugText(std::format("seed {}  state {:016x}  entities {}", scene_.seed(), scene_.stateHash(), scene_.registry().view<const StableId>().size()));
         renderer_.debugText("ms (mean/peak) " + stages_.summary());
+        const TextureResidencyStats textures = renderer_.textureStats();
+        renderer_.debugText(std::format("textures {:.1f} / {} MiB  {} of {} evicted  {:.1f} evictions/s", static_cast<double>(textures.usedBytes) / 1048576.0,
+            textures.capBytes >> 20, textures.evicted, textures.textures, textures.evictionsPerSecond));
     }
     if (overlayBuilder_ && overlayToggle_.mode == OverlayMode::Full) {
         overlay_.clear();

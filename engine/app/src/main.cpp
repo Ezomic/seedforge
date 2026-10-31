@@ -169,6 +169,7 @@ struct Options {
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
     ichor::CampaignWorldPlan campaignPlan; // what main() decided for `campaign` before run()
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
+    std::uint64_t textureBudgetMb = ichor::kDefaultTextureBudgetBytes >> 20; // --texture-budget-mb: resident texture bytes before the least recently drawn drop to their mip tail (SEED-690)
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
     std::optional<ichor::OverlayMode> overlay; // --overlay [off|compact|full]; none is compact in play and off for a screenshot
@@ -310,6 +311,8 @@ bool parse(int argc, char** argv, Options& options)
             options.screenshot = argv[++i];
         } else if (arg == "--frame-stats" && hasValue) {
             if (!parseNumber(argv[++i], options.frameStats)) return false;
+        } else if (arg == "--texture-budget-mb" && hasValue) {
+            if (!parseNumber(argv[++i], options.textureBudgetMb)) return false;
         } else if (arg == "--weather" && hasValue) {
             const std::string_view mode = argv[++i];
             if (mode != "rain" && mode != "dry") return false;
@@ -658,6 +661,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     if (!platform.init({.hidden = hidden}) || !renderer.init()) {
         return 1;
     }
+    renderer.setTextureBudget(options.textureBudgetMb << 20);
     if (!options.screenshot.empty()) {
         ichor::log(ichor::LogLevel::Info, hidden ? "screenshot: hidden window, fixed frame step, no pacing" : "screenshot: visible window, fixed frame step");
     }
@@ -2271,6 +2275,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return 1;
         }
     }
+    const ichor::TextureResidencyStats textures = renderer.textureStats();
+    ichor::logf(ichor::LogLevel::Info, "texture budget: {} of {} MiB resident, {} textures, {} evictions, {} reloads",
+        (textures.usedBytes + 1048575) >> 20, textures.capBytes >> 20, textures.textures, textures.evictions, textures.reloads);
     ichor::logf(ichor::LogLevel::Info, "exit after {} frames, {} ticks, state {:016x}",
         engine.frameCount(), engine.scene().tickCount(), engine.scene().stateHash());
     return 0;
@@ -2289,7 +2296,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe

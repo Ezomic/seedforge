@@ -51,6 +51,7 @@
     "skinning the first frame of idle leaves the Exile standing on the ground",
     "streaming keeps the ring resident across every cell boundary of the 4 km world and leaks nothing",
     "tectonics: land share still differs a lot from seed to seed",
+    "texture_budget_app",
     "the Bull-Warden cooks with its five clips and 27 joints",
     "the Exile loads with all nine clips and draws a body, a spear and a shield",
     "the Exile mesh is metric, upright, on the ground, facing -Z and fully skinned",
