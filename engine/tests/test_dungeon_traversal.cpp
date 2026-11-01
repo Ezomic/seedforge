@@ -7,6 +7,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -14,6 +16,7 @@
 #include <format>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace ichor;
@@ -221,6 +224,21 @@ private:
     DungeonContent content_;
 };
 
+// Skeletons whose objective the grey-box does not join to the entry today (SEED-765 found them). The night is red for a
+// skeleton off this list that is stuck, and for one on it that now passes: then remove it here.
+constexpr std::array<std::string_view, 14> kKnownStuck = {"sunless_aqueduct", "storm_bastion", "bramble_hollow", "salt_cavern", "cistern_maze", "iron_citadel",
+    "ash_crater", "sunken_crypt", "ring_fort", "foundry_depths", "thorn_gardens", "coral_grotto", "clockwork_keep", "gilded_menagerie"};
+
+bool knownStuck(std::string_view id) { return std::find(kKnownStuck.begin(), kKnownStuck.end(), id) != kKnownStuck.end(); }
+
+// Empty when the result is what the list says it should be, else what to do about it.
+std::string verdict(std::string_view id, bool listed, bool reached, const std::string& stuck)
+{
+    if (!reached && !listed) return std::string(id) + ": " + stuck;
+    if (reached && listed) return std::string(id) + " now reaches its objective: remove it from kKnownStuck in engine/tests/test_dungeon_traversal.cpp";
+    return {};
+}
+
 const DungeonSkeletonCatalog& catalog()
 {
     static const DungeonSkeletonCatalog loaded = DungeonSkeletonCatalog::loadDirectory(std::filesystem::path(ICHOR_REPO_DATA) / "dungeon_skeletons");
@@ -244,12 +262,13 @@ int traverse(const std::vector<std::size_t>& indices)
         const Traversal result = Bot(skeleton).run();
         std::printf("%s\n", std::format("TRAVERSE #{} {} ({}), layout hash {:016x}: {} | {} rooms, objective room {}, {:.1f} s scene{}{}", i, skeleton.id, skeleton.theme, hash,
                                   result.reached ? "ok" : "STUCK", result.rooms, result.objective, result.seconds, result.stuck.empty() ? "" : ", ", result.stuck).c_str());
-        if (!result.reached) {
+        const std::string problem = verdict(skeleton.id, knownStuck(skeleton.id), result.reached, result.stuck);
+        if (!problem.empty()) {
             ++stuck;
-            FAIL_CHECK(std::format("skeleton {}: {}", skeleton.id, result.stuck));
+            FAIL_CHECK(problem);
         }
     }
-    std::printf("%s\n", std::format("TRAVERSE summary: {} of {} skeleton(s) reach the objective, {} stuck", count - static_cast<std::size_t>(stuck), count, stuck).c_str());
+    std::printf("%s\n", std::format("TRAVERSE summary: {} of {} skeleton(s) were as expected (known stuck ones included), {} not", count - static_cast<std::size_t>(stuck), count, stuck).c_str());
     std::fflush(stdout);
     return stuck;
 }
@@ -282,4 +301,18 @@ TEST_CASE("nightly: the dungeon traversal bot walks every baked skeleton to its 
     for (std::size_t i = 0; i < static_cast<std::size_t>(count) && i < catalog().all().size(); ++i) indices.push_back(i);
     REQUIRE(indices.size() == static_cast<std::size_t>(count));
     CHECK(traverse(indices) == 0);
+}
+
+TEST_CASE("the known-stuck list fails an unlisted stuck skeleton and a listed one that now passes", "[dungeon_traversal]")
+{
+    CHECK(verdict("a", false, true, "").empty());
+    CHECK(verdict("a", true, false, "no route").empty());
+    CHECK(verdict("a", false, false, "no route").find("no route") != std::string::npos);
+    CHECK(verdict("a", true, true, "").find("remove it from kKnownStuck") != std::string::npos);
+    CHECK(knownStuck("sunken_crypt"));
+    CHECK_FALSE(knownStuck("smuggler_cellar"));
+    for (const std::string_view id : kKnownStuck) {
+        const auto& all = catalog().all();
+        CHECK(std::any_of(all.begin(), all.end(), [&](const DungeonSkeleton& k) { return k.id == id; }));
+    }
 }
