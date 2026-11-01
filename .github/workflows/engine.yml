@@ -82,6 +82,8 @@ jobs:
           python3 tools/check_data.py --self-test
           python3 tools/check_deps.py --root .
           python3 tools/check_deps.py --root . --self-test
+          python3 tools/bump_vcpkg.py --root . --check
+          python3 tools/bump_vcpkg.py --self-test
       - name: Dialogue coverage
         run: |
           python3 tools/dialogue_coverage.py --root . --report dialogue-coverage.md
