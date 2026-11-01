@@ -103,6 +103,7 @@
 #include <filesystem>
 #include <fstream>
 #include <format>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -1233,6 +1234,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     // sound of a settlement near it, and footsteps by surface. Audio only reads the scene, so none of it is sim state.
     // A bed or step whose clip does not exist is silent.
     ichor::Soundscape soundscape;
+    // A footfall at the player's feet. The cooked foot contacts of the drawn Exile call it from the render path while
+    // `markerFootsteps` holds; otherwise the distance pacer below decides when the feet land.
+    std::function<void(const glm::dvec3&)> playFootstep;
+    bool markerFootsteps = false;
     ichor::BedMixer bedMixer;
     std::vector<ichor::SettlementSoundType> settlementTypes;
     if (forged && forged->biomes) {
@@ -1243,19 +1248,21 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         for (const ichor::SettlementSite& site : forged->sites) {
             settlementTypes.push_back(ichor::settlementTypeForBiome(worldforge::kBiomeNames[static_cast<std::size_t>(forged->biomes->biomeAt(site.x, site.z))]));
         }
+        playFootstep = [&](const glm::dvec3& feet) {
+            const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
+            const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
+            if (const auto step = ichor::footstepFor(soundscape, surface)) {
+                const std::uint32_t clip = audio.findSound(step->clip);
+                if (clip != ichor::Mixer::kNoSound) {
+                    audio.play(clip, feet, false, step->gain);
+                }
+            }
+        };
         engine.scene().addSystem("footsteps", [&, pacer = ichor::FootstepPacer{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
             for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
                 const glm::dvec3& feet = transform.position;
-                if (!pacer.step(feet.x, feet.z)) {
-                    continue;
-                }
-                const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
-                const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
-                if (const auto step = ichor::footstepFor(soundscape, surface)) {
-                    const std::uint32_t clip = audio.findSound(step->clip);
-                    if (clip != ichor::Mixer::kNoSound) {
-                        audio.play(clip, feet, false, step->gain);
-                    }
+                if (pacer.step(feet.x, feet.z) && !markerFootsteps) {
+                    playFootstep(feet);
                 }
             }
         });
@@ -1740,9 +1747,15 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
             glm::dvec3 feet = blend(previous, transform).first;
             glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
+            markerFootsteps = false;
             if (exileAvatar.loaded() && !(combat && combat->live())) {
                 // The Exile walks in front of a camera behind it; the avatar is drawn only, so the sim never sees it.
                 feet = exileAvatar.appendPlayer(previous.position, transform.position, alpha, config.fixedDt, scene.time() + alpha * config.fixedDt, heightfield.heightAt(feet.x, feet.z), view);
+                const std::vector<std::uint32_t> footfalls = exileAvatar.takeFootfalls();
+                markerFootsteps = playFootstep && exileAvatar.hasFootContacts();
+                for (std::size_t i = 0; markerFootsteps && i < footfalls.size(); ++i) {
+                    playFootstep(feet);
+                }
                 eye = ichor::walkFollowPosition(feet, viewYaw);
                 eye.y = ichor::followClearY(eye.y, heightfield.heightAt(eye.x, eye.z));
             }

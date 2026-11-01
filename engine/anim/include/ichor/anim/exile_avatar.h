@@ -46,6 +46,11 @@ float turnToward(float current, float target, float maxStep);
 // when it is further (off a ledge, on a roof). Not a number for the ground keeps the body's height.
 double avatarFeetHeight(double bodyY, double groundY);
 
+// The feet whose contact times lie in the stretch of a looping clip from `fromPhase` to `toPhase` (0..1 shares of the
+// clip; `toPhase` below `fromPhase` means the stretch wrapped past the end), in the order they land. A contact exactly
+// at `fromPhase` was counted by the stretch before.
+std::vector<std::uint32_t> footfallsBetween(const std::vector<FootContact>& contacts, float duration, float fromPhase, float toPhase);
+
 class ExileAvatar {
 public:
     // Readies the clips of an already cooked kit whose meshes sit in the renderer from `meshBase`.
@@ -57,6 +62,12 @@ public:
 
     // The skinning matrices of a clip at the current stride, with the root's ground travel taken out.
     bool pose(AvatarClip clip, std::vector<glm::mat4>& skin) const;
+
+    // Whether the walk and run clips carry foot contacts, so the stride can say when each foot lands.
+    bool hasFootContacts() const { return hasContacts_; }
+
+    // The feet that landed since the last call, in order, as the stride crossed their cooked contact times.
+    std::vector<std::uint32_t> takeFootfalls();
 
     // Advances, then appends the body and props standing at `feet`, turned by `yaw`.
     void append(glm::dvec3 feet, float yaw, float speed, double seconds, RenderView& view);
@@ -78,6 +89,8 @@ private:
     std::array<std::uint32_t, static_cast<std::size_t>(AvatarClip::Count)> clips_{};
     std::array<float, static_cast<std::size_t>(AvatarClip::Count)> travelSpeed_{};
     float phase_ = 0.0f;
+    bool hasContacts_ = false;
+    std::vector<std::uint32_t> footfalls_;
     float yaw_ = 0.0f;
     double lastSeconds_ = 0.0;
     bool hasSeconds_ = false;
