@@ -266,6 +266,9 @@ TEST_CASE("the allocation hook sees a known allocation", "[forge_perf]")
     {
         std::vector<std::uint8_t> v(1 << 20);
         v[0] = 1;
+        // A release build drops an allocation nothing observes, so the pointer has to escape.
+        static const volatile void* sink;
+        sink = v.data();
     }
     CHECK(alloc.total >= (1u << 20));
     CHECK(alloc.worst >= (1u << 20));
