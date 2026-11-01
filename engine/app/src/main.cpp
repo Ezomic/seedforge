@@ -147,6 +147,7 @@ struct Options {
     bool ironman = false;
     bool editor = false;
     bool showMap = false;
+    bool showPause = false;
     int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
@@ -321,6 +322,8 @@ bool parse(int argc, char** argv, Options& options)
             options.editor = true;
         } else if (arg == "--map") {
             options.showMap = true;
+        } else if (arg == "--pause") {
+            options.showPause = true;
         } else if (arg == "--map-explore" && hasValue) {
             if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
         } else if (arg == "--new-game") {
@@ -1482,6 +1485,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             pauseMenu->setFullscreen(platform.fullscreen());
             pauseMenu->setResolution(shownResolution().width, shownResolution().height);
             pauseMenu->setVsync(settings.vsync);
+            pauseMenu->setUiScale(settings.uiScale);
+            pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+            ui->setScale(settings.uiScale);
+            renderer.setUiScale(settings.uiScale);
+            mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
@@ -1523,6 +1531,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
+        }
+        if (options.showPause && !editing) {
+            paused = true;
+            pauseMenu->setVisible(true);
         }
         if (options.showNewGame && !editing) {
             ichor::AxiomSet axioms;
@@ -2059,6 +2071,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 pauseMenu->setVsync(settings.vsync);
                 persistSettings();
             }
+            if (const int steps = pauseMenu->takeUiScaleSteps(); steps != 0) {
+                settings = ichor::stepUiScale(settings, steps);
+                ui->setScale(settings.uiScale);
+                renderer.setUiScale(settings.uiScale);
+                pauseMenu->setUiScale(settings.uiScale);
+                persistSettings();
+            }
+            if (pauseMenu->takePaletteClicks() % 2 == 1) {
+                settings.palette = settings.palette == ichor::ColourPalette::ColourblindSafe ? ichor::ColourPalette::Default : ichor::ColourPalette::ColourblindSafe;
+                mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+                pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+                persistSettings();
+            }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
             }
@@ -2303,7 +2328,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe

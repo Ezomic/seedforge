@@ -45,6 +45,18 @@ constexpr std::array<Colour, 8> kFactionColours = {{
 
 constexpr Colour kFord{250, 250, 250}; // a road on a river; it stays visible when cells share a pixel
 constexpr Colour kRiver{40, 120, 255};
+// Okabe-Ito, the set chosen to stay apart under every common colour vision deficiency.
+constexpr std::array<Colour, 8> kColourblindFactionColours = {{
+    {213, 94, 0},
+    {0, 114, 178},
+    {240, 228, 66},
+    {0, 158, 115},
+    {204, 121, 167},
+    {230, 159, 0},
+    {86, 180, 233},
+    {153, 153, 153},
+}};
+
 constexpr Colour kRoadHalo{244, 226, 170};
 constexpr Colour kLake{96, 170, 255}; // lighter than a river so a lake reads as a body of water
 constexpr std::uint8_t kBiomeAlpha = 120;
@@ -187,12 +199,16 @@ MapLayerStack::MapLayerStack(MapImage base, const worldforge::ForgedWorld& world
     }
     const auto& politics = world.politics();
     if (politics && gridUsable(politics->width, politics->height, politics->owner.size())) {
-        overlay_[slot(MapLayer::Territories)] = sampledOverlay(side, politics->width, politics->height, [&](Overlay& o, std::size_t pixel, std::size_t cell) {
-            const std::uint8_t owner = politics->owner[cell];
-            if (owner != worldforge::kPoliticsNoOwner) {
-                put(o, pixel, kFactionColours[owner % kFactionColours.size()], kTerritoryAlpha);
-            }
-        });
+        const auto territories = [&](const std::array<Colour, 8>& colours) {
+            return sampledOverlay(side, politics->width, politics->height, [&](Overlay& o, std::size_t pixel, std::size_t cell) {
+                const std::uint8_t owner = politics->owner[cell];
+                if (owner != worldforge::kPoliticsNoOwner) {
+                    put(o, pixel, colours[owner % colours.size()], kTerritoryAlpha);
+                }
+            });
+        };
+        overlay_[slot(MapLayer::Territories)] = territories(kFactionColours);
+        colourblindTerritories_ = territories(kColourblindFactionColours);
     }
     const auto& hydrology = world.hydrology();
     if (hydrology && gridUsable(hydrology->width, hydrology->height, hydrology->river.size())) {
@@ -217,7 +233,7 @@ MapLayerStack::MapLayerStack(MapImage base, const worldforge::ForgedWorld& world
     }
 }
 
-MapImage MapLayerStack::composite(MapLayerSet layers) const
+MapImage MapLayerStack::composite(MapLayerSet layers, bool colourblindSafe) const
 {
     if (base_.empty()) {
         return MapImage{};
@@ -227,7 +243,8 @@ MapImage MapLayerStack::composite(MapLayerSet layers) const
         if (!layers.on(static_cast<MapLayer>(layer)) || !present_[layer]) {
             continue;
         }
-        const Overlay& overlay = overlay_[layer];
+        const bool swapped = colourblindSafe && layer == slot(MapLayer::Territories);
+        const Overlay& overlay = swapped ? colourblindTerritories_ : overlay_[layer];
         for (std::size_t i = 0; i + 3 < out.rgba.size(); i += 4) {
             const unsigned alpha = overlay[i + 3];
             if (alpha == 0) {
