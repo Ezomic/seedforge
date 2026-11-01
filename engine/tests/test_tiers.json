@@ -48,6 +48,7 @@
     "landmark coverage passes on the first attempt at 128 and 256 for seeds 1 to 8",
     "live worlds: a mostly ocean seed found by search scores below a balanced one",
     "live worlds: the probe finds a spawn, repeats itself, and the walk reaches a settlement on some seed",
+    "loading the cached forged world at 256 and 1024 stays within its budget",
     "no clip drags the hips off the ground or through it",
     "only the foe is replaced: its grey body is skipped and the Bull-Warden is added with a joint palette",
     "packaged_app_smoke",
