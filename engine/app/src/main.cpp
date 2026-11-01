@@ -76,6 +76,7 @@
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/dungeon_entry.h"
 #include "ichor/world/dungeon_reverb.h"
+#include "ichor/world/poi_discovery.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
@@ -838,6 +839,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::ForgedScenery scenery;
     std::set<std::string> bakedDungeons;
     std::unique_ptr<ichor::DungeonEntry> dungeonEntry;
+    std::unique_ptr<ichor::PoiDiscovery> poiDiscovery;
     std::unique_ptr<ichor::DungeonFight> dungeonFight; // SEED-648: the enemies in the dungeons, with --combat
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
@@ -1262,6 +1264,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // Streaming advances once per tick, so residency follows the path and
         // the budget alone. While the gate holds no ticks run, so it advances
         // the streamer itself until the required ring is in.
+        if (forged) {
+            poiDiscovery = std::make_unique<ichor::PoiDiscovery>(*forged);
+            poiDiscovery->install(engine.scene());
+        }
         if (dungeonEntry) {
             dungeonEntry->install(engine.scene());
             if (combat) {
@@ -1639,8 +1645,14 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     inventoryScreen->bind(ichor::buildInventoryScreen(carry->view(engine.scene()), carry->notice(engine.scene())));
                 }
                 if (characterScreen->visible()) {
-                    // The app has no progression state yet, so only health is known.
-                    characterScreen->bind({{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}});
+                    // Only health and the discovery XP are known: the app has no other progression state yet.
+                    ichor::CharacterScreenInput character{{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}};
+                    if (poiDiscovery) {
+                        for (const ichor::PoiDiscoveryEntry& entry : poiDiscovery->found(engine.scene())) {
+                            character.discoveries.push_back({entry.poiId, entry.xp});
+                        }
+                    }
+                    characterScreen->bind(character);
                 }
                 if (forged) {
                     const glm::dvec3 walker = playerPosition(engine.scene());
@@ -1854,6 +1866,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (const std::optional<double> yaw = dungeonEntry->takeViewYaw()) {
                 viewYaw = static_cast<float>(*yaw);
+            }
+        }
+        if (poiDiscovery && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
+            if (const std::string found = poiDiscovery->notice(scene); !found.empty()) {
+                hudGuide = found;
             }
         }
         if (carry && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
