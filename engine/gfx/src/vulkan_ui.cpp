@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 
 namespace ichor {
@@ -212,10 +213,11 @@ void VulkanUiRenderer::applyScissor()
 {
     VkRect2D rect{{0, 0}, extent_};
     if (scissorOn_) {
-        const int left = std::clamp(scissor_.Left(), 0, static_cast<int>(extent_.width));
-        const int top = std::clamp(scissor_.Top(), 0, static_cast<int>(extent_.height));
-        const int right = std::clamp(scissor_.Right(), left, static_cast<int>(extent_.width));
-        const int bottom = std::clamp(scissor_.Bottom(), top, static_cast<int>(extent_.height));
+        const auto drawn = [&](int value) { return static_cast<int>(std::lround(static_cast<float>(value) * scale_)); };
+        const int left = std::clamp(drawn(scissor_.Left()), 0, static_cast<int>(extent_.width));
+        const int top = std::clamp(drawn(scissor_.Top()), 0, static_cast<int>(extent_.height));
+        const int right = std::clamp(drawn(scissor_.Right()), left, static_cast<int>(extent_.width));
+        const int bottom = std::clamp(drawn(scissor_.Bottom()), top, static_cast<int>(extent_.height));
         rect = {{left, top}, {static_cast<std::uint32_t>(right - left), static_cast<std::uint32_t>(bottom - top)}};
     }
     vkCmdSetScissor(cmd_, 0, 1, &rect);
@@ -257,7 +259,7 @@ void VulkanUiRenderer::RenderGeometry(Rml::CompiledGeometryHandle geometry, Rml:
     if (found == geometry_.end() || image == textures_.end()) {
         return;
     }
-    const Push push{{translation.x, translation.y}, {static_cast<float>(extent_.width), static_cast<float>(extent_.height)}};
+    const Push push{{translation.x, translation.y}, {static_cast<float>(extent_.width) / scale_, static_cast<float>(extent_.height) / scale_}};
     vkCmdPushConstants(cmd_, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);
     vkCmdBindDescriptorSets(cmd_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &image->second.set, 0, nullptr);
     const VkDeviceSize offset = 0;

@@ -98,6 +98,8 @@ public:
     // is called inside the open pass, under the debug overlay. Neither runs while the
     // drawable is empty, as when the window is minimised.
     virtual Rml::RenderInterface* uiRenderInterface() { return nullptr; }
+    // How many times larger the UI is drawn; the caller gives its UI context the same scale.
+    virtual void setUiScale(float scale) { (void)scale; }
     virtual void setUiHooks(std::function<void(std::uint32_t, std::uint32_t)> update, std::function<void()> render)
     {
         (void)update;

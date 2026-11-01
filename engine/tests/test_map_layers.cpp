@@ -193,3 +193,19 @@ TEST_CASE("a lake is drawn on the water layer in a lighter blue than a river")
     }
     REQUIRE(lakePixels > 0);
 }
+
+TEST_CASE("the colourblind-safe palette recolours only the territories")
+{
+    const MapLayerStack stack(greyImage(kSide), fullWorld());
+    REQUIRE(stack.hasLayer(MapLayer::Territories));
+    const MapImage normal = stack.composite(only(MapLayer::Territories));
+    const MapImage safe = stack.composite(only(MapLayer::Territories), true);
+    REQUIRE(normal.rgba != safe.rgba);
+    REQUIRE(changedPixels(greyImage(kSide), safe) == changedPixels(greyImage(kSide), normal)); // the same cells, other colours
+
+    for (const MapLayer layer : {MapLayer::Biomes, MapLayer::Roads, MapLayer::Rivers}) {
+        REQUIRE(stack.composite(only(layer), true).rgba == stack.composite(only(layer)).rgba);
+    }
+    REQUIRE(stack.composite(MapLayerSet{}, true).rgba == stack.composite(MapLayerSet{}).rgba);
+    REQUIRE(stack.composite(only(MapLayer::Territories), false).rgba == normal.rgba);
+}

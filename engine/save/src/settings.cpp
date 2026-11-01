@@ -18,6 +18,7 @@ constexpr std::string_view kHeader = "ichor-settings 1";
 constexpr std::string_view kTrailer = "end";
 constexpr std::size_t kMaxBytes = 4096;
 constexpr float kMouseSensitivityStep = 0.1f;
+constexpr float kUiScaleStep = 0.25f;
 
 float clampField(float value, float low, float high, float fallback)
 {
@@ -56,6 +57,11 @@ std::string_view displayModeName(DisplayMode mode)
     return mode == DisplayMode::Fullscreen ? "fullscreen" : "windowed";
 }
 
+std::string_view paletteName(ColourPalette palette)
+{
+    return palette == ColourPalette::ColourblindSafe ? "colourblind" : "default";
+}
+
 bool parseFloat(std::string_view text, float& out)
 {
     const auto result = std::from_chars(text.data(), text.data() + text.size(), out);
@@ -72,7 +78,8 @@ Settings Settings::clamped() const
 {
     return {clampField(fovDegrees, kMinFovDegrees, kMaxFovDegrees, kDefaultFovDegrees),
             clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity), promptsSeen,
-            displayMode == DisplayMode::Fullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed, clampResolution(resolution), vsync};
+            displayMode == DisplayMode::Fullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed, clampResolution(resolution), vsync,
+            clampField(uiScale, kMinUiScale, kMaxUiScale, kDefaultUiScale), palette == ColourPalette::ColourblindSafe ? ColourPalette::ColourblindSafe : ColourPalette::Default};
 }
 
 float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override)
@@ -88,6 +95,16 @@ Settings stepMouseSensitivity(const Settings& stored, float current, int steps)
     }
     Settings stepped = stored;
     stepped.mouseSensitivity = std::round((current + static_cast<float>(steps) * kMouseSensitivityStep) * 10.0f) / 10.0f;
+    return stepped.clamped();
+}
+
+Settings stepUiScale(const Settings& stored, int steps)
+{
+    if (steps == 0) {
+        return stored;
+    }
+    Settings stepped = stored;
+    stepped.uiScale = std::round((stored.clamped().uiScale + static_cast<float>(steps) * kUiScaleStep) * 4.0f) / 4.0f;
     return stepped.clamped();
 }
 
@@ -111,8 +128,8 @@ Settings stepResolution(const Settings& stored, const std::vector<Resolution>& m
 std::string serializeSettings(const Settings& settings)
 {
     const Settings safe = settings.clamped();
-    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\ndisplay={}\nresolution={}x{}\nvsync={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen,
-        displayModeName(safe.displayMode), safe.resolution.width, safe.resolution.height, safe.vsync ? 1 : 0, kTrailer);
+    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\ndisplay={}\nresolution={}x{}\nvsync={}\nuiScale={}\npalette={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen,
+        displayModeName(safe.displayMode), safe.resolution.width, safe.resolution.height, safe.vsync ? 1 : 0, safe.uiScale, paletteName(safe.palette), kTrailer);
 }
 
 Settings parseSettings(std::string_view text)
@@ -151,6 +168,10 @@ Settings parseSettings(std::string_view text)
                 settings.vsync = rest == "1" ? true : rest == "0" ? false : Settings::kDefaultVsync;
                 continue;
             }
+            if (key == "palette") {
+                settings.palette = rest == "colourblind" ? ColourPalette::ColourblindSafe : ColourPalette::Default;
+                continue;
+            }
             if (key == "promptsSeen") {
                 const std::string_view digits = line.substr(equals + 1);
                 std::uint32_t flags = 0;
@@ -162,6 +183,8 @@ Settings parseSettings(std::string_view text)
             const bool valid = parseFloat(line.substr(equals + 1), value);
             if (key == "fov") {
                 settings.fovDegrees = valid ? value : Settings::kDefaultFovDegrees;
+            } else if (key == "uiScale") {
+                settings.uiScale = valid ? value : Settings::kDefaultUiScale;
             } else if (key == "mouseSensitivity") {
                 settings.mouseSensitivity = valid ? value : Settings::kDefaultMouseSensitivity;
             }

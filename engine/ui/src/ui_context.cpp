@@ -5,6 +5,7 @@
 
 #include <RmlUi/Core.h>
 
+#include <cmath>
 #include <string>
 
 namespace ichor {
@@ -95,8 +96,21 @@ void UiContext::unloadDocument(Rml::ElementDocument* document)
 
 void UiContext::setSize(std::uint32_t width, std::uint32_t height)
 {
+    width_ = width;
+    height_ = height;
     if (context_ != nullptr) {
-        context_->SetDimensions(Rml::Vector2i(static_cast<int>(width), static_cast<int>(height)));
+        context_->SetDimensions(Rml::Vector2i(static_cast<int>(std::lround(static_cast<float>(width) / scale_)), static_cast<int>(std::lround(static_cast<float>(height) / scale_))));
+    }
+}
+
+void UiContext::setScale(float scale)
+{
+    if (!std::isfinite(scale) || scale <= 0.0f || scale == scale_) {
+        return;
+    }
+    scale_ = scale;
+    if (width_ != 0 && height_ != 0) {
+        setSize(width_, height_);
     }
 }
 
@@ -121,7 +135,7 @@ void UiContext::render()
 
 bool UiContext::mouseMove(int x, int y)
 {
-    return context_ != nullptr && !context_->ProcessMouseMove(x, y, 0);
+    return context_ != nullptr && !context_->ProcessMouseMove(static_cast<int>(std::lround(static_cast<float>(x) / scale_)), static_cast<int>(std::lround(static_cast<float>(y) / scale_)), 0);
 }
 
 void UiContext::mouseLeave()

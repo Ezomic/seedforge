@@ -49,6 +49,7 @@ enum class LoadStatus {
 struct LoadResult {
     LoadStatus status = LoadStatus::NoSuchSlot;
     bool fromBackup = false;     // the newest slot file was bad and a backup was used
+    std::uint32_t backupIndex = 0; // which backup, 1 the newest; 0 when the slot file itself loaded
     bool dataChanged = false;    // loaded, but the data layer differs from when it was saved
     SlotInfo info;
     Chronicle chronicle;         // the story up to the moment of the save
@@ -56,6 +57,9 @@ struct LoadResult {
     std::uint32_t savedFormat = 0;  // the format of the file an UnsupportedVersion or MigrationFailed refusal was about
     bool chronicleDamaged = false; // the slot held a chronicle that could not be read, so it came back empty
 };
+
+// The line the player is shown at startup when a slot came back from a backup; empty when the slot file itself loaded.
+std::string restoreNotice(std::string_view slot, const LoadResult& result);
 
 class SaveSlots {
 public:

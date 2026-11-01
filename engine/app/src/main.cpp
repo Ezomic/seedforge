@@ -34,6 +34,7 @@
 #include "ichor/ui/hud.h"
 #include "ichor/ui/prompt_screen.h"
 #include "ichor/ui/note_box.h"
+#include "ichor/ui/notice_screen.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/traversal/roads.h"
@@ -116,6 +117,7 @@
 namespace {
 
 constexpr float kFovStepDegrees = 5.0f;
+constexpr double kStartupNoticeSeconds = 8.0;
 
 struct Options {
     bool headless = false;
@@ -149,6 +151,7 @@ struct Options {
     bool ironman = false;
     bool editor = false;
     bool showMap = false;
+    bool showPause = false;
     int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
@@ -323,6 +326,8 @@ bool parse(int argc, char** argv, Options& options)
             options.editor = true;
         } else if (arg == "--map") {
             options.showMap = true;
+        } else if (arg == "--pause") {
+            options.showPause = true;
         } else if (arg == "--map-explore" && hasValue) {
             if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
         } else if (arg == "--new-game") {
@@ -1094,6 +1099,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         parley->install(engine.scene());
     }
 
+    std::string startupNotice;
+    std::uint64_t startupNoticeTick = 0;
     if (!options.loadSlot.empty()) {
         const ichor::LoadResult loaded = slots.load(options.loadSlot, engine.scene(), saveContext());
         if (loaded.status != ichor::LoadStatus::Loaded) {
@@ -1104,6 +1111,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (loaded.chronicleDamaged) {
             ichor::log(ichor::LogLevel::Warn, "the slot's chronicle was unreadable and starts empty");
         }
+        startupNotice = ichor::restoreNotice(options.loadSlot, loaded);
+        startupNoticeTick = engine.scene().tickCount();
         ichor::logf(ichor::LogLevel::Info, "slot '{}' loaded at tick {}{}{}", options.loadSlot, loaded.info.tick, loaded.fromBackup ? ", from a backup" : "",
             loaded.dataChanged ? ", data has changed since it was saved" : "");
     } else if (!options.load.empty()) {
@@ -1434,6 +1443,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::FirstPrompts firstPrompts{.seen = settings.promptsSeen};
     bool promptHeld = true;
     std::unique_ptr<ichor::NoteBox> noteBox;
+    std::unique_ptr<ichor::NoticeScreen> noticeScreen;
     ichor::FeedbackPrompt notePrompt;
     bool noteShown = false; // from the frame after F8, so the note's screenshot is of the game, not the box
     bool paused = false;
@@ -1489,16 +1499,23 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             pauseMenu->setFullscreen(platform.fullscreen());
             pauseMenu->setResolution(shownResolution().width, shownResolution().height);
             pauseMenu->setVsync(settings.vsync);
+            pauseMenu->setUiScale(settings.uiScale);
+            pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+            ui->setScale(settings.uiScale);
+            renderer.setUiScale(settings.uiScale);
+            mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
             deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
             promptScreen = std::make_unique<ichor::PromptScreen>(*ui);
             noteBox = std::make_unique<ichor::NoteBox>(*ui);
+            noticeScreen = std::make_unique<ichor::NoticeScreen>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             promptScreen.reset();
+            noticeScreen.reset();
             noteBox.reset();
             deathScreen.reset();
             captionScreen.reset();
@@ -1530,6 +1547,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
+        }
+        if (options.showPause && !editing) {
+            paused = true;
+            pauseMenu->setVisible(true);
         }
         if (options.showNewGame && !editing) {
             ichor::AxiomSet axioms;
@@ -1581,6 +1602,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 }
                 if (promptScreen) {
                     promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld));
+                }
+                if (noticeScreen) {
+                    noticeScreen->bind(!startupNotice.empty() && static_cast<double>(engine.scene().tickCount() - startupNoticeTick) * config.fixedDt < kStartupNoticeSeconds ? std::optional<std::string>(startupNotice) : std::nullopt);
                 }
                 if (noteBox) {
                     noteBox->bind(notePrompt.open() && noteShown ? std::optional<std::string>(notePrompt.text()) : std::nullopt);
@@ -2077,6 +2101,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 pauseMenu->setVsync(settings.vsync);
                 persistSettings();
             }
+            if (const int steps = pauseMenu->takeUiScaleSteps(); steps != 0) {
+                settings = ichor::stepUiScale(settings, steps);
+                ui->setScale(settings.uiScale);
+                renderer.setUiScale(settings.uiScale);
+                pauseMenu->setUiScale(settings.uiScale);
+                persistSettings();
+            }
+            if (pauseMenu->takePaletteClicks() % 2 == 1) {
+                settings.palette = settings.palette == ichor::ColourPalette::ColourblindSafe ? ichor::ColourPalette::Default : ichor::ColourPalette::ColourblindSafe;
+                mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+                pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+                persistSettings();
+            }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
             }
@@ -2323,7 +2360,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe

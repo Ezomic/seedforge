@@ -257,3 +257,62 @@ TEST_CASE("the first-minute prompt flags survive the file, and a file from befor
     REQUIRE(saveSettings(file.path(), flagged));
     REQUIRE(loadSettings(file.path()) == flagged);
 }
+
+TEST_CASE("the UI scale and palette survive the file, and a bad value reads as the default")
+{
+    Settings look;
+    look.uiScale = 1.25f;
+    look.palette = ColourPalette::ColourblindSafe;
+    REQUIRE(parseSettings(serializeSettings(look)) == look);
+    const std::string text = serializeSettings(look);
+    REQUIRE(text.find("uiScale=1.25\n") != std::string::npos);
+    REQUIRE(text.find("palette=colourblind\n") != std::string::npos);
+    REQUIRE(serializeSettings(kDefaults).find("uiScale=1\npalette=default\n") != std::string::npos);
+
+    // A file from before these keys is the stand-in default.
+    const std::string head = "ichor-settings 1\n";
+    const Settings old = parseSettings(head + "fov=80\nend\n");
+    REQUIRE(old.uiScale == Settings::kDefaultUiScale);
+    REQUIRE(old.palette == ColourPalette::Default);
+    REQUIRE(kDefaults.uiScale == 1.0f);
+    REQUIRE(kDefaults.palette == ColourPalette::Default);
+
+    for (const char* bad : {"", "Colourblind", "colorblind", "1", "tritan"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "palette=" + bad + "\nend\n").palette == ColourPalette::Default);
+    }
+    for (const char* bad : {"", "abc", "nan", "inf", "1x", "--1"}) {
+        INFO(bad);
+        REQUIRE(parseSettings(head + "uiScale=" + bad + "\nend\n").uiScale == Settings::kDefaultUiScale);
+    }
+    REQUIRE(parseSettings(head + "uiScale=9\nend\n").uiScale == Settings::kMaxUiScale);
+    REQUIRE(parseSettings(head + "uiScale=0.1\nend\n").uiScale == Settings::kMinUiScale);
+
+    // A bad value costs only its field.
+    const Settings mixed = parseSettings(head + "fov=80\nuiScale=wide\npalette=colourblind\nend\n");
+    REQUIRE(mixed.fovDegrees == 80.0f);
+    REQUIRE(mixed.uiScale == Settings::kDefaultUiScale);
+    REQUIRE(mixed.palette == ColourPalette::ColourblindSafe);
+
+    Settings absurd;
+    absurd.uiScale = kNaN;
+    REQUIRE(absurd.clamped().uiScale == Settings::kDefaultUiScale);
+
+    TempFile file;
+    REQUIRE(saveSettings(file.path(), look));
+    REQUIRE(loadSettings(file.path()) == look);
+}
+
+TEST_CASE("a UI scale step moves a quarter at a time inside the range and keeps the other settings")
+{
+    Settings stored;
+    stored.fovDegrees = 80.0f;
+    stored.palette = ColourPalette::ColourblindSafe;
+    REQUIRE(stepUiScale(stored, 0) == stored);
+    REQUIRE(stepUiScale(stored, 1).uiScale == 1.25f);
+    REQUIRE(stepUiScale(stored, -1).uiScale == 0.75f);
+    REQUIRE(stepUiScale(stored, -9).uiScale == Settings::kMinUiScale);
+    REQUIRE(stepUiScale(stored, 9).uiScale == Settings::kMaxUiScale);
+    REQUIRE(stepUiScale(stored, 1).fovDegrees == 80.0f);
+    REQUIRE(stepUiScale(stored, 1).palette == ColourPalette::ColourblindSafe);
+}
