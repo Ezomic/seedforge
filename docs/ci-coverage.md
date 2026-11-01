@@ -150,6 +150,10 @@ Add a seed to `play_seeds` once its stall is fixed; the two fight stalls are the
 
 An UNSUPPORTED step is printed and counted in the summary but does not fail the night: it is the list of what the bot cannot drive yet, not a regression. Today that list is `quit`. The job summary lists the `PLAY` lines and `play.log` is uploaded as `nightly-playthrough-log`. Run it locally with `bin/build combat_bridge_tests`, then `ICHOR_NIGHTLY_PLAYTHROUGH_SEEDS=2 engine/build/windows-ci/combat_bridge/combat_bridge_tests "nightly: the playthrough bot*"`. `ICHOR_NIGHTLY_PLAYTHROUGH_SKILL` picks another bot skill (`novice`, `regular`, `expert`).
 
+## Performance guards on Linux Release (SEED-754)
+
+The frame, forge and streaming budget guards run under ASan on the Linux PR job and in Release on Windows, so neither covered Linux Release. The nightly job `linux-release-perf` (`performance guards (linux release)`, 45 minute timeout) builds `ichor_tests_world` and `ichor_tests_core` with the `linux-headless-asan` preset as Release with sanitizers off, like `forged-walk` (same vcpkg and ccache keys, `ccache-walk-` with `ccache-asan-` as the fallback), and runs the guards by Catch tag: `[forge_perf]`, `[forge_budget]`, `[forged_frame_cost]` and `[forged_stream_hitch]` in the world executable, and the case `every frame stage is timed once per frame and stays inside a generous budget` in the core executable. It catches a Linux-only regression in frame cost or forge time that the sanitizer build hides in its own slowdown. It never runs on a pull request, and it changes no hash or default. Both logs are uploaded as `nightly-perf-logs`.
+
 ## Test-time budget (SEED-658)
 
 Main went red twice because one test ran too close to the sanitizer timeout (the SEED-492 walk test on the SEED-556 worlds, and the SEED-650 live-worlds probe, which timed out at 1500 s). `tools/test_times.py` reads the per-test durations of a ctest run, prints the 20 slowest cases, and fails when a case exceeds its budget:
