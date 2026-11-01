@@ -1,6 +1,7 @@
 #include "ichor/core/controls_overlay.h"
 #include "ichor/core/first_prompts.h"
 #include "ichor/core/input.h"
+#include "ichor/ui/notice_screen.h"
 #include "ichor/ui/prompt_screen.h"
 #include "ichor/ui/recording_renderer.h"
 #include "ichor/ui/ui_context.h"
@@ -237,4 +238,27 @@ TEST_CASE("one long frame, such as a stall, runs a prompt down by a short step o
     state = stepFirstPrompts(state, kWalking, 9.0);
     CHECK(state.showing == FirstPrompt::Move);
     CHECK(state.secondsLeft >= kFirstPromptSeconds - 2 * kFirstPromptMaxStep);
+}
+
+TEST_CASE("the notice screen draws nothing until a line is bound, shows it escaped, and hides again", "[first_prompts]")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui{renderer, 1280, 720};
+    NoticeScreen screen{ui};
+    REQUIRE(ui.ok());
+    REQUIRE(ui.loadFontFace(std::filesystem::path(ICHOR_ART_DIR) / "fonts" / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(screen.ok());
+    const auto draws = [&](double time) {
+        renderer.clearDraws();
+        ui.update(time);
+        ui.render();
+        return renderer.draws().size();
+    };
+    CHECK(draws(0.0) == 0);
+    screen.bind(std::string("Slot 'a<b>' restored"));
+    CHECK(screen.visible());
+    CHECK(draws(0.1) > 0);
+    CHECK(screen.markup().find("<b>") == std::string::npos);
+    screen.bind(std::nullopt);
+    CHECK(draws(0.2) == 0);
 }

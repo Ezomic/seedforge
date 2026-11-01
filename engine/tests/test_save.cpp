@@ -390,3 +390,26 @@ TEST_CASE("the chronicle hands the journal its newest entries first, timed in pl
     // A bad rate falls to zero rather than an undefined conversion.
     REQUIRE(chronicle.recent(std::nan(""), 1)[0].time == "0:00:00");
 }
+
+TEST_CASE("a save restored from a backup says which slot and which backup, and a clean load says nothing")
+{
+    const Dir dir;
+    Scene scene(5);
+    populate(scene, 10);
+    SaveSlots slots(dir.path());
+    REQUIRE(slots.save("auto", scene, kContext));
+    Scene clean(5);
+    CHECK(restoreNotice("auto", slots.load("auto", clean, kContext)).empty());
+
+    scene.tick(kDt);
+    REQUIRE(slots.save("auto", scene, kContext));
+    const std::filesystem::path file = dir.path() / "auto.sav";
+    std::filesystem::resize_file(file, std::filesystem::file_size(file) / 2);
+
+    Scene restored(5);
+    const LoadResult result = slots.load("auto", restored, kContext);
+    REQUIRE(result.status == LoadStatus::Loaded);
+    CHECK(result.fromBackup);
+    CHECK(result.backupIndex == 1);
+    CHECK(restoreNotice("auto", result) == "Slot 'auto' was damaged; restored from backup 1 (your previous save).");
+}
