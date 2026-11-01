@@ -37,7 +37,7 @@ def workflows(root: Path) -> list[Path]:
 
 def mentions_vcpkg(path: Path) -> bool:
     text = path.read_text(encoding="utf-8")
-    return "microsoft/vcpkg" in text or "VCPKG_COMMIT" in text
+    return bool(re.search(r"repository:\s*microsoft/vcpkg|^\s*VCPKG_COMMIT:", text, re.M))
 
 
 def patterns_for(path: Path) -> list[re.Pattern[str]]:
@@ -85,7 +85,7 @@ def current(root: Path) -> str:
 
 
 def rewrite(path: Path, new: str) -> bool:
-    text = path.read_text(encoding="utf-8")
+    text = path.read_bytes().decode("utf-8")
     out = text
     for pattern in patterns_for(path):
         out = pattern.sub(lambda m: m.group(1) + new + (m.group(3) if m.lastindex == 3 else ""), out)

@@ -4,3 +4,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo e456309491fd875487bf02b8a0dca76c1b1b00cc
+      - run: echo https://github.com/microsoft/vcpkg/compare/a...b VCPKG_COMMIT
