@@ -91,7 +91,7 @@ std::string keyName(KeyCode key)
 
 std::optional<KeyCode> parseKeyName(std::string_view name)
 {
-    for (KeyCode key = 1; key < 256; ++key) {
+    for (KeyCode key = 1; !name.empty() && key < 256; ++key) {
         if (keyName(key) == name) {
             return key;
         }
