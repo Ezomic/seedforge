@@ -64,6 +64,7 @@ public:
     // F1 opens the controls card; the state also carries the first-run hint line.
     void setControlsOverlay(ControlsOverlay state) { controls_ = state; }
     const ControlsOverlay& controlsOverlay() const { return controls_; }
+    void setKeyBindings(const KeyBindings& bindings) { controls_.bindings = bindings; }
 
     // While the gate says no, no simulation tick runs and no time is owed
     // afterwards; rendering continues. Streaming holds the world here until

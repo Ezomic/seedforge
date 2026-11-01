@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ichor/core/input.h"
+#include "ichor/core/key_bindings.h"
 
 #include <string>
 #include <vector>
@@ -97,6 +98,10 @@ public:
     // a size no mode has uses the closest mode; a window is kept inside the usable screen.
     virtual bool setDisplay(const DisplayRequest& request) { (void)request; return false; }
     virtual bool fullscreen() const { return false; }
+    // The keys input() reads for the rebindable actions. Other platforms have no keys to read.
+    virtual void setKeyBindings(const KeyBindings& bindings) { (void)bindings; }
+    // The last key pressed since the last call, 0 for none: how the rebinding screen hears the key it waits for.
+    virtual KeyCode takePressedKey() { return 0; }
 };
 
 }

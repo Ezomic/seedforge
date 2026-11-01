@@ -67,6 +67,9 @@ void SdlPlatform::pumpEvents()
         if (lookEnabled_ && event.type == SDL_EVENT_MOUSE_MOTION) {
             mouseLook_.addMotion(event.motion.xrel);
         }
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+            pressedKey_ = static_cast<KeyCode>(event.key.scancode);
+        }
         if (event.type == SDL_EVENT_QUIT) {
             quit_ = true;
         }
@@ -90,27 +93,28 @@ void SdlPlatform::pumpEvents()
     const auto down = [&](SDL_Scancode a, SDL_Scancode b) { return keys[a] || keys[b]; };
     InputFrame frame;
     const bool arrowsWalk = !arrowsReserved_ && !lookEnabled_;
-    const auto walk = [&](SDL_Scancode letter, SDL_Scancode arrow) { return arrowsWalk ? down(letter, arrow) : keys[letter]; };
-    frame.moveX = (walk(SDL_SCANCODE_D, SDL_SCANCODE_RIGHT) ? 1.0f : 0.0f) - (walk(SDL_SCANCODE_A, SDL_SCANCODE_LEFT) ? 1.0f : 0.0f);
-    frame.moveY = (walk(SDL_SCANCODE_W, SDL_SCANCODE_UP) ? 1.0f : 0.0f) - (walk(SDL_SCANCODE_S, SDL_SCANCODE_DOWN) ? 1.0f : 0.0f);
-    if (down(SDL_SCANCODE_RETURN, SDL_SCANCODE_KP_ENTER)) frame.buttons |= InputFrame::Confirm;
-    if (keys[SDL_SCANCODE_Q]) frame.buttons |= InputFrame::Cancel;
-    if (down(SDL_SCANCODE_LSHIFT, SDL_SCANCODE_RSHIFT)) frame.buttons |= InputFrame::Sprint;
-    if (keys[SDL_SCANCODE_J]) frame.buttons |= InputFrame::Attack;
-    if (keys[SDL_SCANCODE_K]) frame.buttons |= InputFrame::Heavy;
-    if (keys[SDL_SCANCODE_L]) frame.buttons |= InputFrame::Block;
-    if (keys[SDL_SCANCODE_SPACE]) frame.buttons |= InputFrame::Dodge;
-    if (keys[SDL_SCANCODE_F5]) frame.buttons |= InputFrame::QuickSave;
-    if (keys[SDL_SCANCODE_F9]) frame.buttons |= InputFrame::QuickLoad;
-    if (keys[SDL_SCANCODE_TAB]) frame.buttons |= InputFrame::Journal;
+    const auto bound = [&](BindAction action) { return keys[bindings_.key(action)]; };
+    const auto walk = [&](BindAction action, SDL_Scancode arrow) { return arrowsWalk ? bound(action) || keys[arrow] : bound(action); };
+    frame.moveX = (walk(BindAction::MoveRight, SDL_SCANCODE_RIGHT) ? 1.0f : 0.0f) - (walk(BindAction::MoveLeft, SDL_SCANCODE_LEFT) ? 1.0f : 0.0f);
+    frame.moveY = (walk(BindAction::MoveForward, SDL_SCANCODE_UP) ? 1.0f : 0.0f) - (walk(BindAction::MoveBack, SDL_SCANCODE_DOWN) ? 1.0f : 0.0f);
+    if (bound(BindAction::Confirm) || keys[SDL_SCANCODE_KP_ENTER]) frame.buttons |= InputFrame::Confirm;
+    if (bound(BindAction::Cancel)) frame.buttons |= InputFrame::Cancel;
+    if (bound(BindAction::Sprint) || keys[SDL_SCANCODE_RSHIFT]) frame.buttons |= InputFrame::Sprint;
+    if (bound(BindAction::Attack)) frame.buttons |= InputFrame::Attack;
+    if (bound(BindAction::Heavy)) frame.buttons |= InputFrame::Heavy;
+    if (bound(BindAction::Block)) frame.buttons |= InputFrame::Block;
+    if (bound(BindAction::Dodge)) frame.buttons |= InputFrame::Dodge;
+    if (bound(BindAction::QuickSave)) frame.buttons |= InputFrame::QuickSave;
+    if (bound(BindAction::QuickLoad)) frame.buttons |= InputFrame::QuickLoad;
+    if (bound(BindAction::Journal)) frame.buttons |= InputFrame::Journal;
     if (keys[SDL_SCANCODE_ESCAPE]) frame.buttons |= InputFrame::Menu;
-    if (keys[SDL_SCANCODE_M]) frame.buttons |= InputFrame::Map;
-    if (keys[SDL_SCANCODE_N]) frame.buttons |= InputFrame::Notes;
-    if (keys[SDL_SCANCODE_C]) frame.buttons |= InputFrame::Character;
-    if (keys[SDL_SCANCODE_F]) frame.buttons |= InputFrame::Interact;
-    if (keys[SDL_SCANCODE_I]) frame.buttons |= InputFrame::Inventory;
+    if (bound(BindAction::Map)) frame.buttons |= InputFrame::Map;
+    if (bound(BindAction::Notes)) frame.buttons |= InputFrame::Notes;
+    if (bound(BindAction::Character)) frame.buttons |= InputFrame::Character;
+    if (bound(BindAction::Interact)) frame.buttons |= InputFrame::Interact;
+    if (bound(BindAction::Inventory)) frame.buttons |= InputFrame::Inventory;
     if (lookEnabled_) {
-        if (keys[SDL_SCANCODE_E]) frame.buttons |= InputFrame::LockOn;
+        if (bound(BindAction::LockOn)) frame.buttons |= InputFrame::LockOn;
         const float mouse = mouseLook_.step(elapsed);
         const float arrows = arrowsReserved_ ? 0.0f : (keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
         frame.lookX = std::clamp(mouse + arrows, -1.0f, 1.0f);
