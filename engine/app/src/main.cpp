@@ -74,6 +74,7 @@
 #include "ichor/ui/loading_screen.h"
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/dungeon_entry.h"
+#include "ichor/world/dungeon_reverb.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
@@ -2172,7 +2173,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             engine.stages().reset();
         }
         // The audio thread holds a lock while it renders, so only a change is worth taking it for.
-        const ichor::ReverbSettings reverb = reverbField.at(playerPosition(engine.scene()));
+        const glm::dvec3 listener = playerPosition(engine.scene());
+        const std::optional<ichor::ReverbSettings> hall = dungeonEntry ? ichor::dungeonReverbAt(dungeonEntry->content(), listener) : std::nullopt;
+        const ichor::ReverbSettings reverb = hall ? *hall : reverbField.at(listener);
         if (reverb != lastReverb) {
             audio.setReverb(reverb);
             lastReverb = reverb;
