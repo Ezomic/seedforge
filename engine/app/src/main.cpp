@@ -1435,6 +1435,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
+    ichor::AxiomSet newGameAxioms;
+    std::vector<ichor::Axiom> newGamePool;
+    const auto showNewGameSeed = [&](std::uint64_t seed) {
+        newGameScreen->setView(ichor::buildNewGameView(seed, ichor::rollSlots(seed, newGamePool), newGameAxioms));
+    };
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
     std::unique_ptr<ichor::DeathScreen> deathScreen;
@@ -1553,19 +1558,18 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             pauseMenu->setVisible(true);
         }
         if (options.showNewGame && !editing) {
-            ichor::AxiomSet axioms;
-            if (!axioms.loadDirectory(options.data)) {
+            if (!newGameAxioms.loadDirectory(options.data)) {
                 ichor::log(ichor::LogLevel::Warn, "data: the axioms could not be loaded, so the new-game screen shows no titles");
             }
-            std::vector<ichor::Axiom> pool;
-            for (const auto& [id, axiom] : axioms.axioms()) {
-                pool.push_back(axiom);
+            for (const auto& [id, axiom] : newGameAxioms.axioms()) {
+                newGamePool.push_back(axiom);
             }
-            const ichor::SlotRollResult roll = ichor::rollSlots(worldSeed, pool);
-            if (!roll.ok()) {
+            if (!ichor::rollSlots(worldSeed, newGamePool).ok()) {
                 ichor::log(ichor::LogLevel::Warn, "the world's axioms could not be rolled from the data");
             }
-            newGameScreen->setView(ichor::buildNewGameView(worldSeed, roll, axioms));
+            showNewGameSeed(worldSeed);
+            const std::vector<ichor::FeaturedSeed> featuredSeeds = ichor::loadFeaturedFile(options.data / "showcase" / "seeds.json");
+            newGameScreen->setFeatured(ichor::buildFeaturedRows(featuredSeeds, newGamePool, newGameAxioms));
             newGameScreen->setVisible(true);
         }
         // The simulation clock drives the UI, so a replay sees the same animations.
@@ -2021,6 +2025,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (mapScreen->takeCloseRequest()) {
                 mapScreen->setVisible(false);
+            }
+            if (const std::optional<std::uint64_t> picked = newGameScreen->takePickedSeed()) {
+                showNewGameSeed(*picked);
             }
             if (newGameScreen->takeBegin()) {
                 newGameScreen->setVisible(false);
