@@ -56,6 +56,8 @@ struct Run {
         CombatBridgeConfig config;
         config.tuning = tuning;
         config.legacyControls = true;
+        // The recorded bots kite the foe far from its post; a leash would end every world 1 foe win and break the plan.
+        config.foeLeashRadiusM = 1e6;
         const glm::dvec3 start = site.duelStart + glm::dvec3(0.0, 0.5, 0.0);
         addGround(scene, game.heightfield);
         SpawnCommand player;
