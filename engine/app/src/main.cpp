@@ -74,6 +74,7 @@
 #include "ichor/ui/loading_screen.h"
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/dungeon_entry.h"
+#include "ichor/world/dungeon_reverb.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
@@ -147,6 +148,7 @@ struct Options {
     bool ironman = false;
     bool editor = false;
     bool showMap = false;
+    bool showPause = false;
     int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
@@ -169,6 +171,7 @@ struct Options {
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
     ichor::CampaignWorldPlan campaignPlan; // what main() decided for `campaign` before run()
     std::uint64_t frameStats = 0; // log the per-stage frame cost every this many frames; 0 is off
+    std::uint64_t textureBudgetMb = ichor::kDefaultTextureBudgetBytes >> 20; // --texture-budget-mb: resident texture bytes before the least recently drawn drop to their mip tail (SEED-690)
     bool rain = false; // --weather rain lets the seeded weather rain; off keeps the sky dry
     std::string screenshot; // where to save the last frame; empty is none. The window stays hidden and frames run unthrottled
     std::optional<ichor::OverlayMode> overlay; // --overlay [off|compact|full]; none is compact in play and off for a screenshot
@@ -310,6 +313,8 @@ bool parse(int argc, char** argv, Options& options)
             options.screenshot = argv[++i];
         } else if (arg == "--frame-stats" && hasValue) {
             if (!parseNumber(argv[++i], options.frameStats)) return false;
+        } else if (arg == "--texture-budget-mb" && hasValue) {
+            if (!parseNumber(argv[++i], options.textureBudgetMb)) return false;
         } else if (arg == "--weather" && hasValue) {
             const std::string_view mode = argv[++i];
             if (mode != "rain" && mode != "dry") return false;
@@ -318,6 +323,8 @@ bool parse(int argc, char** argv, Options& options)
             options.editor = true;
         } else if (arg == "--map") {
             options.showMap = true;
+        } else if (arg == "--pause") {
+            options.showPause = true;
         } else if (arg == "--map-explore" && hasValue) {
             if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
         } else if (arg == "--new-game") {
@@ -658,6 +665,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     if (!platform.init({.hidden = hidden}) || !renderer.init()) {
         return 1;
     }
+    renderer.setTextureBudget(options.textureBudgetMb << 20);
     if (!options.screenshot.empty()) {
         ichor::log(ichor::LogLevel::Info, hidden ? "screenshot: hidden window, fixed frame step, no pacing" : "screenshot: visible window, fixed frame step");
     }
@@ -1159,14 +1167,17 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         ResidentCell cell;
         cell.origin = {heightfield.cellOriginX(payload.cell.id), 0.0, heightfield.cellOriginZ(payload.cell.id)};
         {
+            ZoneScopedN("up.terrain");
             ichor::FrameStages::Scope timer(engine.stages(), "up.terrain", true);
             cell.handle = renderer.uploadTerrainCell(payload.lods);
         }
         if (!payload.plants.empty()) {
+            ZoneScopedN("up.trees");
             ichor::FrameStages::Scope timer(engine.stages(), "up.trees", true);
             cell.grove = renderer.uploadVegetationCell(payload.plants);
         }
         {
+            ZoneScopedN("up.water");
             ichor::FrameStages::Scope timer(engine.stages(), "up.water", true);
             cell.water = renderer.uploadWaterCell(payload.water);
         }
@@ -1176,11 +1187,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         cell.loot = payload.loot;
         cell.cast = payload.cast;
         {
+            ZoneScopedN("up.physics");
             ichor::FrameStages::Scope timer(engine.stages(), "up.physics", true);
             engine.scene().physics().addHeightField(ichor::StableId::of("cell", ichor::cellKey(payload.cell.id)), payload.cell.heights.data(), payload.cell.samplesPerSide, cell.origin,
                 static_cast<float>(heightfield.desc().metresPerSample));
         }
         cells[payload.cell.id] = cell;
+        ZoneScopedN("up.nav");
         ichor::FrameStages::Scope navTimer(engine.stages(), "up.nav", true);
         ichor::NavTile tile = payload.nav;
         if (!tile.empty() && !navigation.addTile(payload.cell.id, std::move(tile))) {
@@ -1253,6 +1266,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // Inside a dungeon the player is outside the world: the cells around the entrance stay as they were.
         engine.scene().addSystem("streaming", [&](ichor::Scene& scene, double, const ichor::InputFrame&) {
             if (ichor::inDungeonPocket(playerPosition(scene))) return;
+            ZoneScopedN("stream");
             ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(playerPosition(scene));
         });
@@ -1261,6 +1275,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             if (ichor::inDungeonPocket(position) || streamer.ready(position)) {
                 return true;
             }
+            ZoneScopedN("stream");
             ichor::FrameStages::Scope timer(engine.stages(), "stream", true);
             streamer.update(position);
             return streamer.ready(position);
@@ -1471,6 +1486,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             pauseMenu->setFullscreen(platform.fullscreen());
             pauseMenu->setResolution(shownResolution().width, shownResolution().height);
             pauseMenu->setVsync(settings.vsync);
+            pauseMenu->setUiScale(settings.uiScale);
+            pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+            ui->setScale(settings.uiScale);
+            renderer.setUiScale(settings.uiScale);
+            mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
@@ -1512,6 +1532,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
+        }
+        if (options.showPause && !editing) {
+            paused = true;
+            pauseMenu->setVisible(true);
         }
         if (options.showNewGame && !editing) {
             ichor::AxiomSet axioms;
@@ -2048,6 +2072,19 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 pauseMenu->setVsync(settings.vsync);
                 persistSettings();
             }
+            if (const int steps = pauseMenu->takeUiScaleSteps(); steps != 0) {
+                settings = ichor::stepUiScale(settings, steps);
+                ui->setScale(settings.uiScale);
+                renderer.setUiScale(settings.uiScale);
+                pauseMenu->setUiScale(settings.uiScale);
+                persistSettings();
+            }
+            if (pauseMenu->takePaletteClicks() % 2 == 1) {
+                settings.palette = settings.palette == ichor::ColourPalette::ColourblindSafe ? ichor::ColourPalette::Default : ichor::ColourPalette::ColourblindSafe;
+                mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+                pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
+                persistSettings();
+            }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
             }
@@ -2161,7 +2198,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             engine.stages().reset();
         }
         // The audio thread holds a lock while it renders, so only a change is worth taking it for.
-        const ichor::ReverbSettings reverb = reverbField.at(playerPosition(engine.scene()));
+        const glm::dvec3 listener = playerPosition(engine.scene());
+        const std::optional<ichor::ReverbSettings> hall = dungeonEntry ? ichor::dungeonReverbAt(dungeonEntry->content(), listener) : std::nullopt;
+        const ichor::ReverbSettings reverb = hall ? *hall : reverbField.at(listener);
         if (reverb != lastReverb) {
             audio.setReverb(reverb);
             lastReverb = reverb;
@@ -2271,6 +2310,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return 1;
         }
     }
+    const ichor::TextureResidencyStats textures = renderer.textureStats();
+    ichor::logf(ichor::LogLevel::Info, "texture budget: {} of {} MiB resident, {} textures, {} evictions, {} reloads",
+        (textures.usedBytes + 1048575) >> 20, textures.capBytes >> 20, textures.textures, textures.evictions, textures.reloads);
     ichor::logf(ichor::LogLevel::Info, "exit after {} frames, {} ticks, state {:016x}",
         engine.frameCount(), engine.scene().tickCount(), engine.scene().stateHash());
     return 0;
@@ -2289,7 +2331,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe

@@ -275,6 +275,13 @@ Rml::RenderInterface* VulkanRenderer::uiRenderInterface()
     return impl_->ui.get();
 }
 
+void VulkanRenderer::setUiScale(float scale)
+{
+    if (impl_->ui) {
+        impl_->ui->setScale(scale);
+    }
+}
+
 bool VulkanRenderer::uploadBundle(const SceneBundle& bundle)
 {
     return impl_->scene->uploadBundle(bundle);
@@ -328,6 +335,18 @@ void VulkanRenderer::removeVegetationCell(std::uint32_t cell)
 const std::vector<Renderer::GpuPassTime>& VulkanRenderer::gpuPasses() const
 {
     return impl_->scene->gpuPasses();
+}
+
+void VulkanRenderer::setTextureBudget(std::uint64_t bytes)
+{
+    if (impl_->scene) {
+        impl_->scene->setTextureBudget(bytes);
+    }
+}
+
+TextureResidencyStats VulkanRenderer::textureStats() const
+{
+    return impl_->scene ? impl_->scene->textureStats() : TextureResidencyStats{};
 }
 
 bool VulkanRenderer::reloadShaders()

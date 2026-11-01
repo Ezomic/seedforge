@@ -50,3 +50,20 @@ engine/build/windows-ci/tests/ichor_tests.exe "[.perf_report]"
 ```
 
 `kRecord.timeRatio` is the `ratio` column, `allocBytes` the `alloc` column, `maxSingleAlloc` the largest single allocation in bytes.
+
+## Loading the cached world (SEED-750)
+
+Forging is paid once; every later start reads the cached world (SEED-507): the forged world file (heightfield and manifest) and the phase maps beside it, each checked against its own checksum, which is what stands between the menu and the first frame. `engine/tests/test_forged_load_time.cpp`, tag `[forged_load_time]`, reads a warm entry five times at each size and fails when the mean passes the budget. The forge that fills a missing entry is not timed.
+
+| Size | Measured mean | Budget |
+| --- | --- | --- |
+| 256 | 17 to 20 ms | 100 ms |
+| 1024 | 135 to 155 ms | 750 ms |
+
+Same machine and caveats as above (shared 12-thread Windows build machine, Release). The budget is about 5 times the measured mean: wide enough for a loaded runner or a cold disk cache, narrow enough that a load made several times slower (a decode that stops streaming, a checksum run twice) goes red. The check is skipped under sanitizers. The enforcing case is in the medium tier (`test_tiers.json`) because a cold cache forges the 1024 world first.
+
+To refresh after an intended change to the cache format:
+
+```bash
+engine/build/windows-ci/tests/ichor_tests_world.exe "[.forged_load_report]"
+```

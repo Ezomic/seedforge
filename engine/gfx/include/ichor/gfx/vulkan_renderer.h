@@ -31,6 +31,8 @@ public:
     bool reloadShaders() override;
     void setVsync(bool on) override;
     const std::vector<GpuPassTime>& gpuPasses() const override;
+    void setTextureBudget(std::uint64_t bytes) override;
+    TextureResidencyStats textureStats() const override;
     void beginFrame() override;
     void submit(const RenderView& view) override;
     void endFrame() override;
@@ -44,6 +46,7 @@ public:
     bool screenshotPending() const override { return screenshotRequested_ && !screenshotSaved_; }
     void setGuiHook(std::function<void()> hook) override { guiHook_ = std::move(hook); }
     Rml::RenderInterface* uiRenderInterface() override;
+    void setUiScale(float scale) override;
     void setUiHooks(std::function<void(std::uint32_t, std::uint32_t)> update, std::function<void()> render) override
     {
         uiUpdate_ = std::move(update);

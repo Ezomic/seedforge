@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <set>
+#include <vector>
 
 namespace ichor {
 
@@ -23,6 +24,9 @@ public:
     void submit(const RenderView& view) override;
     void endFrame() override;
     void debugText(std::string line) override;
+    void setTextureBudget(std::uint64_t bytes) override { residency_.setCap(bytes); }
+    TextureResidencyStats textureStats() const override { return residency_.stats(); }
+    bool textureResidentInFull(std::uint32_t texture) const { return residency_.isFull(texture); }
 
     std::uint64_t framesBegun() const { return begun_; }
     std::uint64_t framesEnded() const { return ended_; }
@@ -52,6 +56,10 @@ private:
     std::uint64_t vegetationDraws_ = 0;
     std::uint64_t waterDraws_ = 0;
     std::size_t lastDraws_ = 0;
+    // The budget is kept here as the device would: the bytes of every bundle texture, and which ones each mesh's
+    // materials draw, so a headless run reports what the real renderer would hold.
+    TextureResidency residency_;
+    std::vector<std::vector<std::uint32_t>> meshTextures_;
 };
 
 }

@@ -37,11 +37,15 @@ endif()
 # Tracy's macros compile to nothing unless TRACY_ENABLE is defined, which the
 # client target adds. Without ENGINE_PROFILE only the headers are used, so no
 # build ever listens on a port by accident.
+# Zones sit in headless libraries too (ichor/core/profile.h finds the headers
+# through __has_include), so a profiling build links the client into every
+# target rather than wiring those libraries to a runtime-only target.
 if(ENGINE_RUNTIME)
     find_package(Tracy CONFIG REQUIRED)
     add_library(ichor_profile INTERFACE)
     if(ENGINE_PROFILE)
         target_link_libraries(ichor_profile INTERFACE Tracy::TracyClient)
+        link_libraries(Tracy::TracyClient)
     else()
         get_target_property(tracy_includes Tracy::TracyClient INTERFACE_INCLUDE_DIRECTORIES)
         target_include_directories(ichor_profile INTERFACE ${tracy_includes})

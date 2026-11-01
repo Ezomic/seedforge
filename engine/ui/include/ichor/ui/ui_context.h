@@ -43,7 +43,12 @@ public:
     // RmlUi drops its fonts when the last context goes, so load them again for a new one.
     bool loadFontFace(const std::filesystem::path& path, bool fallback = false);
 
+    // `width` and `height` are the pixels drawn into. At a scale above 1 the documents lay out in
+    // that many times fewer pixels, so everything draws larger; the renderer must be told the same
+    // scale, and pointer input stays in drawn pixels.
     void setSize(std::uint32_t width, std::uint32_t height);
+    void setScale(float scale);
+    float scale() const { return scale_; }
 
     // The UI clock is the one the caller advances, not the wall clock, so a
     // replay and a headless run see the same animations.
@@ -62,6 +67,9 @@ private:
     Rml::Context* context_ = nullptr;
     std::string name_;
     double clock_ = 0.0;
+    float scale_ = 1.0f;
+    std::uint32_t width_ = 0;
+    std::uint32_t height_ = 0;
 };
 
 }
