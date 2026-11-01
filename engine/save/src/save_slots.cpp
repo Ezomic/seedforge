@@ -120,6 +120,15 @@ SlotInfo infoOf(std::string_view name, const Header& header)
 
 }
 
+std::string restoreNotice(std::string_view slot, const LoadResult& result)
+{
+    if (result.status != LoadStatus::Loaded || !result.fromBackup) {
+        return {};
+    }
+    return "Slot '" + std::string(slot) + "' was damaged; restored from backup " + std::to_string(result.backupIndex)
+        + (result.backupIndex == 1 ? " (your previous save)." : " (an older save).");
+}
+
 SaveSlots::SaveSlots(std::filesystem::path directory, SavePolicy policy)
     : directory_(std::move(directory))
     , policy_(policy)
@@ -317,6 +326,7 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
         result.chronicleDamaged = !story.empty() && !Chronicle::parse(story, result.chronicle);
         result.status = LoadStatus::Loaded;
         result.fromBackup = backup > 0;
+        result.backupIndex = backup;
         result.dataChanged = header.dataDigest != expected.dataDigest;
         return result;
     }

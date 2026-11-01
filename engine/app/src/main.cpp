@@ -34,6 +34,7 @@
 #include "ichor/ui/hud.h"
 #include "ichor/ui/prompt_screen.h"
 #include "ichor/ui/note_box.h"
+#include "ichor/ui/notice_screen.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/traversal/roads.h"
@@ -115,6 +116,7 @@
 namespace {
 
 constexpr float kFovStepDegrees = 5.0f;
+constexpr double kStartupNoticeSeconds = 8.0;
 
 struct Options {
     bool headless = false;
@@ -1095,6 +1097,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         parley->install(engine.scene());
     }
 
+    std::string startupNotice;
+    std::uint64_t startupNoticeTick = 0;
     if (!options.loadSlot.empty()) {
         const ichor::LoadResult loaded = slots.load(options.loadSlot, engine.scene(), saveContext());
         if (loaded.status != ichor::LoadStatus::Loaded) {
@@ -1105,6 +1109,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (loaded.chronicleDamaged) {
             ichor::log(ichor::LogLevel::Warn, "the slot's chronicle was unreadable and starts empty");
         }
+        startupNotice = ichor::restoreNotice(options.loadSlot, loaded);
+        startupNoticeTick = engine.scene().tickCount();
         ichor::logf(ichor::LogLevel::Info, "slot '{}' loaded at tick {}{}{}", options.loadSlot, loaded.info.tick, loaded.fromBackup ? ", from a backup" : "",
             loaded.dataChanged ? ", data has changed since it was saved" : "");
     } else if (!options.load.empty()) {
@@ -1431,6 +1437,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::FirstPrompts firstPrompts{.seen = settings.promptsSeen};
     bool promptHeld = true;
     std::unique_ptr<ichor::NoteBox> noteBox;
+    std::unique_ptr<ichor::NoticeScreen> noticeScreen;
     ichor::FeedbackPrompt notePrompt;
     bool noteShown = false; // from the frame after F8, so the note's screenshot is of the game, not the box
     bool paused = false;
@@ -1497,10 +1504,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
             promptScreen = std::make_unique<ichor::PromptScreen>(*ui);
             noteBox = std::make_unique<ichor::NoteBox>(*ui);
+            noticeScreen = std::make_unique<ichor::NoticeScreen>(*ui);
         }
         if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             promptScreen.reset();
+            noticeScreen.reset();
             noteBox.reset();
             deathScreen.reset();
             captionScreen.reset();
@@ -1587,6 +1596,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 }
                 if (promptScreen) {
                     promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld));
+                }
+                if (noticeScreen) {
+                    noticeScreen->bind(!startupNotice.empty() && static_cast<double>(engine.scene().tickCount() - startupNoticeTick) * config.fixedDt < kStartupNoticeSeconds ? std::optional<std::string>(startupNotice) : std::nullopt);
                 }
                 if (noteBox) {
                     noteBox->bind(notePrompt.open() && noteShown ? std::optional<std::string>(notePrompt.text()) : std::nullopt);
