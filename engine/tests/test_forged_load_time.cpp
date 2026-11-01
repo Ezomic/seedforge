@@ -19,8 +19,15 @@ using namespace ichor;
 
 namespace {
 
+// GCC defines the macros; clang only answers __has_feature, and the Linux sanitizer job is clang.
 #if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
 constexpr bool kSanitized = true;
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer) || __has_feature(undefined_behavior_sanitizer)
+constexpr bool kSanitized = true;
+#else
+constexpr bool kSanitized = false;
+#endif
 #else
 constexpr bool kSanitized = false;
 #endif
@@ -100,15 +107,18 @@ TEST_CASE("forged load time report", "[.forged_load_report]")
 
 TEST_CASE("loading the cached forged world at 256 and 1024 stays within its budget", "[forged_load_time]")
 {
+    // A sanitizer slows the load several times over, and a cold cache would forge the 1024 world under it (569 s on main), so
+    // the sanitizer jobs skip the measurement; the Windows job enforces the budget.
+    if (kSanitized) {
+        SKIP("load times are not measured under a sanitizer");
+    }
     for (const Budget& budget : kBudgets) {
         INFO("grid " << budget.grid);
         const Measured m = measureLoad(budget.grid);
         INFO(m.error);
         REQUIRE(m.ok);
         INFO("mean load " << m.meanMs << " ms over a budget of " << budget.meanMs << " ms");
-        if (!kSanitized) {
-            CHECK(withinBudget(m.meanMs, budget.meanMs));
-        }
+        CHECK(withinBudget(m.meanMs, budget.meanMs));
     }
 }
 
