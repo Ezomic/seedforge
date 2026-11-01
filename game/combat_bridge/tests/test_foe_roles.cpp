@@ -363,3 +363,56 @@ TEST_CASE("placeFoe swaps the live foe to the asked role and back to the configu
     CHECK(registry.all_of<stage0::SkirmisherBrain>(fight.foeEntity()));
     CHECK(fight.foe().health == Catch::Approx(stage0::Tuning{}.maxHealth));
 }
+
+namespace {
+
+void dragFoe(Fight& fight, glm::dvec3 post, double metres)
+{
+    Transform moved = fight.scene.registry().get<Transform>(fight.foeEntity());
+    moved.position = post + glm::dvec3(metres, 0.5, 0.0);
+    fight.scene.enqueue(SetTransformCommand{fight.bridge->stage().foeId(), moved});
+}
+
+}
+
+TEST_CASE("a foe dragged past its leash walks home and heals, then guards again", "[combat_bridge][roles]")
+{
+    const ForgedGame& game = gameFor(1);
+    const CombatSite post = findCombatSite(game);
+    REQUIRE(post.found);
+    Fight fight(game, 1, stage0::FoeRole::Skirmisher, post.enemyPost, post.duelStart);
+    for (int i = 0; i < 6; ++i) fight.scene.tick(kDt);
+    REQUIRE(fight.bridge->live());
+    const auto& registry = fight.scene.registry();
+    fight.scene.registry().get<stage0::Combatant>(fight.foeEntity()).health = 20.0f;
+
+    dragFoe(fight, post.enemyPost, CombatBridgeConfig{}.foeLeashRadiusM + 15.0);
+    for (int i = 0; i < 3; ++i) fight.scene.tick(kDt);
+    CHECK_FALSE(registry.all_of<stage0::SkirmisherBrain>(fight.foeEntity()));
+
+    const auto groundDistance = [&] {
+        const glm::dvec3 at = registry.get<Transform>(fight.foeEntity()).position;
+        return std::hypot(at.x - post.enemyPost.x, at.z - post.enemyPost.z);
+    };
+    for (int i = 0; i < 60 * 40 && !registry.all_of<stage0::SkirmisherBrain>(fight.foeEntity()); ++i) fight.scene.tick(kDt);
+    CHECK(registry.all_of<stage0::SkirmisherBrain>(fight.foeEntity()));
+    CHECK(groundDistance() < 3.0);
+    CHECK(fight.foe().health == Catch::Approx(stage0::Tuning{}.maxHealth));
+    CHECK(fight.foe().alive());
+}
+
+TEST_CASE("a foe inside its leash keeps its brain and its wounds", "[combat_bridge][roles]")
+{
+    const ForgedGame& game = gameFor(1);
+    const CombatSite post = findCombatSite(game);
+    REQUIRE(post.found);
+    Fight fight(game, 1, stage0::FoeRole::Skirmisher, post.enemyPost, post.duelStart);
+    for (int i = 0; i < 6; ++i) fight.scene.tick(kDt);
+    REQUIRE(fight.bridge->live());
+    fight.scene.registry().get<stage0::Combatant>(fight.foeEntity()).health = 20.0f;
+
+    dragFoe(fight, post.enemyPost, CombatBridgeConfig{}.foeLeashRadiusM - 15.0);
+    for (int i = 0; i < 120; ++i) fight.scene.tick(kDt);
+    CHECK(fight.scene.registry().all_of<stage0::SkirmisherBrain>(fight.foeEntity()));
+    CHECK(fight.foe().health <= 20.0f);
+}

@@ -21,6 +21,7 @@ constexpr double kCameraGroundClearM = 0.6;
 constexpr double kCameraJumpM = 5.0;
 constexpr double kSightStepM = 1.5;
 constexpr int kSightMaxSteps = 200;
+constexpr double kHomeArrivalM = 1.0;
 
 // A shot is blocked when the ground rises above the straight line between the two eyes. Trees are not solid in the
 // engine yet, so they do not block it either.
@@ -49,6 +50,9 @@ CombatBridge::CombatBridge(const ForgedGame& game, const CombatSite& site, Comba
     if (!std::isfinite(config_.respawnDelaySeconds) || config_.respawnDelaySeconds < 0.0) {
         config_.respawnDelaySeconds = CombatBridgeConfig{}.respawnDelaySeconds;
     }
+    if (!std::isfinite(config_.foeLeashRadiusM) || config_.foeLeashRadiusM <= kHomeArrivalM) {
+        config_.foeLeashRadiusM = CombatBridgeConfig{}.foeLeashRadiusM;
+    }
     if (!std::isfinite(config_.fixedDt) || config_.fixedDt <= 0.0) {
         config_.fixedDt = CombatBridgeConfig{}.fixedDt;
     }
@@ -74,6 +78,7 @@ void CombatBridge::install(Scene& scene, StableId player, glm::dvec3 start)
     player_ = player;
     start_ = start;
     lastSettlement_ = site_.settlement;
+    foePost_ = site_.enemyPost;
     stage_.setLegacyControls(config_.legacyControls);
     openFightLog();
     stage_.attach(scene, player, start, site_.enemyPost + kSettleLift);
@@ -173,6 +178,8 @@ void CombatBridge::setFoe(Scene& scene, glm::dvec3 feet, bool alive, stage0::Foe
     moved.position = feet + kSettleLift;
     scene.enqueue(SetTransformCommand{stage_.foeId(), moved});
     foeParked_ = !alive;
+    foeHoming_ = false;
+    foePost_ = feet;
     lastRoleState_ = 0;
     lastEnemyAlive_ = alive;
     lastEnemyState_ = combatant.state;
@@ -202,6 +209,7 @@ void CombatBridge::step(Scene& scene, double dt)
     if (phase_ == Phase::WaitingForGround) {
         if (startAt_) {
             stage_.setSpawns(registry.get<Transform>(player).position, *startAt_ + kSettleLift);
+            foePost_ = *startAt_;
             stage_.spawnFoe(scene);
             startAt_.reset();
             phase_ = Phase::FoeQueued;
@@ -246,6 +254,7 @@ void CombatBridge::step(Scene& scene, double dt)
         lastSettlement_ = inside;
         setSpawnsForLastSettlement();
     }
+    updateLeash(scene);
     logTransitions(scene);
     if (registry.get<stage0::Combatant>(player).alive()) {
         deadSeconds_ = 0.0;
@@ -256,8 +265,48 @@ void CombatBridge::step(Scene& scene, double dt)
         deadSeconds_ = 0.0;
         respawns_ += 1;
         stage_.resetFight(scene);
+        foeHoming_ = false;
         logf(LogLevel::Info, "combat: tick {} the player is back at settlement {}", scene.tickCount(), lastSettlement_);
     }
+}
+
+// A foe dragged past its leash drops its brain and walks to its post; on arrival it is the same fresh, full foe a placement gives.
+void CombatBridge::updateLeash(Scene& scene)
+{
+    auto& registry = scene.registry();
+    const entt::entity foe = scene.find(stage_.foeId());
+    if (foeParked_ || foe == entt::null || !registry.all_of<stage0::Combatant>(foe)) {
+        return;
+    }
+    auto& combatant = registry.get<stage0::Combatant>(foe);
+    if (!combatant.alive()) {
+        foeHoming_ = false;
+        return;
+    }
+    const glm::dvec3 at = registry.get<Transform>(foe).position;
+    const double away = std::hypot(at.x - foePost_.x, at.z - foePost_.z);
+    if (!foeHoming_) {
+        if (away <= config_.foeLeashRadiusM) {
+            return;
+        }
+        foeHoming_ = true;
+        registry.remove<stage0::SkirmisherBrain>(foe);
+        registry.remove<stage0::ControllerBrain>(foe);
+        registry.remove<stage0::AnchorBrain>(foe);
+        registry.remove<stage0::ArtilleryBrain>(foe);
+        combatant.state = static_cast<std::uint8_t>(stage0::CombatState::Idle);
+        combatant.stateTime = 0.0f;
+        combatant.blocking = false;
+        logf(LogLevel::Info, "combat: tick {} the enemy is {:.1f} m from its post and heads home", scene.tickCount(), away);
+    }
+    if (away <= kHomeArrivalM) {
+        logf(LogLevel::Info, "combat: tick {} the enemy is home and healed", scene.tickCount());
+        setFoe(scene, foePost_, true, stage_.foeRole());
+        return;
+    }
+    combatant.yaw = stage0::yawTowards(at, foePost_);
+    const glm::dvec3 heading = glm::normalize(glm::dvec3(foePost_.x - at.x, 0.0, foePost_.z - at.z));
+    registry.get<CharacterBody>(foe).intent = glm::vec3(heading) * stage_.tuning().moveSpeed;
 }
 
 // One line per enemy wind-up and per death, so a run says where in its ticks the interesting moments are.

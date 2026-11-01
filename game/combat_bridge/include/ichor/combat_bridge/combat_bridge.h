@@ -33,6 +33,8 @@ struct CombatBridgeConfig {
     stage0::ArtilleryTuning artillery;
     double fixedDt = 1.0 / 60.0;
     double respawnDelaySeconds = 3.0; // from the player's death to standing at the last settlement again
+    // How far along the ground the foe may be dragged from its post before it gives up, walks home and heals to full.
+    double foeLeashRadiusM = 40.0;
     // World-axis steering with the player always facing the foe: what a scripted player (FightBot) needs.
     // Off is the free look a person plays with.
     bool legacyControls = false;
@@ -115,6 +117,7 @@ private:
     enum class Phase : std::uint8_t { WaitingForGround, FoeQueued, Live };
 
     void step(Scene& scene, double dt);
+    void updateLeash(Scene& scene);
     void setFoe(Scene& scene, glm::dvec3 feet, bool alive, stage0::FoeRole role);
     void logTransitions(const Scene& scene);
     void openFightLog();
@@ -132,6 +135,8 @@ private:
     Phase phase_ = Phase::WaitingForGround;
     std::optional<glm::dvec3> startAt_;
     bool foeParked_ = false;
+    glm::dvec3 foePost_{0.0};
+    bool foeHoming_ = false;
     bool returningToWorld_ = false;
     bool returnParked_ = false;
     std::function<bool(glm::dvec3)> groundReady_;

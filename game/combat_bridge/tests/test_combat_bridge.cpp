@@ -129,9 +129,9 @@ struct Played {
 };
 
 // Plays until the fight is decided (or the time is up). A skill-less player stands still.
-Played play(const ForgedGame& game, std::uint64_t worldSeed, const stage0::BotSkill* skill, std::uint64_t botSeed)
+Played play(const ForgedGame& game, std::uint64_t worldSeed, const stage0::BotSkill* skill, std::uint64_t botSeed, CombatBridgeConfig config = {})
 {
-    Setup setup(game, worldSeed);
+    Setup setup(game, worldSeed, config);
     if (skill != nullptr) setup.bridge->enableBot(*skill, botSeed);
     Played played;
     constexpr int kMaxTicks = 60 * 120;
@@ -153,10 +153,10 @@ bool same(const Played& a, const Played& b)
 }
 
 // The first bot seed whose fight ends the given way; the search is part of the test, so a retuned fight finds new seeds.
-bool findBotSeed(const ForgedGame& game, std::uint64_t worldSeed, const stage0::BotSkill& skill, stage0::FightOutcome wanted, std::uint64_t& seed)
+bool findBotSeed(const ForgedGame& game, std::uint64_t worldSeed, const stage0::BotSkill& skill, stage0::FightOutcome wanted, std::uint64_t& seed, CombatBridgeConfig config = {})
 {
     for (seed = 1; seed <= 40; ++seed) {
-        if (play(game, worldSeed, &skill, seed).outcome == wanted) return true;
+        if (play(game, worldSeed, &skill, seed, config).outcome == wanted) return true;
     }
     return false;
 }
@@ -259,13 +259,16 @@ TEST_CASE("a scripted bot wins a fight in the forged world, the same way twice, 
 TEST_CASE("a scripted bot loses a fight in the forged world, the same way twice, on two seeds", "[combat_bridge]")
 {
     const stage0::BotSkill novice = *stage0::findBotSkill("novice");
+    // A novice kites the foe far from its post; with a leash it walks home and heals, so this test is about the bot, not the leash.
+    CombatBridgeConfig config;
+    config.foeLeashRadiusM = 1e6;
     for (const std::uint64_t seed : {1u, 2u}) {
         INFO("seed " << seed);
         const ForgedGame& game = gameFor(seed);
         std::uint64_t botSeed = 0;
-        REQUIRE(findBotSeed(game, seed, novice, stage0::FightOutcome::PlayerDied, botSeed));
-        const Played first = play(game, seed, &novice, botSeed);
-        const Played second = play(game, seed, &novice, botSeed);
+        REQUIRE(findBotSeed(game, seed, novice, stage0::FightOutcome::PlayerDied, botSeed, config));
+        const Played first = play(game, seed, &novice, botSeed, config);
+        const Played second = play(game, seed, &novice, botSeed, config);
         CHECK(first.outcome == stage0::FightOutcome::PlayerDied);
         CHECK(first.playerHealth == 0.0f);
         CHECK(first.enemyHealth > 0.0f);
