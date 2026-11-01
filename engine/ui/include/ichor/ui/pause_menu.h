@@ -15,7 +15,7 @@ class ElementDocument;
 namespace ichor {
 
 // The menu Esc opens: a veil over the world and a card with the field of view, the mouse
-// sensitivity, the display mode, resolution and vsync, the UI scale and colour palette, Resume and Quit.
+// sensitivity, the display mode, resolution and vsync, the UI scale and colour palette, Resume, Load and Quit.
 // Hidden until shown.
 // The context must have the Cinzel and Alegreya Sans faces loaded.
 class PauseMenu {
@@ -32,6 +32,7 @@ public:
 
     // True once after the button was clicked.
     bool takeResume();
+    bool takeLoad();
     bool takeQuit();
 
     // The field of view the card shows. The menu only reports the player's clicks on the
@@ -62,6 +63,7 @@ public:
     // Where the buttons sit on screen once laid out, for tests and for anything that wants to
     // point at them. Nothing while the menu is hidden.
     std::optional<std::pair<float, float>> resumeCentre() const { return centreOf(resume_); }
+    std::optional<std::pair<float, float>> loadCentre() const { return centreOf(load_); }
     std::optional<std::pair<float, float>> quitCentre() const { return centreOf(quit_); }
     std::optional<std::pair<float, float>> fovDownCentre() const { return centreOf(fovDown_); }
     std::optional<std::pair<float, float>> fovUpCentre() const { return centreOf(fovUp_); }
@@ -90,6 +92,7 @@ private:
 
     UiContext& ui_;
     Click resumeClick_;
+    Click loadClick_;
     Click quitClick_;
     Count fovDownClicks_;
     Count fovUpClicks_;
@@ -103,6 +106,7 @@ private:
     Count scaleUpClicks_;
     Count paletteClicks_;
     Rml::Element* resume_ = nullptr;
+    Rml::Element* load_ = nullptr;
     Rml::Element* quit_ = nullptr;
     Rml::Element* fovDown_ = nullptr;
     Rml::Element* fovUp_ = nullptr;

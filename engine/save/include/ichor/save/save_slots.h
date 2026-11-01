@@ -28,6 +28,13 @@ struct SlotInfo {
     std::uint64_t tick = 0;
 };
 
+// A slot as the load screen lists it. A slot with no readable copy is still listed, flagged damaged, with only its name.
+struct SlotEntry {
+    SlotInfo info;
+    bool damaged = false;
+    std::uint32_t backupIndex = 0; // which copy would load, 0 the slot file, 1 the newest backup
+};
+
 struct SavePolicy {
     // One rolling slot, no manual saves.
     bool ironman = false;
@@ -75,6 +82,12 @@ public:
 
     // Slots that have a readable newest file, by name.
     std::vector<SlotInfo> list() const;
+
+    // Every slot with any file, damaged ones included, by name.
+    std::vector<SlotEntry> listAll() const;
+
+    // Where the picture of a slot lives: a separate file beside it, so the slot format never carries it.
+    std::filesystem::path thumbnailPath(std::string_view name) const { return directory_ / (std::string(name) + ".png"); }
 
     const std::string& lastError() const { return error_; }
 

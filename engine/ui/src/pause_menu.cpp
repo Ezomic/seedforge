@@ -29,7 +29,7 @@ constexpr const char* kPauseDocument = R"(<rml><head><style>
     .value { float: right; width: 100px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #f4e8c0; padding-top: 4px; }
 </style></head><body>
     <div id="veil"></div>
-    <div id="card"><div id="title">PAUSED</div><div class="row"><div class="name">Field of view</div><div id="fovup" class="res">+</div><div id="fovvalue" class="value">45 deg</div><div id="fovdown" class="res">-</div></div><div class="row"><div class="name">Mouse sensitivity</div><div id="sensup" class="res">+</div><div id="sensvalue" class="value">1.0</div><div id="sensdown" class="res">-</div></div><div class="row"><div class="name">Display</div><div id="mode" class="toggle">Windowed</div></div><div class="row"><div class="name">Resolution</div><div id="resup" class="res">&gt;</div><div id="resvalue" class="value">1280 x 720</div><div id="resdown" class="res">&lt;</div></div><div class="row"><div class="name">Vsync</div><div id="vsync" class="toggle">On</div></div><div class="row"><div class="name">UI scale</div><div id="scaleup" class="res">+</div><div id="scalevalue" class="value">100%</div><div id="scaledown" class="res">-</div></div><div class="row"><div class="name">Palette</div><div id="palette" class="toggle">Default</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
+    <div id="card"><div id="title">PAUSED</div><div class="row"><div class="name">Field of view</div><div id="fovup" class="res">+</div><div id="fovvalue" class="value">45 deg</div><div id="fovdown" class="res">-</div></div><div class="row"><div class="name">Mouse sensitivity</div><div id="sensup" class="res">+</div><div id="sensvalue" class="value">1.0</div><div id="sensdown" class="res">-</div></div><div class="row"><div class="name">Display</div><div id="mode" class="toggle">Windowed</div></div><div class="row"><div class="name">Resolution</div><div id="resup" class="res">&gt;</div><div id="resvalue" class="value">1280 x 720</div><div id="resdown" class="res">&lt;</div></div><div class="row"><div class="name">Vsync</div><div id="vsync" class="toggle">On</div></div><div class="row"><div class="name">UI scale</div><div id="scaleup" class="res">+</div><div id="scalevalue" class="value">100%</div><div id="scaledown" class="res">-</div></div><div class="row"><div class="name">Palette</div><div id="palette" class="toggle">Default</div></div><div id="resume" class="button">Resume</div><div id="load" class="button">Load</div><div id="quit" class="button">Quit</div></div>
 </body></rml>)";
 
 }
@@ -42,6 +42,7 @@ PauseMenu::PauseMenu(UiContext& ui)
         return;
     }
     resume_ = document_->GetElementById("resume");
+    load_ = document_->GetElementById("load");
     quit_ = document_->GetElementById("quit");
     fovDown_ = document_->GetElementById("fovdown");
     fovUp_ = document_->GetElementById("fovup");
@@ -58,13 +59,14 @@ PauseMenu::PauseMenu(UiContext& ui)
     scaleUp_ = document_->GetElementById("scaleup");
     scaleValue_ = document_->GetElementById("scalevalue");
     palette_ = document_->GetElementById("palette");
-    if (resume_ == nullptr || quit_ == nullptr || fovDown_ == nullptr || fovUp_ == nullptr || fovValue_ == nullptr || sensDown_ == nullptr || sensUp_ == nullptr || sensValue_ == nullptr
+    if (resume_ == nullptr || load_ == nullptr || quit_ == nullptr || fovDown_ == nullptr || fovUp_ == nullptr || fovValue_ == nullptr || sensDown_ == nullptr || sensUp_ == nullptr || sensValue_ == nullptr
         || mode_ == nullptr || resDown_ == nullptr || resUp_ == nullptr || resValue_ == nullptr || vsync_ == nullptr || scaleDown_ == nullptr || scaleUp_ == nullptr || scaleValue_ == nullptr || palette_ == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
         return;
     }
     resume_->AddEventListener("click", &resumeClick_);
+    load_->AddEventListener("click", &loadClick_);
     quit_->AddEventListener("click", &quitClick_);
     fovDown_->AddEventListener("click", &fovDownClicks_);
     fovUp_->AddEventListener("click", &fovUpClicks_);
@@ -84,6 +86,9 @@ PauseMenu::~PauseMenu()
     // The elements may live on until the context next updates, and the listeners go first.
     if (resume_ != nullptr) {
         resume_->RemoveEventListener("click", &resumeClick_);
+    }
+    if (load_ != nullptr) {
+        load_->RemoveEventListener("click", &loadClick_);
     }
     if (quit_ != nullptr) {
         quit_->RemoveEventListener("click", &quitClick_);
@@ -134,6 +139,7 @@ void PauseMenu::setVisible(bool visible)
     visible_ = visible;
     if (visible_) {
         resumeClick_.requested = false; // a click from an earlier showing is not a click now
+        loadClick_.requested = false;
         quitClick_.requested = false;
         fovDownClicks_.clicks = 0;
         fovUpClicks_.clicks = 0;
@@ -156,6 +162,13 @@ bool PauseMenu::takeResume()
 {
     const bool requested = resumeClick_.requested;
     resumeClick_.requested = false;
+    return requested;
+}
+
+bool PauseMenu::takeLoad()
+{
+    const bool requested = loadClick_.requested;
+    loadClick_.requested = false;
     return requested;
 }
 

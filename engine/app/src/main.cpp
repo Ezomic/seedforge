@@ -34,6 +34,7 @@
 #include "ichor/ui/hud.h"
 #include "ichor/ui/prompt_screen.h"
 #include "ichor/ui/note_box.h"
+#include "ichor/ui/load_screen.h"
 #include "ichor/ui/notice_screen.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
@@ -53,6 +54,7 @@
 #include "ichor/ui/map_screen_model.h"
 #include "ichor/ui/new_game_screen.h"
 #include "ichor/ui/pause_menu.h"
+#include "ichor/world/world_title.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
@@ -154,6 +156,7 @@ struct Options {
     bool showPause = false;
     int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
+    bool showLoad = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
     bool noExilePlayer = false; // --forged walks as the Exile unless this is set, and then as the wire capsule from inside
     bool forged = false; // build the world from libworldforge instead of the stand-in terrain
@@ -330,6 +333,8 @@ bool parse(int argc, char** argv, Options& options)
             options.showPause = true;
         } else if (arg == "--map-explore" && hasValue) {
             if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
+        } else if (arg == "--load-screen") {
+            options.showLoad = true;
         } else if (arg == "--new-game") {
             options.showNewGame = true;
         } else if (arg == "--no-forged-atmosphere") {
@@ -1072,6 +1077,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         renderer.setVsync(settings.vsync);
     }
+    // The picture beside a slot is the next frame, written next to the slot file and never inside it.
+    const auto saveThumbnail = [&](const std::string& name) {
+        if (!renderer.screenshotPending() && options.screenshot.empty()) {
+            renderer.requestScreenshot(slots.thumbnailPath(name).string());
+        }
+    };
     ichor::Chronicle chronicle;
     const std::string quickSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "quicksave";
     const std::string autoSlot = options.ironman ? ichor::SaveSlots::kIronmanSlot : "autosave";
@@ -1435,6 +1446,30 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
+    std::unique_ptr<ichor::LoadScreen> loadScreen;
+    // The title is the one the new-game screen showed for this world, composed from the axioms rolled for its seed.
+    const auto showLoadScreen = [&] {
+        ichor::AxiomSet axioms;
+        std::vector<ichor::Axiom> pool;
+        if (axioms.loadDirectory(options.data)) {
+            for (const auto& [id, axiom] : axioms.axioms()) {
+                pool.push_back(axiom);
+            }
+        }
+        std::vector<std::string_view> ids;
+        const ichor::SlotRollResult roll = ichor::rollSlots(worldSeed, pool);
+        for (const ichor::SlotAssignment& assignment : roll.slots) {
+            if (assignment.shown) {
+                ids.push_back(assignment.axiomId);
+            }
+        }
+        loadScreen->setView(ichor::buildLoadView(slots.listAll(), ichor::composeWorldBlurb(ids, worldSeed).title, config.fixedDt, [&slots](const std::string& name) {
+            std::error_code ec;
+            const std::filesystem::path picture = slots.thumbnailPath(name);
+            return std::filesystem::is_regular_file(picture, ec) ? picture : std::filesystem::path();
+        }));
+        loadScreen->setVisible(true);
+    };
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
     std::unique_ptr<ichor::DeathScreen> deathScreen;
@@ -1505,6 +1540,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             renderer.setUiScale(settings.uiScale);
             mapScreen->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
             newGameScreen = std::make_unique<ichor::NewGameScreen>(*ui);
+            loadScreen = std::make_unique<ichor::LoadScreen>(*ui);
             combatHud = std::make_unique<ichor::CombatHudScreen>(*ui);
             captionScreen = std::make_unique<ichor::CaptionScreen>(*ui);
             deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
@@ -1512,7 +1548,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             noteBox = std::make_unique<ichor::NoteBox>(*ui);
             noticeScreen = std::make_unique<ichor::NoticeScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok() || !loadScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             promptScreen.reset();
             noticeScreen.reset();
@@ -1520,6 +1556,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             deathScreen.reset();
             captionScreen.reset();
             combatHud.reset();
+            loadScreen.reset();
             newGameScreen.reset();
             pauseMenu.reset();
             landmarkCompass.reset();
@@ -1551,6 +1588,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (options.showPause && !editing) {
             paused = true;
             pauseMenu->setVisible(true);
+        }
+        if (options.showLoad && !editing) {
+            paused = true;
+            showLoadScreen();
         }
         if (options.showNewGame && !editing) {
             ichor::AxiomSet axioms;
@@ -1954,6 +1995,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         }
         confirmHeld = confirm;
         const std::uint32_t buttons = platform.input().buttons;
+        std::optional<std::string> loadRequest;
         const bool quickSave = (buttons & ichor::InputFrame::QuickSave) != 0;
         const bool quickLoad = (buttons & ichor::InputFrame::QuickLoad) != 0;
         // The journal is only a view, so it works in a replay too.
@@ -1967,6 +2009,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 mapScreen->setVisible(false); // Esc first puts the map away
             } else if (newGameScreen && newGameScreen->visible()) {
                 newGameScreen->setVisible(false);
+            } else if (loadScreen && loadScreen->visible()) {
+                loadScreen->setVisible(false);
+                pauseMenu->setVisible(true);
             } else {
                 paused = !paused;
                 pauseMenu->setVisible(paused);
@@ -2114,6 +2159,18 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
                 persistSettings();
             }
+            if (pauseMenu->takeLoad()) {
+                pauseMenu->setVisible(false);
+                showLoadScreen();
+            }
+            if (loadScreen->takeBack()) {
+                loadScreen->setVisible(false);
+                pauseMenu->setVisible(true);
+            }
+            if (const std::optional<std::string> chosen = loadScreen->takeChosen()) {
+                loadScreen->setVisible(false);
+                loadRequest = *chosen;
+            }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
             }
@@ -2152,23 +2209,28 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (quickSave && !quickSaveHeld && options.replay.empty()) {
             if (slots.save(quickSlot, engine.scene(), saveContext(), chronicle)) {
                 ichor::logf(ichor::LogLevel::Info, "saved '{}' at tick {}", quickSlot, engine.scene().tickCount());
+                saveThumbnail(quickSlot);
             } else {
                 ichor::logf(ichor::LogLevel::Warn, "save failed: {}", slots.lastError());
             }
         }
         // A restore mid-replay or mid-recording would diverge from the recording, and in ironman
         // a reload would undo a death, so loading waits for a live, unrecorded, non-ironman run.
-        if (quickLoad && !quickLoadHeld && options.replay.empty() && options.record.empty() && !options.ironman) {
-            const ichor::LoadResult loaded = slots.load(quickSlot, engine.scene(), saveContext());
+        if (quickLoad && !quickLoadHeld) {
+            loadRequest = quickSlot;
+        }
+        if (loadRequest && options.replay.empty() && options.record.empty() && !options.ironman) {
+            const std::string& loadName = *loadRequest;
+            const ichor::LoadResult loaded = slots.load(loadName, engine.scene(), saveContext());
             if (loaded.status == ichor::LoadStatus::Loaded) {
                 // The restore cleared the physics world, terrain collision included, so the streamer starts over.
                 streamer.clear();
                 editorSession.reset(); // its history describes a scene that was just replaced
                 chronicle = loaded.chronicle;
                 lastAutosave = engine.scene().tickCount(); // the clock just moved, usually backwards
-                ichor::logf(ichor::LogLevel::Info, "loaded '{}' at tick {}", quickSlot, loaded.info.tick);
+                ichor::logf(ichor::LogLevel::Info, "loaded '{}' at tick {}", loadName, loaded.info.tick);
             } else {
-                ichor::logf(ichor::LogLevel::Warn, "load of '{}' failed (status {})", quickSlot, static_cast<int>(loaded.status));
+                ichor::logf(ichor::LogLevel::Warn, "load of '{}' failed (status {})", loadName, static_cast<int>(loaded.status));
             }
         }
         quickSaveHeld = quickSave;
@@ -2176,7 +2238,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         const std::uint64_t tickNow = engine.scene().tickCount();
         if (autosaveTicks > 0 && (tickNow < lastAutosave || tickNow - lastAutosave >= autosaveTicks)) {
             lastAutosave = engine.scene().tickCount();
-            if (!slots.save(autoSlot, engine.scene(), saveContext(), chronicle)) {
+            if (slots.save(autoSlot, engine.scene(), saveContext(), chronicle)) {
+                saveThumbnail(autoSlot);
+            } else {
                 ichor::logf(ichor::LogLevel::Warn, "autosave failed: {}", slots.lastError());
             }
         }
@@ -2360,7 +2424,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--load-screen] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe
