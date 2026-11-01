@@ -167,8 +167,9 @@ struct Options {
     bool combat = false;      // --forged: one enemy at a settlement's outskirts and the stage0 fight with it (SEED-643)
     bool combatDebug = false; // --combat: keep the Stage 0 debug rings, lines and collider lines (F3 full shows them too)
     bool combatDuel = false;  // --combat: begin a few metres from the enemy instead of at the spawn
-    std::string combatRole;   // --combat: the enemy's role, skirmisher (the default), anchor or artillery (SEED-661)
+    std::string combatRole;   // --combat: the enemy's role, skirmisher (the default), controller, anchor or artillery (SEED-661)
     std::string combatBot;    // --combat: a scripted player of this skill (novice, regular, expert) instead of the keyboard
+    bool combatBleed = false; // --combat-bleed: every hit the player lands leaves the foe bleeding (SEED-763)
     std::string combatFights; // --combat: write each finished fight as a Stage 0 fights.csv row here (SEED-660)
     int forgedGrid = ichor::kForgedDefaultGridSize;
     std::string campaign; // --forged: keep the forged world in this campaign under --saves, and load it when it exists
@@ -346,7 +347,9 @@ bool parse(int argc, char** argv, Options& options)
             options.combatDuel = true;
         } else if (arg == "--combat-role" && hasValue) {
             options.combatRole = argv[++i];
-            if (options.combatRole != "skirmisher" && options.combatRole != "anchor" && options.combatRole != "artillery") return false;
+            if (options.combatRole != "skirmisher" && options.combatRole != "controller" && options.combatRole != "anchor" && options.combatRole != "artillery") return false;
+        } else if (arg == "--combat-bleed") {
+            options.combatBleed = true;
         } else if (arg == "--combat-fights" && hasValue) {
             options.combatFights = argv[++i];
         } else if (arg == "--combat-bot" && hasValue) {
@@ -824,6 +827,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         combatConfig.legacyControls = !options.combatBot.empty();
         if (options.combatRole == "anchor") combatConfig.role = ichor::stage0::FoeRole::Anchor;
         else if (options.combatRole == "artillery") combatConfig.role = ichor::stage0::FoeRole::Artillery;
+        else if (options.combatRole == "controller") combatConfig.role = ichor::stage0::FoeRole::Controller;
+        combatConfig.playerHitsBleed = options.combatBleed;
         combatConfig.fightsCsv = options.combatFights;
         combat = std::make_unique<ichor::CombatBridge>(*forged, site, combatConfig);
         if (!combat->loadVisuals(renderer, std::filesystem::path(ICHOR_DATA_DIR).parent_path() / "art")) {
@@ -1452,6 +1457,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     float hudWater = 0.0f;
     std::string hudGuide;
     // Without --combat the app has no combatants, so the bars show full until the sim supplies one.
+    std::vector<ichor::CombatHudStatus> hudStatuses;
     float hudHealth = 100.0f;
     float hudMaxHealth = 100.0f;
     float hudStamina = 100.0f;
@@ -1589,8 +1595,14 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     hudMaxHealth = fighter.maxHealth;
                     hudStamina = fighter.stamina;
                     hudMaxStamina = fighter.maxStamina;
+                    hudStatuses.clear();
+                    for (const ichor::CombatHudStatusState& status : fighter.statuses) {
+                        hudStatuses.push_back({status.id == ichor::stage0::StatusId::Bleed ? "bleed" : "slow", status.stacks, status.remaining});
+                    }
                 }
-                combatHud->bind(ichor::buildCombatHudView({.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = hudStamina, .maxStamina = hudMaxStamina}));
+                ichor::CombatHudInput hudInput{.health = hudHealth, .maxHealth = hudMaxHealth, .stamina = hudStamina, .maxStamina = hudMaxStamina};
+                hudInput.statuses = hudStatuses;
+                combatHud->bind(ichor::buildCombatHudView(hudInput));
                 if (captionScreen) {
                     captionFeed.prune(engine.scene().tickCount());
                     captionScreen->bind(soundHelp.captionsOn ? captionFeed.visible(engine.scene().tickCount()) : std::vector<std::string>{});
@@ -2360,7 +2372,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|controller|anchor|artillery] [--combat-bleed] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe
@@ -2377,8 +2389,8 @@ int main(int argc, char** argv)
     if (!options.forged && (options.combat || options.combatDuel || !options.combatBot.empty() || !options.combatRole.empty())) {
         ichor::log(ichor::LogLevel::Warn, "--combat only applies with --forged and is ignored");
     }
-    if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatFights.empty() || !options.combatRole.empty())) {
-        ichor::log(ichor::LogLevel::Warn, "--combat-duel, --combat-role, --combat-bot and --combat-fights only apply with --combat and are ignored");
+    if (!options.combat && (options.combatDuel || !options.combatBot.empty() || !options.combatFights.empty() || !options.combatRole.empty() || options.combatBleed)) {
+        ichor::log(ichor::LogLevel::Warn, "--combat-duel, --combat-role, --combat-bleed, --combat-bot and --combat-fights only apply with --combat and are ignored");
     }
     if (options.forged && !options.campaign.empty() && !planCampaign(options)) {
         return 1;

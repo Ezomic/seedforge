@@ -38,9 +38,18 @@ struct CombatBridgeConfig {
     // World-axis steering with the player always facing the foe: what a scripted player (FightBot) needs.
     // Off is the free look a person plays with.
     bool legacyControls = false;
+    // Every hit the player lands leaves the foe bleeding (Stage0::setPlayerHitsBleed). Off keeps the fight, and so every
+    // recorded one, as it was.
+    bool playerHitsBleed = false;
     // Where every finished fight is written as a Stage 0 fights.csv row (plus world_seed and site columns), so
     // stage0_report reads it. Empty records nothing to disk.
     std::filesystem::path fightsCsv;
+};
+
+struct CombatHudStatusState {
+    stage0::StatusId id = stage0::StatusId::None;
+    int stacks = 1;
+    float remaining = 0.0f; // 0..1 of the effect's full duration
 };
 
 struct CombatHudState {
@@ -48,6 +57,7 @@ struct CombatHudState {
     float maxHealth = 100.0f;
     float stamina = 100.0f;
     float maxStamina = 100.0f;
+    std::vector<CombatHudStatusState> statuses; // on the player
 };
 
 // The proof of concept that puts the stage0 fight into a forged world (SEED-643): one skirmisher at a settlement's

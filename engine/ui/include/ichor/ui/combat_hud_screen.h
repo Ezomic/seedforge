@@ -26,7 +26,7 @@ public:
     // Shows the view; an absent Law resource, hit or target hides its element.
     void bind(const CombatHudView& view);
 
-    // The markup of the Law readout and the hit ring, for tests.
+    // The markup of the Law readout, the hit ring and the status icons, for tests.
     std::string markup() const;
 
 private:
@@ -40,6 +40,7 @@ private:
     Rml::Element* lawText_ = nullptr;
     Rml::Element* lawFill_ = nullptr;
     Rml::Element* ring_ = nullptr;
+    Rml::Element* statuses_ = nullptr;
     Rml::Element* reticle_ = nullptr;
     Rml::Element* staggerFill_ = nullptr;
 };

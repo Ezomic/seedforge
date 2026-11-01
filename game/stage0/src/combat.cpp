@@ -345,6 +345,9 @@ void Stage0::receiveHit(Scene& scene, entt::entity victim, entt::entity attacker
         c.sincePoiseDamage = 0.0f;
     }
     recorder_.noteHit(a.side == 0, applied, blocked);
+    if (playerHitsBleed_ && a.side == 0 && c.side != 0 && applied > 0.0f && c.alive()) {
+        c.status.apply(StatusId::Bleed);
+    }
 
     if (c.health <= 0.0f) {
         const glm::dvec3 at = scene.registry().get<Transform>(victim).position;
