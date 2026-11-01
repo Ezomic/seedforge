@@ -69,8 +69,7 @@ A new small library `game/combat_bridge` (`ichor_combat_bridge`, one `add_subdir
 ## What is deliberately not built
 
 More than one enemy at once (SEED-648 puts a dungeon room's enemies on the one foe in turns, `DungeonFight`), other
-roles, the bow, loot or xp on a kill, a leash
-that returns the enemy to its post, a lock-on camera in the world, saving a fight in a campaign, and any
+roles, the bow, loot or xp on a kill, a lock-on camera in the world, saving a fight in a campaign, and any
 tuning. A foe whose ground cell unloads (the player outruns it by more than the streaming radius) has no
 floor; the respawn resets it.
 

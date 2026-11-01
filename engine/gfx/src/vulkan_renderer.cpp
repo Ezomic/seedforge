@@ -275,6 +275,13 @@ Rml::RenderInterface* VulkanRenderer::uiRenderInterface()
     return impl_->ui.get();
 }
 
+void VulkanRenderer::setUiScale(float scale)
+{
+    if (impl_->ui) {
+        impl_->ui->setScale(scale);
+    }
+}
+
 bool VulkanRenderer::uploadBundle(const SceneBundle& bundle)
 {
     return impl_->scene->uploadBundle(bundle);

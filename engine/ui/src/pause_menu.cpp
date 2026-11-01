@@ -16,26 +16,20 @@ constexpr const char* kPauseDocument = R"(<rml><head><style>
     body, div { display: block; }
     body { width: 100%; height: 100%; }
     #veil { position: absolute; top: 0px; left: 0px; right: 0px; bottom: 0px; background-color: #05070bb0; }
-    #card { position: absolute; top: 14%; left: 50%; margin-left: -203px; width: 340px; padding: 26px 30px 30px 30px; background-color: #10141af4; border: 3px #a08850; }
-    #title { font-family: Cinzel; font-size: 36px; color: #e8d8a8; letter-spacing: 4px; text-align: center; padding-bottom: 20px; }
-    .button { font-family: Alegreya Sans; font-size: 26px; text-align: center; color: #d8d8d8; padding: 10px 0px 12px 0px; margin-top: 10px; background-color: #1c222c; border: 2px #3a4252; }
-    .label { font-family: Alegreya Sans; font-size: 22px; color: #a8a090; text-align: center; padding-top: 6px; }
-    #fov, #sens { height: 52px; margin-top: 6px; }
-    .step { float: left; width: 56px; font-family: Alegreya Sans; font-size: 28px; text-align: center; color: #d8d8d8; padding: 4px 0px 6px 0px; background-color: #1c222c; border: 2px #3a4252; }
-    #fovup, #sensup { float: right; }
-    .step:hover { color: #f4e8c0; background-color: #2a3242; border-color: #a08850; }
-    #fovvalue, #sensvalue { font-family: Alegreya Sans; font-size: 28px; text-align: center; color: #f4e8c0; padding-top: 8px; }
+    #card { position: absolute; top: 2%; left: 50%; margin-left: -203px; width: 340px; padding: 14px 30px 16px 30px; background-color: #10141af4; border: 3px #a08850; }
+    #title { font-family: Cinzel; font-size: 32px; color: #e8d8a8; letter-spacing: 4px; text-align: center; padding-bottom: 8px; }
+    .button { font-family: Alegreya Sans; font-size: 24px; text-align: center; color: #d8d8d8; padding: 4px 0px 6px 0px; margin-top: 6px; background-color: #1c222c; border: 2px #3a4252; }
     .button:hover { color: #f4e8c0; background-color: #2a3242; border-color: #a08850; }
-    .row { height: 44px; margin-top: 8px; }
-    .name { float: left; width: 110px; font-family: Alegreya Sans; font-size: 22px; color: #a8a090; padding-top: 8px; }
-    .toggle { float: right; width: 160px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #f4e8c0; padding: 6px 0px 8px 0px; background-color: #1c222c; border: 2px #3a4252; }
+    .row { height: 36px; margin-top: 4px; }
+    .name { float: left; width: 140px; font-family: Alegreya Sans; font-size: 20px; color: #a8a090; padding-top: 6px; }
+    .toggle { float: right; width: 160px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #f4e8c0; padding: 2px 0px 4px 0px; background-color: #1c222c; border: 2px #3a4252; }
     .toggle:hover { background-color: #2a3242; border-color: #a08850; }
-    .res { float: right; width: 42px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #d8d8d8; padding: 6px 0px 8px 0px; background-color: #1c222c; border: 2px #3a4252; }
+    .res { float: right; width: 42px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #d8d8d8; padding: 2px 0px 4px 0px; background-color: #1c222c; border: 2px #3a4252; }
     .res:hover { color: #f4e8c0; background-color: #2a3242; border-color: #a08850; }
-    #resvalue { float: right; width: 110px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #f4e8c0; padding-top: 8px; }
+    .value { float: right; width: 100px; font-family: Alegreya Sans; font-size: 22px; text-align: center; color: #f4e8c0; padding-top: 4px; }
 </style></head><body>
     <div id="veil"></div>
-    <div id="card"><div id="title">PAUSED</div><div class="label">Field of view</div><div id="fov"><div id="fovdown" class="step">-</div><div id="fovup" class="step">+</div><div id="fovvalue">45 deg</div></div><div class="label">Mouse sensitivity</div><div id="sens"><div id="sensdown" class="step">-</div><div id="sensup" class="step">+</div><div id="sensvalue">1.0</div></div><div class="row"><div class="name">Display</div><div id="mode" class="toggle">Windowed</div></div><div class="row"><div class="name">Resolution</div><div id="resup" class="res">&gt;</div><div id="resvalue">1280 x 720</div><div id="resdown" class="res">&lt;</div></div><div class="row"><div class="name">Vsync</div><div id="vsync" class="toggle">On</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
+    <div id="card"><div id="title">PAUSED</div><div class="row"><div class="name">Field of view</div><div id="fovup" class="res">+</div><div id="fovvalue" class="value">45 deg</div><div id="fovdown" class="res">-</div></div><div class="row"><div class="name">Mouse sensitivity</div><div id="sensup" class="res">+</div><div id="sensvalue" class="value">1.0</div><div id="sensdown" class="res">-</div></div><div class="row"><div class="name">Display</div><div id="mode" class="toggle">Windowed</div></div><div class="row"><div class="name">Resolution</div><div id="resup" class="res">&gt;</div><div id="resvalue" class="value">1280 x 720</div><div id="resdown" class="res">&lt;</div></div><div class="row"><div class="name">Vsync</div><div id="vsync" class="toggle">On</div></div><div class="row"><div class="name">UI scale</div><div id="scaleup" class="res">+</div><div id="scalevalue" class="value">100%</div><div id="scaledown" class="res">-</div></div><div class="row"><div class="name">Palette</div><div id="palette" class="toggle">Default</div></div><div id="resume" class="button">Resume</div><div id="quit" class="button">Quit</div></div>
 </body></rml>)";
 
 }
@@ -60,8 +54,12 @@ PauseMenu::PauseMenu(UiContext& ui)
     resUp_ = document_->GetElementById("resup");
     resValue_ = document_->GetElementById("resvalue");
     vsync_ = document_->GetElementById("vsync");
+    scaleDown_ = document_->GetElementById("scaledown");
+    scaleUp_ = document_->GetElementById("scaleup");
+    scaleValue_ = document_->GetElementById("scalevalue");
+    palette_ = document_->GetElementById("palette");
     if (resume_ == nullptr || quit_ == nullptr || fovDown_ == nullptr || fovUp_ == nullptr || fovValue_ == nullptr || sensDown_ == nullptr || sensUp_ == nullptr || sensValue_ == nullptr
-        || mode_ == nullptr || resDown_ == nullptr || resUp_ == nullptr || resValue_ == nullptr || vsync_ == nullptr) {
+        || mode_ == nullptr || resDown_ == nullptr || resUp_ == nullptr || resValue_ == nullptr || vsync_ == nullptr || scaleDown_ == nullptr || scaleUp_ == nullptr || scaleValue_ == nullptr || palette_ == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
         return;
@@ -76,6 +74,9 @@ PauseMenu::PauseMenu(UiContext& ui)
     resDown_->AddEventListener("click", &resDownClicks_);
     resUp_->AddEventListener("click", &resUpClicks_);
     vsync_->AddEventListener("click", &vsyncClicks_);
+    scaleDown_->AddEventListener("click", &scaleDownClicks_);
+    scaleUp_->AddEventListener("click", &scaleUpClicks_);
+    palette_->AddEventListener("click", &paletteClicks_);
 }
 
 PauseMenu::~PauseMenu()
@@ -111,6 +112,15 @@ PauseMenu::~PauseMenu()
     if (vsync_ != nullptr) {
         vsync_->RemoveEventListener("click", &vsyncClicks_);
     }
+    if (scaleDown_ != nullptr) {
+        scaleDown_->RemoveEventListener("click", &scaleDownClicks_);
+    }
+    if (scaleUp_ != nullptr) {
+        scaleUp_->RemoveEventListener("click", &scaleUpClicks_);
+    }
+    if (palette_ != nullptr) {
+        palette_->RemoveEventListener("click", &paletteClicks_);
+    }
     if (document_ != nullptr) {
         ui_.unloadDocument(document_);
     }
@@ -133,6 +143,9 @@ void PauseMenu::setVisible(bool visible)
         resDownClicks_.clicks = 0;
         resUpClicks_.clicks = 0;
         vsyncClicks_.clicks = 0;
+        scaleDownClicks_.clicks = 0;
+        scaleUpClicks_.clicks = 0;
+        paletteClicks_.clicks = 0;
         document_->Show();
     } else {
         document_->Hide();
@@ -220,6 +233,33 @@ void PauseMenu::setVsync(bool on)
 int PauseMenu::takeVsyncClicks()
 {
     return std::exchange(vsyncClicks_.clicks, 0);
+}
+
+void PauseMenu::setUiScale(float scale)
+{
+    if (scaleValue_ != nullptr && std::isfinite(scale)) {
+        scaleValue_->SetInnerRML(std::format("{}%", static_cast<int>(std::lround(scale * 100.0f))));
+    }
+}
+
+int PauseMenu::takeUiScaleSteps()
+{
+    const int steps = scaleUpClicks_.clicks - scaleDownClicks_.clicks;
+    scaleUpClicks_.clicks = 0;
+    scaleDownClicks_.clicks = 0;
+    return steps;
+}
+
+void PauseMenu::setColourblindSafe(bool on)
+{
+    if (palette_ != nullptr) {
+        palette_->SetInnerRML(on ? "Colourblind" : "Default");
+    }
+}
+
+int PauseMenu::takePaletteClicks()
+{
+    return std::exchange(paletteClicks_.clicks, 0);
 }
 
 std::optional<std::pair<float, float>> PauseMenu::centreOf(Rml::Element* element) const

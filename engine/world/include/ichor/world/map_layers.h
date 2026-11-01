@@ -49,12 +49,14 @@ public:
     bool hasLayer(MapLayer layer) const { return present_[static_cast<std::size_t>(layer)]; }
 
     // The base picture with every layer in `layers` blended over it, in the order of MapLayer. An empty
-    // stack gives an empty image.
-    MapImage composite(MapLayerSet layers) const;
+    // stack gives an empty image. `colourblindSafe` draws the territories in colours that stay apart under
+    // colour vision deficiency; every other layer is unchanged.
+    MapImage composite(MapLayerSet layers, bool colourblindSafe = false) const;
 
 private:
     MapImage base_;
     std::array<std::vector<std::uint8_t>, kMapLayerCount> overlay_; // RGBA, straight alpha, base size
+    std::vector<std::uint8_t> colourblindTerritories_; // the Territories overlay again, in the colourblind-safe colours
     std::array<bool, kMapLayerCount> present_{};
 };
 

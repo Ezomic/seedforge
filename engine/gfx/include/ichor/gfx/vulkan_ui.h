@@ -30,6 +30,9 @@ public:
 
     bool init();
 
+    // Draws the geometry this many times larger: the UI context lays out in extent / scale pixels.
+    void setScale(float scale) { scale_ = scale > 0.0f ? scale : 1.0f; }
+
     void begin(VkCommandBuffer cmd, VkExtent2D extent);
     void end();
 
@@ -84,6 +87,7 @@ private:
 
     VkCommandBuffer cmd_ = VK_NULL_HANDLE;
     VkExtent2D extent_{};
+    float scale_ = 1.0f;
     bool scissorOn_ = false;
     Rml::Rectanglei scissor_;
 };

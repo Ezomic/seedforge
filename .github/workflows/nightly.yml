@@ -410,6 +410,72 @@ jobs:
           path: play.log
           if-no-files-found: ignore
 
+  linux-release-perf:
+    # SEED-754: the frame, forge and streaming budget guards run under ASan on the Linux PR job and in Release on Windows. This
+    # runs them in Linux Release without sanitizers, so a Linux-only regression in frame cost shows. Nightly only, never on a PR.
+    name: performance guards (linux release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-walk-${{ github.sha }}
+          restore-keys: |
+            ccache-walk-
+            ccache-asan-
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target ichor_tests_world ichor_tests_core
+        working-directory: engine
+      - name: Forge, frame cost and streaming hitch guards
+        id: world
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/tests/ichor_tests_world "[forge_perf],[forge_budget],[forged_frame_cost],[forged_stream_hitch]" | tee perf-world.log
+      - name: Frame stage timer guard
+        id: core
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/tests/ichor_tests_core "every frame stage is timed once per frame and stays inside a generous budget" | tee perf-core.log
+      - name: Upload perf logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-perf-logs
+          path: |
+            perf-world.log
+            perf-core.log
+          if-no-files-found: ignore
+
   soak:
     # The full variants of the heavy tests (label soak in engine/tests/test_tiers.json) under ASan/UBSan. The stress job above runs
     # every other test, so together the nightly covers the whole suite. Pull requests run the small variants only (SEED-664, SEED-672).

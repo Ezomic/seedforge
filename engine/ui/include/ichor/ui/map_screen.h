@@ -46,6 +46,8 @@ public:
     MapLayerSet layers() const { return layers_; }
     void setLayer(MapLayer layer, bool on);
     void toggleLayer(MapLayer layer) { setLayer(layer, !layers_.on(layer)); }
+    // Draws the territories in the colourblind-safe colours.
+    void setColourblindSafe(bool on);
 
     // Fog of war: what the player has not seen is drawn dark, layers and settlements included. Without a
     // discovery everything shows. A discovery of another size than the picture is ignored.
@@ -100,6 +102,7 @@ private:
     MapImage plain_;
     MapLayerStack stack_;
     MapLayerSet layers_;
+    bool colourblindSafe_ = false;
     std::optional<MapDiscovery> discovery_;
     std::vector<MapSettlement> settlements_;
     std::vector<std::string> shownNames_;
