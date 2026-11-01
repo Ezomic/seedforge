@@ -317,3 +317,15 @@ If a job shows pointer files instead of assets (a test fails on a file that star
 The sccache and ccache entries are keyed by commit and are 20 MB to 1 GB each. They used to be saved by every PR run, which filled the 10 GB Actions cache limit and made GitHub evict the vcpkg caches. Only main saves them now; PR runs restore the newest one from main. Check the total with `gh api repos/Ezomic/seedforge/actions/cache/usage` and list the biggest with `gh cache list --sort size_in_bytes --order desc`.
 
 `cache-prune.yml` runs after the engine and nightly workflows (and by hand with `gh workflow run cache-prune`). It keeps the newest main entry of each compiler and LFS cache family and deletes the caches of closed pull requests, so main's one-entry-per-commit saves cannot grow past one set.
+
+## Monthly vcpkg bump (SEED-764)
+
+The vcpkg commit is pinned so the binary cache can hit, which also means the ports age. `vcpkg-bump.yml` runs on the 1st of every month at 05:00 UTC (and by hand) and moves every pin to the latest `microsoft/vcpkg` master commit through `tools/bump_vcpkg.py`:
+
+- The pins are `VCPKG_COMMIT` in `engine.yml`, the two kinds of vcpkg checkout in `nightly.yml`, and `builtin-baseline` in `engine/vcpkg.json`. The script rewrites all of them, then re-reads every file that mentions vcpkg and fails unless each pin equals the new commit. A new workflow that checks out vcpkg with an unrecognised `ref:` also fails it, so a bump cannot silently miss a file.
+- `python3 tools/bump_vcpkg.py --check` (run in the `light` job) fails when the pins disagree. `--self-test` bumps a fixture copy of the files in `tools/bump_vcpkg_fixtures/` and checks that a bump which leaves one workflow, the manifest, or an unpinned checkout behind goes red.
+- The workflow pushes `chore/vcpkg-bump-<sha>`, opens a PR with `gh pr create`, and then runs `gh workflow run engine.yml --ref <branch>`. A push or PR made with `GITHUB_TOKEN` does not trigger other workflows, so without that dispatch the required checks would never start. The dispatch is a `workflow_dispatch` run, so the `changes` job treats it as heavy and the full suite runs (with the 60 minute limits and cold caches that a non-PR run gets, see above).
+- Permissions are `contents: write` (push the branch), `pull-requests: write` and `actions: write` (the dispatch). The repository setting "Allow GitHub Actions to create and approve pull requests" must be on.
+- It never merges or enables auto-merge. A person reviews the PR, and the bump merges only when the required checks are green. Only one bump PR is open at a time.
+- Manual run: `gh workflow run vcpkg-bump.yml -f dry_run=true` prints the diff and opens nothing (the default for a manual run). `-f dry_run=false` opens the PR; `-f commit=<sha>` pins a specific vcpkg commit instead of master. The monthly cron always opens the PR.
+- A bump changes the baseline, so the cache keys change with the manifest hash and the first run is cold. If a port update breaks the build, close the PR; the pins stay where they were.

@@ -6,6 +6,7 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
+#include "ichor/audio/ambience_suppress_rules.h"
 #include "ichor/combat_bridge/combat_bridge.h"
 #include "ichor/combat_bridge/dungeon_fight.h"
 #include "ichor/audio/music_player.h"
@@ -909,6 +910,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const std::uint32_t tellCue = ichor::resolveCueSound(audio, "combat.tell");
     const std::uint32_t splashCue = audio.findSound("A_Splash");
     const std::uint32_t rainBed = audio.findSound("A_Rain");
+    std::vector<std::string> axiomIds;
+    if (forged && forged->worldConfig) {
+        for (const ichor::SlotAssignment& slot : forged->worldConfig->slots) {
+            axiomIds.push_back(slot.axiomId);
+        }
+    }
     ichor::AmbienceLayers ambience;
     ambience.assign(ichor::AmbienceLayer::Weather, rainBed);
     // No biome beds exist yet, so the wind takes the bed layer.
@@ -2304,7 +2311,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             const glm::dvec3 feet = playerPosition(engine.scene());
             const float hour = ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour);
             const ichor::BiomeBlend here = forged->biomes->blendAt(feet.x, feet.z);
-            std::vector<ichor::BedGain> beds = ichor::blendedBeds(soundscape, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
+            std::vector<ichor::BedGain> beds = ichor::axiomBeds(soundscape, axiomIds, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
             ichor::addBeds(beds, {{"A_Wind", weatherAudio.wind}, {"A_Rain", weatherAudio.rain}});
             for (std::size_t i = 0; i < forged->sites.size(); ++i) {
                 const ichor::SettlementSite& site = forged->sites[i];
