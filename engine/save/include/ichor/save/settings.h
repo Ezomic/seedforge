@@ -11,6 +11,8 @@ namespace ichor {
 
 enum class DisplayMode : std::uint8_t { Windowed, Fullscreen };
 
+enum class ColourPalette : std::uint8_t { Default, ColourblindSafe };
+
 // A window or display size in pixels. 0 x 0 is "as the window was made": the default window size, or the
 // display's own mode in fullscreen.
 struct Resolution {
@@ -34,6 +36,10 @@ struct Settings {
     static constexpr DisplayMode kDefaultDisplayMode = DisplayMode::Windowed;
     static constexpr int kMaxResolutionSide = 16384;
     static constexpr bool kDefaultVsync = true;
+    static constexpr float kDefaultUiScale = 1.0f;
+    static constexpr float kMinUiScale = 0.75f;
+    static constexpr float kMaxUiScale = 1.5f;
+    static constexpr ColourPalette kDefaultPalette = ColourPalette::Default;
 
     float fovDegrees = kDefaultFovDegrees; // vertical
     float mouseSensitivity = kDefaultMouseSensitivity; // scales the right-button mouse look
@@ -42,6 +48,8 @@ struct Settings {
     DisplayMode displayMode = kDefaultDisplayMode;
     Resolution resolution; // the window size, or the fullscreen mode; 0 x 0 leaves the window as made
     bool vsync = kDefaultVsync;
+    float uiScale = kDefaultUiScale; // the menus and the HUD are drawn this many times their size
+    ColourPalette palette = kDefaultPalette;
 
     // Every field inside its range; a NaN or infinity becomes the default, as does a resolution with a side
     // that is zero, negative or absurd.
@@ -57,6 +65,9 @@ float effectiveMouseSensitivity(const Settings& stored, std::optional<float> ove
 // The settings after the player steps the sensitivity from the one they look with now, landing on
 // a tenth and inside the range.
 Settings stepMouseSensitivity(const Settings& stored, float current, int steps);
+
+// The settings after the player steps the UI scale a quarter at a time, inside the range.
+Settings stepUiScale(const Settings& stored, int steps);
 
 // The settings after the player steps the resolution through the display's sizes, starting from the one
 // nearest the size shown now and stopping at either end. An empty list changes nothing.

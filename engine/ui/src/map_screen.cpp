@@ -408,9 +408,18 @@ void MapScreen::setLayer(MapLayer layer, bool on)
     redraw();
 }
 
+void MapScreen::setColourblindSafe(bool on)
+{
+    if (document_ == nullptr || colourblindSafe_ == on) {
+        return;
+    }
+    colourblindSafe_ = on;
+    redraw();
+}
+
 void MapScreen::redraw()
 {
-    MapImage drawing = stack_.empty() ? plain_ : stack_.composite(layers_);
+    MapImage drawing = stack_.empty() ? plain_ : stack_.composite(layers_, colourblindSafe_);
     if (discovery_ && !drawing.empty()) {
         drawing = withFog(drawing, *discovery_);
     }

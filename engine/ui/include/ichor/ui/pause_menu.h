@@ -15,7 +15,7 @@ class ElementDocument;
 namespace ichor {
 
 // The menu Esc opens: a veil over the world and a card with the field of view, the mouse
-// sensitivity, the display mode, resolution and vsync, Resume and Quit.
+// sensitivity, the display mode, resolution and vsync, the UI scale and colour palette, Resume and Quit.
 // Hidden until shown.
 // The context must have the Cinzel and Alegreya Sans faces loaded.
 class PauseMenu {
@@ -53,6 +53,12 @@ public:
     void setVsync(bool on);
     int takeVsyncClicks();
 
+    // The UI scale steps and the palette toggle, reported like the display rows.
+    void setUiScale(float scale);
+    int takeUiScaleSteps();
+    void setColourblindSafe(bool on);
+    int takePaletteClicks();
+
     // Where the buttons sit on screen once laid out, for tests and for anything that wants to
     // point at them. Nothing while the menu is hidden.
     std::optional<std::pair<float, float>> resumeCentre() const { return centreOf(resume_); }
@@ -65,6 +71,9 @@ public:
     std::optional<std::pair<float, float>> resolutionDownCentre() const { return centreOf(resDown_); }
     std::optional<std::pair<float, float>> resolutionUpCentre() const { return centreOf(resUp_); }
     std::optional<std::pair<float, float>> vsyncCentre() const { return centreOf(vsync_); }
+    std::optional<std::pair<float, float>> uiScaleDownCentre() const { return centreOf(scaleDown_); }
+    std::optional<std::pair<float, float>> uiScaleUpCentre() const { return centreOf(scaleUp_); }
+    std::optional<std::pair<float, float>> paletteCentre() const { return centreOf(palette_); }
 
 private:
     struct Click final : Rml::EventListener {
@@ -90,6 +99,9 @@ private:
     Count resDownClicks_;
     Count resUpClicks_;
     Count vsyncClicks_;
+    Count scaleDownClicks_;
+    Count scaleUpClicks_;
+    Count paletteClicks_;
     Rml::Element* resume_ = nullptr;
     Rml::Element* quit_ = nullptr;
     Rml::Element* fovDown_ = nullptr;
@@ -103,6 +115,10 @@ private:
     Rml::Element* resUp_ = nullptr;
     Rml::Element* resValue_ = nullptr;
     Rml::Element* vsync_ = nullptr;
+    Rml::Element* scaleDown_ = nullptr;
+    Rml::Element* scaleUp_ = nullptr;
+    Rml::Element* scaleValue_ = nullptr;
+    Rml::Element* palette_ = nullptr;
     Rml::ElementDocument* document_ = nullptr;
     bool visible_ = false;
 };

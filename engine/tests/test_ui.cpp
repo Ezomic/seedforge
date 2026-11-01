@@ -730,6 +730,56 @@ TEST_CASE("the pause menu draws nothing until shown, and its buttons report clic
     REQUIRE(menu.takeResolutionSteps() == 0);
     REQUIRE(menu.takeVsyncClicks() == 0);
 
+    // The UI scale steps and the palette toggle sit under vsync and count their own clicks.
+    const auto scaleDown = menu.uiScaleDownCentre();
+    const auto scaleUp = menu.uiScaleUpCentre();
+    const auto palette = menu.paletteCentre();
+    REQUIRE(scaleDown.has_value());
+    REQUIRE(scaleUp.has_value());
+    REQUIRE(palette.has_value());
+    REQUIRE(scaleDown->second > menu.vsyncCentre()->second);
+    REQUIRE(palette->second > scaleDown->second);
+    REQUIRE(palette->second < menu.resumeCentre()->second);
+    REQUIRE(menu.takeUiScaleSteps() == 0);
+    REQUIRE(menu.takePaletteClicks() == 0);
+    click(*scaleUp, 0.4001);
+    click(*scaleUp, 0.4002);
+    click(*scaleDown, 0.4003);
+    click(*palette, 0.4004);
+    REQUIRE(menu.takeUiScaleSteps() == 1);
+    REQUIRE(menu.takeUiScaleSteps() == 0);
+    REQUIRE(menu.takePaletteClicks() == 1);
+    REQUIRE(menu.takePaletteClicks() == 0);
+    REQUIRE(menu.takeVsyncClicks() == 0);
+    menu.setUiScale(std::numeric_limits<float>::quiet_NaN()); // ignored, not drawn
+    menu.setUiScale(1.25f);
+    menu.setColourblindSafe(true);
+    frame(ui, renderer, 0.4005);
+    click(*scaleUp, 0.4006);
+    click(*palette, 0.4007);
+    menu.setVisible(false);
+    menu.setVisible(true);
+    REQUIRE(menu.takeUiScaleSteps() == 0); // a click from an earlier showing is not a click now
+    REQUIRE(menu.takePaletteClicks() == 0);
+
+    // At a UI scale of two the card lays out in half the pixels, so it draws twice as large, and a click lands on what it shows.
+    ui.setScale(2.0f);
+    ui.setSize(1280, 720);
+    frame(ui, renderer, 0.4008);
+    const auto bigResume = menu.resumeCentre();
+    REQUIRE(bigResume.has_value());
+    REQUIRE(std::abs(bigResume->first - 320.0f) < 2.0f); // the layout is in half-size pixels
+    ui.mouseMove(static_cast<int>(bigResume->first * 2.0f), static_cast<int>(bigResume->second * 2.0f));
+    frame(ui, renderer, 0.4009);
+    ui.mouseButton(0, true);
+    frame(ui, renderer, 0.4010);
+    ui.mouseButton(0, false);
+    frame(ui, renderer, 0.4011);
+    REQUIRE(menu.takeResume());
+    ui.setScale(1.0f);
+    ui.setSize(1280, 720);
+    frame(ui, renderer, 0.4012);
+
     // A click left over from before the menu was hidden does not count when it is shown again.
     click(*quit, 0.4);
     menu.setVisible(false);

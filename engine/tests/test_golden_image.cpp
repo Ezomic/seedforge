@@ -857,6 +857,68 @@ TEST_CASE("golden image: the map over the world")
     checkAgainstGolden(actual, goldenPath);
 }
 
+static void checkTerritoryMap(bool colourblindSafe, const char* name)
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        NO_VULKAN_DEVICE();
+    }
+    Heightfield heightfield;
+    REQUIRE(readWorld(std::filesystem::path(ICHOR_CONTENT_DIR) / "world", heightfield));
+    worldforge::FactionSpec first;
+    worldforge::FactionSpec second;
+    second.strategy = worldforge::ClaimStrategy::ResourceFollowing;
+    second.oreWeight = 200;
+    worldforge::ForgeConfig config;
+    config.factions = {first, second};
+    const worldforge::ForgedWorld world = worldforge::forgeWorld(3, 129, config, worldforge::ForgePhase::Politics);
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    MapScreen map(ui);
+    REQUIRE(map.ok());
+    map.setLayerStack(MapLayerStack(renderMapImage(heightfield), world));
+    map.setLayer(MapLayer::Territories, true);
+    map.setColourblindSafe(colourblindSafe);
+    map.setVisible(true);
+    ui.update(0.0);
+
+    RenderView view;
+    applyAtmosphere(atmosphereAt(17.5f), view);
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(-0.5f, 0.15f, -1.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / (std::string(name) + ".actual.png"), kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = goldenFile(std::string(name) + ".png");
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    checkAgainstGolden(actual, goldenPath);
+}
+
+TEST_CASE("golden image: the map territories in the default palette")
+{
+    checkTerritoryMap(false, "ui_map_territories");
+}
+
+TEST_CASE("golden image: the map territories in the colourblind-safe palette")
+{
+    checkTerritoryMap(true, "ui_map_territories_colourblind");
+}
+
 TEST_CASE("golden image: the default palette over the forest")
 {
     checkTerrainAtHour(15.0f, "terrain_graded", true, {}, false, false, true);
@@ -1041,6 +1103,51 @@ TEST_CASE("golden image: the pause menu over the world")
     REQUIRE(writePng(kOutDir / "ui_pause.actual.png", kWidth, kHeight, actual.data()));
 
     const std::filesystem::path goldenPath = goldenFile("ui_pause.png");
+    const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
+    if (update != nullptr && update[0] == '1') {
+        REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
+        SUCCEED("golden image written");
+        return;
+    }
+    checkAgainstGolden(actual, goldenPath);
+}
+
+TEST_CASE("golden image: the pause menu at a larger UI scale with the colourblind palette")
+{
+    OffscreenRenderer renderer;
+    if (!renderer.init(kWidth, kHeight, false)) {
+        NO_VULKAN_DEVICE();
+    }
+    VulkanUiRenderer vkUi(renderer.context(), renderer.colorFormat(), SceneRenderer::depthFormat());
+    REQUIRE(vkUi.init());
+    UiContext ui(vkUi, kWidth, kHeight);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_CONTENT_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    PauseMenu menu(ui);
+    REQUIRE(menu.ok());
+    menu.setUiScale(0.75f);
+    menu.setColourblindSafe(true);
+    ui.setScale(0.75f);
+    vkUi.setScale(0.75f);
+    ui.setSize(kWidth, kHeight);
+    menu.setVisible(true);
+    ui.update(0.0);
+
+    RenderView view;
+    applyAtmosphere(atmosphereAt(15.0f), view);
+    view.camera.rotation = glm::quatLookAt(glm::normalize(glm::vec3(-0.5f, 0.15f, -1.0f)), glm::vec3(0.0f, 1.0f, 0.0f));
+    std::vector<std::uint8_t> actual;
+    REQUIRE(renderer.render(view, actual, [&](VkCommandBuffer cmd, VkExtent2D extent) {
+        vkUi.begin(cmd, extent);
+        ui.render();
+        vkUi.end();
+    }));
+    std::filesystem::create_directories(kOutDir);
+    REQUIRE(writePng(kOutDir / "ui_pause_scaled.actual.png", kWidth, kHeight, actual.data()));
+
+    const std::filesystem::path goldenPath = goldenFile("ui_pause_scaled.png");
     const char* update = std::getenv("ICHOR_UPDATE_GOLDEN");
     if (update != nullptr && update[0] == '1') {
         REQUIRE(writePng(goldenPath, kWidth, kHeight, actual.data()));
