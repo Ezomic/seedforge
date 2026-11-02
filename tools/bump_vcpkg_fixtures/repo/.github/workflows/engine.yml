@@ -1,0 +1,12 @@
+name: engine
+env:
+  VCPKG_COMMIT: e456309491fd875487bf02b8a0dca76c1b1b00cc
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_COMMIT }}
+          path: vcpkg

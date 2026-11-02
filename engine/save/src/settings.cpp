@@ -16,6 +16,7 @@ namespace {
 
 constexpr std::string_view kHeader = "ichor-settings 1";
 constexpr std::string_view kTrailer = "end";
+constexpr std::string_view kBindPrefix = "bind.";
 constexpr std::size_t kMaxBytes = 4096;
 constexpr float kMouseSensitivityStep = 0.1f;
 constexpr float kUiScaleStep = 0.25f;
@@ -79,7 +80,7 @@ Settings Settings::clamped() const
     return {clampField(fovDegrees, kMinFovDegrees, kMaxFovDegrees, kDefaultFovDegrees),
             clampField(mouseSensitivity, kMinMouseSensitivity, kMaxMouseSensitivity, kDefaultMouseSensitivity), promptsSeen,
             displayMode == DisplayMode::Fullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed, clampResolution(resolution), vsync,
-            clampField(uiScale, kMinUiScale, kMaxUiScale, kDefaultUiScale), palette == ColourPalette::ColourblindSafe ? ColourPalette::ColourblindSafe : ColourPalette::Default};
+            clampField(uiScale, kMinUiScale, kMaxUiScale, kDefaultUiScale), palette == ColourPalette::ColourblindSafe ? ColourPalette::ColourblindSafe : ColourPalette::Default, sanitizedBindings(bindings)};
 }
 
 float effectiveMouseSensitivity(const Settings& stored, std::optional<float> override)
@@ -128,8 +129,13 @@ Settings stepResolution(const Settings& stored, const std::vector<Resolution>& m
 std::string serializeSettings(const Settings& settings)
 {
     const Settings safe = settings.clamped();
-    return std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\ndisplay={}\nresolution={}x{}\nvsync={}\nuiScale={}\npalette={}\n{}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity, safe.promptsSeen,
-        displayModeName(safe.displayMode), safe.resolution.width, safe.resolution.height, safe.vsync ? 1 : 0, safe.uiScale, paletteName(safe.palette), kTrailer);
+    std::string text = std::format("{}\nfov={}\nmouseSensitivity={}\npromptsSeen={}\ndisplay={}\nresolution={}x{}\nvsync={}\nuiScale={}\npalette={}\n", kHeader, safe.fovDegrees, safe.mouseSensitivity,
+        safe.promptsSeen, displayModeName(safe.displayMode), safe.resolution.width, safe.resolution.height, safe.vsync ? 1 : 0, safe.uiScale, paletteName(safe.palette));
+    for (std::size_t i = 0; i < kBindActionCount; ++i) {
+        const auto action = static_cast<BindAction>(i);
+        text += std::format("{}{}={}\n", kBindPrefix, bindActionKey(action), keyName(safe.bindings.key(action)));
+    }
+    return text + std::format("{}\n", kTrailer);
 }
 
 Settings parseSettings(std::string_view text)
@@ -170,6 +176,14 @@ Settings parseSettings(std::string_view text)
             }
             if (key == "palette") {
                 settings.palette = rest == "colourblind" ? ColourPalette::ColourblindSafe : ColourPalette::Default;
+                continue;
+            }
+            if (key.starts_with(kBindPrefix)) {
+                for (std::size_t i = 0; i < kBindActionCount; ++i) {
+                    if (key.substr(kBindPrefix.size()) == bindActionKey(static_cast<BindAction>(i))) {
+                        settings.bindings.keys[i] = parseKeyName(rest).value_or(0);
+                    }
+                }
                 continue;
             }
             if (key == "promptsSeen") {

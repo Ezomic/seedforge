@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/core/key_bindings.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -50,9 +52,10 @@ struct Settings {
     bool vsync = kDefaultVsync;
     float uiScale = kDefaultUiScale; // the menus and the HUD are drawn this many times their size
     ColourPalette palette = kDefaultPalette;
+    KeyBindings bindings; // the keys of the actions the player can rebind; bind.<action>=<key> in the file
 
     // Every field inside its range; a NaN or infinity becomes the default, as does a resolution with a side
-    // that is zero, negative or absurd.
+    // that is zero, negative or absurd. A bad or doubled key goes back to the action's default (sanitizedBindings).
     Settings clamped() const;
 
     bool operator==(const Settings&) const = default;

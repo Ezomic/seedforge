@@ -7,11 +7,14 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace ichor {
+
+struct WorldConfig;
 
 // What the forge makes today: the land, with channels cut along its rivers when asked, and where
 // the water goes over that final land.
@@ -22,6 +25,8 @@ struct ForgeRequest {
     // Take the land from libworldforge (forged_heightfield.h) instead of the value-noise stand-in. Off by
     // default, so the stand-in and every golden made from it stay as they are.
     bool forgedTerrain = false;
+    // Doc 08 phase 0: the world's axioms. Only the axiom gates read it; null or without axioms, they pass.
+    std::shared_ptr<const WorldConfig> axioms;
 };
 
 struct ForgedWorld {
@@ -70,8 +75,17 @@ ForgedWorld forgeWorld(const ForgeRequest& request);
 std::vector<GateFailure> runGates(const std::vector<Gate>& gates, const ForgedWorld& world, const ForgeRequest& request);
 
 // The gates that are cheap with the phases that exist: land above the water, not flat, a river when
-// rivers were asked for, and hydrology that agrees with itself.
+// rivers were asked for, and hydrology that agrees with itself, then axiomGates().
 std::vector<Gate> defaultGates();
+
+// Doc 01 invariants an axiom's merged directives put on the forged land. Each reads the request's WorldConfig and
+// passes when it is absent or does not set the directive, so a world without axioms is never rejected by them:
+//  settlement-elevation-land  settlement.min_elevation_m: enough dry land stands at or above that height
+//  dive-water-reachable       traversal.unlock has swim_deep: water kDiveDepthM deep is reachable from a shore
+//  spring-needs-water         poi.weights gives sacred_spring weight: a river, lake or sea exists
+//  coast-needs-shore          biomes.inject has tidal_ruin or salt_blight, or poi.weights gives pharos or
+//                             drowned_polis weight: land meets water somewhere
+std::vector<Gate> axiomGates();
 
 constexpr std::uint32_t kMaxRerolls = 8;
 

@@ -1,0 +1,101 @@
+name: vcpkg bump
+
+on:
+  schedule:
+    - cron: "0 5 1 * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Show the bump as a diff and open no branch or PR"
+        type: boolean
+        default: true
+      commit:
+        description: "vcpkg commit to pin (default: latest master)"
+        type: string
+        default: ""
+
+# contents: push the bump branch. pull-requests: open the PR. actions: start engine.yml on that branch, because a push or PR
+# made with GITHUB_TOKEN never triggers workflows by itself, so without the dispatch the required checks would not run.
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: vcpkg-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: bump vcpkg baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      COMMIT: ${{ inputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Check the bump tool
+        run: python3 tools/bump_vcpkg.py --self-test
+      - name: Bump every pin
+        id: bump
+        run: |
+          set -euo pipefail
+          python3 tools/bump_vcpkg.py --check
+          args=()
+          [ -n "$COMMIT" ] && args+=(--commit "$COMMIT")
+          result=$(python3 tools/bump_vcpkg.py "${args[@]}")
+          echo "$result"
+          python3 tools/bump_vcpkg.py --check
+          if [ "${result%% *}" = unchanged ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          read -r old new <<< "$result"
+          {
+            echo "changed=true"
+            echo "old=$old"
+            echo "new=$new"
+          } >> "$GITHUB_OUTPUT"
+          git diff --stat
+          git diff
+      - name: Dependency policy still passes
+        if: steps.bump.outputs.changed == 'true'
+        run: python3 tools/check_deps.py --root .
+      - name: Open the pull request
+        if: steps.bump.outputs.changed == 'true' && env.DRY_RUN != 'true'
+        env:
+          OLD: ${{ steps.bump.outputs.old }}
+          NEW: ${{ steps.bump.outputs.new }}
+        run: |
+          set -euo pipefail
+          branch="chore/vcpkg-bump-${NEW:0:10}"
+          existing=$(gh pr list --state open --search "head:chore/vcpkg-bump-" --json number --jq 'length')
+          if [ "$existing" != 0 ]; then
+            echo "A vcpkg bump PR is already open; not opening another."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add engine/vcpkg.json .github/workflows
+          git commit -m "Bump vcpkg baseline to ${NEW:0:10}"
+          git push origin "$branch"
+          body=$(cat <<EOF
+          Monthly vcpkg baseline bump, made by \`vcpkg-bump.yml\` (SEED-764).
+
+          - Old: \`$OLD\`
+          - New: \`$NEW\`
+          - Changed together: \`VCPKG_COMMIT\` in \`engine.yml\`, the vcpkg checkouts in \`nightly.yml\`, and \`builtin-baseline\` in \`engine/vcpkg.json\`.
+          - Compare: https://github.com/microsoft/vcpkg/compare/$OLD...$NEW
+
+          ## Merge danger
+
+          Two-way door: reverting this PR restores the old pins. It changes the port versions the engine builds against, so a port update can break the build or move a golden or smoke hash. It also changes the vcpkg binary cache keys, so the first run after the merge is cold. Merging deploys nothing. Do not merge until the required checks (\`windows runtime + tests\`, \`linux headless + sanitizers\`) are green on this PR.
+          EOF
+          )
+          gh pr create --base main --head "$branch" --title "Bump vcpkg baseline to ${NEW:0:10}" --body "$body"
+          gh workflow run engine.yml --ref "$branch"

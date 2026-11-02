@@ -26,6 +26,9 @@ on:
       play_seeds:
         description: playthrough bot world seeds, comma separated
         default: "2"
+      dungeon_bot_skeletons:
+        description: how many baked dungeon skeletons the traversal bot walks
+        default: "20"
 
 jobs:
   ci-time-trend:
@@ -408,6 +411,77 @@ jobs:
         with:
           name: nightly-playthrough-log
           path: play.log
+          if-no-files-found: ignore
+
+  dungeon-traversal-bot:
+    # SEED-765: a bot walks the player's character body, under the real physics, from the entry room to the objective of 20 baked
+    # dungeon skeletons and names every door or ledge it cannot pass. Nightly only; the pull request runs 3 skeletons in the
+    # ordinary test run. Same Release build as the walk job.
+    name: dungeon traversal bot (linux headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      ICHOR_NIGHTLY_DUNGEON_BOT_SKELETONS: ${{ inputs.dungeon_bot_skeletons || '20' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: ./.github/actions/lfs-cache
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: e456309491fd875487bf02b8a0dca76c1b1b00cc
+          path: vcpkg
+          fetch-depth: 0
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang ccache
+      - name: Restore vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-linux-v2-${{ hashFiles('engine/vcpkg.json', 'engine/ports/**') }}
+          restore-keys: vcpkg-linux-v2-
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-dungeon-bot-${{ github.sha }}
+          restore-keys: |
+            ccache-dungeon-bot-
+            ccache-play-
+            ccache-walk-
+            ccache-asan-
+      - name: Configure
+        run: cmake --preset linux-headless-asan -DCMAKE_BUILD_TYPE=Release -DENGINE_SANITIZERS=OFF
+        working-directory: engine
+      - name: Build
+        run: cmake --build --preset linux-headless-asan --target ichor_tests_world
+        working-directory: engine
+      - name: Dungeon traversal bot
+        id: traverse
+        run: |
+          set -o pipefail
+          engine/build/linux-headless-asan/tests/ichor_tests_world "nightly: the dungeon traversal bot*" | tee traverse.log
+      - name: Summarize traversal
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Dungeon traversal bot"
+            echo '```'
+            grep -E '^TRAVERSE' traverse.log
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload traversal log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-dungeon-traversal-log
+          path: traverse.log
           if-no-files-found: ignore
 
   linux-release-perf:

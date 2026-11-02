@@ -1,11 +1,13 @@
 #pragma once
 
 #include "ichor/data/axiom.h"
+#include "ichor/data/featured_seeds.h"
 #include "ichor/data/slot_roll.h"
 #include "ichor/ui/ui_context.h"
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -36,6 +38,20 @@ struct NewGameView {
     bool operator==(const NewGameView&) const = default;
 };
 
+// One featured seed as the new-game screen lists it: the curated title and the titles of the
+// visible axioms it rolls (slots A to C only, so the hidden slots stay hidden).
+struct FeaturedRow {
+    std::uint64_t seed = 0;
+    std::string title;
+    std::string summary;
+    bool operator==(const FeaturedRow&) const = default;
+};
+
+// The rows for a featured list. An entry that fails validateFeaturedSeed against `pool` (empty or
+// bad title, a roll that fails, a pin that does not match) is dropped, as is one whose roll shows
+// no axiom from `axioms`. Order is kept.
+std::vector<FeaturedRow> buildFeaturedRows(std::span<const FeaturedSeed> list, std::span<const Axiom> pool, const AxiomSet& axioms);
+
 // The view for a world seed and its slot roll. A slot the roll did not fill, or filled with an
 // axiom missing from `axioms`, shows a placeholder title; the roll's error text is never used,
 // because it may name a hidden slot.
@@ -57,6 +73,13 @@ public:
 
     void setView(const NewGameView& view);
 
+    // The featured list shown above Begin. An empty list hides the section.
+    void setFeatured(const std::vector<FeaturedRow>& rows);
+
+    // The seed of the featured row clicked since the last call, once. The caller fills the seed
+    // by setting a new view for it.
+    std::optional<std::uint64_t> takePickedSeed();
+
     // True once after the Begin button was clicked.
     bool takeBegin();
 
@@ -72,8 +95,16 @@ private:
         bool requested = false;
     };
 
+    struct Pick final : Rml::EventListener {
+        void ProcessEvent(Rml::Event& event) override;
+        std::vector<std::uint64_t> seeds;
+        std::optional<std::uint64_t> picked;
+    };
+
     UiContext& ui_;
     Click click_;
+    Pick pick_;
+    Rml::Element* featured_ = nullptr;
     Rml::ElementDocument* document_ = nullptr;
     Rml::Element* begin_ = nullptr;
     Rml::Element* seed_ = nullptr;

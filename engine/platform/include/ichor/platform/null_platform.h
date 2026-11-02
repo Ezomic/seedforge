@@ -2,6 +2,8 @@
 
 #include "ichor/platform/platform.h"
 
+#include <utility>
+
 namespace ichor {
 
 // No window, no device input, and a clock that advances one fixed tick per
@@ -28,6 +30,10 @@ public:
     void setOverlayKey(bool down) { overlayKey_ = down; }
     bool focused() const override { return focused_; }
     void setFocused(bool focused) { focused_ = focused; }
+    void setKeyBindings(const KeyBindings& bindings) override { bindings_ = bindings; }
+    const KeyBindings& keyBindings() const { return bindings_; }
+    KeyCode takePressedKey() override { return std::exchange(pressedKey_, KeyCode{0}); }
+    void pressKey(KeyCode key) { pressedKey_ = key; }
     unsigned pumpCount() const { return pumps_; }
 
     static constexpr double kTick = 1.0 / 60.0;
@@ -41,6 +47,8 @@ private:
     bool soundLegendKey_ = false;
     bool captionKey_ = false;
     bool focused_ = true;
+    KeyBindings bindings_;
+    KeyCode pressedKey_ = 0;
 };
 
 }

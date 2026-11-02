@@ -1,4 +1,5 @@
 #include "ichor/ui/pause_menu.h"
+#include "ichor/ui/rebind_screen.h"
 #include "ichor/ui/ledger.h"
 #include "ichor/ui/hud.h"
 #include "ichor/ui/recording_renderer.h"
@@ -874,4 +875,67 @@ TEST_CASE("the HUD shows the target line only while a target is set")
     hud.setGuide("");
     frame(ui, renderer, 0.3);
     REQUIRE(renderer.draws().size() == plain);
+}
+
+TEST_CASE("the controls screen shows the bindings, hears a row click, and Reset and Back report once")
+{
+    RecordingUiRenderer renderer;
+    UiContext ui(renderer, 1280, 720);
+    REQUIRE(ui.ok());
+    const std::filesystem::path fonts = std::filesystem::path(ICHOR_ART_DIR) / "fonts";
+    REQUIRE(ui.loadFontFace(fonts / "AlegreyaSans-Regular.ttf"));
+    REQUIRE(ui.loadFontFace(fonts / "Cinzel.ttf"));
+    PauseMenu pause(ui);
+    RebindScreen screen(ui);
+    REQUIRE(pause.ok());
+    REQUIRE(screen.ok());
+    REQUIRE_FALSE(screen.visible());
+
+    frame(ui, renderer, 0.0);
+    REQUIRE(renderer.draws().empty());
+
+    const auto click = [&](std::pair<float, float> at, double time) {
+        ui.mouseMove(static_cast<int>(at.first), static_cast<int>(at.second));
+        frame(ui, renderer, time);
+        ui.mouseButton(0, true);
+        frame(ui, renderer, time + 0.01);
+        ui.mouseButton(0, false);
+        frame(ui, renderer, time + 0.02);
+    };
+    pause.setVisible(true);
+    frame(ui, renderer, 0.05);
+    const auto controls = pause.controlsCentre();
+    REQUIRE(controls.has_value());
+    click(*controls, 0.1);
+    REQUIRE(pause.takeControls());
+    REQUIRE_FALSE(pause.takeControls());
+    pause.setVisible(false);
+
+    screen.setVisible(true);
+    frame(ui, renderer, 0.2);
+    REQUIRE(renderer.draws().size() >= 20);
+    REQUIRE_FALSE(screen.takeRebindClick().has_value());
+
+    for (std::size_t i = 0; i < kBindActionCount; ++i) {
+        const auto at = screen.keyCentre(static_cast<BindAction>(i));
+        REQUIRE(at.has_value());
+        REQUIRE(at->second < 720.0f);
+    }
+    const auto dodge = screen.keyCentre(BindAction::Dodge);
+    click(*dodge, 0.3);
+    REQUIRE(screen.takeRebindClick() == BindAction::Dodge);
+    REQUIRE_FALSE(screen.takeRebindClick().has_value());
+    screen.setWaiting(BindAction::Dodge);
+    REQUIRE(screen.waiting() == BindAction::Dodge);
+    frame(ui, renderer, 0.4);
+    screen.setWaiting(std::nullopt);
+    screen.setBindings(rebound(KeyBindings{}, BindAction::Dodge, 25));
+    frame(ui, renderer, 0.5);
+
+    click(*screen.resetCentre(), 0.6);
+    REQUIRE(screen.takeReset());
+    REQUIRE_FALSE(screen.takeReset());
+    click(*screen.backCentre(), 0.7);
+    REQUIRE(screen.takeBack());
+    REQUIRE_FALSE(screen.takeBack());
 }

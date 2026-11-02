@@ -6,6 +6,7 @@
 #include "ichor/audio/miniaudio_device.h"
 #include "ichor/audio/null_audio.h"
 #include "ichor/audio/ambience_layers.h"
+#include "ichor/audio/ambience_suppress_rules.h"
 #include "ichor/combat_bridge/combat_bridge.h"
 #include "ichor/combat_bridge/dungeon_fight.h"
 #include "ichor/audio/music_player.h"
@@ -34,6 +35,7 @@
 #include "ichor/ui/hud.h"
 #include "ichor/ui/prompt_screen.h"
 #include "ichor/ui/note_box.h"
+#include "ichor/ui/notice_screen.h"
 #include "ichor/world/palette.h"
 #include "ichor/world/water_field.h"
 #include "ichor/traversal/roads.h"
@@ -52,6 +54,7 @@
 #include "ichor/ui/map_screen_model.h"
 #include "ichor/ui/new_game_screen.h"
 #include "ichor/ui/pause_menu.h"
+#include "ichor/ui/rebind_screen.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
@@ -75,6 +78,7 @@
 #include "ichor/ui/new_game_flow.h"
 #include "ichor/world/dungeon_entry.h"
 #include "ichor/world/dungeon_reverb.h"
+#include "ichor/world/poi_discovery.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_atmosphere.h"
 #include "ichor/world/forged_campaign_hook.h"
@@ -101,6 +105,7 @@
 #include <filesystem>
 #include <fstream>
 #include <format>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -115,6 +120,7 @@
 namespace {
 
 constexpr float kFovStepDegrees = 5.0f;
+constexpr double kStartupNoticeSeconds = 8.0;
 
 struct Options {
     bool headless = false;
@@ -149,6 +155,7 @@ struct Options {
     bool editor = false;
     bool showMap = false;
     bool showPause = false;
+    bool showRebind = false;
     int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
     bool standInAtmosphere = false; // a forged world keeps the stand-in sky and weather, for comparing
@@ -325,6 +332,8 @@ bool parse(int argc, char** argv, Options& options)
             options.showMap = true;
         } else if (arg == "--pause") {
             options.showPause = true;
+        } else if (arg == "--rebind") {
+            options.showRebind = true;
         } else if (arg == "--map-explore" && hasValue) {
             if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
         } else if (arg == "--new-game") {
@@ -836,6 +845,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::ForgedScenery scenery;
     std::set<std::string> bakedDungeons;
     std::unique_ptr<ichor::DungeonEntry> dungeonEntry;
+    std::unique_ptr<ichor::PoiDiscovery> poiDiscovery;
     std::unique_ptr<ichor::DungeonFight> dungeonFight; // SEED-648: the enemies in the dungeons, with --combat
     std::uint32_t sceneryBase = 0;
     bool sceneryDrawn = false;
@@ -900,6 +910,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     const std::uint32_t tellCue = ichor::resolveCueSound(audio, "combat.tell");
     const std::uint32_t splashCue = audio.findSound("A_Splash");
     const std::uint32_t rainBed = audio.findSound("A_Rain");
+    std::vector<std::string> axiomIds;
+    if (forged && forged->worldConfig) {
+        for (const ichor::SlotAssignment& slot : forged->worldConfig->slots) {
+            axiomIds.push_back(slot.axiomId);
+        }
+    }
     ichor::AmbienceLayers ambience;
     ambience.assign(ichor::AmbienceLayer::Weather, rainBed);
     // No biome beds exist yet, so the wind takes the bed layer.
@@ -1054,6 +1070,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
         }
     };
+    platform.setKeyBindings(settings.bindings);
+    engine.setKeyBindings(settings.bindings);
     // The stored display settings go to the window once; a headless run has none and a screenshot run keeps its hidden one.
     const bool displayFromSettings = !options.headless && options.screenshot.empty();
     const auto displayRequest = [&] { return ichor::DisplayRequest{settings.displayMode == ichor::DisplayMode::Fullscreen, {settings.resolution.width, settings.resolution.height}}; };
@@ -1095,6 +1113,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         parley->install(engine.scene());
     }
 
+    std::string startupNotice;
+    std::uint64_t startupNoticeTick = 0;
     if (!options.loadSlot.empty()) {
         const ichor::LoadResult loaded = slots.load(options.loadSlot, engine.scene(), saveContext());
         if (loaded.status != ichor::LoadStatus::Loaded) {
@@ -1105,6 +1125,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (loaded.chronicleDamaged) {
             ichor::log(ichor::LogLevel::Warn, "the slot's chronicle was unreadable and starts empty");
         }
+        startupNotice = ichor::restoreNotice(options.loadSlot, loaded);
+        startupNoticeTick = engine.scene().tickCount();
         ichor::logf(ichor::LogLevel::Info, "slot '{}' loaded at tick {}{}{}", options.loadSlot, loaded.info.tick, loaded.fromBackup ? ", from a backup" : "",
             loaded.dataChanged ? ", data has changed since it was saved" : "");
     } else if (!options.load.empty()) {
@@ -1225,6 +1247,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     // sound of a settlement near it, and footsteps by surface. Audio only reads the scene, so none of it is sim state.
     // A bed or step whose clip does not exist is silent.
     ichor::Soundscape soundscape;
+    // A footfall at the player's feet. The cooked foot contacts of the drawn Exile call it from the render path while
+    // `markerFootsteps` holds; otherwise the distance pacer below decides when the feet land.
+    std::function<void(const glm::dvec3&)> playFootstep;
+    bool markerFootsteps = false;
     ichor::BedMixer bedMixer;
     std::vector<ichor::SettlementSoundType> settlementTypes;
     if (forged && forged->biomes) {
@@ -1235,19 +1261,21 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         for (const ichor::SettlementSite& site : forged->sites) {
             settlementTypes.push_back(ichor::settlementTypeForBiome(worldforge::kBiomeNames[static_cast<std::size_t>(forged->biomes->biomeAt(site.x, site.z))]));
         }
+        playFootstep = [&](const glm::dvec3& feet) {
+            const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
+            const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
+            if (const auto step = ichor::footstepFor(soundscape, surface)) {
+                const std::uint32_t clip = audio.findSound(step->clip);
+                if (clip != ichor::Mixer::kNoSound) {
+                    audio.play(clip, feet, false, step->gain);
+                }
+            }
+        };
         engine.scene().addSystem("footsteps", [&, pacer = ichor::FootstepPacer{}](ichor::Scene& scene, double, const ichor::InputFrame&) mutable {
             for (auto [entity, transform, player] : scene.registry().view<const ichor::Transform, const ichor::Player>().each()) {
                 const glm::dvec3& feet = transform.position;
-                if (!pacer.step(feet.x, feet.z)) {
-                    continue;
-                }
-                const glm::vec3 splat = forged->biomes->splatAt(feet.x, feet.z);
-                const ichor::SoundSurface surface = ichor::soundSurface(splat.x, splat.y, splat.z, roadField.coverageAt(feet.x, feet.z), waterField ? waterField->at(feet.x, feet.z).depth : 0.0f);
-                if (const auto step = ichor::footstepFor(soundscape, surface)) {
-                    const std::uint32_t clip = audio.findSound(step->clip);
-                    if (clip != ichor::Mixer::kNoSound) {
-                        audio.play(clip, feet, false, step->gain);
-                    }
+                if (pacer.step(feet.x, feet.z) && !markerFootsteps) {
+                    playFootstep(feet);
                 }
             }
         });
@@ -1256,6 +1284,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         // Streaming advances once per tick, so residency follows the path and
         // the budget alone. While the gate holds no ticks run, so it advances
         // the streamer itself until the required ring is in.
+        if (forged) {
+            poiDiscovery = std::make_unique<ichor::PoiDiscovery>(*forged);
+            poiDiscovery->install(engine.scene());
+        }
         if (dungeonEntry) {
             dungeonEntry->install(engine.scene());
             if (combat) {
@@ -1422,7 +1454,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::MapAnnotationStore mapMarks;
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
+    std::unique_ptr<ichor::RebindScreen> rebindScreen;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
+    ichor::AxiomSet newGameAxioms;
+    std::vector<ichor::Axiom> newGamePool;
+    const auto showNewGameSeed = [&](std::uint64_t seed) {
+        newGameScreen->setView(ichor::buildNewGameView(seed, ichor::rollSlots(seed, newGamePool), newGameAxioms));
+    };
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
     std::unique_ptr<ichor::DeathScreen> deathScreen;
@@ -1431,6 +1469,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::FirstPrompts firstPrompts{.seen = settings.promptsSeen};
     bool promptHeld = true;
     std::unique_ptr<ichor::NoteBox> noteBox;
+    std::unique_ptr<ichor::NoticeScreen> noticeScreen;
     ichor::FeedbackPrompt notePrompt;
     bool noteShown = false; // from the frame after F8, so the note's screenshot is of the game, not the box
     bool paused = false;
@@ -1481,6 +1520,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
+            rebindScreen = std::make_unique<ichor::RebindScreen>(*ui);
+            rebindScreen->setBindings(settings.bindings);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             pauseMenu->setMouseSensitivity(mouseSensitivity);
             pauseMenu->setFullscreen(platform.fullscreen());
@@ -1497,15 +1538,18 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             deathScreen = std::make_unique<ichor::DeathScreen>(*ui);
             promptScreen = std::make_unique<ichor::PromptScreen>(*ui);
             noteBox = std::make_unique<ichor::NoteBox>(*ui);
+            noticeScreen = std::make_unique<ichor::NoticeScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !rebindScreen->ok() || !newGameScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             promptScreen.reset();
+            noticeScreen.reset();
             noteBox.reset();
             deathScreen.reset();
             captionScreen.reset();
             combatHud.reset();
             newGameScreen.reset();
+            rebindScreen.reset();
             pauseMenu.reset();
             landmarkCompass.reset();
             mapBinding.reset();
@@ -1533,24 +1577,24 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
         }
-        if (options.showPause && !editing) {
+        if ((options.showPause || options.showRebind) && !editing) {
             paused = true;
-            pauseMenu->setVisible(true);
+            pauseMenu->setVisible(!options.showRebind);
+            rebindScreen->setVisible(options.showRebind);
         }
         if (options.showNewGame && !editing) {
-            ichor::AxiomSet axioms;
-            if (!axioms.loadDirectory(options.data)) {
+            if (!newGameAxioms.loadDirectory(options.data)) {
                 ichor::log(ichor::LogLevel::Warn, "data: the axioms could not be loaded, so the new-game screen shows no titles");
             }
-            std::vector<ichor::Axiom> pool;
-            for (const auto& [id, axiom] : axioms.axioms()) {
-                pool.push_back(axiom);
+            for (const auto& [id, axiom] : newGameAxioms.axioms()) {
+                newGamePool.push_back(axiom);
             }
-            const ichor::SlotRollResult roll = ichor::rollSlots(worldSeed, pool);
-            if (!roll.ok()) {
+            if (!ichor::rollSlots(worldSeed, newGamePool).ok()) {
                 ichor::log(ichor::LogLevel::Warn, "the world's axioms could not be rolled from the data");
             }
-            newGameScreen->setView(ichor::buildNewGameView(worldSeed, roll, axioms));
+            showNewGameSeed(worldSeed);
+            const std::vector<ichor::FeaturedSeed> featuredSeeds = ichor::loadFeaturedFile(options.data / "showcase" / "seeds.json");
+            newGameScreen->setFeatured(ichor::buildFeaturedRows(featuredSeeds, newGamePool, newGameAxioms));
             newGameScreen->setVisible(true);
         }
         // The simulation clock drives the UI, so a replay sees the same animations.
@@ -1586,7 +1630,10 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
                 }
                 if (promptScreen) {
-                    promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld));
+                    promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld, settings.bindings));
+                }
+                if (noticeScreen) {
+                    noticeScreen->bind(!startupNotice.empty() && static_cast<double>(engine.scene().tickCount() - startupNoticeTick) * config.fixedDt < kStartupNoticeSeconds ? std::optional<std::string>(startupNotice) : std::nullopt);
                 }
                 if (noteBox) {
                     noteBox->bind(notePrompt.open() && noteShown ? std::optional<std::string>(notePrompt.text()) : std::nullopt);
@@ -1627,8 +1674,14 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     inventoryScreen->bind(ichor::buildInventoryScreen(carry->view(engine.scene()), carry->notice(engine.scene())));
                 }
                 if (characterScreen->visible()) {
-                    // The app has no progression state yet, so only health is known.
-                    characterScreen->bind({{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}});
+                    // Only health and the discovery XP are known: the app has no other progression state yet.
+                    ichor::CharacterScreenInput character{{{ichor::CharacterStat::Health, hudHealth, hudMaxHealth}}, {}, {}, {}};
+                    if (poiDiscovery) {
+                        for (const ichor::PoiDiscoveryEntry& entry : poiDiscovery->found(engine.scene())) {
+                            character.discoveries.push_back({entry.poiId, entry.xp});
+                        }
+                    }
+                    characterScreen->bind(character);
                 }
                 if (forged) {
                     const glm::dvec3 walker = playerPosition(engine.scene());
@@ -1716,9 +1769,15 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         for (auto [entity, previous, transform, player] : scene.registry().view<const ichor::PreviousTransform, const ichor::Transform, const ichor::Player>().each()) {
             glm::dvec3 feet = blend(previous, transform).first;
             glm::dvec3 eye = feet + glm::dvec3(0.0, 1.6, 0.0);
+            markerFootsteps = false;
             if (exileAvatar.loaded() && !(combat && combat->live())) {
                 // The Exile walks in front of a camera behind it; the avatar is drawn only, so the sim never sees it.
                 feet = exileAvatar.appendPlayer(previous.position, transform.position, alpha, config.fixedDt, scene.time() + alpha * config.fixedDt, heightfield.heightAt(feet.x, feet.z), view);
+                const std::vector<std::uint32_t> footfalls = exileAvatar.takeFootfalls();
+                markerFootsteps = playFootstep && exileAvatar.hasFootContacts();
+                for (std::size_t i = 0; markerFootsteps && i < footfalls.size(); ++i) {
+                    playFootstep(feet);
+                }
                 eye = ichor::walkFollowPosition(feet, viewYaw);
                 eye.y = ichor::followClearY(eye.y, heightfield.heightAt(eye.x, eye.z));
             }
@@ -1844,6 +1903,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 viewYaw = static_cast<float>(*yaw);
             }
         }
+        if (poiDiscovery && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
+            if (const std::string found = poiDiscovery->notice(scene); !found.empty()) {
+                hudGuide = found;
+            }
+        }
         if (carry && (!dungeonEntry || dungeonEntry->prompt(scene).empty())) {
             if (const std::string prompt = carry->prompt(scene); !prompt.empty()) {
                 hudGuide = prompt;
@@ -1938,6 +2002,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 mapScreen->setVisible(false); // Esc first puts the map away
             } else if (newGameScreen && newGameScreen->visible()) {
                 newGameScreen->setVisible(false);
+            } else if (rebindScreen->visible()) {
+                if (rebindScreen->waiting()) {
+                    rebindScreen->setWaiting(std::nullopt);
+                } else {
+                    rebindScreen->setVisible(false);
+                    pauseMenu->setVisible(true);
+                }
             } else {
                 paused = !paused;
                 pauseMenu->setVisible(paused);
@@ -1992,6 +2063,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (mapScreen->takeCloseRequest()) {
                 mapScreen->setVisible(false);
+            }
+            if (const std::optional<std::uint64_t> picked = newGameScreen->takePickedSeed()) {
+                showNewGameSeed(*picked);
             }
             if (newGameScreen->takeBegin()) {
                 newGameScreen->setVisible(false);
@@ -2085,8 +2159,39 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
                 persistSettings();
             }
+            if (pauseMenu->takeControls()) {
+                pauseMenu->setVisible(false);
+                rebindScreen->setVisible(true);
+                rebindScreen->setBindings(settings.bindings);
+                platform.takePressedKey();
+            }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
+            }
+            if (rebindScreen->visible()) {
+                const auto applyBindings = [&] {
+                    platform.setKeyBindings(settings.bindings);
+                    engine.setKeyBindings(settings.bindings);
+                    rebindScreen->setBindings(settings.bindings);
+                    persistSettings();
+                };
+                if (const auto clicked = rebindScreen->takeRebindClick()) {
+                    rebindScreen->setWaiting(clicked);
+                    platform.takePressedKey();
+                }
+                if (const ichor::KeyCode pressed = platform.takePressedKey(); pressed != 0 && rebindScreen->waiting() && ichor::bindable(pressed)) {
+                    settings.bindings = ichor::rebound(settings.bindings, *rebindScreen->waiting(), pressed);
+                    rebindScreen->setWaiting(std::nullopt);
+                    applyBindings();
+                }
+                if (rebindScreen->takeReset()) {
+                    settings.bindings = ichor::KeyBindings{};
+                    applyBindings();
+                }
+                if (rebindScreen->takeBack()) {
+                    rebindScreen->setVisible(false);
+                    pauseMenu->setVisible(true);
+                }
             }
         }
         // A click in the editor picks what is under the cursor; one on empty space clears the pick.
@@ -2211,7 +2316,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             const glm::dvec3 feet = playerPosition(engine.scene());
             const float hour = ichor::hourOfDay(engine.scene().tickCount(), config.fixedDt, options.daySeconds, options.startHour);
             const ichor::BiomeBlend here = forged->biomes->blendAt(feet.x, feet.z);
-            std::vector<ichor::BedGain> beds = ichor::blendedBeds(soundscape, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
+            std::vector<ichor::BedGain> beds = ichor::axiomBeds(soundscape, axiomIds, worldforge::kBiomeNames[static_cast<std::size_t>(here.primary)], worldforge::kBiomeNames[static_cast<std::size_t>(here.secondary)], here.weight, hour);
             ichor::addBeds(beds, {{"A_Wind", weatherAudio.wind}, {"A_Rain", weatherAudio.rain}});
             for (std::size_t i = 0; i < forged->sites.size(); ++i) {
                 const ichor::SettlementSite& site = forged->sites[i];
@@ -2331,7 +2436,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause | --rebind] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe

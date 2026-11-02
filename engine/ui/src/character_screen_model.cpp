@@ -13,6 +13,7 @@ namespace {
 
 constexpr double kMaxStatValue = 1.0e9;
 constexpr std::int32_t kStandingLimit = 1000;
+constexpr std::int64_t kMaxDiscoveryTotal = 1'000'000'000;
 constexpr std::int32_t kMaxGrowthPercent = 10000;
 
 bool isContinuation(unsigned char c)
@@ -222,6 +223,31 @@ std::vector<CharacterScreenSection> buildCharacterScreen(const CharacterScreenIn
         if (!lines.empty()) {
             CharacterScreenSection section{CharacterSectionKind::Standing, "Standing", {}, 0};
             capLines(section, lines, kCharacterScreenMaxStandingLines);
+            view.push_back(std::move(section));
+        }
+    }
+
+    {
+        std::vector<CharacterScreenLine> lines;
+        std::int64_t total = 0;
+        for (auto it = input.discoveries.rbegin(); it != input.discoveries.rend(); ++it) {
+            std::string name = clean(it->place);
+            if (name.empty() || it->xp < 0) {
+                continue;
+            }
+            total = std::min<std::int64_t>(total + it->xp, kMaxDiscoveryTotal);
+            CharacterScreenLine line;
+            line.text = std::move(name);
+            line.value = static_cast<std::int32_t>(std::min<std::int64_t>(it->xp, kMaxDiscoveryTotal));
+            lines.push_back(std::move(line));
+        }
+        if (!lines.empty()) {
+            CharacterScreenSection section{CharacterSectionKind::Discoveries, "Discoveries", {}, 0};
+            capLines(section, lines, kCharacterScreenMaxDiscoveryLines);
+            CharacterScreenLine totalLine;
+            totalLine.text = "Discovery XP";
+            totalLine.value = static_cast<std::int32_t>(total);
+            section.lines.insert(section.lines.begin(), std::move(totalLine));
             view.push_back(std::move(section));
         }
     }

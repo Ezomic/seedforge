@@ -1,7 +1,10 @@
 #include "ichor/audio/ambience_suppress_rules.h"
+#include "ichor/data/data_set.h"
+#include "ichor/data/world_config.h"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -79,5 +82,68 @@ TEST_CASE("the same inputs always give the same answer")
     for (std::size_t i = 0; i < a.size(); ++i) {
         CHECK(a[i].id == b[i].id);
         CHECK(a[i].suppression == b[i].suppression);
+    }
+}
+
+namespace {
+
+Soundscape realSoundscape()
+{
+    DataSet data;
+    REQUIRE(data.loadDirectory(std::filesystem::path(ICHOR_GAME_DATA_DIR)));
+    Soundscape soundscape;
+    std::string error;
+    REQUIRE(Soundscape::load(data, soundscape, error));
+    return soundscape;
+}
+
+std::vector<std::string> worldAxioms(std::string_view ids)
+{
+    const WorldConfigResult world = loadPinnedWorldConfig(ids, ICHOR_GAME_DATA_DIR);
+    REQUIRE(world.ok());
+    std::vector<std::string> out;
+    for (const SlotAssignment& slot : world.config.slots)
+        out.push_back(slot.axiomId);
+    return out;
+}
+
+float faunaGain(const std::vector<BedGain>& beds)
+{
+    float total = 0.0f;
+    for (const BedGain& bed : beds)
+        if (bedSource(bed.clip) == kSourceFauna)
+            total += bed.gain;
+    return total;
+}
+
+}
+
+TEST_CASE("The beds of a forest at night follow the axioms of the world")
+{
+    const Soundscape soundscape = realSoundscape();
+    const auto plain = worldAxioms("cataclysm.flood");
+    const auto withdrawn = worldAxioms("cataclysm.artemis_withdrew");
+    REQUIRE(plain != withdrawn);
+
+    const auto lively = axiomBeds(soundscape, plain, "forest", "forest", 0.0f, 23.0f);
+    const auto silent = axiomBeds(soundscape, withdrawn, "forest", "forest", 0.0f, 23.0f);
+
+    CHECK(faunaGain(lively) > 0.0f);
+    CHECK(faunaGain(silent) == 0.0f);
+    CHECK(lively != silent);
+    CHECK_FALSE(silent.empty());
+    CHECK(lively == blendedBeds(soundscape, "forest", "forest", 0.0f, 23.0f));
+}
+
+TEST_CASE("Artemis Withdrew leaves the bed and the wind of every biome untouched")
+{
+    const Soundscape soundscape = realSoundscape();
+    const auto withdrawn = worldAxioms("cataclysm.artemis_withdrew");
+    for (const char* biome : {"forest", "tundra", "taiga", "lake"}) {
+        for (float hour : {5.0f, 12.0f, 18.0f, 23.0f}) {
+            auto expected = blendedBeds(soundscape, biome, biome, 0.0f, hour);
+            std::erase_if(expected, [](const BedGain& b) { return bedSource(b.clip) == kSourceFauna; });
+            CHECK(axiomBeds(soundscape, withdrawn, biome, biome, 0.0f, hour) == expected);
+        }
     }
 }

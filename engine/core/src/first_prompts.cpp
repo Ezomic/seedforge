@@ -53,17 +53,17 @@ std::uint32_t possible(const FirstPromptsFrame& frame)
 
 }
 
-std::string firstPromptText(FirstPrompt prompt)
+std::string firstPromptText(FirstPrompt prompt, const KeyBindings& bindings)
 {
     switch (prompt) {
     case FirstPrompt::Move:
-        return std::format("{} to move", spoken(kMoveKeys));
+        return std::format("{} to move", spoken(moveKeysText(bindings)));
     case FirstPrompt::Attack:
-        return std::format("{} to attack", spoken(kAttackKeys));
+        return std::format("{} to attack", spoken(attackKeysText(bindings)));
     case FirstPrompt::Block:
-        return std::format("Hold {} to block", spoken(kBlockKeys));
+        return std::format("Hold {} to block", spoken(blockKeysText(bindings)));
     case FirstPrompt::Dodge:
-        return std::format("{} to dodge", spoken(kDodgeKeys));
+        return std::format("{} to dodge", spoken(dodgeKeysText(bindings)));
     }
     return {};
 }
@@ -106,12 +106,12 @@ FirstPrompts stepFirstPrompts(FirstPrompts state, const FirstPromptsFrame& frame
     return state;
 }
 
-std::optional<std::string> firstPromptLine(const FirstPrompts& state, bool held)
+std::optional<std::string> firstPromptLine(const FirstPrompts& state, bool held, const KeyBindings& bindings)
 {
     if (held || !state.showing) {
         return std::nullopt;
     }
-    return firstPromptText(*state.showing);
+    return firstPromptText(*state.showing, bindings);
 }
 
 bool firstPromptsShown(const FirstPromptsRun& run)
