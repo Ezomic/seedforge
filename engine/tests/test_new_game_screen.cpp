@@ -6,6 +6,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/ElementDocument.h>
+
 #include <array>
 #include <cmath>
 #include <filesystem>
@@ -248,4 +252,99 @@ TEST_CASE("the Begin button reports a click once, and a stale click is dropped o
     screen.setVisible(false);
     screen.setVisible(true);
     REQUIRE_FALSE(screen.takeBegin());
+}
+
+namespace {
+
+std::vector<FeaturedSeed> featuredSample()
+{
+    return {{11, "First light", {}}, {12, "", {}}, {13, "Second wind", {}}, {14, "Mismatch", {"cataclysm.n0", "cataclysm.n1"}}};
+}
+
+std::filesystem::path writeTemp(const std::string& text)
+{
+    static int counter = 0;
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / ("ichor_featured_" + std::to_string(ICHOR_PID) + "_" + std::to_string(counter++) + ".json");
+    std::ofstream(path, std::ios::binary) << text;
+    return path;
+}
+
+}
+
+TEST_CASE("the featured rows list each valid entry with its visible axiom titles and drop bad ones", "[new_game][featured]")
+{
+    const Pool pool;
+    const std::vector<FeaturedSeed> list = featuredSample();
+    const std::vector<FeaturedRow> rows = buildFeaturedRows(list, pool.axioms, pool.set);
+    REQUIRE(rows.size() == 2);
+    REQUIRE(rows[0].seed == 11);
+    REQUIRE(rows[0].title == "First light");
+    REQUIRE(rows[1].seed == 13);
+    const SlotRollResult roll = rollSlots(11, pool.axioms);
+    for (const AxiomSlot slot : {AxiomSlot::Cataclysm, AxiomSlot::Law, AxiomSlot::Powers}) {
+        REQUIRE(rows[0].summary.find(pool.set.find(roll.find(slot)->axiomId)->title) != std::string::npos);
+    }
+    REQUIRE_FALSE(mentions(rows[0].summary, AxiomSlot::Pressure));
+    REQUIRE_FALSE(mentions(rows[0].summary, AxiomSlot::Anomaly));
+    REQUIRE(buildFeaturedRows({}, pool.axioms, pool.set).empty());
+}
+
+TEST_CASE("the featured file loader reads seeds and skips entries without a usable seed", "[new_game][featured]")
+{
+    const std::filesystem::path path = writeTemp(R"([{"seed": 5, "rank": 1}, {"seed": "x"}, 7, {"seed": 9, "title": "Named"}, {"seed": 4}])");
+    const std::vector<FeaturedSeed> list = loadFeaturedFile(path);
+    std::filesystem::remove(path);
+    REQUIRE(list.size() == 3);
+    REQUIRE(list[0] == FeaturedSeed{5, "Showcase 1", {}});
+    REQUIRE(list[1] == FeaturedSeed{9, "Named", {}});
+    REQUIRE(list[2].title.empty());
+    REQUIRE(loadFeaturedFile("no/such/file.json").empty());
+    const std::filesystem::path junk = writeTemp("{not json");
+    REQUIRE(loadFeaturedFile(junk).empty());
+    std::filesystem::remove(junk);
+}
+
+TEST_CASE("the shipped showcase file gives featured rows", "[new_game][featured]")
+{
+    const std::vector<FeaturedSeed> list = loadFeaturedFile(std::filesystem::path(ICHOR_REPO_DATA) / "showcase" / "seeds.json");
+    REQUIRE(list.size() == 5);
+    for (const FeaturedSeed& entry : list) {
+        REQUIRE_FALSE(entry.title.empty());
+    }
+}
+
+TEST_CASE("clicking a featured row reports its seed once, and an empty list hides the section", "[new_game][featured]")
+{
+    const Pool pool;
+    Fixture f;
+    NewGameScreen screen(f.ui);
+    screen.setVisible(true);
+    screen.setView(NewGameView{});
+    f.frame(0.0);
+    const std::size_t bare = f.renderer.draws().size();
+
+    screen.setFeatured({{21, "Alpha", "One, Two"}, {22, "Beta", "Three"}});
+    REQUIRE(screen.markup().find("Beta") != std::string::npos);
+    f.frame(0.1);
+    REQUIRE(f.renderer.draws().size() > bare);
+    REQUIRE_FALSE(screen.takePickedSeed().has_value());
+
+    const auto element = f.ui.context()->GetRootElement()->GetElementById("f1");
+    REQUIRE(element != nullptr);
+    const Rml::Vector2f offset = element->GetAbsoluteOffset(Rml::BoxArea::Border);
+    const Rml::Vector2f size = element->GetBox().GetSize(Rml::BoxArea::Border);
+    const int x = static_cast<int>(offset.x + size.x * 0.5f);
+    const int y = static_cast<int>(offset.y + size.y * 0.5f);
+    f.ui.mouseMove(x, y);
+    f.frame(0.2);
+    f.ui.mouseButton(0, true);
+    f.frame(0.21);
+    f.ui.mouseButton(0, false);
+    f.frame(0.22);
+    REQUIRE(screen.takePickedSeed() == std::optional<std::uint64_t>(22));
+    REQUIRE_FALSE(screen.takePickedSeed().has_value());
+
+    screen.setFeatured({});
+    f.frame(0.3);
+    REQUIRE(f.renderer.draws().size() == bare);
 }

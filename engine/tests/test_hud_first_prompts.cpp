@@ -51,7 +51,8 @@ TEST_CASE("each prompt names the same keys as the F1 card", "[first_prompts]")
     ControlsOverlay card;
     card.open = true;
     const std::vector<std::string> lines = controlsOverlayLines(card);
-    for (const std::string_view keys : {kMoveKeys, kAttackKeys, kBlockKeys, kDodgeKeys}) {
+    const KeyBindings bindings;
+    for (const std::string keys : {moveKeysText(bindings), attackKeysText(bindings), blockKeysText(bindings), dodgeKeysText(bindings)}) {
         INFO(keys);
         CHECK(std::ranges::any_of(lines, [&](const std::string& line) { return line.starts_with(keys); }));
     }
@@ -261,4 +262,11 @@ TEST_CASE("the notice screen draws nothing until a line is bound, shows it escap
     CHECK(screen.markup().find("<b>") == std::string::npos);
     screen.bind(std::nullopt);
     CHECK(draws(0.2) == 0);
+}
+
+TEST_CASE("a prompt names the key the player rebound, not the default", "[first_prompts]")
+{
+    const KeyBindings bindings = rebound(rebound(KeyBindings{}, BindAction::Dodge, 20), BindAction::MoveForward, 25);
+    CHECK(firstPromptText(FirstPrompt::Dodge, bindings) == "Q to dodge");
+    CHECK(firstPromptText(FirstPrompt::Move, bindings) == "V A S D to move");
 }

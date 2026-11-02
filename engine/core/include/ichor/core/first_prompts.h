@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ichor/core/key_bindings.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -23,7 +25,7 @@ constexpr std::uint32_t firstPromptBit(FirstPrompt prompt)
 }
 
 // "W A S D to move" and so on, from the same key text as the F1 card.
-std::string firstPromptText(FirstPrompt prompt);
+std::string firstPromptText(FirstPrompt prompt, const KeyBindings& bindings = {});
 
 // What one frame offers the prompts. A held frame (a screen open, a pause, the player dead) neither runs a
 // prompt's time nor starts one, and its input is not counted as the action.
@@ -50,7 +52,7 @@ struct FirstPrompts {
 FirstPrompts stepFirstPrompts(FirstPrompts state, const FirstPromptsFrame& frame, double dt);
 
 // The prompt's line while one is up and the frame is not held, else nothing.
-std::optional<std::string> firstPromptLine(const FirstPrompts& state, bool held);
+std::optional<std::string> firstPromptLine(const FirstPrompts& state, bool held, const KeyBindings& bindings = {});
 
 // Who gets prompts: a person playing at the window. A headless run, a screenshot, a replay or a bot never does,
 // so neither the picture they produce nor the stored flags depend on the prompts.
