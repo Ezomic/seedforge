@@ -2,6 +2,7 @@
 
 #include "ichor/core/binary.h"
 #include "ichor/core/hash.h"
+#include "ichor/data/world_config.h"
 #include "ichor/world/forge.h"
 #include "ichor/world/forged_heightfield.h"
 
@@ -9,6 +10,9 @@
 #include <exception>
 #include <stdexcept>
 #include <format>
+#include <map>
+#include <variant>
+#include <vector>
 #include <string_view>
 #include <utility>
 
@@ -19,6 +23,8 @@ namespace {
 constexpr std::uint64_t kMinLandPerMille = 20;
 constexpr std::uint16_t kMinSampleRange = 256;
 constexpr std::uint32_t kRerollCeiling = 64;
+constexpr std::uint64_t kMinSettleablePerMille = 10;
+constexpr float kDiveDepthM = 3.0f;
 
 Heightfield forgedTerrainOrThrow(const WorldDesc& desc)
 {
@@ -113,6 +119,162 @@ std::optional<std::string> hydrologyAgrees(const ForgedWorld& world, const Forge
     return std::nullopt;
 }
 
+const AxiomValue* directive(const ForgeRequest& request, std::string_view block, std::string_view key)
+{
+    if (!request.axioms) {
+        return nullptr;
+    }
+    const auto& blocks = request.axioms->merged.directives.blocks;
+    const auto b = blocks.find(block);
+    if (b == blocks.end()) {
+        return nullptr;
+    }
+    const auto v = b->second.find(key);
+    return v == b->second.end() ? nullptr : &v->second;
+}
+
+bool listHas(const ForgeRequest& request, std::string_view block, std::string_view key, std::string_view word)
+{
+    const AxiomValue* v = directive(request, block, key);
+    const auto* list = v ? std::get_if<std::vector<std::string>>(v) : nullptr;
+    return list && std::find(list->begin(), list->end(), word) != list->end();
+}
+
+bool weighted(const ForgeRequest& request, std::string_view poi)
+{
+    const AxiomValue* v = directive(request, "poi", "weights");
+    const auto* weights = v ? std::get_if<std::map<std::string, double, std::less<>>>(v) : nullptr;
+    if (!weights) {
+        return false;
+    }
+    const auto it = weights->find(poi);
+    return it != weights->end() && it->second > 0.0;
+}
+
+bool isWaterSample(const ForgedWorld& world, const ForgeRequest& request, std::uint32_t x, std::uint32_t z)
+{
+    return world.heightfield.heightAtSample(x, z) <= request.desc.waterLevel();
+}
+
+template <typename F>
+void forEachNeighbour(std::uint32_t n, std::uint32_t x, std::uint32_t z, F&& visit)
+{
+    if (x > 0) visit(x - 1, z);
+    if (z > 0) visit(x, z - 1);
+    if (x + 1 < n) visit(x + 1, z);
+    if (z + 1 < n) visit(x, z + 1);
+}
+
+bool hasShore(const ForgedWorld& world, const ForgeRequest& request)
+{
+    const std::uint32_t n = request.desc.samplesPerSide();
+    for (std::uint32_t z = 0; z < n; ++z) {
+        for (std::uint32_t x = 0; x < n; ++x) {
+            if (isWaterSample(world, request, x, z)) {
+                continue;
+            }
+            bool touches = false;
+            forEachNeighbour(n, x, z, [&](std::uint32_t nx, std::uint32_t nz) { touches = touches || isWaterSample(world, request, nx, nz); });
+            if (touches) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+std::optional<std::string> settlementElevationLand(const ForgedWorld& world, const ForgeRequest& request)
+{
+    const AxiomValue* v = directive(request, "settlement", "min_elevation_m");
+    const double* minElevation = v ? std::get_if<double>(v) : nullptr;
+    if (!minElevation) {
+        return std::nullopt;
+    }
+    const std::uint32_t n = request.desc.samplesPerSide();
+    std::uint64_t high = 0;
+    for (std::uint32_t z = 0; z < n; ++z) {
+        for (std::uint32_t x = 0; x < n; ++x) {
+            const float h = world.heightfield.heightAtSample(x, z);
+            high += (h >= *minElevation && h > request.desc.waterLevel()) ? 1 : 0;
+        }
+    }
+    const std::uint64_t total = static_cast<std::uint64_t>(n) * n;
+    if (high * 1000 < total * kMinSettleablePerMille) {
+        return std::format("{} of {} samples are dry land at or above {} m, under {}%", high, total, *minElevation, kMinSettleablePerMille / 10.0);
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> diveWaterReachable(const ForgedWorld& world, const ForgeRequest& request)
+{
+    if (!listHas(request, "traversal", "unlock", "swim_deep")) {
+        return std::nullopt;
+    }
+    if (!request.desc.hasWater()) {
+        return "swim_deep is unlocked but the world has no water";
+    }
+    const std::uint32_t n = request.desc.samplesPerSide();
+    const float deepLevel = request.desc.waterLevel() - kDiveDepthM;
+    std::vector<std::uint8_t> seen(static_cast<std::size_t>(n) * n, 0);
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> queue;
+    const auto enqueueWater = [&](std::uint32_t nx, std::uint32_t nz) {
+        std::uint8_t& s = seen[static_cast<std::size_t>(nz) * n + nx];
+        if (!s && isWaterSample(world, request, nx, nz)) {
+            s = 1;
+            queue.emplace_back(nx, nz);
+        }
+    };
+    for (std::uint32_t z = 0; z < n; ++z) {
+        for (std::uint32_t x = 0; x < n; ++x) {
+            if (!isWaterSample(world, request, x, z)) {
+                forEachNeighbour(n, x, z, enqueueWater);
+            }
+        }
+    }
+    for (std::size_t i = 0; i < queue.size(); ++i) {
+        const auto [x, z] = queue[i];
+        if (world.heightfield.heightAtSample(x, z) <= deepLevel) {
+            return std::nullopt;
+        }
+        forEachNeighbour(n, x, z, enqueueWater);
+    }
+    return std::format("no water {} m deep or more can be reached from a shore, so nothing can be dived to", kDiveDepthM);
+}
+
+std::optional<std::string> springNeedsWater(const ForgedWorld& world, const ForgeRequest& request)
+{
+    if (!weighted(request, "sacred_spring")) {
+        return std::nullopt;
+    }
+    const Hydrology& h = world.hydrology;
+    for (std::size_t i = 0; i < h.accumulation.size() && i < h.lake.size(); ++i) {
+        if (h.lake[i] != 0 || isRiver(h, i, request.rivers)) {
+            return std::nullopt;
+        }
+    }
+    if (request.desc.hasWater()) {
+        const std::uint32_t n = request.desc.samplesPerSide();
+        for (std::uint32_t z = 0; z < n; ++z) {
+            for (std::uint32_t x = 0; x < n; ++x) {
+                if (isWaterSample(world, request, x, z)) {
+                    return std::nullopt;
+                }
+            }
+        }
+    }
+    return "sacred_spring has weight but the world has no river, lake or sea for a spring to feed";
+}
+
+std::optional<std::string> coastNeedsShore(const ForgedWorld& world, const ForgeRequest& request)
+{
+    const bool wanted = listHas(request, "biomes", "inject", "tidal_ruin") || listHas(request, "biomes", "inject", "salt_blight") || weighted(request, "pharos")
+        || weighted(request, "drowned_polis");
+    if (!wanted || hasShore(world, request)) {
+        return std::nullopt;
+    }
+    return "the axioms ask for coast (tidal_ruin, salt_blight, pharos or drowned_polis) but no land meets the water";
+}
+
 }
 
 std::uint64_t attemptSeed(std::uint64_t worldSeed, std::uint32_t attempt)
@@ -170,11 +332,25 @@ std::vector<GateFailure> runGates(const std::vector<Gate>& gates, const ForgedWo
 
 std::vector<Gate> defaultGates()
 {
-    return {
+    std::vector<Gate> gates{
         {"land-above-water", landAboveWater},
         {"not-flat", notFlat},
         {"has-river", hasRiver},
         {"hydrology-agrees", hydrologyAgrees},
+    };
+    for (Gate& gate : axiomGates()) {
+        gates.push_back(std::move(gate));
+    }
+    return gates;
+}
+
+std::vector<Gate> axiomGates()
+{
+    return {
+        {"settlement-elevation-land", settlementElevationLand},
+        {"dive-water-reachable", diveWaterReachable},
+        {"spring-needs-water", springNeedsWater},
+        {"coast-needs-shore", coastNeedsShore},
     };
 }
 

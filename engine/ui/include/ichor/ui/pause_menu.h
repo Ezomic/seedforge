@@ -15,7 +15,7 @@ class ElementDocument;
 namespace ichor {
 
 // The menu Esc opens: a veil over the world and a card with the field of view, the mouse
-// sensitivity, the display mode, resolution and vsync, the UI scale and colour palette, Resume, Load and Quit.
+// sensitivity, the display mode, resolution and vsync, the UI scale and colour palette, Controls, Resume, Load and Quit.
 // Hidden until shown.
 // The context must have the Cinzel and Alegreya Sans faces loaded.
 class PauseMenu {
@@ -34,6 +34,8 @@ public:
     bool takeResume();
     bool takeLoad();
     bool takeQuit();
+    // True once after the Controls button was clicked; the owner shows the rebinding screen.
+    bool takeControls();
 
     // The field of view the card shows. The menu only reports the player's clicks on the
     // minus and plus buttons; the owner decides the value and puts it back here.
@@ -65,6 +67,7 @@ public:
     std::optional<std::pair<float, float>> resumeCentre() const { return centreOf(resume_); }
     std::optional<std::pair<float, float>> loadCentre() const { return centreOf(load_); }
     std::optional<std::pair<float, float>> quitCentre() const { return centreOf(quit_); }
+    std::optional<std::pair<float, float>> controlsCentre() const { return centreOf(controls_); }
     std::optional<std::pair<float, float>> fovDownCentre() const { return centreOf(fovDown_); }
     std::optional<std::pair<float, float>> fovUpCentre() const { return centreOf(fovUp_); }
     std::optional<std::pair<float, float>> sensitivityDownCentre() const { return centreOf(sensDown_); }
@@ -94,6 +97,7 @@ private:
     Click resumeClick_;
     Click loadClick_;
     Click quitClick_;
+    Click controlsClick_;
     Count fovDownClicks_;
     Count fovUpClicks_;
     Count sensDownClicks_;
@@ -108,6 +112,7 @@ private:
     Rml::Element* resume_ = nullptr;
     Rml::Element* load_ = nullptr;
     Rml::Element* quit_ = nullptr;
+    Rml::Element* controls_ = nullptr;
     Rml::Element* fovDown_ = nullptr;
     Rml::Element* fovUp_ = nullptr;
     Rml::Element* fovValue_ = nullptr;

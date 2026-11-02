@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -195,8 +196,10 @@ TEST_CASE("a requested river must exist", "[validation]")
 TEST_CASE("hydrology that does not agree with itself is flagged", "[validation]")
 {
     const ForgeRequest request = smallRequest(3);
-    const Gate agrees = defaultGates().back();
-    REQUIRE(agrees.name == "hydrology-agrees");
+    const std::vector<Gate> gates = defaultGates();
+    const auto found = std::find_if(gates.begin(), gates.end(), [](const Gate& g) { return g.name == "hydrology-agrees"; });
+    REQUIRE(found != gates.end());
+    const Gate agrees = *found;
     ForgedWorld world = forgeWorld(request);
     CHECK_FALSE(agrees.check(world, request).has_value());
 

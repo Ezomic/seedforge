@@ -56,6 +56,7 @@
 #include "ichor/ui/new_game_screen.h"
 #include "ichor/ui/pause_menu.h"
 #include "ichor/world/world_title.h"
+#include "ichor/ui/rebind_screen.h"
 #include "ichor/ui/ui_context.h"
 #include "ichor/data/data_set.h"
 #include "ichor/gfx/null_renderer.h"
@@ -155,6 +156,7 @@ struct Options {
     bool editor = false;
     bool showMap = false;
     bool showPause = false;
+    bool showRebind = false;
     int mapExplore = 0; // --forged --map: show the map as if the player had walked from the spawn through this many settlements
     bool showNewGame = false;
     bool showLoad = false;
@@ -332,6 +334,8 @@ bool parse(int argc, char** argv, Options& options)
             options.showMap = true;
         } else if (arg == "--pause") {
             options.showPause = true;
+        } else if (arg == "--rebind") {
+            options.showRebind = true;
         } else if (arg == "--map-explore" && hasValue) {
             if (!parseNumber(argv[++i], options.mapExplore) || options.mapExplore < 0) return false;
         } else if (arg == "--load-screen") {
@@ -1070,6 +1074,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             ichor::logf(ichor::LogLevel::Warn, "the settings could not be saved to {}", settingsPath.string());
         }
     };
+    platform.setKeyBindings(settings.bindings);
+    engine.setKeyBindings(settings.bindings);
     // The stored display settings go to the window once; a headless run has none and a screenshot run keeps its hidden one.
     const bool displayFromSettings = !options.headless && options.screenshot.empty();
     const auto displayRequest = [&] { return ichor::DisplayRequest{settings.displayMode == ichor::DisplayMode::Fullscreen, {settings.resolution.width, settings.resolution.height}}; };
@@ -1452,6 +1458,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
     ichor::MapAnnotationStore mapMarks;
     ichor::WaypointSet mapWaypoints;
     std::unique_ptr<ichor::PauseMenu> pauseMenu;
+    std::unique_ptr<ichor::RebindScreen> rebindScreen;
     std::unique_ptr<ichor::NewGameScreen> newGameScreen;
     std::unique_ptr<ichor::LoadScreen> loadScreen;
     // The title is the one the new-game screen showed for this world, composed from the axioms rolled for its seed.
@@ -1476,6 +1483,11 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             return std::filesystem::is_regular_file(picture, ec) ? picture : std::filesystem::path();
         }));
         loadScreen->setVisible(true);
+    };
+    ichor::AxiomSet newGameAxioms;
+    std::vector<ichor::Axiom> newGamePool;
+    const auto showNewGameSeed = [&](std::uint64_t seed) {
+        newGameScreen->setView(ichor::buildNewGameView(seed, ichor::rollSlots(seed, newGamePool), newGameAxioms));
     };
     std::unique_ptr<ichor::CombatHudScreen> combatHud;
     std::unique_ptr<ichor::CaptionScreen> captionScreen;
@@ -1536,6 +1548,8 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             mapBinding = std::make_unique<ichor::MapScreenBinding>(*ui);
             pauseMenu = std::make_unique<ichor::PauseMenu>(*ui);
+            rebindScreen = std::make_unique<ichor::RebindScreen>(*ui);
+            rebindScreen->setBindings(settings.bindings);
             pauseMenu->setFovDegrees(settings.fovDegrees);
             pauseMenu->setMouseSensitivity(mouseSensitivity);
             pauseMenu->setFullscreen(platform.fullscreen());
@@ -1555,7 +1569,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             noteBox = std::make_unique<ichor::NoteBox>(*ui);
             noticeScreen = std::make_unique<ichor::NoticeScreen>(*ui);
         }
-        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !newGameScreen->ok() || !loadScreen->ok()) {
+        if (!fontsLoaded || !hud->ok() || !ledger->ok() || !journalScreen->ok() || !characterScreen->ok() || !inventoryScreen->ok() || !dialogueScreen->ok() || !mapScreen->ok() || !mapBinding->ok() || !landmarkCompass->ok() || !pauseMenu->ok() || !rebindScreen->ok() || !newGameScreen->ok() || !loadScreen->ok()) {
             ichor::log(ichor::LogLevel::Warn, "the game UI could not start; the HUD is off");
             promptScreen.reset();
             noticeScreen.reset();
@@ -1565,6 +1579,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             combatHud.reset();
             loadScreen.reset();
             newGameScreen.reset();
+            rebindScreen.reset();
             pauseMenu.reset();
             landmarkCompass.reset();
             mapBinding.reset();
@@ -1592,28 +1607,28 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
         if (options.showMap && !editing) {
             mapScreen->setVisible(true);
         }
-        if (options.showPause && !editing) {
+        if ((options.showPause || options.showRebind) && !editing) {
             paused = true;
-            pauseMenu->setVisible(true);
+            pauseMenu->setVisible(!options.showRebind);
+            rebindScreen->setVisible(options.showRebind);
         }
         if (options.showLoad && !editing) {
             paused = true;
             showLoadScreen();
         }
         if (options.showNewGame && !editing) {
-            ichor::AxiomSet axioms;
-            if (!axioms.loadDirectory(options.data)) {
+            if (!newGameAxioms.loadDirectory(options.data)) {
                 ichor::log(ichor::LogLevel::Warn, "data: the axioms could not be loaded, so the new-game screen shows no titles");
             }
-            std::vector<ichor::Axiom> pool;
-            for (const auto& [id, axiom] : axioms.axioms()) {
-                pool.push_back(axiom);
+            for (const auto& [id, axiom] : newGameAxioms.axioms()) {
+                newGamePool.push_back(axiom);
             }
-            const ichor::SlotRollResult roll = ichor::rollSlots(worldSeed, pool);
-            if (!roll.ok()) {
+            if (!ichor::rollSlots(worldSeed, newGamePool).ok()) {
                 ichor::log(ichor::LogLevel::Warn, "the world's axioms could not be rolled from the data");
             }
-            newGameScreen->setView(ichor::buildNewGameView(worldSeed, roll, axioms));
+            showNewGameSeed(worldSeed);
+            const std::vector<ichor::FeaturedSeed> featuredSeeds = ichor::loadFeaturedFile(options.data / "showcase" / "seeds.json");
+            newGameScreen->setFeatured(ichor::buildFeaturedRows(featuredSeeds, newGamePool, newGameAxioms));
             newGameScreen->setVisible(true);
         }
         // The simulation clock drives the UI, so a replay sees the same animations.
@@ -1649,7 +1664,7 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                     deathScreen->bind(death ? std::optional<ichor::DeathScreenView>({ichor::stage0::plainCause(*death), ichor::stage0::retryHint()}) : std::nullopt);
                 }
                 if (promptScreen) {
-                    promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld));
+                    promptScreen->bind(ichor::firstPromptLine(firstPrompts, promptHeld, settings.bindings));
                 }
                 if (noticeScreen) {
                     noticeScreen->bind(!startupNotice.empty() && static_cast<double>(engine.scene().tickCount() - startupNoticeTick) * config.fixedDt < kStartupNoticeSeconds ? std::optional<std::string>(startupNotice) : std::nullopt);
@@ -2019,6 +2034,13 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             } else if (loadScreen && loadScreen->visible()) {
                 loadScreen->setVisible(false);
                 pauseMenu->setVisible(true);
+            } else if (rebindScreen->visible()) {
+                if (rebindScreen->waiting()) {
+                    rebindScreen->setWaiting(std::nullopt);
+                } else {
+                    rebindScreen->setVisible(false);
+                    pauseMenu->setVisible(true);
+                }
             } else {
                 paused = !paused;
                 pauseMenu->setVisible(paused);
@@ -2073,6 +2095,9 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (mapScreen->takeCloseRequest()) {
                 mapScreen->setVisible(false);
+            }
+            if (const std::optional<std::uint64_t> picked = newGameScreen->takePickedSeed()) {
+                showNewGameSeed(*picked);
             }
             if (newGameScreen->takeBegin()) {
                 newGameScreen->setVisible(false);
@@ -2166,6 +2191,12 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
                 pauseMenu->setColourblindSafe(settings.palette == ichor::ColourPalette::ColourblindSafe);
                 persistSettings();
             }
+            if (pauseMenu->takeControls()) {
+                pauseMenu->setVisible(false);
+                rebindScreen->setVisible(true);
+                rebindScreen->setBindings(settings.bindings);
+                platform.takePressedKey();
+            }
             if (pauseMenu->takeLoad()) {
                 pauseMenu->setVisible(false);
                 showLoadScreen();
@@ -2180,6 +2211,31 @@ int run(ichor::Platform& platform,ichor::Renderer& renderer, ichor::AudioHost& d
             }
             if (pauseMenu->takeQuit()) {
                 platform.requestQuit();
+            }
+            if (rebindScreen->visible()) {
+                const auto applyBindings = [&] {
+                    platform.setKeyBindings(settings.bindings);
+                    engine.setKeyBindings(settings.bindings);
+                    rebindScreen->setBindings(settings.bindings);
+                    persistSettings();
+                };
+                if (const auto clicked = rebindScreen->takeRebindClick()) {
+                    rebindScreen->setWaiting(clicked);
+                    platform.takePressedKey();
+                }
+                if (const ichor::KeyCode pressed = platform.takePressedKey(); pressed != 0 && rebindScreen->waiting() && ichor::bindable(pressed)) {
+                    settings.bindings = ichor::rebound(settings.bindings, *rebindScreen->waiting(), pressed);
+                    rebindScreen->setWaiting(std::nullopt);
+                    applyBindings();
+                }
+                if (rebindScreen->takeReset()) {
+                    settings.bindings = ichor::KeyBindings{};
+                    applyBindings();
+                }
+                if (rebindScreen->takeBack()) {
+                    rebindScreen->setVisible(false);
+                    pauseMenu->setVisible(true);
+                }
             }
         }
         // A click in the editor picks what is under the cursor; one on empty space clears the pick.
@@ -2431,7 +2487,7 @@ int main(int argc, char** argv)
     }
     options.runFlags = ichor::scrubRunFlags({argv + 1, argv + argc});
     if (!parse(argc, argv, options)) {
-        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause] [--load-screen] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
+        ichor::log(ichor::LogLevel::Info, "usage: ichor [--headless] [--frames N] [--seed S] [--scene file.iscene] [--world dir] [--exile art/exile] [--kit art/settlement_kit [--kit-variants]] [--water-view river|lake] [--settlement N | --biome NAME] [--overlook M] [--dungeon N [--enter-dungeon [--dungeon-room N]]] [--record in.iinp] [--replay in.iinp] [--load save.isav] [--save save.isav] [--saves dir] [--load-slot name] [--autosave seconds] [--ironman] [--hour h] [--day-seconds s] [--water y] [--target x z] [--editor] [--map [--map-explore N]] [--pause | --rebind] [--load-screen] [--new-game] [--forged [--grid N] [--campaign NAME] [--no-exile-player] [--combat [--combat-duel] [--combat-role skirmisher|anchor|artillery] [--combat-bot novice|regular|expert] [--combat-debug] [--combat-fights fights.csv]]] [--overlay [off|compact|full]] [--loot N] [--give id,id] [--inventory] [--talk] [--accept-quest | --turn-in-quest] [--journal] [--controls] [--texture-budget-mb N] [--screenshot file.png [--show-window]]");
         return 2;
     }
     ichor::installCrashHandler(options.logs); // a packaged build keeps its logs beside the exe
