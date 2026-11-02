@@ -4,6 +4,7 @@
 
 #include <cgltf.h>
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
@@ -27,6 +28,10 @@ namespace ichor {
 namespace {
 
 constexpr float kSampleRate = 60.0f;
+// A foot is planted while it is within this share of its own height range above that range's lowest point.
+constexpr float kPlantedShare = 0.25f;
+// A foot that never rises this far, as a share of the hips' standing height, is not stepping.
+constexpr float kMinLiftOfHips = 0.06f;
 
 using Trs = JointPose;
 
@@ -249,6 +254,64 @@ bool cookSkeleton(const cgltf_data& data, const cgltf_skin& skin, Skeleton& out,
     return serialize(*skeleton, out.ozzBytes);
 }
 
+namespace {
+
+bool endsWith(const std::string& text, const char* suffix)
+{
+    const std::string tail(suffix);
+    return text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
+}
+
+std::int32_t jointEndingWith(const std::vector<std::string>& names, const char* suffix)
+{
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        if (endsWith(names[i], suffix)) return static_cast<std::int32_t>(i);
+    }
+    return -1;
+}
+
+std::vector<float> jointHeights(std::int32_t joint, const std::vector<std::int32_t>& parents, const std::vector<std::vector<Trs>>& poses)
+{
+    std::vector<float> heights;
+    heights.reserve(poses.size());
+    for (const std::vector<Trs>& frame : poses) {
+        glm::mat4 world(1.0f);
+        for (std::int32_t j = joint; j >= 0; j = parents[static_cast<std::size_t>(j)]) {
+            const Trs& t = frame[static_cast<std::size_t>(j)];
+            world = glm::translate(glm::mat4(1.0f), t.translation) * glm::mat4_cast(t.rotation) * glm::scale(glm::mat4(1.0f), t.scale) * world;
+        }
+        heights.push_back(world[3].y);
+    }
+    return heights;
+}
+
+// A foot lands where its height drops into the lowest quarter of its range. A clip whose feet barely lift (idle,
+// block) gets none, and one that starts planted and ends in the air lands at its start, as it does when it loops.
+void deriveFootContacts(const std::vector<std::string>& jointNames, const std::vector<std::int32_t>& parents, const std::vector<std::vector<Trs>>& poses, AnimationClip& out)
+{
+    out.footContacts.clear();
+    const std::int32_t feet[2] = {jointEndingWith(jointNames, "LeftFoot"), jointEndingWith(jointNames, "RightFoot")};
+    const std::int32_t hips = jointEndingWith(jointNames, "Hips");
+    if (feet[0] < 0 || feet[1] < 0 || hips < 0 || poses.size() < 2) return;
+    const float minLift = kMinLiftOfHips * jointHeights(hips, parents, poses).front();
+    for (std::uint32_t foot = 0; foot < 2; ++foot) {
+        const std::vector<float> heights = jointHeights(feet[foot], parents, poses);
+        const auto [lowest, highest] = std::minmax_element(heights.begin(), heights.end());
+        if (*highest - *lowest < minLift) continue;
+        const float limit = *lowest + kPlantedShare * (*highest - *lowest);
+        if (heights.front() <= limit && heights.back() > limit) out.footContacts.push_back({0.0f, foot});
+        for (std::size_t f = 1; f < heights.size(); ++f) {
+            if (heights[f] > limit || heights[f - 1] <= limit) continue;
+            const float along = (heights[f - 1] - limit) / (heights[f - 1] - heights[f]);
+            const float time = (static_cast<float>(f - 1) + along) / kSampleRate;
+            out.footContacts.push_back({std::min(time, out.duration), foot});
+        }
+    }
+    std::sort(out.footContacts.begin(), out.footContacts.end(), [](const FootContact& a, const FootContact& b) { return a.time < b.time; });
+}
+
+}
+
 bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cgltf_skin& skin, const Skeleton& skeleton,
     std::uint32_t skeletonIndex, AnimationClip& out, float rootYawDegrees, const ClipPass& pass)
 {
@@ -333,6 +396,8 @@ bool cookClip(const cgltf_data& data, const cgltf_animation& animation, const cg
         ClipFrames clip{out.name, skeleton.jointNames, parents, rest, poses};
         pass(clip);
     }
+    out.duration = duration;
+    deriveFootContacts(skeleton.jointNames, parents, poses, out);
     for (std::size_t j = 0; j < channels.size(); ++j) {
         const bool isRoot = jointNodes[j] != nullptr && (jointNodes[j]->parent == nullptr || !isJointOf(skin, jointNodes[j]->parent));
         auto& track = raw.tracks[j];

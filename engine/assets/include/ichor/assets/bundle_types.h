@@ -71,11 +71,18 @@ struct Skeleton {
     std::vector<std::uint8_t> ozzBytes;
 };
 
+// A foot meeting the ground, found at cook time from the foot joints' heights.
+struct FootContact {
+    float time = 0.0f; // seconds from the clip start
+    std::uint32_t foot = 0; // 0 left, 1 right
+};
+
 struct AnimationClip {
     std::string name;
     std::uint32_t skeleton = 0;
     float duration = 0.0f; // seconds
     std::vector<std::uint8_t> ozzBytes;
+    std::vector<FootContact> footContacts; // by time; empty for a clip that does not walk
 };
 
 // Mono PCM at the source rate; the mixer resamples.
