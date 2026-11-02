@@ -3,6 +3,7 @@
 #include "ichor/data/slot_roll.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -71,6 +72,12 @@ FeaturedCheck validateFeaturedList(std::span<const FeaturedSeed> list, std::span
 // string. Nullopt when the list breaks the shape limits (titles and ids printable ASCII within
 // the caps, at most kMaxFeaturedSeeds entries).
 std::optional<std::string> encodeFeaturedList(std::span<const FeaturedSeed> list);
+
+// Reads a showcase style file: a JSON array of objects with an unsigned "seed" and either a string
+// "title" or an unsigned "rank" (titled "Showcase <rank>"). An unreadable file gives an empty list
+// and an object without a usable seed is skipped; a missing title stays empty, which
+// validateFeaturedSeed rejects.
+std::vector<FeaturedSeed> loadFeaturedFile(const std::filesystem::path& path);
 
 // Nullopt for anything encodeFeaturedList could not have produced. Never throws, and its
 // allocation is bounded by the size cap, whatever the text.

@@ -44,6 +44,8 @@ public:
     std::vector<Extent> displayModes() const override;
     bool setDisplay(const DisplayRequest& request) override;
     bool fullscreen() const override;
+    void setKeyBindings(const KeyBindings& bindings) override { bindings_ = bindings; }
+    KeyCode takePressedKey() override { return std::exchange(pressedKey_, KeyCode{0}); }
 
     SDL_Window* window() const { return window_; }
 
@@ -66,6 +68,8 @@ private:
     InputFrame rawInput_; // before the typing guard, so closing the box knows which keys are still down
     std::string typed_;
     bool focused_ = true;
+    KeyBindings bindings_;
+    KeyCode pressedKey_ = 0;
     bool arrowsReserved_ = false;
     bool lookEnabled_ = false;
     MouseLook mouseLook_;

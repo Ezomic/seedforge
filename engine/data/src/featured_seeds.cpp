@@ -2,7 +2,10 @@
 
 #include "ichor/core/hash.h"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <fstream>
 #include <functional>
 #include <utility>
 #include <set>
@@ -307,6 +310,37 @@ std::optional<std::vector<FeaturedSeed>> decodeFeaturedList(std::string_view tex
     }
     if (!in.done()) {
         return std::nullopt;
+    }
+    return list;
+}
+
+}
+
+namespace ichor {
+
+std::vector<FeaturedSeed> loadFeaturedFile(const std::filesystem::path& path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return {};
+    }
+    const nlohmann::json json = nlohmann::json::parse(in, nullptr, false);
+    if (!json.is_array()) {
+        return {};
+    }
+    std::vector<FeaturedSeed> list;
+    for (const nlohmann::json& item : json) {
+        if (!item.is_object() || !item.contains("seed") || !item["seed"].is_number_unsigned()) {
+            continue;
+        }
+        FeaturedSeed entry;
+        entry.seed = item["seed"].get<std::uint64_t>();
+        if (item.contains("title") && item["title"].is_string()) {
+            entry.title = item["title"].get<std::string>();
+        } else if (item.contains("rank") && item["rank"].is_number_unsigned()) {
+            entry.title = "Showcase " + std::to_string(item["rank"].get<std::uint64_t>());
+        }
+        list.push_back(std::move(entry));
     }
     return list;
 }

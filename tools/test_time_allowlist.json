@@ -37,8 +37,8 @@
       "reason": "Forges and walks real worlds, slow under the sanitizer."
     },
     "the land erosion removes is about the same at 64, 128 and 256": {
-      "seconds": 300.0,
-      "reason": "Forges and walks real worlds, slow under the sanitizer."
+      "seconds": 450.0,
+      "reason": "Forges and walks real worlds, slow under the sanitizer. Measured 292 s, 306 s and 317 s on main on 2026-10-31 and 2026-11-01, so the 300 s cap had no headroom on a slow runner."
     }
   },
   "release": {
