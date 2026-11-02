@@ -63,7 +63,7 @@ private:
     struct GpuMesh {
         GpuBuffer vertices;
         GpuBuffer indices;
-        std::vector<std::array<std::uint32_t, 3>> submeshes; // firstIndex, indexCount, material
+        std::vector<std::array<std::uint32_t, 4>> submeshes; // firstIndex, indexCount, material, region bit
         std::uint32_t jointCount = 0; // zero for rigid meshes
     };
     struct FrameSlot {
