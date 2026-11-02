@@ -69,18 +69,10 @@ std::vector<Neighbour> neighboursOf(const DungeonGreyBox& box, std::size_t from)
         }
         return std::nullopt;
     };
-    // A ramp or the hole over one fills the whole strip along its side wall, so a doorway in that wall opens onto a slope or a drop.
-    const auto blocked = [](const GreyBoxRoom& r, std::size_t side) {
-        constexpr std::size_t east = 1;
-        constexpr std::size_t west = 3;
-        if (side != east && side != west) return false;
-        return (r.ramp && (side == west) == r.rampWest) || (r.hole && (side == west) == r.holeWest);
-    };
     std::vector<Neighbour> out;
     for (std::size_t side = 0; side < sides.size(); ++side) {
-        if (!room.doors[side] || blocked(room, side)) continue;
-        const auto next = at(room.centre + sides[side]);
-        if (next && !blocked(box.rooms[*next], (side + 2) % 4)) out.push_back({*next, RoomLink::Door});
+        if (!room.doors[side]) continue;
+        if (const auto next = at(room.centre + sides[side])) out.push_back({*next, RoomLink::Door});
     }
     if (room.ramp) {
         if (const auto next = at(room.centre + glm::dvec3(0.0, greybox::kStoreyM, 0.0))) out.push_back({*next, RoomLink::RampUp});

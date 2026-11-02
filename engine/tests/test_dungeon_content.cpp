@@ -113,7 +113,7 @@ bool sameContent(const DungeonContent& a, const DungeonContent& b)
 glm::dvec3 doorwayCentre(const GreyBoxRoom& room, int side)
 {
     constexpr double R = greybox::kRoomHalfM;
-    const glm::dvec2 offsets[4] = {{0.0, -R}, {R, 0.0}, {0.0, R}, {-R, 0.0}};
+    const glm::dvec2 offsets[4] = {{room.doorOffset[0], -R}, {R, room.doorOffset[1]}, {room.doorOffset[2], R}, {-R, room.doorOffset[3]}};
     return room.centre + glm::dvec3(offsets[side].x, 0.0, offsets[side].y);
 }
 
@@ -324,7 +324,7 @@ TEST_CASE("a route between rooms follows doorways and ramps, and a sealed room h
     Hand h = row(5);
     const auto sealed = h.add("vault", {7, 0, 0});  // no path link: a lock that only the mission graph knows about
     const auto upper = h.add("rest", {0, 0, 1});    // above the entry room, up its ramp
-    const auto behindRamp = h.add("rest", {-1, 0, 0}); // through the entry room's west wall, which its ramp (on the west side of an even floor) fills
+    const auto behindRamp = h.add("rest", {-1, 0, 0}); // through the entry room's west wall, which its ramp (on the west side of an even floor) runs along
     h.link(1, upper);
     h.link(1, behindRamp);
     const Built built = build(h, items(3));
@@ -343,11 +343,14 @@ TEST_CASE("a route between rooms follows doorways and ramps, and a sealed room h
     REQUIRE(down.has_value());
     CHECK(down->front().link == RoomLink::RampDown);
     CHECK_FALSE(routeBetweenRooms(built.box, 1, sealed).has_value());
-    CHECK_FALSE(routeBetweenRooms(built.box, 1, behindRamp).has_value());
-    CHECK_FALSE(routeBetweenRooms(built.box, behindRamp, 1).has_value());
+    CHECK(routeBetweenRooms(built.box, 1, behindRamp).has_value());
+    CHECK(routeBetweenRooms(built.box, behindRamp, 1).has_value());
+    CHECK(boxRoom(built.box, 1).doorOffset[3] == -greybox::kDoorShiftM);
+    CHECK(boxRoom(built.box, behindRamp).doorOffset[1] == -greybox::kDoorShiftM);
+    CHECK(boxRoom(built.box, 1).doorOffset[1] == 0.0);
     CHECK_FALSE(routeBetweenRooms(built.box, 1, 999).has_value());
 
-    for (const DungeonRoom& room : built.content.rooms) CHECK(room.reachable == (room.id != sealed && room.id != behindRamp));
+    for (const DungeonRoom& room : built.content.rooms) CHECK(room.reachable == (room.id != sealed));
 }
 
 TEST_CASE("loot is never sealed away: a room the player cannot walk to takes none, even when it is the reward room", "[dungeon_content][route]")

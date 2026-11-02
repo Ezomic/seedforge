@@ -212,10 +212,10 @@ TEST_CASE("a path link between floors is a ramp under a hole, and an unlinked pa
         REQUIRE(box.ok());
         // The lower floor is -1, odd, so its ramp and the hole above it are on the east side.
         const double side = 5.0 - greybox::kRampWidthM * 0.5;
-        const glm::dvec3 inHole = kOrigin + glm::dvec3(side, -0.25, 0.0);
+        const glm::dvec3 inHole = kOrigin + glm::dvec3(side, -0.25, 3.0);
         CHECK(solidAt(box, inHole) == !linked);
         const glm::dvec3 lowerFloor = kOrigin + glm::dvec3(0.0, -greybox::kStoreyM, 0.0);
-        const glm::dvec3 rampMiddleBelow = lowerFloor + glm::dvec3(side, greybox::kStoreyM * 0.5 - 0.1, 0.0);
+        const glm::dvec3 rampMiddleBelow = lowerFloor + glm::dvec3(side, greybox::kStoreyM * 0.5 - 0.1, 5.0 - greybox::kRampRunM * 0.5);
         const glm::dvec3 rampMiddleAbove = rampMiddleBelow + glm::dvec3(0.0, 0.2, 0.0);
         CHECK(solidAt(box, rampMiddleBelow) == linked);
         CHECK_FALSE(solidAt(box, rampMiddleAbove));
@@ -324,14 +324,19 @@ TEST_CASE("every shipped skeleton builds a dungeon whose doorways and ramps are 
                 return kOrigin + glm::dvec3((c.x - home.x) * greybox::kPitchM, (c.floor - home.floor) * greybox::kStoreyM, (c.y - home.y) * greybox::kPitchM);
             };
             if (from.floor == to.floor) {
-                const glm::dvec3 middle = (centre(from) + centre(to)) * 0.5;
+                glm::dvec3 middle = (centre(from) + centre(to)) * 0.5;
+                if (from.x != to.x) {
+                    for (const GreyBoxRoom& room : box.rooms) {
+                        if (room.id == edge.from) middle.z += room.doorOffset[to.x > from.x ? 1 : 3];
+                    }
+                }
                 for (const double height : {0.3, 1.0, 1.8, 2.7}) CHECK_FALSE(solidAt(box, middle + glm::dvec3(0.0, height, 0.0)));
                 CHECK(solidAt(box, middle - glm::dvec3(0.0, 0.2, 0.0)));
                 ++doorways;
             } else {
                 const auto& low = from.floor < to.floor ? from : to;
                 const double side = (low.floor & 1) == 0 ? -(5.0 - greybox::kRampWidthM * 0.5) : 5.0 - greybox::kRampWidthM * 0.5;
-                const glm::dvec3 midRamp = centre(low) + glm::dvec3(side, greybox::kStoreyM * 0.5, 0.0);
+                const glm::dvec3 midRamp = centre(low) + glm::dvec3(side, greybox::kStoreyM * 0.5, 5.0 - greybox::kRampRunM * 0.5);
                 CHECK(solidAt(box, midRamp - glm::dvec3(0.0, 0.1, 0.0)));
                 CHECK_FALSE(solidAt(box, midRamp + glm::dvec3(0.0, 0.1, 0.0)));
                 ++ramps;
