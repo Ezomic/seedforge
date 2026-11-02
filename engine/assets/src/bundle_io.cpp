@@ -17,7 +17,8 @@ namespace {
 
 constexpr std::array<char, 4> kMagic{'I', 'S', 'C', 'N'};
 // 4: a texture may be block-compressed (BC7, BC5, BC4), its mips stored as whole blocks. Version 3 bundles are refused, not converted.
-constexpr std::uint32_t kVersion = 4;
+// 5: a clip carries its foot contacts. Version 4 bundles are refused, not converted.
+constexpr std::uint32_t kVersion = 5;
 // Sockets, LOD groups and collision follow the nodes under this tag, and only when there are any,
 // so a bundle without them is the same bytes it always was.
 constexpr std::array<char, 4> kPieceTag{'I', 'P', 'C', '1'};
@@ -155,6 +156,9 @@ bool validate(const SceneBundle& bundle, const PieceData& pieces, const std::str
     }
     for (const AnimationClip& c : bundle.clips) {
         if (c.skeleton >= bundle.skeletons.size() || !(c.duration > 0.0f) || !std::isfinite(c.duration) || c.ozzBytes.empty()) return fail("clip shape");
+        for (const FootContact& f : c.footContacts) {
+            if (!(f.time >= 0.0f && f.time <= c.duration) || f.foot > 1) return fail("foot contact");
+        }
     }
     for (const Mesh& m : bundle.meshes) {
         if (m.vertices.empty() || m.indices.size() % 3 != 0 || m.submeshes.empty()) return fail("mesh shape");
@@ -264,6 +268,7 @@ bool writeBundle(const std::filesystem::path& path, const SceneBundle& bundle, c
         w.pod(c.skeleton);
         w.pod(c.duration);
         w.pods(c.ozzBytes);
+        w.pods(c.footContacts);
     }
 
     w.pod(static_cast<std::uint32_t>(bundle.meshes.size()));
@@ -365,7 +370,7 @@ bool readBundle(const std::filesystem::path& path, SceneBundle& bundle, PieceDat
     if (!r.count(count, 16)) return false;
     bundle.clips.resize(count);
     for (auto& c : bundle.clips) {
-        if (!r.string(c.name) || !r.pod(c.skeleton) || !r.pod(c.duration) || !r.pods(c.ozzBytes)) {
+        if (!r.string(c.name) || !r.pod(c.skeleton) || !r.pod(c.duration) || !r.pods(c.ozzBytes) || !r.pods(c.footContacts)) {
             return false;
         }
     }

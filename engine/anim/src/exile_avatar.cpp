@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace ichor {
 
@@ -60,6 +61,26 @@ double avatarFeetHeight(double bodyY, double groundY)
     return std::abs(bodyY - groundY) <= kAvatarSnapMetres ? groundY : bodyY;
 }
 
+std::vector<std::uint32_t> footfallsBetween(const std::vector<FootContact>& contacts, float duration, float fromPhase, float toPhase)
+{
+    std::vector<std::uint32_t> feet;
+    if (!(duration > 0.0f) || !std::isfinite(fromPhase) || !std::isfinite(toPhase) || fromPhase == toPhase) return feet;
+    const bool wraps = toPhase < fromPhase;
+    const auto collect = [&](float lo, float hi) {
+        for (const FootContact& c : contacts) {
+            const float p = c.time / duration;
+            if (p > lo && p <= hi) feet.push_back(c.foot);
+        }
+    };
+    if (wraps) {
+        collect(fromPhase, 1.0f);
+        collect(-1.0f, toPhase);
+    } else {
+        collect(fromPhase, toPhase);
+    }
+    return feet;
+}
+
 bool ExileAvatar::prepare(const ExileKit& kit, std::uint32_t meshBase)
 {
     loaded_ = false;
@@ -82,6 +103,9 @@ bool ExileAvatar::prepare(const ExileKit& kit, std::uint32_t meshBase)
         }
     }
     phase_ = 0.0f;
+    footfalls_.clear();
+    hasContacts_ = !animations_.footContacts(clips_[static_cast<std::size_t>(AvatarClip::Walk)]).empty()
+        && !animations_.footContacts(clips_[static_cast<std::size_t>(AvatarClip::Run)]).empty();
     loaded_ = true;
     return true;
 }
@@ -93,10 +117,17 @@ AvatarClip ExileAvatar::advance(float speed, double seconds)
     const float duration = animations_.clipDuration(clips_[index]);
     if (duration > 0.0f && std::isfinite(seconds) && seconds > 0.0) {
         const float rate = clip == AvatarClip::Idle ? 1.0f : avatarClipRate(speed, travelSpeed_[index]);
+        const float before = phase_;
         phase_ += static_cast<float>(seconds) * rate / duration;
         phase_ -= std::floor(phase_);
+        for (const std::uint32_t foot : footfallsBetween(animations_.footContacts(clips_[index]), duration, before, phase_)) footfalls_.push_back(foot);
     }
     return clip;
+}
+
+std::vector<std::uint32_t> ExileAvatar::takeFootfalls()
+{
+    return std::exchange(footfalls_, {});
 }
 
 bool ExileAvatar::pose(AvatarClip clip, std::vector<glm::mat4>& skin) const
