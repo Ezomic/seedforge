@@ -57,6 +57,7 @@ CombatBridge::CombatBridge(const ForgedGame& game, const CombatSite& site, Comba
         config_.fixedDt = CombatBridgeConfig{}.fixedDt;
     }
     stage_.setFoeRole(config_.role);
+    stage_.setPlayerHitsBleed(config_.playerHitsBleed);
     stage_.setAnchorTuning(config_.anchor);
     stage_.setArtilleryTuning(config_.artillery);
     if (!game_.heightfield.empty()) {
@@ -391,7 +392,7 @@ stage0::FightOutcome CombatBridge::outcome(const Scene& scene) const
 CombatHudState CombatBridge::hud(const Scene& scene) const
 {
     const stage0::Tuning& tuning = stage_.tuning();
-    CombatHudState state{tuning.maxHealth, tuning.maxHealth, tuning.maxStamina, tuning.maxStamina};
+    CombatHudState state{.health = tuning.maxHealth, .maxHealth = tuning.maxHealth, .stamina = tuning.maxStamina, .maxStamina = tuning.maxStamina};
     if (!live()) {
         return state;
     }
@@ -399,6 +400,12 @@ CombatHudState CombatBridge::hud(const Scene& scene) const
     if (const auto* fighter = player != entt::null ? scene.registry().try_get<stage0::Combatant>(player) : nullptr) {
         state.health = fighter->health;
         state.stamina = fighter->stamina;
+        for (const stage0::StatusEffect& effect : fighter->status.effects) {
+            const stage0::StatusDef* def = stage0::statusDef(static_cast<stage0::StatusId>(effect.id));
+            if (def == nullptr || def->durationTicks <= 0) continue;
+            const float left = static_cast<float>(effect.remainingTicks) / static_cast<float>(def->durationTicks);
+            state.statuses.push_back({def->id, effect.stacks, std::clamp(left, 0.0f, 1.0f)});
+        }
     }
     return state;
 }
@@ -487,7 +494,14 @@ void CombatBridge::buildView(const Scene& scene, double alpha, RenderView& view,
 
     exile_.append(scene, alpha, frameSeconds, static_cast<float>(config_.fixedDt), stage_.tuning(), view);
     if (bullWarden_ && !foeParked_) {
+        const std::size_t firstFoeInstance = view.instances.size();
         appendRoleFoe(scene, stage_, alpha, *bullWarden_, view);
+        if (const auto* foeFighter = registry.try_get<stage0::Combatant>(foe)) {
+            const glm::vec3 tint = statusTint(foeFighter->status);
+            for (std::size_t i = firstFoeInstance; i < view.instances.size(); ++i) {
+                view.instances[i].tint = tint;
+            }
+        }
     }
     if (foeParked_) {
         return;

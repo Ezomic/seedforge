@@ -87,6 +87,21 @@ TEST_CASE("the stagger tick exists only with a target and tracks its stagger", "
     REQUIRE(buildCombatHudView(input).targetStagger.value() == 0.0f);
 }
 
+TEST_CASE("status icons keep their order and clean up hostile values", "[combat_hud]")
+{
+    CombatHudInput input = base();
+    REQUIRE(buildCombatHudView(input).statuses.empty());
+    input.statuses = {{"bleed", 3, 0.5f}, {"", 1, 1.0f}, {"slow", 0, 7.0f}, {"slow", 2, kNaN}};
+    const CombatHudView view = buildCombatHudView(input);
+    REQUIRE(view.statuses.size() == 3);
+    REQUIRE(view.statuses[0].id == "bleed");
+    REQUIRE(view.statuses[0].stacks == 3);
+    REQUIRE(view.statuses[0].remaining == Approx(0.5f));
+    REQUIRE(view.statuses[1].stacks == 1);
+    REQUIRE(view.statuses[1].remaining == 1.0f);
+    REQUIRE(view.statuses[2].remaining == 0.0f);
+}
+
 TEST_CASE("damage indicators point at the attacker relative to facing", "[combat_hud]")
 {
     CombatHudInput input = base();

@@ -195,6 +195,8 @@ public:
 
     // Which brain the foe gets on the next reset; call before install or resetFight.
     void setFoeRole(FoeRole role) { role_ = role; }
+    // Off by default: every hit the player lands on the foe also leaves it bleeding. A fight with it on is a different fight.
+    void setPlayerHitsBleed(bool on) { playerHitsBleed_ = on; }
     FoeRole foeRole() const { return role_; }
 
     // The Anchor and Artillery roles run the pure brains of anchor.h and artillery.h; these are their numbers.
@@ -268,6 +270,7 @@ private:
 
     Tuning tuning_;
     FoeRole role_ = FoeRole::Skirmisher;
+    bool playerHitsBleed_ = false;
     AnchorTuning anchorTuning_;
     ArtilleryTuning artilleryTuning_;
     Ground ground_;

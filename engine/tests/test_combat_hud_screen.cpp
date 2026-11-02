@@ -45,6 +45,8 @@ constexpr int kLowHealth[] = {224, 64, 64};
 constexpr int kLaw[] = {216, 176, 72};
 constexpr int kHit[] = {224, 48, 48};
 constexpr int kStagger[] = {232, 216, 168};
+constexpr int kBleedIcon[] = {138, 28, 28};
+constexpr int kSlowIcon[] = {42, 76, 138};
 
 CombatHudView fullView()
 {
@@ -83,6 +85,37 @@ TEST_CASE("a bound view draws the health bar, law resource, hit markers and stag
     REQUIRE(fixture.drawsOf(kHit[0], kHit[1], kHit[2]) == 2);
     REQUIRE(fixture.drawsOf(kStagger[0], kStagger[1], kStagger[2]) == 1);
     REQUIRE(fixture.screen.markup().find("favour") != std::string::npos);
+}
+
+TEST_CASE("status effects draw an icon each and vanish when they end", "[combat_hud_screen]")
+{
+    Fixture fixture;
+    CombatHudInput input;
+    input.health = 100.0f;
+    input.maxHealth = 100.0f;
+    fixture.screen.bind(buildCombatHudView(input));
+    fixture.frame(0.0);
+    REQUIRE(fixture.drawsOf(kBleedIcon[0], kBleedIcon[1], kBleedIcon[2]) == 0);
+    REQUIRE(fixture.drawsOf(kSlowIcon[0], kSlowIcon[1], kSlowIcon[2]) == 0);
+
+    input.statuses = {{"bleed", 3, 0.6f}, {"slow", 1, 0.2f}};
+    fixture.screen.bind(buildCombatHudView(input));
+    fixture.frame(0.1);
+    REQUIRE(fixture.drawsOf(kBleedIcon[0], kBleedIcon[1], kBleedIcon[2]) == 1);
+    REQUIRE(fixture.drawsOf(kSlowIcon[0], kSlowIcon[1], kSlowIcon[2]) == 1);
+    REQUIRE(fixture.screen.markup().find("status bleed") != std::string::npos);
+    REQUIRE(fixture.screen.markup().find(">3<") != std::string::npos);
+
+    input.statuses = {{"slow", 1, 0.2f}};
+    fixture.screen.bind(buildCombatHudView(input));
+    fixture.frame(0.2);
+    REQUIRE(fixture.drawsOf(kBleedIcon[0], kBleedIcon[1], kBleedIcon[2]) == 0);
+    REQUIRE(fixture.drawsOf(kSlowIcon[0], kSlowIcon[1], kSlowIcon[2]) == 1);
+
+    input.statuses.clear();
+    fixture.screen.bind(buildCombatHudView(input));
+    fixture.frame(0.3);
+    REQUIRE(fixture.drawsOf(kSlowIcon[0], kSlowIcon[1], kSlowIcon[2]) == 0);
 }
 
 TEST_CASE("low health turns the health bar its warning colour", "[combat_hud_screen]")
