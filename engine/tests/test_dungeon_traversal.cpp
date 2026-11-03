@@ -146,15 +146,22 @@ private:
         return Leg::Stuck;
     }
 
-    // Where the ramp of a room lies, as an offset from its centre along x: the plank is the only tilted floor piece.
-    double rampOffset(const glm::dvec3& lowerCentre) const
+    // Where the ramp of the lower room lies across the room, as an offset from its centre along x.
+    double rampOffset(graph::NodeId lowerRoom) const
     {
-        for (const GreyBoxPiece& piece : box_.pieces) {
-            if (piece.kind != GreyBoxKind::Floor || std::abs(piece.rotation.w - 1.0f) < 1e-4f) continue;
-            if (std::abs(piece.centre.z - lowerCentre.z) < 0.5 && std::abs(piece.centre.y - (lowerCentre.y + 2.25)) < 0.5
-                && std::abs(piece.centre.x - lowerCentre.x) < greybox::kRoomHalfM) {
-                return piece.centre.x - lowerCentre.x;
-            }
+        const double offset = greybox::kRoomHalfM - greybox::kRampWidthM * 0.5;
+        for (const GreyBoxRoom& room : box_.rooms) {
+            if (room.id == lowerRoom) return room.rampWest ? -offset : offset;
+        }
+        return 0.0;
+    }
+
+    // Where the doorway from one room to the next lies along its wall, as an offset from the middle of the wall.
+    double doorOffset(graph::NodeId from, const glm::dvec3& a, const glm::dvec3& b) const
+    {
+        const std::size_t side = b.x > a.x + 1.0 ? 1 : b.x < a.x - 1.0 ? 3 : b.z > a.z ? 2 : 0;
+        for (const GreyBoxRoom& room : box_.rooms) {
+            if (room.id == from) return room.doorOffset[side];
         }
         return 0.0;
     }
@@ -190,10 +197,11 @@ private:
             std::vector<glm::dvec2> via;
             const char* what = "doorway";
             if (step.link == RoomLink::Door) {
-                via.push_back({(a.x + b.x) * 0.5, (a.z + b.z) * 0.5});
+                const double along = doorOffset(hereId, a, b);
+                const bool eastWest = std::abs(b.x - a.x) > 1.0;
+                via.push_back({(a.x + b.x) * 0.5 + (eastWest ? 0.0 : along), (a.z + b.z) * 0.5 + (eastWest ? along : 0.0)});
             } else {
-                const glm::dvec3& lower = step.link == RoomLink::RampUp ? a : b;
-                const double xs = rampOffset(lower);
+                const double xs = rampOffset(step.link == RoomLink::RampUp ? hereId : step.room);
                 what = step.link == RoomLink::RampUp ? "ramp up" : "ledge down the ramp";
                 if (step.link == RoomLink::RampUp) {
                     via = {{a.x, a.z - (R - 0.5)}, {a.x + xs, a.z - (R - 0.5)}, {a.x + xs, a.z + (R - 0.4)}, {a.x, a.z + (R - 0.4)}};
@@ -224,10 +232,9 @@ private:
     DungeonContent content_;
 };
 
-// Skeletons whose objective the grey-box does not join to the entry today (SEED-765 found them). The night is red for a
-// skeleton off this list that is stuck, and for one on it that now passes: then remove it here.
-constexpr std::array<std::string_view, 14> kKnownStuck = {"sunless_aqueduct", "storm_bastion", "bramble_hollow", "salt_cavern", "cistern_maze", "iron_citadel",
-    "ash_crater", "sunken_crypt", "ring_fort", "foundry_depths", "thorn_gardens", "coral_grotto", "clockwork_keep", "gilded_menagerie"};
+// A skeleton the grey-box does not join to its entry goes here with the ticket that fixes it. The night is red for a skeleton
+// off this list that is stuck, and for one on it that now passes: then remove it here.
+constexpr std::array<std::string_view, 0> kKnownStuck = {};
 
 bool knownStuck(std::string_view id) { return std::find(kKnownStuck.begin(), kKnownStuck.end(), id) != kKnownStuck.end(); }
 
@@ -275,18 +282,13 @@ int traverse(const std::vector<std::size_t>& indices)
 
 }
 
-// The pull request variant walks three skeletons by id, the ones whose objective the grey-box joins to the entry today
-// (the nightly case lists the rest), so a regression in the grey-box or the body goes red here.
-TEST_CASE("the traversal bot walks three dungeon skeletons to their objective with real physics", "[dungeon_traversal]")
+// The pull request variant walks the first 20 skeletons of the catalogue, the ones SEED-765 first found stuck, so a regression in
+// the grey-box or the body goes red here; the night walks as many as it is told to.
+TEST_CASE("the traversal bot walks twenty dungeon skeletons to their objective with real physics", "[dungeon_traversal]")
 {
     std::vector<std::size_t> indices;
-    for (const char* id : {"lantern_catacomb", "smuggler_cellar", "mirror_labyrinth"}) {
-        const std::vector<DungeonSkeleton>& all = catalog().all();
-        for (std::size_t i = 0; i < all.size(); ++i) {
-            if (all[i].id == id) indices.push_back(i);
-        }
-    }
-    REQUIRE(indices.size() == 3);
+    for (std::size_t i = 0; i < 20; ++i) indices.push_back(i);
+    REQUIRE(catalog().all().size() >= indices.size());
     CHECK(traverse(indices) == 0);
 }
 
@@ -309,7 +311,7 @@ TEST_CASE("the known-stuck list fails an unlisted stuck skeleton and a listed on
     CHECK(verdict("a", true, false, "no route").empty());
     CHECK(verdict("a", false, false, "no route").find("no route") != std::string::npos);
     CHECK(verdict("a", true, true, "").find("remove it from kKnownStuck") != std::string::npos);
-    CHECK(knownStuck("sunken_crypt"));
+    CHECK_FALSE(knownStuck("sunken_crypt"));
     CHECK_FALSE(knownStuck("smuggler_cellar"));
     for (const std::string_view id : kKnownStuck) {
         const auto& all = catalog().all();
