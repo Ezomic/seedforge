@@ -29,6 +29,13 @@ struct CombatHudTarget {
     float staggerMax = 0.0f;
 };
 
+// A status effect on the player: `id` names its icon ("bleed", "slow"), `remaining` is 0..1 of its duration left.
+struct CombatHudStatus {
+    std::string id;
+    int stacks = 1;
+    float remaining = 0.0f;
+};
+
 struct CombatHudInput {
     float health = 0.0f;
     float maxHealth = 0.0f;
@@ -38,6 +45,7 @@ struct CombatHudInput {
     std::optional<CombatHudLawResource> lawResource;
     std::vector<CombatHudHit> recentHits;
     std::optional<CombatHudTarget> target;
+    std::vector<CombatHudStatus> statuses;
 };
 
 struct CombatHudTuning {
@@ -64,6 +72,12 @@ struct CombatHudLawView {
     float value = 0.0f;
 };
 
+struct CombatHudStatusIcon {
+    std::string id;
+    int stacks = 1;
+    float remaining = 0.0f;
+};
+
 struct CombatHudView {
     CombatHudBar health;
     CombatHudBar stamina;
@@ -73,6 +87,8 @@ struct CombatHudView {
     std::vector<CombatHudIndicator> indicators;
     // 0..1 fill of the tick beside the reticle; absent when nothing is targeted.
     std::optional<float> targetStagger;
+    // In the order given; stacks are at least 1 and remaining is clamped to 0..1. Entries without an id are dropped.
+    std::vector<CombatHudStatusIcon> statuses;
 };
 
 // Pure and deterministic. NaN, infinite or negative inputs read as empty; a hit that is not yet

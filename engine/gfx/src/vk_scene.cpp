@@ -1398,7 +1398,7 @@ void SceneRenderer::render(VkCommandBuffer cmd, std::uint32_t slot, const Render
             vkCmdBindIndexBuffer(cmd, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
             for (const auto& sub : mesh.submeshes) {
                 const MaterialConstants& material = materials_[sub[2]];
-                push.baseColorFactor = material.baseColorFactor;
+                push.baseColorFactor = material.baseColorFactor * glm::vec4(instance.tint, 1.0f);
                 push.params = glm::vec4(material.metallic, material.roughness, material.hasNormalMap ? 1.0f : 0.0f, static_cast<float>(cascade));
                 if (!shadowPass) {
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1, &materialSets_[sub[2]], 0, nullptr);

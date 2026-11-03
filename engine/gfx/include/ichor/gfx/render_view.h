@@ -30,6 +30,8 @@ struct RenderInstance {
     // height is flat, from the foot's level, not from the terrain's surface under each point.
     // Skinned instances ignore it.
     bool groundBlend = false;
+    // Multiplies the base colour of every material of the object; white leaves it as authored.
+    glm::vec3 tint{1.0f};
 };
 
 // A resident terrain cell: the handle the renderer gave its meshes, where

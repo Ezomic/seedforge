@@ -27,6 +27,12 @@ constexpr const char* kCombatHudDocument = R"(<rml><head><style>
     #law { position: absolute; left: 24px; bottom: 74px; width: 260px; font-family: Alegreya Sans; font-size: 18px; color: #e8d8a8; }
     #lawbar { width: 260px; height: 6px; background-color: #10141acc; border: 1px #a08850; }
     #lawfill { width: 0%; height: 6px; background-color: #d8b048; }
+    #statuses { position: absolute; left: 24px; bottom: 94px; width: 260px; height: 30px; }
+    .status { display: inline-block; position: relative; width: 26px; height: 26px; margin-right: 6px; border: 1px #a08850; font-family: Alegreya Sans; font-size: 14px; color: #f4ecd0; text-align: center; }
+    .status.bleed { background-color: #8a1c1c; }
+    .status.slow { background-color: #2a4c8a; }
+    .status .stacks { position: absolute; right: 1px; top: 0px; }
+    .status .left { position: absolute; left: 0px; bottom: 0px; height: 3px; background-color: #f4ecd0; }
     #ring { position: absolute; left: 50%; top: 50%; width: 0px; height: 0px; }
     .hit { position: absolute; width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; }
     #reticle { position: absolute; left: 50%; top: 50%; margin-left: 18px; margin-top: -20px; width: 6px; height: 40px; background-color: #10141acc; border: 1px #a08850; }
@@ -35,6 +41,7 @@ constexpr const char* kCombatHudDocument = R"(<rml><head><style>
     <div id="health" class="bar"><div id="healthfill" class="fill"></div></div>
     <div id="stamina" class="bar"><div id="staminafill" class="fill"></div></div>
     <div id="law"><div id="lawtext"></div><div id="lawbar"><div id="lawfill"></div></div></div>
+    <div id="statuses"></div>
     <div id="ring"></div>
     <div id="reticle"><div id="staggerfill"></div></div>
 </body></rml>)";
@@ -67,6 +74,17 @@ std::string hitMarker(const CombatHudIndicator& indicator)
     return text;
 }
 
+std::string statusIcon(const CombatHudStatusIcon& status)
+{
+    char left[16];
+    std::snprintf(left, sizeof(left), "%.0f%%", static_cast<double>(std::clamp(status.remaining, 0.0f, 1.0f) * 100.0f));
+    std::string markup = "<div class=\"status " + escapeRml(status.id) + "\">";
+    if (status.stacks > 1) {
+        markup += "<div class=\"stacks\">" + std::to_string(status.stacks) + "</div>";
+    }
+    return markup + "<div class=\"left\" style=\"width: " + left + ";\"></div></div>";
+}
+
 }
 
 CombatHudScreen::CombatHudScreen(UiContext& ui)
@@ -84,10 +102,11 @@ CombatHudScreen::CombatHudScreen(UiContext& ui)
     lawText_ = document_->GetElementById("lawtext");
     lawFill_ = document_->GetElementById("lawfill");
     ring_ = document_->GetElementById("ring");
+    statuses_ = document_->GetElementById("statuses");
     reticle_ = document_->GetElementById("reticle");
     staggerFill_ = document_->GetElementById("staggerfill");
     if (health_ == nullptr || healthFill_ == nullptr || stamina_ == nullptr || staminaFill_ == nullptr || law_ == nullptr || lawText_ == nullptr
-        || lawFill_ == nullptr || ring_ == nullptr || reticle_ == nullptr || staggerFill_ == nullptr) {
+        || lawFill_ == nullptr || ring_ == nullptr || statuses_ == nullptr || reticle_ == nullptr || staggerFill_ == nullptr) {
         ui_.unloadDocument(document_);
         document_ = nullptr;
         return;
@@ -130,6 +149,12 @@ void CombatHudScreen::bind(const CombatHudView& view)
     }
     ring_->SetInnerRML(hits);
 
+    std::string icons;
+    for (const CombatHudStatusIcon& status : view.statuses) {
+        icons += statusIcon(status);
+    }
+    statuses_->SetInnerRML(icons);
+
     if (view.targetStagger) {
         reticle_->SetProperty("display", "block");
         setHeightPercent(staggerFill_, *view.targetStagger);
@@ -143,7 +168,7 @@ std::string CombatHudScreen::markup() const
     if (ring_ == nullptr) {
         return {};
     }
-    return lawText_->GetInnerRML() + ring_->GetInnerRML();
+    return lawText_->GetInnerRML() + ring_->GetInnerRML() + statuses_->GetInnerRML();
 }
 
 }

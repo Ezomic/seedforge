@@ -13,6 +13,9 @@ namespace ichor {
 // reads the scene and writes nothing back.
 void appendRoleFoe(const Scene& scene, const stage0::Stage0& stage, double alpha, const stage0::BullWardenKit& kit, RenderView& view);
 
+// What a body under these effects is multiplied by: white with none, red-shifted while bleeding, blue-shifted while slowed.
+glm::vec3 statusTint(const stage0::StatusSet& status);
+
 // The scale the Bull-Warden is drawn at for a role, relative to the kit's own.
 float roleScale(stage0::FoeRole role);
 

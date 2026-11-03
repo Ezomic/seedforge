@@ -58,6 +58,14 @@ void appendRing(glm::dvec3 centre, glm::vec3 color, RenderView& view)
 
 }
 
+glm::vec3 statusTint(const stage0::StatusSet& status)
+{
+    glm::vec3 tint(1.0f);
+    if (status.find(stage0::StatusId::Bleed) != nullptr) tint *= glm::vec3(1.0f, 0.35f, 0.35f);
+    if (status.find(stage0::StatusId::Slow) != nullptr) tint *= glm::vec3(0.55f, 0.7f, 1.0f);
+    return tint;
+}
+
 float roleScale(stage0::FoeRole role)
 {
     switch (role) {
