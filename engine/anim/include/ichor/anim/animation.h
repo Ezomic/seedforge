@@ -34,6 +34,8 @@ public:
     std::uint32_t findClip(std::string_view name) const; // kNoClip when absent
     float clipDuration(std::uint32_t clip) const;
     std::uint32_t clipSkeleton(std::uint32_t clip) const;
+    // The cooked foot contacts of a clip, by time; empty when the clip has none.
+    const std::vector<FootContact>& footContacts(std::uint32_t clip) const;
 
     // Model-space joint matrices for the clip at `time` (seconds, clamped to
     // the clip). `out` is resized to the joint count.

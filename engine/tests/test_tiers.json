@@ -1,6 +1,7 @@
 {
   "medium": [
     "a cache that is empty, cut short or has any bit flipped is recomputed and rewritten",
+    "a clip without contacts falls back to the distance pacer",
     "a flipped byte anywhere in a real cache file is dropped by the cache, never served",
     "a flipped byte in the phase blob is rejected, in the campaign and in the decoder",
     "a missing, truncated or damaged entry is forged again and repaired",
@@ -31,6 +32,7 @@
     "every forge phase stays within a generous multiple of its recorded cost",
     "every recorded forged-world fight replays to its recorded outcome",
     "every river runs on to the sea or a lake",
+    "footfalls land once per planted foot per cycle at walk, run and dodge speeds, left and right in turn",
     "forge world digests: a moved phase hash is reported by phase with the regenerate command",
     "forge world digests: every phase of the forge matches the checked-in table on every platform",
     "forged_app_determinism",
@@ -77,8 +79,11 @@
     "the bridge corpus goes red when a damage value changes",
     "the bridge gives the foe the role it is configured with",
     "the character stays in place: the root travel of a locomotion clip is taken out of the pose",
+    "the contacts survive a bundle written and read back",
     "the cooked Bull-Warden faces -Z like Stage 0 characters",
     "the cooked Exile survives the bundle file",
+    "the cooked contacts fall while the foot is low",
+    "the cooked walk and run clips land both feet equally often and a standing clip lands none",
     "the coverage reserve lifts the recorded weak seeds over the gate",
     "the enclosed spawn of seed 2 names its pocket without searching the world for every goal",
     "the errand can be finished on foot in the world of seed 1",

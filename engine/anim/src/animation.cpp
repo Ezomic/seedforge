@@ -58,6 +58,7 @@ struct AnimationSet::Impl {
         std::string name;
         std::uint32_t skeleton = 0;
         float duration = 0.0f;
+        std::vector<FootContact> footContacts;
     };
     std::vector<SkeletonEntry> skeletons;
     std::vector<ClipEntry> clips;
@@ -135,6 +136,7 @@ bool AnimationSet::load(const SceneBundle& bundle)
         entry.name = source.name;
         entry.skeleton = skeleton;
         entry.duration = source.duration;
+        entry.footContacts = source.footContacts;
         impl_->clips.push_back(std::move(entry));
     }
     return true;
@@ -167,6 +169,12 @@ std::uint32_t AnimationSet::findClip(std::string_view name) const
 float AnimationSet::clipDuration(std::uint32_t clip) const
 {
     return clip < impl_->clips.size() ? impl_->clips[clip].duration : 0.0f;
+}
+
+const std::vector<FootContact>& AnimationSet::footContacts(std::uint32_t clip) const
+{
+    static const std::vector<FootContact> none;
+    return clip < impl_->clips.size() ? impl_->clips[clip].footContacts : none;
 }
 
 std::uint32_t AnimationSet::clipSkeleton(std::uint32_t clip) const
