@@ -336,7 +336,7 @@ LoadResult SaveSlots::load(std::string_view name, Scene& scene, const SaveContex
     return result;
 }
 
-std::vector<SlotInfo> SaveSlots::list() const
+std::vector<SlotEntry> SaveSlots::listAll() const
 {
     // A slot is every name with a .sav or a backup, shown by its newest good copy.
     std::set<std::string> names;
@@ -347,18 +347,35 @@ std::vector<SlotInfo> SaveSlots::list() const
             names.insert(entry.path().stem().string());
         }
     }
-    std::vector<SlotInfo> slots;
+    std::vector<SlotEntry> slots;
     for (const std::string& name : names) {
+        SlotEntry slot;
+        slot.damaged = true;
+        slot.info.name = name;
         for (std::uint32_t backup = 0; backup <= policy_.backups; ++backup) {
             Header header{};
             std::vector<std::uint8_t> payload;
             if (readSlot(migrations(), pathOf(name, backup), header, payload) == SlotRead::Ok) {
-                slots.push_back(infoOf(name, header));
+                slot.info = infoOf(name, header);
+                slot.damaged = false;
+                slot.backupIndex = backup;
                 break;
             }
         }
+        slots.push_back(std::move(slot));
     }
-    std::sort(slots.begin(), slots.end(), [](const SlotInfo& a, const SlotInfo& b) { return a.name < b.name; });
+    std::sort(slots.begin(), slots.end(), [](const SlotEntry& a, const SlotEntry& b) { return a.info.name < b.info.name; });
+    return slots;
+}
+
+std::vector<SlotInfo> SaveSlots::list() const
+{
+    std::vector<SlotInfo> slots;
+    for (SlotEntry& entry : listAll()) {
+        if (!entry.damaged) {
+            slots.push_back(std::move(entry.info));
+        }
+    }
     return slots;
 }
 

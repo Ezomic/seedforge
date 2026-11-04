@@ -67,8 +67,7 @@ struct RoomStep {
 };
 
 // The shortest walk, by rooms, from one room to another over the grey-box's doorways and ramps (what the player's body can
-// pass, not the mission graph's logical links). A doorway in the wall a ramp or its hole runs along is not passable: the ramp
-// fills the strip in front of it in the lower room and the hole does in the upper one. Empty for the same room, nullopt when
+// pass, not the mission graph's logical links). Empty for the same room, nullopt when
 // `to` cannot be reached. Pure; of equal routes the one that tries north, east, south, west, up, down in that order first wins.
 std::optional<std::vector<RoomStep>> routeBetweenRooms(const DungeonGreyBox& box, graph::NodeId from, graph::NodeId to);
 

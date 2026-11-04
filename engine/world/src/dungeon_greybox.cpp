@@ -24,6 +24,7 @@ struct Room {
     NodeId id = 0;
     Cell cell;
     bool door[4] = {false, false, false, false};
+    double doorOffset[4] = {0.0, 0.0, 0.0, 0.0};
     bool ramp = false; // a ramp up to the room above
     bool hole = false; // a hole in this room's floor, over the ramp of the room below
 };
@@ -65,10 +66,11 @@ void addWalls(Builder& b, const Room& room, glm::dvec3 c, double fy)
             b.box(GreyBoxKind::Wall, c, -W, W, bottom, top, z0, z1);
             continue;
         }
-        b.box(GreyBoxKind::Wall, c, -W, -D, bottom, top, z0, z1);
-        b.box(GreyBoxKind::Wall, c, D, W, bottom, top, z0, z1);
-        b.box(GreyBoxKind::Wall, c, -D, D, lintel, top, z0, z1);
-        b.box(GreyBoxKind::Floor, c, -D, D, bottom, fy, z0, z1);
+        const double mid = room.doorOffset[side];
+        b.box(GreyBoxKind::Wall, c, -W, mid - D, bottom, top, z0, z1);
+        b.box(GreyBoxKind::Wall, c, mid + D, W, bottom, top, z0, z1);
+        b.box(GreyBoxKind::Wall, c, mid - D, mid + D, lintel, top, z0, z1);
+        b.box(GreyBoxKind::Floor, c, mid - D, mid + D, bottom, fy, z0, z1);
     }
     for (const Side side : {West, East}) {
         const double x0 = side == West ? -W : R;
@@ -77,10 +79,11 @@ void addWalls(Builder& b, const Room& room, glm::dvec3 c, double fy)
             b.box(GreyBoxKind::Wall, c, x0, x1, bottom, top, -R, R);
             continue;
         }
-        b.box(GreyBoxKind::Wall, c, x0, x1, bottom, top, -R, -D);
-        b.box(GreyBoxKind::Wall, c, x0, x1, bottom, top, D, R);
-        b.box(GreyBoxKind::Wall, c, x0, x1, lintel, top, -D, D);
-        b.box(GreyBoxKind::Floor, c, x0, x1, bottom, fy, -D, D);
+        const double mid = room.doorOffset[side];
+        b.box(GreyBoxKind::Wall, c, x0, x1, bottom, top, -R, mid - D);
+        b.box(GreyBoxKind::Wall, c, x0, x1, bottom, top, mid + D, R);
+        b.box(GreyBoxKind::Wall, c, x0, x1, lintel, top, mid - D, mid + D);
+        b.box(GreyBoxKind::Floor, c, x0, x1, bottom, fy, mid - D, mid + D);
     }
 }
 
@@ -93,10 +96,13 @@ void addFloor(Builder& b, const Room& room, glm::dvec3 c, double fy, bool holeWe
         return;
     }
     const double edge = holeWest ? -R + gb::kRampWidthM : R - gb::kRampWidthM;
+    const double holeStart = R - gb::kHoleLengthM;
     if (holeWest) {
         b.box(GreyBoxKind::Floor, c, edge, R, bottom, fy, -R, R);
+        b.box(GreyBoxKind::Floor, c, -R, edge, bottom, fy, -R, holeStart);
     } else {
         b.box(GreyBoxKind::Floor, c, -R, edge, bottom, fy, -R, R);
+        b.box(GreyBoxKind::Floor, c, edge, R, bottom, fy, -R, holeStart);
     }
 }
 
@@ -104,16 +110,17 @@ void addRamp(Builder& b, glm::dvec3 c, double fy, bool west)
 {
     constexpr double R = gb::kRoomHalfM;
     constexpr double thickness = 0.4;
-    const double run = 2.0 * R;
+    const double run = gb::kRampRunM;
     const double rise = gb::kStoreyM;
     const double length = std::sqrt(run * run + rise * rise);
     const double angle = std::atan2(rise, run);
     const double xs = west ? -R + gb::kRampWidthM * 0.5 : R - gb::kRampWidthM * 0.5;
-    // The top surface runs from the floor at the north wall to the floor above at the south wall; the plank hangs below it.
+    // The top surface runs from the floor, kRampRunM short of the south wall, to the floor above at the south wall; the plank
+    // hangs below it.
     const glm::dvec3 normal(0.0, std::cos(angle), -std::sin(angle));
     GreyBoxPiece piece;
     piece.kind = GreyBoxKind::Floor;
-    piece.centre = c + glm::dvec3(xs, fy + rise * 0.5, 0.0) - normal * (thickness * 0.5);
+    piece.centre = c + glm::dvec3(xs, fy + rise * 0.5, R - run * 0.5) - normal * (thickness * 0.5);
     piece.halfExtents = glm::vec3(static_cast<float>(gb::kRampWidthM * 0.5), static_cast<float>(thickness * 0.5), static_cast<float>(length * 0.5));
     piece.rotation = glm::angleAxis(static_cast<float>(-angle), glm::vec3(1.0f, 0.0f, 0.0f));
     if (b.out.pieces.size() >= gb::kMaxPieces) {
@@ -179,6 +186,20 @@ DungeonGreyBox buildDungeonGreyBox(const BakedDungeon& dungeon, glm::dvec3 origi
         room.hole = linked.count({cell, below}) != 0 && byCell.count(below) != 0;
     }
 
+    // A doorway on the wall a ramp or its hole runs along moves north, out of the way of the slope and the drop; the room on the
+    // other side of it moves its end of the doorway the same way.
+    const auto stripOn = [&](const Room& room, Side side) {
+        const bool west = side == West;
+        return (room.ramp && rampOnWest(room.cell.floor) == west) || (room.hole && rampOnWest(room.cell.floor - 1) == west);
+    };
+    for (auto& [cell, room] : byCell) {
+        for (const Side side : {East, West}) {
+            if (!room.door[side]) continue;
+            const Cell other{cell.x + (side == East ? 1 : -1), cell.y, cell.floor};
+            if (stripOn(room, side) || stripOn(byCell.at(other), side == East ? West : East)) room.doorOffset[side] = -gb::kDoorShiftM;
+        }
+    }
+
     const Cell home = cellOf[entry];
     const auto centreOf = [&](const Cell& cell, double& fy) {
         fy = origin.y + static_cast<double>(cell.floor - home.floor) * gb::kStoreyM;
@@ -200,7 +221,10 @@ DungeonGreyBox buildDungeonGreyBox(const BakedDungeon& dungeon, glm::dvec3 origi
         GreyBoxRoom placed;
         placed.id = room.id;
         placed.centre = glm::dvec3(c.x, fy, c.z);
-        for (int side = 0; side < 4; ++side) placed.doors[side] = room.door[side];
+        for (int side = 0; side < 4; ++side) {
+            placed.doors[side] = room.door[side];
+            placed.doorOffset[side] = room.doorOffset[side];
+        }
         placed.ramp = room.ramp;
         placed.hole = room.hole;
         placed.rampWest = rampOnWest(cell.floor);

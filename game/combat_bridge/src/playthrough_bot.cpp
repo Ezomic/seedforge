@@ -374,7 +374,7 @@ struct Rig {
     {
         for (const GreyBoxPiece& piece : box.pieces) {
             if (piece.kind != GreyBoxKind::Floor || std::abs(piece.rotation.w - 1.0f) < 1e-4f) continue;
-            if (std::abs(piece.centre.z - lowerCentre.z) < 0.5 && std::abs(piece.centre.y - (lowerCentre.y + 2.25)) < 0.5 && std::abs(piece.centre.x - lowerCentre.x) < greybox::kRoomHalfM) {
+            if (std::abs(piece.centre.z - (lowerCentre.z + greybox::kRoomHalfM - greybox::kRampRunM * 0.5)) < 0.5 && std::abs(piece.centre.y - (lowerCentre.y + 2.25)) < 0.5 && std::abs(piece.centre.x - lowerCentre.x) < greybox::kRoomHalfM) {
                 return piece.centre.x - lowerCentre.x;
             }
         }
@@ -416,12 +416,17 @@ struct Rig {
             const glm::dvec3 b = content.room(step.room)->centre;
             std::vector<glm::dvec2> via;
             if (step.link == RoomLink::Door) {
-                via.push_back({(a.x + b.x) * 0.5, (a.z + b.z) * 0.5});
+                const std::size_t side = b.x > a.x + 1.0 ? 1 : b.x < a.x - 1.0 ? 3 : b.z > a.z ? 2 : 0;
+                double along = 0.0;
+                for (const GreyBoxRoom& room : box.rooms) {
+                    if (room.id == here->id) along = room.doorOffset[side];
+                }
+                via.push_back({(a.x + b.x) * 0.5 + (side % 2 == 0 ? along : 0.0), (a.z + b.z) * 0.5 + (side % 2 == 1 ? along : 0.0)});
             } else {
                 const glm::dvec3& lower = step.link == RoomLink::RampUp ? a : b;
                 const double xs = rampOffset(box, lower);
                 if (step.link == RoomLink::RampUp) {
-                    via = {{a.x, a.z - (R - 0.5)}, {a.x + xs, a.z - (R - 0.5)}, {a.x + xs, a.z + (R - 0.4)}, {a.x, a.z + (R - 0.4)}}; // off the top sideways: the hole lies over the whole ramp strip
+                    via = {{a.x, a.z - (R - 0.5)}, {a.x + xs, a.z - (R - 0.5)}, {a.x + xs, a.z + (R - 0.4)}, {a.x, a.z + (R - 0.4)}}; // off the top sideways: the hole lies over the ramp strip
                 } else {
                     via = {{a.x, a.z + (R - 0.4)}, {a.x + xs, a.z + (R - 0.4)}, {a.x + xs, a.z - (R - 0.5)}, {a.x, a.z - (R - 0.5)}};
                 }
