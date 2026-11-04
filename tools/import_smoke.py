@@ -38,7 +38,11 @@ def run_one(exe, path, timeout):
     for line in done.stdout.splitlines():
         if line.startswith("RESULT\t"):
             f = line.split("\t")
-            return {"status": f[2], "kind": f[3], "yaw": f[4], "height": f[5], "walk": f[6], "clips": f[8], "why": f[9] if len(f) > 9 else ""}
+            why = f[9] if len(f) > 9 else ""
+            if "cooker rejected" in why:
+                errors = [l[len("[error] "):] for l in done.stderr.splitlines() if l.startswith("[error]")]
+                why = f"{why}: {errors[-1]}" if errors else why
+            return {"status": f[2], "kind": f[3], "yaw": f[4], "height": f[5], "walk": f[6], "clips": f[8], "why": why}
     errors = [l for l in done.stderr.splitlines() if l.startswith("[error]")]
     why = errors[-1][len("[error] "):] if errors else f"no result, exit code {done.returncode}"
     return {"kind": "?", "status": "FAIL", "yaw": "-", "height": "-", "walk": "-", "clips": "-", "why": f"cannot import: {why}"}

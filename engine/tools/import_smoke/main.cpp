@@ -71,12 +71,12 @@ std::string lower(std::string s)
 }
 
 // What the game would pass as CookOptions::rootYawDegrees. The Exile v6 rig was exported facing -Z and needs no turn,
-// every older Exile export (the v6 rig folder and file names carry "v6") faces +Z and needs 180, and any other rig is cooked as it is.
+// every older Exile export (the v6 rig folder and file names carry "v6" or "v7") faces +Z and needs 180, and any other rig is cooked as it is.
 float conventionYaw(const fs::path& file)
 {
     const std::string name = lower(file.generic_string());
     if (name.find("exile") == std::string::npos) return 0.0f;
-    return name.find("v6") != std::string::npos ? 0.0f : 180.0f;
+    return (name.find("v6") != std::string::npos || name.find("v7") != std::string::npos) ? 0.0f : 180.0f;
 }
 
 std::size_t jointEndingWith(const std::vector<std::string>& names, std::string_view suffix)
