@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -29,10 +30,13 @@ struct Vertex {
 };
 static_assert(sizeof(Vertex) == 64);
 
+constexpr std::size_t kRegionNameSize = 16;
+
 struct Submesh {
     std::uint32_t firstIndex = 0;
     std::uint32_t indexCount = 0;
     std::uint32_t material = 0;
+    char region[kRegionNameSize] = {}; // body region the primitive covers, empty for none; see body_regions.h
 };
 
 constexpr std::uint32_t kNoSkeleton = 0xffffffffu;

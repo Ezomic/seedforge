@@ -133,11 +133,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true' || needs.changes.outputs.art == 'true'
     runs-on: windows-2022
-    # PR_LIMIT: 15 minutes, the budget of a pull request (the first number in these expressions, three jobs). Raise it to 30 after a cache
+    # PR_LIMIT: 15 minutes (30 while the caches are cold, see SEED-749), the budget of a pull request (the first number in these expressions, three jobs). Raise it to 30 after a cache
     # eviction or a key rename until a run on main has saved the caches again: a cold PR run needs about 25 minutes and a job killed by its
     # limit saves nothing. A run on main starts with cold caches (a cache saved on a PR branch is not visible to main) and
     # a job killed by its limit saves no cache, so main gets room to finish once and warm them.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 30 || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -331,7 +331,7 @@ jobs:
     runs-on: ubuntu-latest
     # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in 12 to 25 minutes, and on main the shards also run
     # the medium tier. A job killed by its limit saves no cache, so only a pull request is held to 15 minutes.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 30 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -433,7 +433,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     # Cold, this job builds SDL3 and friends from source (670 to 737 s of configure), so only a pull request is held to 15 minutes.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 30 || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
