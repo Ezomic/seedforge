@@ -87,3 +87,12 @@ the only place the props are simulation entities. Combat, Stage 0 and the bridge
 ## Placeholder status
 
 Props untextured, one take per clip.
+
+## Import smoke test (SEED-772)
+
+`python tools/import_smoke.py <pack dir>` runs `ichor_import_smoke` (build it with `bin/build ichor_import_smoke`) over every GLB
+under a pack folder, skipping `work` and `_`-prefixed folders. Each file is cooked, written and read back as a bundle, loaded
+into the `AnimationSet` and played for 8 frames of every clip. A skinned humanoid must face -Z at the first frame of idle,
+its walk root must travel along -Z, and it must stand 1.7 to 1.9 m tall. Skin matrices must be finite and clip names must be in
+the standard set. The table lists the `rootYawDegrees` used and the one the facing needs: Exile files with `v6` or `v7` in the path use 0,
+older Exile files 180, any other rig 0. A file that faces the wrong way fails with the yaw it needs. Local only, no CI tier yet.

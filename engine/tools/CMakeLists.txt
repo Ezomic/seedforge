@@ -15,3 +15,8 @@ add_executable(ichor_seed_harness
     seed_harness/main.cpp
 )
 target_link_libraries(ichor_seed_harness PRIVATE ichor_world)
+
+add_executable(ichor_import_smoke
+    import_smoke/main.cpp
+)
+target_link_libraries(ichor_import_smoke PRIVATE ichor_anim ichor_assets)
