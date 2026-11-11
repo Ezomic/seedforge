@@ -40,6 +40,7 @@ POLE_DOWN = 0.25
 ROLL_KEPT = 0.7
 WRIST_TWIST = 45.0
 RELAXED_OUT = 0.04
+RELAXED_CLEAR = 0.18
 RELAXED_AHEAD = 0.08  # the shoulders sit behind the hips, and a hanging hand rests beside the thigh, not behind it
 FLEX_MIN = 14.0
 FLEX_MAX = 150.0
@@ -223,6 +224,13 @@ class Arm:
             hang = add(add(shoulder, mul(level, self.side * RELAXED_OUT)), mul(ahead, RELAXED_AHEAD))
             hang = add(hang, [0.0, -self.hang * (self.upper_length + self.fore_length), 0.0])
             wrist = add(hang, sway)
+            # The shoulders turn in a run, and a hand hung from them swings in towards the thigh. It stays this far out
+            # from the hips' midline, so it never passes through the leg (and the cook, which carries the hand's swing
+            # over, keeps its hands over 12 cm out).
+            at = body.in_rest_axes(world, wrist)
+            out = self.side * dot(sub(at, body.hips_at), body.lateral)
+            if out < RELAXED_CLEAR:
+                wrist = body.from_rest_axes(world, add(at, mul(body.lateral, self.side * (RELAXED_CLEAR - out))))
         to_wrist = sub(wrist, shoulder)
         distance = length(to_wrist)
         s = mul(to_wrist, 1.0 / distance)
