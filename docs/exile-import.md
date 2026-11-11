@@ -71,8 +71,10 @@ two-bone chain, from the posed skeleton only:
   equal. The same tool stands the idle square: the source turned the hips 14 degrees one way and the shoulders 10 the
   other and set the right foot 24 cm back, and every joint but the arms and hands now takes its bind rotation times its
   key's turn from the clip's mean, so the clip's own motion stays. This changes the stance in the game too. The tool also
-  solves the arms of the other eight clips in the file: Walk and Run hang the hands the same way with their own swing
-  kept, and the six combat clips take the cook's solve as it stands (hands where the source put them). `tools/restore_exile_roll.py` writes the source idle back, so run
+  corrects the arms of the other eight clips in the file. Their hands crossed the body's midline because the clips were
+  made for a rig that rests in a T-pose and this rig rests with the arms 63 degrees lower: each upper arm key is turned
+  back by that angle, and the cook's elbow and wrist solve is then applied as it stands. The hand positions of those
+  clips therefore change in the game too. `tools/restore_exile_roll.py` writes the source idle back, so run
   `relax_exile_idle.py` after it.
 - In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
   saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.
