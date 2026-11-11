@@ -65,8 +65,9 @@ two-bone chain, from the posed skeleton only:
   The props follow: the sockets come from the cooked Idle's hand.
   Idle's arms are also relaxed in `SK_Exile.glb` itself (SEED-792), so a tool that reads the file no longer shows the
   source's flared hands: `tools/relax_exile_idle.py` solves the same two-bone chain on the clip's own keys and rewrites
-  the upper arm, forearm and hand rotations. It hangs each hand straight down from its own posed shoulder and keeps the
-  bind wrist, where the cook measures the hang from the hips, so the file's arms and the cooked ones are close, not
+  the upper arm, forearm and hand rotations. It hangs each hand straight down from its own posed shoulder, keeps the
+  bind wrist and takes the elbow plane from the pole alone, where the cook measures the hang from the hips and keeps most
+  of the source's upper arm roll, so the file's arms and the cooked ones are close, not
   equal. The same tool stands the idle square: the source turned the hips 14 degrees one way and the shoulders 10 the
   other and set the right foot 24 cm back, and every joint but the arms and hands now takes its bind rotation times its
   key's turn from the clip's mean, so the clip's own motion stays. This changes the stance in the game too. Walk and Run

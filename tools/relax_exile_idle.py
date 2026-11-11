@@ -7,8 +7,8 @@ stance, with the clip's own motion kept about it (see straighten).
 The source idle holds the forearms out with the palms up. The engine hangs the hands beside the thighs when it
 cooks the file (solveArms in engine/anim/src/exile.cpp), so the game was right and everything that reads the
 GLB itself was not. This solves each arm of the idle's own keys with the cook's two-bone chain and rewrites the
-rotation keys of the upper arms, forearms and hands. Two things differ from the cook: each hand hangs straight
-down from its own posed shoulder, and the wrist keeps its bind rotation. The cook still solves the arms again on
+rotation keys of the upper arms, forearms and hands. Three things differ from the cook: each hand hangs straight
+down from its own posed shoulder, the wrist keeps its bind rotation, and the elbow plane is the pole's alone. The cook still solves the arms again on
 top of these keys. The mesh, the skin, the root bone and the other clips are untouched.
 
 tools/restore_exile_roll.py rewrites the idle from the FBX again, so run this after it.
@@ -31,7 +31,6 @@ FLEX_MIN = 14.0
 FLEX_MAX = 150.0
 POLE_BACK = 0.4
 POLE_DOWN = 0.25
-ROLL_KEPT = 0.7
 
 
 def add(a, b):
@@ -64,10 +63,6 @@ def unit(a):
 
 def across(v, axis):
     return sub(v, mul(axis, dot(v, axis)))
-
-
-def mix(a, b, t):
-    return [x * (1.0 - t) + y * t for x, y in zip(a, b)]
 
 
 def framed(along, hinge, local_along, local_hinge):
@@ -182,7 +177,6 @@ class Arm:
             posed = idle.world(idle.pose(k))
             mean = add(mean, body.in_rest_axes(posed, posed[self.hand][0]))
         self.mean_at = mul(mean, 1.0 / idle.frames)
-        self.normal = None
 
     def reach(self, flex):
         l1, l2 = self.upper_length, self.fore_length
@@ -209,17 +203,9 @@ class Arm:
         if length(q) <= 1e-4:
             q = across(mul(forward, -1.0), s)
         q = unit(q)
-        pole_plane = unit(cross(q, s))
-        plane = pole_plane
-        source_plane = across(qrot(world[self.arm][1], self.arm_hinge), s)
-        if length(source_plane) > 1e-3:
-            kept = unit(source_plane)
-            if dot(kept, pole_plane if self.normal is None else self.normal) < 0.0:
-                kept = mul(kept, -1.0)
-            self.normal = kept
-            blended = mix(pole_plane, kept, ROLL_KEPT)
-            if length(blended) > 1e-3:
-                plane = unit(blended)
+        # The elbow plane is the pole's alone. The cook keeps 70% of the source's upper arm roll, and the source idle
+        # rolls the left arm about 90 degrees further than the right, which turned the left palm forward.
+        plane = unit(cross(q, s))
         q = cross(s, plane)
         l1, l2 = self.upper_length, self.fore_length
         along = (l1 * l1 - l2 * l2 + d * d) / (2.0 * d)
