@@ -67,7 +67,10 @@ two-bone chain, from the posed skeleton only:
   source's flared hands: `tools/relax_exile_idle.py` solves the same two-bone chain on the clip's own keys and rewrites
   the upper arm, forearm and hand rotations. It hangs each hand straight down from its own posed shoulder and keeps the
   bind wrist, where the cook measures the hang from the hips, so the file's arms and the cooked ones are close, not
-  equal. Walk and Run are relaxed by the cook only. `tools/restore_exile_roll.py` writes the source idle back, so run
+  equal. The same tool stands the idle square: the source turned the hips 14 degrees one way and the shoulders 10 the
+  other and set the right foot 24 cm back, and every joint but the arms and hands now takes its bind rotation times its
+  key's turn from the clip's mean, so the clip's own motion stays. This changes the stance in the game too. Walk and Run
+  are relaxed by the cook only. `tools/restore_exile_roll.py` writes the source idle back, so run
   `relax_exile_idle.py` after it.
 - In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
   saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.

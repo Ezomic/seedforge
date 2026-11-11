@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Bakes the relaxed arms into the idle clip of art/exile/SK_Exile.glb (SEED-792).
+"""Stands the idle clip of art/exile/SK_Exile.glb square and hangs its arms (SEED-792).
+
+The source idle also turns the hips against the shoulders and sets one foot back. The body takes the bind pose's
+stance, with the clip's own motion kept about it (see straighten).
 
 The source idle holds the forearms out with the palms up. The engine hangs the hands beside the thighs when it
 cooks the file (solveArms in engine/anim/src/exile.cpp), so the game was right and everything that reads the
 GLB itself was not. This solves each arm of the idle's own keys with the cook's two-bone chain and rewrites the
 rotation keys of the upper arms, forearms and hands. Two things differ from the cook: each hand hangs straight
 down from its own posed shoulder, and the wrist keeps its bind rotation. The cook still solves the arms again on
-top of these keys. The mesh, the skin, every translation and the other clips are untouched.
+top of these keys. The mesh, the skin, the root bone and the other clips are untouched.
 
 tools/restore_exile_roll.py rewrites the idle from the FBX again, so run this after it.
 
@@ -93,21 +96,22 @@ class Idle:
         for other in glb.gltf["animations"]:
             for sampler in other["samplers"]:
                 used[sampler["output"]] = used.get(sampler["output"], 0) + 1
-        self.rotation, self.translation, self.outputs = {}, {}, {}
+        self.rotation, self.translation, self.outputs, self.moved = {}, {}, {}, {}
         counts = set()
         for channel in animation["channels"]:
             sampler = animation["samplers"][channel["sampler"]]
             if sampler.get("interpolation", "LINEAR") != "LINEAR":
                 raise SystemExit(f"{CLIP}: only linear keys are supported")
             node, path = channel["target"]["node"], channel["target"]["path"]
+            if path in ("rotation", "translation") and used[sampler["output"]] != 1:
+                raise SystemExit(f"{CLIP}: a {path} accessor is shared with another sampler")
             if path == "rotation":
-                if used[sampler["output"]] != 1:
-                    raise SystemExit(f"{CLIP}: a rotation accessor is shared with another sampler")
                 self.rotation[node] = glb.read(sampler["output"])
                 self.outputs[node] = sampler["output"]
                 counts.add(len(self.rotation[node]))
             elif path == "translation":
                 self.translation[node] = glb.read(sampler["output"])
+                self.moved[node] = sampler["output"]
                 counts.add(len(self.translation[node]))
         if len(counts) != 1:
             raise SystemExit(f"{CLIP}: channels have different key counts {sorted(counts)}")
@@ -234,12 +238,50 @@ class Arm:
         return {self.arm: arm, self.fore: fore, self.hand: hand}
 
 
+def stance(idle, world):
+    """How far the hips and the shoulders are turned about the vertical, and how far the right foot stands back."""
+    at = {n: world[idle.node("mixamorig:" + n)][0] for n in ("LeftUpLeg", "RightUpLeg", "LeftArm", "RightArm", "LeftFoot", "RightFoot")}
+    hips = sub(at["LeftUpLeg"], at["RightUpLeg"])
+    shoulders = sub(at["LeftArm"], at["RightArm"])
+    turn = [math.degrees(math.atan2(v[2], v[0])) for v in (hips, shoulders)]
+    return f"hips turned {turn[0]:+.0f} deg, shoulders {turn[1]:+.0f} deg, right foot {at['LeftFoot'][2] - at['RightFoot'][2]:+.2f} m back"
+
+
+def straighten(idle):
+    """Stands the body as the bind pose does and keeps the clip's own motion about it.
+
+    The source idle turns the hips 14 degrees one way and the shoulders 10 the other, and sets the right foot 23 cm
+    back. Every joint but the arms and hands takes its bind rotation times its key's turn from the clip's mean, and
+    the hips' translation its bind value plus the key's offset from the mean.
+    """
+    for node, keys in idle.rotation.items():
+        name = idle.glb.gltf["nodes"][node].get("name", "")
+        if not name.startswith("mixamorig:") or "Arm" in name or "Hand" in name:
+            continue
+        mean = [0.0, 0.0, 0.0, 0.0]
+        for q in keys:
+            mean = add(mean, keep_side(q, keys[0]))
+        mean = qnorm(mean)
+        rest = idle.rest[node][1]
+        new = []
+        for q in keys:
+            new.append(keep_side(qnorm(qmul(rest, qmul(qinv(mean), q))), new[-1] if new else rest))
+        idle.rotation[node] = new
+    hips = idle.node("mixamorig:Hips")
+    if hips in idle.translation:
+        keys = idle.translation[hips]
+        mean = mul([sum(t[i] for t in keys) for i in range(3)], 1.0 / len(keys))
+        idle.translation[hips] = [add(idle.rest[hips][0], sub(t, mean)) for t in keys]
+
+
 def relax(glb):
-    """New rotation keys per node, and what the hands and elbows did before and after."""
+    """New rotation keys per node, and what the stance, the hands and the elbows did before and after."""
     idle = Idle(glb)
+    before = stance(idle, idle.world(idle.pose(0)))
+    straighten(idle)
+    lines = [f"stance: {before}  ->  {stance(idle, idle.world(idle.pose(0)))}"]
     body = Body(idle)
-    new = {}
-    lines = []
+    new = {node: keys for node, keys in idle.rotation.items()}
     for side in ("Left", "Right"):
         arm = Arm(idle, body, side)
         for node in (arm.arm, arm.fore, arm.hand):
@@ -290,6 +332,8 @@ def main():
     if not args.report:
         for node, keys in new.items():
             glb.write(idle.outputs[node], keys)
+        for node, keys in idle.translation.items():
+            glb.write(idle.moved[node], keys)
         out = Path(args.out) if args.out else folder / "SK_Exile.glb"
         out.write_bytes(bytes(glb.data))
         print(f"wrote {out}")
