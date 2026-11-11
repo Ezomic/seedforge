@@ -63,6 +63,10 @@ two-bone chain, from the posed skeleton only:
   thigh, thumb forward, fingers along the forearm: the hand's path is the source's own, offset from the clip's mean (in
   the hips' frame), so the arm swing of Walk and Run survives. Hang is 0.93 of the arm's length (Idle, Walk), 0.8 (Run).
   The props follow: the sockets come from the cooked Idle's hand.
+  Idle's hang is also baked into `SK_Exile.glb` (SEED-792), so a tool that reads the file shows the same arms as the game:
+  `tools/relax_exile_idle.py` applies this solve to the clip's own keys and rewrites the upper arm, forearm and hand
+  rotations. Walk and Run are relaxed by the cook only. `tools/restore_exile_roll.py` writes the source idle back, so run
+  `relax_exile_idle.py` after it.
 - In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
   saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.
 
