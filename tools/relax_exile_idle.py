@@ -26,11 +26,11 @@ from restore_exile_roll import Glb, matrix_rotation, qangle, qinv, qmul, qnorm, 
 
 CLIP = "idle"
 HANG = 0.97
-RELAXED_OUT = 0.08
+RELAXED_OUT = 0.04
+RELAXED_AHEAD = 0.08  # the shoulders sit behind the hips, and a hanging hand rests beside the thigh, not behind it
 FLEX_MIN = 14.0
 FLEX_MAX = 150.0
-POLE_BACK = 0.4
-POLE_DOWN = 0.25
+POLE_OUT = 0.3
 
 
 def add(a, b):
@@ -187,13 +187,17 @@ class Arm:
         lateral = unit(sub(world[body.left_arm][0], world[body.right_arm][0]))
         up = unit(sub(world[body.neck][0], world[body.hips][0]))
         forward = unit(cross(lateral, up))
-        pole = sub(sub(mul(lateral, self.side), mul(forward, POLE_BACK)), mul(up, POLE_DOWN))
+        # A hanging arm's elbow points back, a little out. The cook's pole is mostly outward, for arms that carry a
+        # spear and a shield; on a hanging arm it stands the elbows out from the body.
+        pole = sub(mul(lateral, self.side * POLE_OUT), forward)
         shoulder = world[self.arm][0]
         # The idle turns the shoulders 24 degrees against the hips, so a hang measured from the hips (as the cook does)
         # bends one elbow far more than the other. Here each hand hangs straight down from its own posed shoulder.
         sway = sub(world[self.hand][0], body.from_rest_axes(world, self.mean_at))
         level = unit(across(lateral, [0.0, 1.0, 0.0]))
-        hang = add(add(shoulder, mul(level, self.side * RELAXED_OUT)), [0.0, -HANG * (self.upper_length + self.fore_length), 0.0])
+        ahead = unit(across(forward, [0.0, 1.0, 0.0]))
+        hang = add(add(shoulder, mul(level, self.side * RELAXED_OUT)), mul(ahead, RELAXED_AHEAD))
+        hang = add(hang, [0.0, -HANG * (self.upper_length + self.fore_length), 0.0])
         wrist = add(hang, sway)
         to_wrist = sub(wrist, shoulder)
         distance = length(to_wrist)
