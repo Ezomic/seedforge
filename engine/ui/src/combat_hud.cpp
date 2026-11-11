@@ -51,6 +51,13 @@ CombatHudView buildCombatHudView(const CombatHudInput& input, const CombatHudTun
         view.targetStagger = fractionOf(input.target->stagger, input.target->staggerMax);
     }
 
+    for (const CombatHudStatus& status : input.statuses) {
+        if (status.id.empty()) {
+            continue;
+        }
+        view.statuses.push_back({status.id, std::max(status.stacks, 1), fractionOf(status.remaining, 1.0f)});
+    }
+
     if (std::isfinite(input.facingYaw) && std::isfinite(tuning.indicatorSeconds) && tuning.indicatorSeconds > 0.0f) {
         std::vector<CombatHudHit> hits;
         for (const CombatHudHit& hit : input.recentHits) {

@@ -30,6 +30,8 @@ struct RenderInstance {
     // height is flat, from the foot's level, not from the terrain's surface under each point.
     // Skinned instances ignore it.
     bool groundBlend = false;
+    // Multiplies the base colour of every material of the object; white leaves it as authored.
+    glm::vec3 tint{1.0f};
     // Body regions (ichor/assets/body_regions.h) whose submeshes are not drawn, for a body under equipment that covers it.
     std::uint32_t hiddenRegions = 0;
 };

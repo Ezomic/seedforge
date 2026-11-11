@@ -1,5 +1,6 @@
 #include "ichor/combat_bridge/combat_bridge.h"
 #include "ichor/combat_bridge/role_bot.h"
+#include "ichor/combat_bridge/role_view.h"
 #include "ichor/combat_bridge/terrain_trials.h"
 #include "ichor/world/forge_job.h"
 
@@ -73,7 +74,7 @@ struct Fight {
     CombatSite site;
     std::unique_ptr<CombatBridge> bridge;
 
-    Fight(const ForgedGame& game, std::uint64_t seed, stage0::FoeRole role, glm::dvec3 foe, glm::dvec3 player)
+    Fight(const ForgedGame& game, std::uint64_t seed, stage0::FoeRole role, glm::dvec3 foe, glm::dvec3 player, bool playerHitsBleed = false)
         : scene(seed)
     {
         site.found = true;
@@ -83,6 +84,7 @@ struct Fight {
         CombatBridgeConfig config;
         config.role = role;
         config.legacyControls = true;
+        config.playerHitsBleed = playerHitsBleed;
         addGround(scene, game.heightfield, foe);
         installFieldRules(scene, game);
         SpawnCommand spawn;
@@ -366,6 +368,19 @@ TEST_CASE("placeFoe swaps the live foe to the asked role and back to the configu
 
 namespace {
 
+bool foeBleedsAfterBotHit(const ForgedGame& game, const CombatSite& post, bool playerHitsBleed)
+{
+    Fight fight(game, 1, stage0::FoeRole::Skirmisher, post.enemyPost, post.duelStart, playerHitsBleed);
+    const float full = stage0::Tuning{}.maxHealth;
+    for (int i = 0; i < 6; ++i) fight.scene.tick(kDt);
+    REQUIRE(fight.bridge->live());
+    for (int i = 0; i < kMaxFightTicks && fight.foe().health >= full; ++i) {
+        fight.scene.tick(kDt, roleBotInput(fight.scene, fight.bridge->stage()));
+    }
+    REQUIRE(fight.foe().health < full);
+    return fight.foe().status.find(stage0::StatusId::Bleed) != nullptr;
+}
+
 void dragFoe(Fight& fight, glm::dvec3 post, double metres)
 {
     Transform moved = fight.scene.registry().get<Transform>(fight.foeEntity());
@@ -373,6 +388,46 @@ void dragFoe(Fight& fight, glm::dvec3 post, double metres)
     fight.scene.enqueue(SetTransformCommand{fight.bridge->stage().foeId(), moved});
 }
 
+}
+
+TEST_CASE("a hit from the player leaves the foe bleeding only when the config asks for it", "[combat_bridge][roles][status]")
+{
+    const ForgedGame& game = gameFor(1);
+    const CombatSite post = findCombatSite(game);
+    REQUIRE(post.found);
+    CHECK_FALSE(CombatBridgeConfig{}.playerHitsBleed);
+    CHECK_FALSE(foeBleedsAfterBotHit(game, post, false));
+    CHECK(foeBleedsAfterBotHit(game, post, true));
+}
+
+TEST_CASE("the HUD state lists the player's effects and the foe's tint follows its own", "[combat_bridge][roles][status]")
+{
+    const ForgedGame& game = gameFor(1);
+    const CombatSite post = findCombatSite(game);
+    REQUIRE(post.found);
+    Fight fight(game, 1, stage0::FoeRole::Skirmisher, post.enemyPost, post.duelStart);
+    for (int i = 0; i < 6; ++i) fight.scene.tick(kDt);
+    REQUIRE(fight.bridge->live());
+    CHECK(fight.bridge->hud(fight.scene).statuses.empty());
+
+    REQUIRE(fight.bridge->stage().applyStatus(fight.scene, fight.playerEntity(), stage0::StatusId::Bleed));
+    REQUIRE(fight.bridge->stage().applyStatus(fight.scene, fight.playerEntity(), stage0::StatusId::Bleed));
+    REQUIRE(fight.bridge->stage().applyStatus(fight.scene, fight.playerEntity(), stage0::StatusId::Slow));
+    const CombatHudState state = fight.bridge->hud(fight.scene);
+    REQUIRE(state.statuses.size() == 2);
+    CHECK(state.statuses[0].id == stage0::StatusId::Bleed);
+    CHECK(state.statuses[0].stacks == 2);
+    CHECK(state.statuses[0].remaining == Catch::Approx(1.0f));
+    CHECK(state.statuses[1].id == stage0::StatusId::Slow);
+
+    stage0::StatusSet none;
+    CHECK(statusTint(none) == glm::vec3(1.0f));
+    stage0::StatusSet bleeding;
+    bleeding.apply(stage0::StatusId::Bleed);
+    CHECK(statusTint(bleeding).r > statusTint(bleeding).g);
+    stage0::StatusSet slowed;
+    slowed.apply(stage0::StatusId::Slow);
+    CHECK(statusTint(slowed).b > statusTint(slowed).r);
 }
 
 TEST_CASE("a foe dragged past its leash walks home and heals, then guards again", "[combat_bridge][roles]")
