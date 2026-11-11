@@ -72,8 +72,9 @@ two-bone chain, from the posed skeleton only:
   other and set the right foot 24 cm back, and every joint but the arms and hands now takes its bind rotation times its
   key's turn from the clip's mean, so the clip's own motion stays. This changes the stance in the game too. The tool also
   corrects the arms of the other eight clips in the file. Their hands crossed the body's midline because the clips were
-  made for a rig that rests in a T-pose and this rig rests with the arms 63 degrees lower: each upper arm key is turned
-  back by that angle, and the cook's elbow and wrist solve is then applied as it stands. The hand positions of those
+  made for a rig that rests with its arms higher than this one's: each upper arm key is turned back out by 46 degrees
+  (of the 63 from the bind arm to level; the figure that leaves the walk's arms about 8 degrees out from the body), and
+  the cook's elbow and wrist solve is then applied as it stands. Walk's arms also bend as they swing forward. The hand positions of those
   clips therefore change in the game too. `tools/restore_exile_roll.py` writes the source idle back, so run
   `relax_exile_idle.py` after it.
 - In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and

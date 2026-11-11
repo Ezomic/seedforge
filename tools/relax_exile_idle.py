@@ -12,11 +12,12 @@ down from its own posed shoulder, the wrist keeps its bind rotation, and the elb
 top of these keys. The mesh, the skin, the root bone and the other clips are untouched.
 
 The other eight clips had their hands across the body's midline for one reason: they were made for a rig that rests
-in a T-pose, and the Exile's rests with the arms 63 degrees lower, so every upper arm key lands 63 degrees too far in
-(see raise_arms). Those clips get that turn put back, which sets both hands on their own sides, and then the cook's
-solve as it is: the hand stays where the corrected clip puts it, the elbow hinges between 14 and 150 degrees on the
-pole's side, and the wrist's twist is saturated under 45 degrees. In Walk and Run the hand also stays clear of the
-thigh. Only the arm tracks of those clips are rewritten.
+with its arms higher than the Exile's, whose bind arm hangs 63 degrees below level, so every upper arm key lands too
+far in (see raise_arms and RAISE). Those clips get 46 degrees of that turn put back, which sets both hands on their
+own sides, and then the cook's solve as it is: the hand stays where the corrected clip puts it, the elbow hinges
+between 14 and 150 degrees on the pole's side, and the wrist's twist is saturated under 45 degrees. In Walk and Run
+the hand also stays clear of the thigh, and Walk's arms bend as they swing forward and swing about the shoulder line
+(the source locks the elbows and swings both hands behind the hips). Only the arm tracks of those clips are rewritten.
 
 tools/restore_exile_roll.py rewrites the clips from the FBX again, so run this after it.
 
@@ -33,6 +34,14 @@ from restore_exile_roll import Glb, matrix_rotation, qangle, qinv, qmul, qnorm, 
 
 CLIP = "idle"
 CLIPS = ("idle", "walk", "run", "swing", "thrust", "block", "dodge", "hit", "death")
+# How far the upper arms are turned out, in degrees (see raise_arms). A T-pose rest would make it the whole 63 degrees
+# from the bind arm to level, but that leaves the walk's upper arms 25 degrees out from the body; with this they swing
+# about 8 degrees out, as a walking arm does. The clips' rig rested with its arms a little below level.
+RAISE = 46.0
+# A walking arm bends as it swings forward and straightens as it swings back. The source's elbows are locked nearly
+# straight through the whole walk (1.5 to 13.6 degrees), so the bend comes from where the hand is in its swing.
+WALK_FLEX = (12.0, 34.0)
+WALK_AHEAD = 0.1
 # The clip whose hands hang, and how much of the arm's length the hang uses.
 HANGS = {"idle": 0.97}
 # The cook's own numbers, for the clips whose hands stay where the source put them.
@@ -190,10 +199,14 @@ class Arm:
         self.fore_hinge = unit(across(hinge, self.fore_axis))
         self.hand_rest = rest[self.hand][1]
         mean = [0.0, 0.0, 0.0]
+        ahead = []
         for k in range(idle.frames):
             posed = idle.world(idle.pose(k))
-            mean = add(mean, body.in_rest_axes(posed, posed[self.hand][0]))
+            at = body.in_rest_axes(posed, posed[self.hand][0])
+            mean = add(mean, at)
+            ahead.append(dot(at, body.forward))
         self.mean_at = mul(mean, 1.0 / idle.frames)
+        self.swing = (min(ahead), max(ahead)) if idle.name == "walk" else None
         self.hang = HANGS.get(idle.name)
         self.clear = idle.name in ("idle", "walk", "run")
         self.normal = None
@@ -234,9 +247,17 @@ class Arm:
             out = self.side * dot(sub(at, body.hips_at), body.lateral)
             if out < RELAXED_CLEAR:
                 wrist = body.from_rest_axes(world, add(at, mul(body.lateral, self.side * (RELAXED_CLEAR - out))))
+        if self.swing:
+            # The source swings both hands behind the hips only (17 cm behind on average); a walking arm swings about
+            # the shoulder line.
+            wrist = add(wrist, mul(unit(across(forward, [0.0, 1.0, 0.0])), WALK_AHEAD))
         to_wrist = sub(wrist, shoulder)
         distance = length(to_wrist)
         s = mul(to_wrist, 1.0 / distance)
+        if self.swing:
+            ahead = dot(body.in_rest_axes(world, wrist), body.forward)
+            phase = (ahead - self.swing[0]) / max(1e-6, self.swing[1] - self.swing[0])
+            distance = self.reach(WALK_FLEX[0] + (WALK_FLEX[1] - WALK_FLEX[0]) * max(0.0, min(1.0, phase)))
         d = min(max(distance, self.reach(FLEX_MAX)), self.reach(FLEX_MIN))
         q = across(pole, s)
         if length(q) <= 1e-4:
@@ -334,11 +355,11 @@ def between(a, b):
 
 
 def raise_arms(clip, body):
-    """Turns each upper arm by the turn from the bind arm to a T-pose arm, and returns that angle in degrees.
+    """Turns each upper arm out, towards a T-pose arm, by RAISE degrees, and returns the angle used.
 
-    The clips were made for a rig that rests in a T-pose, and the Exile's rests with the arms 63 degrees lower. A clip's
-    upper arm key is a turn from its rig's rest, so on this rig every arm ends up 63 degrees too far in: the hands cross
-    the body's midline in all nine clips. The turn is put back in front of each key, in the clavicle's frame.
+    The clips were made for a rig that rests with its arms higher than the Exile's. A clip's upper arm key is a turn
+    from its rig's rest, so on this rig every arm ends up too far in: the hands cross the body's midline in all nine
+    clips. The turn is put back in front of each key, in the clavicle's frame.
     """
     rest = clip.world(clip.rest)
     angle = 0.0
@@ -348,8 +369,11 @@ def raise_arms(clip, body):
         parent = rest[clip.glb.parent[arm]][1]
         bind = unit(sub(rest[fore][0], rest[arm][0]))
         level = mul(body.lateral, sign)
-        fix = qmul(qmul(qinv(parent), between(bind, level)), parent)
-        angle = math.degrees(math.acos(max(-1.0, min(1.0, dot(bind, level)))))
+        full = math.degrees(math.acos(max(-1.0, min(1.0, dot(bind, level)))))
+        angle = min(full, RAISE)
+        half = math.radians(angle) / 2.0
+        turn = mul(unit(cross(bind, level)), math.sin(half)) + [math.cos(half)]
+        fix = qmul(qmul(qinv(parent), turn), parent)
         keys = []
         for q in clip.rotation[arm]:
             keys.append(keep_side(qnorm(qmul(fix, q)), keys[-1] if keys else q))
@@ -371,7 +395,7 @@ def relax(glb, name=CLIP):
         for side in ("Left", "Right"):
             arm = Arm(idle, body, side)
             source[side] = [measure(idle, body, arm, idle.world(idle.pose(k))) for k in range(idle.frames)]
-        lines.append(f"upper arms turned {raise_arms(idle, body):.0f} degrees out, from the bind arm to a T-pose arm")
+        lines.append(f"upper arms turned {raise_arms(idle, body):.0f} degrees out, towards a T-pose arm")
     new = {node: keys for node, keys in idle.rotation.items()} if name == CLIP else {}
     for side in ("Left", "Right"):
         arm = Arm(idle, body, side)
