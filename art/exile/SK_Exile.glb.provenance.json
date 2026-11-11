@@ -1,0 +1,43 @@
+{
+  "clip_origins": {
+    "block": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Sword_Idle, shield arm posed by tools/retarget_exile_clips.py"
+    },
+    "death": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Death01"
+    },
+    "dodge": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Roll"
+    },
+    "hit": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Hit_Chest"
+    },
+    "idle": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Idle_Loop"
+    },
+    "run": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Jog_Fwd_Loop"
+    },
+    "swing": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Sword_Attack"
+    },
+    "thrust": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Punch_Cross"
+    },
+    "walk": {
+      "licence": "CC0-1.0",
+      "source": "Quaternius Universal Animation Library, Standard: Walk_Loop"
+    }
+  },
+  "licence": "own-work",
+  "source": "Mesh, skin and skeleton: first-party, generated locally by the owner. Clips: Quaternius Universal Animation Library (https://quaternius.com/packs/universalanimationlibrary.html), retargeted by tools/retarget_exile_clips.py.",
+  "source_file_sha256": "be684571ed655a1b892c2c07e6e2aeca053b606c442d34004adaf1d944090d01"
+}
