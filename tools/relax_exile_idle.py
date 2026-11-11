@@ -222,14 +222,17 @@ class Arm:
         up = unit(sub(world[body.neck][0], world[body.hips][0]))
         forward = unit(cross(lateral, up))
         shoulder = world[self.arm][0]
-        if self.hang is None:
-            # The cook's own solve: the hand stays where the source put it and the elbow goes where the pole says.
+        if self.clear:
+            # A hanging or swinging arm's elbow points back, a little out. The cook's pole is mostly outward, for arms
+            # that carry a spear and a shield; on a relaxed arm it stands the elbows out from the body.
+            pole = sub(mul(lateral, self.side * POLE_OUT), forward)
+        else:
+            # The cook's own pole, for the combat clips.
             pole = sub(sub(mul(lateral, self.side), mul(forward, POLE_BACK)), mul(up, POLE_DOWN))
+        if self.hang is None:
+            # The hand stays where the corrected clip puts it.
             wrist = world[self.hand][0]
         else:
-            # A hanging arm's elbow points back, a little out. The cook's pole is mostly outward, for arms that carry a
-            # spear and a shield; on a hanging arm it stands the elbows out from the body.
-            pole = sub(mul(lateral, self.side * POLE_OUT), forward)
             # The idle turns the shoulders 24 degrees against the hips, so a hang measured from the hips (as the cook
             # does) bends one elbow far more than the other. Here each hand hangs straight down from its own posed
             # shoulder, and keeps the clip's own swing about that point.
@@ -268,7 +271,7 @@ class Arm:
         # cook does, so the shoulder is not twisted across the chest.
         plane = unit(cross(q, s))
         source_plane = across(qrot(world[self.arm][1], self.arm_hinge), s)
-        if self.hang is None and length(source_plane) > 1e-3:
+        if not self.clear and length(source_plane) > 1e-3:
             kept = unit(source_plane)
             if dot(kept, plane if self.normal is None else self.normal) < 0.0:
                 kept = mul(kept, -1.0)
@@ -288,7 +291,7 @@ class Arm:
         parent_world = world[self.parent][1]
         arm = keep_side(qnorm(qmul(qinv(parent_world), arm_world)), previous[self.arm])
         fore = keep_side(qnorm(qmul(qinv(arm_world), fore_world)), previous[self.fore])
-        if self.hang is None:
+        if not self.clear:
             # The hand keeps its world rotation, and its turn about the forearm is unwrapped and saturated under 45 degrees.
             delta = qmul(qmul(qinv(fore_world), world[self.hand][1]), qinv(self.hand_rest))
             raw = 2.0 * math.atan2(dot(delta[:3], self.fore_axis), delta[3])
