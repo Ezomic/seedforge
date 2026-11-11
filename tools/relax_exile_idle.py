@@ -11,7 +11,13 @@ rotation keys of the upper arms, forearms and hands. Three things differ from th
 down from its own posed shoulder, the wrist keeps its bind rotation, and the elbow plane is the pole's alone. The cook still solves the arms again on
 top of these keys. The mesh, the skin, the root bone and the other clips are untouched.
 
-tools/restore_exile_roll.py rewrites the idle from the FBX again, so run this after it.
+The other eight clips get their arms solved too, so a tool that reads the file shows what the game shows. Walk and
+Run hang the hands as Idle does, with the clip's own arm swing kept (Run with a bent arm). Swing, Thrust, Block,
+Dodge, Hit and Death take the cook's solve as it is: the hand stays where the source put it, the elbow hinges
+between 14 and 150 degrees on the pole's side, and the wrist's twist is saturated under 45 degrees. Only the arm
+tracks of those clips are rewritten.
+
+tools/restore_exile_roll.py rewrites the clips from the FBX again, so run this after it.
 
 Usage: relax_exile_idle.py [--folder art/exile] [--out FILE]   rewrite the GLB (default: in place)
        relax_exile_idle.py --report                             print what would change, write nothing
@@ -25,7 +31,14 @@ from pathlib import Path
 from restore_exile_roll import Glb, matrix_rotation, qangle, qinv, qmul, qnorm, qrot
 
 CLIP = "idle"
-HANG = 0.97
+CLIPS = ("idle", "walk", "run", "swing", "thrust", "block", "dodge", "hit", "death")
+# The clips whose hands hang, and how much of the arm's length the hang uses (a running arm is bent).
+HANGS = {"idle": 0.97, "walk": 0.95, "run": 0.8}
+# The cook's own numbers, for the clips whose hands stay where the source put them.
+POLE_BACK = 0.4
+POLE_DOWN = 0.25
+ROLL_KEPT = 0.7
+WRIST_TWIST = 45.0
 RELAXED_OUT = 0.04
 RELAXED_AHEAD = 0.08  # the shoulders sit behind the hips, and a hanging hand rests beside the thigh, not behind it
 FLEX_MIN = 14.0
@@ -82,24 +95,26 @@ def keep_side(q, previous):
 class Idle:
     """The idle clip's keys per node, and the rig they move."""
 
-    def __init__(self, glb):
+    def __init__(self, glb, name=CLIP):
         self.glb = glb
-        animation = next((a for a in glb.gltf["animations"] if a.get("name") == CLIP), None)
+        self.name = name
+        animation = next((a for a in glb.gltf["animations"] if a.get("name") == name), None)
         if animation is None:
-            raise SystemExit(f"SK_Exile.glb has no {CLIP} clip")
+            raise SystemExit(f"SK_Exile.glb has no {name} clip")
         used = {}
         for other in glb.gltf["animations"]:
             for sampler in other["samplers"]:
                 used[sampler["output"]] = used.get(sampler["output"], 0) + 1
         self.rotation, self.translation, self.outputs, self.moved = {}, {}, {}, {}
+        self.shared = set()
         counts = set()
         for channel in animation["channels"]:
             sampler = animation["samplers"][channel["sampler"]]
             if sampler.get("interpolation", "LINEAR") != "LINEAR":
-                raise SystemExit(f"{CLIP}: only linear keys are supported")
+                raise SystemExit(f"{name}: only linear keys are supported")
             node, path = channel["target"]["node"], channel["target"]["path"]
             if path in ("rotation", "translation") and used[sampler["output"]] != 1:
-                raise SystemExit(f"{CLIP}: a {path} accessor is shared with another sampler")
+                self.shared.add((node, path))
             if path == "rotation":
                 self.rotation[node] = glb.read(sampler["output"])
                 self.outputs[node] = sampler["output"]
@@ -109,7 +124,7 @@ class Idle:
                 self.moved[node] = sampler["output"]
                 counts.add(len(self.translation[node]))
         if len(counts) != 1:
-            raise SystemExit(f"{CLIP}: channels have different key counts {sorted(counts)}")
+            raise SystemExit(f"{name}: channels have different key counts {sorted(counts)}")
         self.frames = counts.pop()
         self.rest = glb.rest()
 
@@ -177,6 +192,9 @@ class Arm:
             posed = idle.world(idle.pose(k))
             mean = add(mean, body.in_rest_axes(posed, posed[self.hand][0]))
         self.mean_at = mul(mean, 1.0 / idle.frames)
+        self.hang = HANGS.get(idle.name)
+        self.normal = None
+        self.twist = None
 
     def reach(self, flex):
         l1, l2 = self.upper_length, self.fore_length
@@ -187,18 +205,24 @@ class Arm:
         lateral = unit(sub(world[body.left_arm][0], world[body.right_arm][0]))
         up = unit(sub(world[body.neck][0], world[body.hips][0]))
         forward = unit(cross(lateral, up))
-        # A hanging arm's elbow points back, a little out. The cook's pole is mostly outward, for arms that carry a
-        # spear and a shield; on a hanging arm it stands the elbows out from the body.
-        pole = sub(mul(lateral, self.side * POLE_OUT), forward)
         shoulder = world[self.arm][0]
-        # The idle turns the shoulders 24 degrees against the hips, so a hang measured from the hips (as the cook does)
-        # bends one elbow far more than the other. Here each hand hangs straight down from its own posed shoulder.
-        sway = sub(world[self.hand][0], body.from_rest_axes(world, self.mean_at))
-        level = unit(across(lateral, [0.0, 1.0, 0.0]))
-        ahead = unit(across(forward, [0.0, 1.0, 0.0]))
-        hang = add(add(shoulder, mul(level, self.side * RELAXED_OUT)), mul(ahead, RELAXED_AHEAD))
-        hang = add(hang, [0.0, -HANG * (self.upper_length + self.fore_length), 0.0])
-        wrist = add(hang, sway)
+        if self.hang is None:
+            # The cook's own solve: the hand stays where the source put it and the elbow goes where the pole says.
+            pole = sub(sub(mul(lateral, self.side), mul(forward, POLE_BACK)), mul(up, POLE_DOWN))
+            wrist = world[self.hand][0]
+        else:
+            # A hanging arm's elbow points back, a little out. The cook's pole is mostly outward, for arms that carry a
+            # spear and a shield; on a hanging arm it stands the elbows out from the body.
+            pole = sub(mul(lateral, self.side * POLE_OUT), forward)
+            # The idle turns the shoulders 24 degrees against the hips, so a hang measured from the hips (as the cook
+            # does) bends one elbow far more than the other. Here each hand hangs straight down from its own posed
+            # shoulder, and keeps the clip's own swing about that point.
+            sway = sub(world[self.hand][0], body.from_rest_axes(world, self.mean_at))
+            level = unit(across(lateral, [0.0, 1.0, 0.0]))
+            ahead = unit(across(forward, [0.0, 1.0, 0.0]))
+            hang = add(add(shoulder, mul(level, self.side * RELAXED_OUT)), mul(ahead, RELAXED_AHEAD))
+            hang = add(hang, [0.0, -self.hang * (self.upper_length + self.fore_length), 0.0])
+            wrist = add(hang, sway)
         to_wrist = sub(wrist, shoulder)
         distance = length(to_wrist)
         s = mul(to_wrist, 1.0 / distance)
@@ -207,9 +231,19 @@ class Arm:
         if length(q) <= 1e-4:
             q = across(mul(forward, -1.0), s)
         q = unit(q)
-        # The elbow plane is the pole's alone. The cook keeps 70% of the source's upper arm roll, and the source idle
-        # rolls the left arm about 90 degrees further than the right, which turned the left palm forward.
+        # A hanging arm's elbow plane is the pole's alone: the source idle rolls the left arm about 90 degrees further
+        # than the right, which turned the left palm forward. The other clips keep 70% of the source's roll, as the
+        # cook does, so the shoulder is not twisted across the chest.
         plane = unit(cross(q, s))
+        source_plane = across(qrot(world[self.arm][1], self.arm_hinge), s)
+        if self.hang is None and length(source_plane) > 1e-3:
+            kept = unit(source_plane)
+            if dot(kept, plane if self.normal is None else self.normal) < 0.0:
+                kept = mul(kept, -1.0)
+            self.normal = kept
+            blended = add(mul(plane, 1.0 - ROLL_KEPT), mul(kept, ROLL_KEPT))
+            if length(blended) > 1e-3:
+                plane = unit(blended)
         q = cross(s, plane)
         l1, l2 = self.upper_length, self.fore_length
         along = (l1 * l1 - l2 * l2 + d * d) / (2.0 * d)
@@ -222,9 +256,23 @@ class Arm:
         parent_world = world[self.parent][1]
         arm = keep_side(qnorm(qmul(qinv(parent_world), arm_world)), previous[self.arm])
         fore = keep_side(qnorm(qmul(qinv(arm_world), fore_world)), previous[self.fore])
-        # The wrist takes its bind rotation: the rig's only finger bones (index, thumb) sit 43 degrees off the forearm,
-        # too far to aim the hand by, and the bind hand lies along the forearm with the palm to the body.
-        hand = keep_side(qnorm(list(self.hand_rest)), previous[self.hand])
+        if self.hang is None:
+            # The hand keeps its world rotation, and its turn about the forearm is unwrapped and saturated under 45 degrees.
+            delta = qmul(qmul(qinv(fore_world), world[self.hand][1]), qinv(self.hand_rest))
+            raw = 2.0 * math.atan2(dot(delta[:3], self.fore_axis), delta[3])
+            if self.twist is None:
+                twist = math.remainder(raw, 2.0 * math.pi)
+            else:
+                twist = raw + 2.0 * math.pi * round((self.twist - raw) / (2.0 * math.pi))
+            self.twist = twist
+            limit = math.radians(WRIST_TWIST)
+            half = (limit * math.tanh(twist / limit) - twist) / 2.0
+            turn = mul(self.fore_axis, math.sin(half)) + [math.cos(half)]
+            hand = keep_side(qnorm(qmul(qmul(delta, turn), self.hand_rest)), previous[self.hand])
+        else:
+            # The wrist takes its bind rotation: the rig's only finger bones (index, thumb) sit 43 degrees off the
+            # forearm, too far to aim the hand by, and the bind hand lies along the forearm with the palm to the body.
+            hand = keep_side(qnorm(list(self.hand_rest)), previous[self.hand])
         return {self.arm: arm, self.fore: fore, self.hand: hand}
 
 
@@ -264,19 +312,21 @@ def straighten(idle):
         idle.translation[hips] = [add(idle.rest[hips][0], sub(t, mean)) for t in keys]
 
 
-def relax(glb):
-    """New rotation keys per node, and what the stance, the hands and the elbows did before and after."""
-    idle = Idle(glb)
-    before = stance(idle, idle.world(idle.pose(0)))
-    straighten(idle)
-    lines = [f"stance: {before}  ->  {stance(idle, idle.world(idle.pose(0)))}"]
+def relax(glb, name=CLIP):
+    """New rotation keys per node of one clip, and what the stance, the hands and the elbows did before and after."""
+    idle = Idle(glb, name)
+    lines = []
+    if name == CLIP:
+        before = stance(idle, idle.world(idle.pose(0)))
+        straighten(idle)
+        lines.append(f"stance: {before}  ->  {stance(idle, idle.world(idle.pose(0)))}")
     body = Body(idle)
-    new = {node: keys for node, keys in idle.rotation.items()}
+    new = {node: keys for node, keys in idle.rotation.items()} if name == CLIP else {}
     for side in ("Left", "Right"):
         arm = Arm(idle, body, side)
         for node in (arm.arm, arm.fore, arm.hand):
             if node not in idle.rotation:
-                raise SystemExit(f"{CLIP}: {glb.gltf['nodes'][node]['name']} has no rotation keys")
+                raise SystemExit(f"{name}: {glb.gltf['nodes'][node]['name']} has no rotation keys")
             new[node] = [list(q) for q in idle.rotation[node]]
         before, after, turned = [], [], 0.0
         for k in range(idle.frames):
@@ -315,15 +365,21 @@ def main():
     args = parser.parse_args()
     folder = Path(args.folder)
     glb = Glb(folder / "SK_Exile.glb")
-    idle, new, lines = relax(glb)
-    print(f"{CLIP}: {idle.frames} keys")
-    for line in lines:
-        print(line)
+    for name in CLIPS:
+        clip, new, lines = relax(glb, name)
+        print(f"{name}: {clip.frames} keys")
+        for line in lines:
+            print("  " + line)
+        moved = clip.translation if name == CLIP else {}
+        for node, path in [(n, "rotation") for n in new] + [(n, "translation") for n in moved]:
+            if (node, path) in clip.shared:
+                raise SystemExit(f"{name}: a {path} track this would rewrite is shared with another sampler")
+        if not args.report:
+            for node, keys in new.items():
+                glb.write(clip.outputs[node], keys)
+            for node, keys in moved.items():
+                glb.write(clip.moved[node], keys)
     if not args.report:
-        for node, keys in new.items():
-            glb.write(idle.outputs[node], keys)
-        for node, keys in idle.translation.items():
-            glb.write(idle.moved[node], keys)
         out = Path(args.out) if args.out else folder / "SK_Exile.glb"
         out.write_bytes(bytes(glb.data))
         print(f"wrote {out}")
