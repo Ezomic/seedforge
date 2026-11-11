@@ -416,6 +416,15 @@ def main():
     args = parser.parse_args()
     folder = Path(args.folder)
     glb = Glb(folder / "SK_Exile.glb")
+    # The upper arm turn is not something to apply twice. In the source's walk both hands are across the midline; once
+    # they are on their own sides the file has been through this tool.
+    walk = Idle(glb, "walk")
+    body = Body(walk)
+    for side in ("Left", "Right"):
+        arm = Arm(walk, body, side)
+        out = sum(measure(walk, body, arm, walk.world(walk.pose(k)))[0] for k in range(walk.frames)) / walk.frames
+        if out > 0.0:
+            raise SystemExit("SK_Exile.glb already has its arms corrected: run tools/restore_exile_roll.py first to start from the source clips")
     for name in CLIPS:
         clip, new, lines = relax(glb, name)
         print(f"{name}: {clip.frames} keys")
