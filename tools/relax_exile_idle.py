@@ -3,8 +3,10 @@
 
 The source idle holds the forearms out with the palms up. The engine hangs the hands beside the thighs when it
 cooks the file (solveArms in engine/anim/src/exile.cpp), so the game was right and everything that reads the
-GLB itself was not. This applies the same solve to the idle's own keys and rewrites the rotation keys of the
-upper arms, forearms and hands. The mesh, the skin, every translation and the other clips are untouched.
+GLB itself was not. This solves each arm of the idle's own keys with the cook's two-bone chain and rewrites the
+rotation keys of the upper arms, forearms and hands. Two things differ from the cook: each hand hangs straight
+down from its own posed shoulder, and the wrist keeps its bind rotation. The cook still solves the arms again on
+top of these keys. The mesh, the skin, every translation and the other clips are untouched.
 
 tools/restore_exile_roll.py rewrites the idle from the FBX again, so run this after it.
 
@@ -20,11 +22,10 @@ from pathlib import Path
 from restore_exile_roll import Glb, matrix_rotation, qangle, qinv, qmul, qnorm, qrot
 
 CLIP = "idle"
-HANG = 0.93
-RELAXED_OUT = 0.05
+HANG = 0.97
+RELAXED_OUT = 0.08
 FLEX_MIN = 14.0
 FLEX_MAX = 150.0
-WRIST_TWIST = 45.0
 POLE_BACK = 0.4
 POLE_DOWN = 0.25
 ROLL_KEPT = 0.7
@@ -159,8 +160,7 @@ class Arm:
         self.arm = idle.node(f"mixamorig:{side}Arm")
         self.fore = idle.node(f"mixamorig:{side}ForeArm")
         self.hand = idle.node(f"mixamorig:{side}Hand")
-        index = idle.node(f"mixamorig:{side}HandIndex1")
-        thumb = idle.node(f"mixamorig:{side}HandThumb1")
+        self.parent = idle.glb.parent[self.arm]
         rest = idle.rest
         world = idle.world(rest)
         self.side = 1.0 if side == "Left" else -1.0
@@ -173,35 +173,30 @@ class Arm:
         hinge = qrot(qinv(rest[self.fore][1]), self.arm_hinge)
         self.fore_hinge = unit(across(hinge, self.fore_axis))
         self.hand_rest = rest[self.hand][1]
-        self.finger = unit(rest[index][0])
-        palm = unit(cross(self.finger, across(rest[thumb][0], self.finger)))
-        toward = sub(mul(body.up, -1.0), mul(body.lateral, self.side))
-        if dot(qrot(world[self.hand][1], palm), toward) < 0.0:
-            palm = mul(palm, -1.0)
-        self.palm = unit(across(palm, self.finger))
-        reach = HANG * (self.upper_length + self.fore_length)
-        self.hang_at = sub(add(world[self.arm][0], mul(body.lateral, self.side * RELAXED_OUT)), mul(body.up, reach))
         mean = [0.0, 0.0, 0.0]
         for k in range(idle.frames):
             posed = idle.world(idle.pose(k))
             mean = add(mean, body.in_rest_axes(posed, posed[self.hand][0]))
         self.mean_at = mul(mean, 1.0 / idle.frames)
-        self.twist = 0.0
         self.normal = None
 
     def reach(self, flex):
         l1, l2 = self.upper_length, self.fore_length
         return math.sqrt(max(0.0, l1 * l1 + l2 * l2 + 2.0 * l1 * l2 * math.cos(math.radians(flex))))
 
-    def solve(self, body, trs, world, previous):
+    def solve(self, body, world, previous):
         """New local rotations of the upper arm, forearm and hand for one key."""
         lateral = unit(sub(world[body.left_arm][0], world[body.right_arm][0]))
         up = unit(sub(world[body.neck][0], world[body.hips][0]))
         forward = unit(cross(lateral, up))
         pole = sub(sub(mul(lateral, self.side), mul(forward, POLE_BACK)), mul(up, POLE_DOWN))
         shoulder = world[self.arm][0]
-        at = body.in_rest_axes(world, world[self.hand][0])
-        wrist = body.from_rest_axes(world, add(self.hang_at, sub(at, self.mean_at)))
+        # The idle turns the shoulders 24 degrees against the hips, so a hang measured from the hips (as the cook does)
+        # bends one elbow far more than the other. Here each hand hangs straight down from its own posed shoulder.
+        sway = sub(world[self.hand][0], body.from_rest_axes(world, self.mean_at))
+        level = unit(across(lateral, [0.0, 1.0, 0.0]))
+        hang = add(add(shoulder, mul(level, self.side * RELAXED_OUT)), [0.0, -HANG * (self.upper_length + self.fore_length), 0.0])
+        wrist = add(hang, sway)
         to_wrist = sub(wrist, shoulder)
         distance = length(to_wrist)
         s = mul(to_wrist, 1.0 / distance)
@@ -230,24 +225,12 @@ class Arm:
         v = unit(sub(add(shoulder, mul(s, d)), elbow))
         arm_world = framed(u, plane, self.arm_axis, self.arm_hinge)
         fore_world = framed(v, plane, self.fore_axis, self.fore_hinge)
-        parent_world = world[self.glb_parent][1]
+        parent_world = world[self.parent][1]
         arm = keep_side(qnorm(qmul(qinv(parent_world), arm_world)), previous[self.arm])
         fore = keep_side(qnorm(qmul(qinv(arm_world), fore_world)), previous[self.fore])
-        hand_world = world[self.hand][1]
-        palm = across(mul(lateral, -self.side), v)
-        if length(palm) > 1e-3:
-            hand_world = framed(v, unit(palm), self.finger, self.palm)
-        delta = qmul(qmul(qinv(fore_world), hand_world), qinv(self.hand_rest))
-        raw = 2.0 * math.atan2(dot(delta[:3], self.fore_axis), delta[3])
-        if self.first:
-            twist = math.remainder(raw, 2.0 * math.pi)
-        else:
-            twist = raw + 2.0 * math.pi * round((self.twist - raw) / (2.0 * math.pi))
-        self.twist = twist
-        limit = math.radians(WRIST_TWIST)
-        half = (limit * math.tanh(twist / limit) - twist) / 2.0
-        turn = mul(self.fore_axis, math.sin(half)) + [math.cos(half)]
-        hand = keep_side(qnorm(qmul(qmul(delta, turn), self.hand_rest)), previous[self.hand])
+        # The wrist takes its bind rotation: the rig's only finger bones (index, thumb) sit 43 degrees off the forearm,
+        # too far to aim the hand by, and the bind hand lies along the forearm with the palm to the body.
+        hand = keep_side(qnorm(list(self.hand_rest)), previous[self.hand])
         return {self.arm: arm, self.fore: fore, self.hand: hand}
 
 
@@ -259,7 +242,6 @@ def relax(glb):
     lines = []
     for side in ("Left", "Right"):
         arm = Arm(idle, body, side)
-        arm.glb_parent = glb.parent[arm.arm]
         for node in (arm.arm, arm.fore, arm.hand):
             if node not in idle.rotation:
                 raise SystemExit(f"{CLIP}: {glb.gltf['nodes'][node]['name']} has no rotation keys")
@@ -270,8 +252,7 @@ def relax(glb):
             world = idle.world(trs)
             before.append(measure(idle, body, arm, world))
             previous = {n: (new[n][k - 1] if k > 0 else idle.rotation[n][k]) for n in (arm.arm, arm.fore, arm.hand)}
-            arm.first = k == 0
-            for node, q in arm.solve(body, trs, world, previous).items():
+            for node, q in arm.solve(body, world, previous).items():
                 turned = max(turned, qangle(q, idle.rotation[node][k]))
                 new[node][k] = q
                 trs[node][1] = q
