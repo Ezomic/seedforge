@@ -357,7 +357,43 @@ def between(a, b):
     return mul(unit(axis), math.sin(half)) + [math.cos(half)]
 
 
-def raise_arms(clip, body):
+def clavicle_turns(glb):
+    """Per side: the turn, in the clavicle's parent's frame, from where the source walk holds the clavicle to its bind.
+
+    The clips drop the clavicles for the same reason they cross the arms: in the source walk they point 50 and 56
+    degrees below level, against 20 in the bind pose, which sinks the shoulders by about 8 cm. A walk carries its
+    shoulders where a standing body does, so the walk's mean clavicle gives the turn, and every clip gets it.
+    """
+    walk = Idle(glb, "walk")
+    body = Body(walk)
+    rest = walk.world(walk.rest)
+    turns = {}
+    for side in ("Left", "Right"):
+        clavicle = walk.node(f"mixamorig:{side}Shoulder")
+        arm = walk.node(f"mixamorig:{side}Arm")
+        bind = unit(sub(rest[arm][0], rest[clavicle][0]))
+        mean = [0.0, 0.0, 0.0]
+        for k in range(walk.frames):
+            world = walk.world(walk.pose(k))
+            mean = add(mean, unit(sub(body.in_rest_axes(world, world[arm][0]), body.in_rest_axes(world, world[clavicle][0]))))
+        mean = unit(mean)
+        parent = rest[glb.parent[clavicle]][1]
+        turns[side] = (qmul(qmul(qinv(parent), between(mean, bind)), parent), math.degrees(math.acos(max(-1.0, min(1.0, dot(mean, bind))))))
+    return turns
+
+
+def raise_clavicles(clip, turns):
+    """Puts the clavicle turn in front of each clavicle key, and returns the angle per side."""
+    for side, (fix, _) in turns.items():
+        clavicle = clip.node(f"mixamorig:{side}Shoulder")
+        keys = []
+        for q in clip.rotation[clavicle]:
+            keys.append(keep_side(qnorm(qmul(fix, q)), keys[-1] if keys else q))
+        clip.rotation[clavicle] = keys
+    return {side: angle for side, (_, angle) in turns.items()}
+
+
+def raise_arms(clip, body, lifted):
     """Turns each upper arm out, towards a T-pose arm, by RAISE degrees, and returns the angle used.
 
     The clips were made for a rig that rests with its arms higher than the Exile's. A clip's upper arm key is a turn
@@ -373,7 +409,8 @@ def raise_arms(clip, body):
         bind = unit(sub(rest[fore][0], rest[arm][0]))
         level = mul(body.lateral, sign)
         full = math.degrees(math.acos(max(-1.0, min(1.0, dot(bind, level)))))
-        angle = min(full, RAISE)
+        # The clavicle's own turn (raise_clavicles) carries the arm with it, so the arm takes the rest.
+        angle = max(0.0, min(full, RAISE - lifted[side]))
         half = math.radians(angle) / 2.0
         turn = mul(unit(cross(bind, level)), math.sin(half)) + [math.cos(half)]
         fix = qmul(qmul(qinv(parent), turn), parent)
@@ -384,7 +421,7 @@ def raise_arms(clip, body):
     return angle
 
 
-def relax(glb, name=CLIP):
+def relax(glb, name=CLIP, turns=None):
     """New rotation keys per node of one clip, and what the stance, the hands and the elbows did before and after."""
     idle = Idle(glb, name)
     lines = []
@@ -398,8 +435,14 @@ def relax(glb, name=CLIP):
         for side in ("Left", "Right"):
             arm = Arm(idle, body, side)
             source[side] = [measure(idle, body, arm, idle.world(idle.pose(k))) for k in range(idle.frames)]
-        lines.append(f"upper arms turned {raise_arms(idle, body):.0f} degrees out, towards a T-pose arm")
+        lifted = raise_clavicles(idle, turns)
+        lines.append(f"clavicles turned back to the bind: left {lifted['Left']:.0f}, right {lifted['Right']:.0f} degrees; "
+                     f"upper arms turned {raise_arms(idle, body, lifted):.0f} degrees further out")
     new = {node: keys for node, keys in idle.rotation.items()} if name == CLIP else {}
+    if name != CLIP:
+        for side in ("Left", "Right"):
+            clavicle = idle.node(f"mixamorig:{side}Shoulder")
+            new[clavicle] = idle.rotation[clavicle]
     for side in ("Left", "Right"):
         arm = Arm(idle, body, side)
         for node in (arm.arm, arm.fore, arm.hand):
@@ -452,8 +495,9 @@ def main():
         out = sum(measure(walk, body, arm, walk.world(walk.pose(k)))[0] for k in range(walk.frames)) / walk.frames
         if out > 0.0:
             raise SystemExit("SK_Exile.glb already has its arms corrected: run tools/restore_exile_roll.py first to start from the source clips")
+    turns = clavicle_turns(glb)
     for name in CLIPS:
-        clip, new, lines = relax(glb, name)
+        clip, new, lines = relax(glb, name, turns)
         print(f"{name}: {clip.frames} keys")
         for line in lines:
             print("  " + line)

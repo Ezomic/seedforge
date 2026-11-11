@@ -74,7 +74,9 @@ two-bone chain, from the posed skeleton only:
   corrects the arms of the other eight clips in the file. Their hands crossed the body's midline because the clips were
   made for a rig that rests with its arms higher than this one's: each upper arm key is turned back out by 46 degrees
   (of the 63 from the bind arm to level; the figure that leaves the walk's arms about 8 degrees out from the body), and
-  the cook's elbow and wrist solve is then applied as it stands. Walk's arms also bend as they swing forward. The hand positions of those
+  the cook's elbow and wrist solve is then applied as it stands. Walk's arms also bend as they swing forward. The clavicles get the same treatment one joint up:
+  the source walk holds them 50 and 56 degrees below level against the bind's 20, so each clavicle key is turned back by
+  the turn from the walk's mean clavicle to the bind one (32 and 40 degrees), which lifts the shoulders about 8 cm. The hand positions of those
   clips therefore change in the game too. `tools/restore_exile_roll.py` writes the source idle back, so run
   `relax_exile_idle.py` after it.
 - In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
