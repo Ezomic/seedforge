@@ -32,6 +32,8 @@ struct RenderInstance {
     bool groundBlend = false;
     // Multiplies the base colour of every material of the object; white leaves it as authored.
     glm::vec3 tint{1.0f};
+    // Body regions (ichor/assets/body_regions.h) whose submeshes are not drawn, for a body under equipment that covers it.
+    std::uint32_t hiddenRegions = 0;
 };
 
 // A resident terrain cell: the handle the renderer gave its meshes, where

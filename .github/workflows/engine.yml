@@ -33,6 +33,7 @@ jobs:
     outputs:
       heavy: ${{ steps.scope.outputs.heavy }}
       art: ${{ steps.scope.outputs.art }}
+      slow: ${{ steps.scope.outputs.slow }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,6 +45,7 @@ jobs:
         run: |
           heavy=true
           art=false
+          slow=false
           if [ "$EVENT" = pull_request ]; then
             heavy=false
             # The checkout is the merge commit: its first parent is the base, so this is exactly the PR's diff. Renames count as delete + add.
@@ -51,6 +53,7 @@ jobs:
             cat changed.txt
             while IFS= read -r f; do
               case "$f" in
+                engine/*/include/*|libworldforge/include/*|engine/CMakeLists.txt|engine/CMakePresets.json|engine/vcpkg.json|engine/fp_flags.cmake|engine/ichor_pch.h|engine/ports/*|.github/workflows/engine.yml) slow=true; heavy=true ;;
                 art/audio/*|art/fonts/*) heavy=true ;;
                 art/*) art=true ;;
                 tools/check_smoke_hash.py|tools/test_times.py|tools/test_time_allowlist.json|tools/ci_tiers.py) heavy=true ;;
@@ -63,7 +66,8 @@ jobs:
           fi
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
           echo "art=$art" >> "$GITHUB_OUTPUT"
-          echo "scope: heavy=$heavy art=$art (event: $EVENT)"
+          echo "slow=$slow" >> "$GITHUB_OUTPUT"
+          echo "scope: heavy=$heavy art=$art slow=$slow (event: $EVENT)"
 
   light:
     # The python checks of the ctest suite, run directly. About 30 s, on every PR, so a docs or tools only change is still checked.
@@ -133,11 +137,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true' || needs.changes.outputs.art == 'true'
     runs-on: windows-2022
-    # PR_LIMIT: 15 minutes, the budget of a pull request (the first number in these expressions, three jobs). Raise it to 30 after a cache
-    # eviction or a key rename until a run on main has saved the caches again: a cold PR run needs about 25 minutes and a job killed by its
-    # limit saves nothing. A run on main starts with cold caches (a cache saved on a PR branch is not visible to main) and
-    # a job killed by its limit saves no cache, so main gets room to finish once and warm them.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
+    # PR_LIMIT: 15 minutes, or 30 when the `changes` job reports `slow` (a changed public header, build file or this workflow, which
+    # recompile most of the tree even on a warm cache: PR 522, bundle_types.h, built for 920 s with 68 percent sccache hits, 20 minutes in all).
+    # The budget is the first number in the expressions of three jobs. A run on main starts with cold caches (a cache saved on a PR branch is
+    # not visible to main) and a job killed by its limit saves no cache, so main gets room to finish once and warm them.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.slow == 'true' && 30 || 15) || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
@@ -331,7 +335,7 @@ jobs:
     runs-on: ubuntu-latest
     # Warm caches finish in 4 to 8 minutes. A cold ccache compiles the whole ASan tree in 12 to 25 minutes, and on main the shards also run
     # the medium tier. A job killed by its limit saves no cache, so only a pull request is held to 15 minutes.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.slow == 'true' && 30 || 15) || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -433,7 +437,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     # Cold, this job builds SDL3 and friends from source (670 to 737 s of configure), so only a pull request is held to 15 minutes.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 15 || 60 }}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.slow == 'true' && 30 || 15) || 60 }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite

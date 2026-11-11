@@ -1,4 +1,6 @@
 # First-party assets that predate the licence ledger (SEED-680). Shrink this file, never grow it.
+# missing-sidecars: models, rigs and animations without a provenance sidecar (SEED-774). Lower it as sidecars land, never raise it.
+@missing-sidecars 240
 art/audio/A_Tell.wav
 art/audio/A_WindupHeavy.wav
 art/audio/A_WindupLight.wav

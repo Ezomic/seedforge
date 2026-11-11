@@ -14,6 +14,10 @@ folders). Fails when, under art/ and the audio folders:
   5. baseline: tools/asset_license_baseline.txt lists a file that is gone or is now covered by the ledger.
      The baseline is the first-party assets that predate the ledger: shrink it, never grow it.
   6. credits: CREDITS.md differs from what the ledger generates.
+  8. provenance: a `<asset>.provenance.json` sidecar (tools/provenance.py, SEED-774) is malformed, has a licence
+     other than CC0-1.0 or own-work, names HY-Motion, or has no asset beside it.
+  9. sidecar-count: models, rigs and animations (.glb .gltf .fbx .bvh) without a sidecar are tolerated only
+     up to the `@missing-sidecars N` line of the baseline; more fails, fewer asks for N to be lowered.
   7. hash: a covered file's sha256 differs from the one the entry's `sha256` map records for it (SEED-707),
      has none recorded, or the map names a file the entry no longer covers. The hash is the Git LFS oid,
      read from the pointer when only the pointer is checked out, so CI never needs `git lfs pull`.
@@ -22,6 +26,7 @@ Usage: check_assets_licensed.py [--root DIR]    check the tree (default: this re
        check_assets_licensed.py --update         rewrite every entry's sha256 map after an intended change
        check_assets_licensed.py --write-credits  regenerate CREDITS.md from the ledger
        check_assets_licensed.py --write-baseline print the baseline lines for the files the ledger does not cover
+       check_assets_licensed.py --pack DIR      check only the sidecars under DIR (an art pack outside the repository)
        check_assets_licensed.py --self-test     prove every rule goes red on a deliberate violation
 """
 import argparse
@@ -33,8 +38,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import provenance
+
 LEDGER = "art/LICENSES.json"
 BASELINE = "tools/asset_license_baseline.txt"
+MISSING_SIDECARS = "@missing-sidecars"
 CREDITS = "CREDITS.md"
 ASSET_ROOTS = ("art", "audio", "data/audio", "engine/content/audio", "engine/assets/vendor")
 SKIP_DIRS = {".git", "node_modules", "build", "__pycache__"}
@@ -250,7 +258,32 @@ def read_text(root, rel):
 
 
 def parse_baseline(text):
-    return {line.strip() for line in (text or "").splitlines() if line.strip() and not line.startswith("#")}
+    return {line.strip() for line in (text or "").splitlines()
+            if line.strip() and not line.startswith(("#", "@"))}
+
+
+def baseline_missing_sidecars(text):
+    for line in (text or "").splitlines():
+        if line.startswith(MISSING_SIDECARS):
+            tail = line[len(MISSING_SIDECARS):].strip()
+            return int(tail) if tail.isdigit() else None
+    return 0
+
+
+def provenance_errors(files, load, allowed_missing=None):
+    """files: relative paths including sidecars; load(path) -> problems. allowed_missing None skips the count."""
+    errors, missing = provenance.scan(files)
+    for f in files:
+        if f.endswith(provenance.SUFFIX):
+            errors.extend((f, "provenance", p) for p in load(f))
+    if allowed_missing is not None and len(missing) != allowed_missing:
+        verb = "grew" if len(missing) > allowed_missing else "shrank"
+        hint = ("add a sidecar (tools/provenance.py write_sidecar)" if verb == "grew"
+                else f"set '{MISSING_SIDECARS} {len(missing)}' in {BASELINE}")
+        errors.append((BASELINE, "sidecar-count",
+                       f"{len(missing)} assets lack a provenance sidecar, baseline allows {allowed_missing} "
+                       f"({verb}): {hint}"))
+    return errors
 
 
 def check_root(root):
@@ -260,8 +293,26 @@ def check_root(root):
     entries, errors = parse_ledger(text)
     if entries is None:
         return errors
-    return check_tree(walk(root), entries, parse_baseline(read_text(root, BASELINE)), read_text(root, CREDITS) or "",
-                      hasher(root))
+    baseline_text = read_text(root, BASELINE)
+    everything = walk(root)
+    errors = provenance_errors(everything, lambda f: provenance.load_problems(Path(root) / f),
+                               None if baseline_text is None else baseline_missing_sidecars(baseline_text))
+    files = [f for f in everything if not f.endswith(provenance.SUFFIX)]
+    return errors + check_tree(files, entries, parse_baseline(baseline_text), read_text(root, CREDITS) or "",
+                               hasher(root))
+
+
+def walk_pack(root):
+    root = Path(root)
+    return sorted(p.relative_to(root).as_posix() for p in root.rglob("*")
+                  if p.is_file() and SKIP_DIRS.isdisjoint(p.relative_to(root).parts))
+
+
+def check_pack(root):
+    """Sidecars of a pack that is not a git repository: validated, missing ones reported but not failed."""
+    files = walk_pack(root)
+    errors = provenance_errors(files, lambda f: provenance.load_problems(Path(root) / f))
+    return errors, len(provenance.scan(files)[1])
 
 
 def update_hashes(root):
@@ -335,7 +386,7 @@ def self_test():
     passed = bool(rx.fullmatch("art/a/x.glb")) and not rx.fullmatch("art/a/b/x.glb")
     print(f"  '*' stays inside a folder: {'ok' if passed else 'FAILED'}")
     missed += not passed
-    hash_checks = hash_self_test()
+    hash_checks = hash_self_test() + provenance_self_test()
     missed += sum(not ok for ok in hash_checks)
     total = len(cases) + len(good) + 1 + len(hash_checks)
     if missed:
@@ -448,6 +499,93 @@ def hash_self_test():
     return checks
 
 
+def provenance_self_test():
+    """Sidecars against real files in a temporary tree."""
+    digest = "a" * 64
+    good = provenance.build_sidecar("Quaternius UAL", "CC0-1.0", digest,
+                                    {"Idle": {"source": "UAL", "licence": "CC0-1.0"}})
+
+    def sidecar(**kw):
+        data = dict(good)
+        data.update(kw)
+        return data
+
+    def run(name, files, baseline="@missing-sidecars 0\n", rule=None, words="", pack=False):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel, data in files.items():
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                if isinstance(data, dict):
+                    data = json.dumps(data)
+                (root / rel).write_bytes(data if isinstance(data, bytes) else data.encode())
+            if pack:
+                errors = check_pack(root)[0]
+            else:
+                (root / LEDGER).parent.mkdir(parents=True, exist_ok=True)
+                (root / LEDGER).write_text(json.dumps({"entries": []}), encoding="utf-8")
+                (root / CREDITS).write_text(render_credits([]), encoding="utf-8", newline="\n")
+                (root / BASELINE).parent.mkdir(parents=True, exist_ok=True)
+                (root / BASELINE).write_text(baseline, encoding="utf-8")
+                errors = check_root(root)
+        errors = [e for e in errors if e[1] in ("provenance", "sidecar-count")]
+        ok = not errors if rule is None else any(r == rule and words in m for _, r, m in errors)
+        print(f"  {name}: {'ok' if ok else f'FAILED {errors}'}")
+        return ok
+
+    base = "art/exile/SK.glb"
+    side = base + ".provenance.json"
+    glb = {base: b"glTF", side: good}
+    checks = [
+        run("a valid sidecar", glb),
+        run("own-work is allowed", {**glb, side: sidecar(licence="own-work")}),
+        run("a sidecar naming HY-Motion", {**glb, side: sidecar(source="HY-Motion 1.0")},
+            rule="provenance", words="HY-Motion"),
+        run("HY-Motion in a clip origin", {**glb, side: sidecar(
+            clip_origins={"Walk": {"source": "hy_motion export", "licence": "CC0-1.0"}})},
+            rule="provenance", words="HY-Motion"),
+        run("a licence off the allow list", {**glb, side: sidecar(licence="CC-BY-4.0")},
+            rule="provenance", words="not allowed"),
+        run("a clip with a licence off the allow list", {**glb, side: sidecar(
+            clip_origins={"Walk": {"source": "x", "licence": "CC-BY-NC-4.0"}})}, rule="provenance", words="Walk"),
+        run("a clip with no licence", {**glb, side: sidecar(clip_origins={"Walk": {"source": "x"}})},
+            rule="provenance", words="Walk"),
+        run("a missing licence field", {**glb, side: {k: v for k, v in good.items() if k != "licence"}},
+            rule="provenance", words="missing field 'licence'"),
+        run("a bad source hash", {**glb, side: sidecar(source_file_sha256="abc")},
+            rule="provenance", words="source_file_sha256"),
+        run("a sidecar that is not JSON", {**glb, side: b"{"}, rule="provenance", words="not readable"),
+        run("a sidecar with no asset", {"art/exile/Gone.glb.provenance.json": good}, rule="provenance",
+            words="no asset"),
+        run("a missing sidecar over the baseline", {base: b"glTF"}, rule="sidecar-count", words="grew"),
+        run("a missing sidecar inside the baseline", {base: b"glTF"}, baseline="@missing-sidecars 1\n"),
+        run("a baseline count that is too high", glb, baseline="@missing-sidecars 3\n", rule="sidecar-count",
+            words="shrank"),
+        run("a pack outside the repository", {"pack/Walk.glb": b"glTF", "pack/Walk.glb.provenance.json": good},
+            pack=True),
+        run("a pack sidecar naming HY-Motion", {"pack/Walk.glb": b"glTF",
+            "pack/Walk.glb.provenance.json": sidecar(source="HY-Motion")}, rule="provenance", words="HY-Motion",
+            pack=True),
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        asset, src = Path(tmp) / "SK.glb", Path(tmp) / "src.glb"
+        asset.write_bytes(b"glTF")
+        src.write_bytes(b"source")
+        out = provenance.write_sidecar(asset, "UAL", "CC0-1.0", source_file=src)
+        written = json.loads(out.read_text(encoding="utf-8"))
+        ok = (out.name == "SK.glb.provenance.json" and not provenance.sidecar_problems(written)
+              and written["source_file_sha256"] == hashlib.sha256(b"source").hexdigest())
+        print(f"  write_sidecar round-trips: {'ok' if ok else 'FAILED'}")
+        checks.append(ok)
+        try:
+            provenance.write_sidecar(asset, "HY-Motion", "CC0-1.0", source_file=src)
+            ok = False
+        except ValueError:
+            ok = True
+        print(f"  write_sidecar refuses HY-Motion: {'ok' if ok else 'FAILED'}")
+        checks.append(ok)
+    return checks
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=str(Path(__file__).resolve().parent.parent))
@@ -455,9 +593,16 @@ def main(argv=None):
     parser.add_argument("--write-credits", action="store_true")
     parser.add_argument("--write-baseline", action="store_true")
     parser.add_argument("--update", action="store_true")
+    parser.add_argument("--pack", metavar="DIR", help="check only the provenance sidecars under DIR")
     args = parser.parse_args(argv)
     if args.self_test:
         return self_test()
+    if args.pack:
+        errors, missing = check_pack(args.pack)
+        for where, rule, msg in errors:
+            print(f"  - {where}: {msg} [{rule}]")
+        print(f"pack sidecars: {len(errors)} problem(s), {missing} asset(s) without a sidecar")
+        return 1 if errors else 0
     if args.write_credits or args.write_baseline or args.update:
         entries, errors = parse_ledger(read_text(args.root, LEDGER) or "")
         if entries is None:
