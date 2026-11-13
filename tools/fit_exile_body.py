@@ -16,7 +16,8 @@ UniRig says where the joints sit in the new body and how each vertex follows the
 joints lie as close to the Exile's as one scale and one offset allow, and then each joint carries its share of the
 vertices onto the Exile's joint: turned by the smallest turn that lines its bone up with the Exile's, and stretched
 along the bone by the ratio of the two lengths. A vertex is the weighted blend of where its joints put it, with
-UniRig's own weights. Fingers follow the hand (see UNIRIG_ORDER).
+UniRig's own weights. Fingers follow the hand (see UNIRIG_ORDER). The skin that is written is not UniRig's as it came:
+its weights are smoothed over the surface, and the head has its vertices alone (see SMOOTHING and HEAD_ALONE).
 
 Needs numpy. Same inputs give the same output.
 """
@@ -40,6 +41,11 @@ for _side in ("Left", "Right"):
 # A joint without a child of its own turns as the bone that leads to it and is not stretched.
 END = {"Head": "Neck", "LeftHand": "LeftForeArm", "RightHand": "RightForeArm", "LeftToeBase": "LeftFoot", "RightToeBase": "RightFoot"}
 PREFIX = "mixamorig:"
+# Metres above the head joint where the head starts to take a vertex over, and where it has it alone.
+HEAD_ALONE = (-0.07, 0.01)
+# Metres that line drops per metre ahead of the head joint, so the chin and beard are the head's.
+CHIN_DROP = 0.6
+SMOOTHING = 30
 
 
 class Glb:
@@ -216,6 +222,36 @@ def fit(body, rig, skeleton):
     turned_normal /= np.linalg.norm(turned_normal, axis=1, keepdims=True)
     turned_tangent /= np.linalg.norm(turned_tangent, axis=1, keepdims=True)
     lines.append(f"fitted body: {np.ptp(moved[:, 1]):.2f} m tall, feet at y = {moved[:, 1].min():+.3f} m, {np.ptp(moved[:, 0]):.2f} m wide")
+
+    # UniRig's weights jump between neighbouring vertices, which tears the surface where joints bend. Vertices at one
+    # place are welded, so a seam cannot open, and each takes the mean of its neighbours a number of times.
+    _, weld = np.unique(np.round(moved / 1e-5).astype(np.int64), axis=0, return_inverse=True)
+    weld = weld.reshape(-1)
+    triangles = weld[body.read(body.primitive()["indices"]).astype(np.int64).reshape(-1, 3)]
+    edges = np.unique(np.sort(np.vstack([triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [0, 2]]]), axis=1), axis=0)
+    edges = edges[edges[:, 0] != edges[:, 1]]
+    count = np.bincount(weld).astype(np.float64)
+    welded = np.zeros((len(count), weights.shape[1]))
+    np.add.at(welded, weld, weights)
+    welded /= count[:, None]
+    degree = np.maximum(np.bincount(edges.reshape(-1), minlength=len(count)), 1)[:, None]
+    for _ in range(SMOOTHING):
+        around = np.zeros_like(welded)
+        np.add.at(around, edges[:, 0], welded[edges[:, 1]])
+        np.add.at(around, edges[:, 1], welded[edges[:, 0]])
+        welded = 0.5 * welded + 0.5 * around / degree
+    weights = welded[weld]
+    lines.append(f"weights smoothed {SMOOTHING} times over {len(count)} welded vertices")
+
+    # The face, beard and skull follow the head alone: UniRig shares them with the neck, which shears the face when the
+    # head turns. The line between head and neck drops toward the front, from the nape to under the chin.
+    ahead = np.maximum(moved[:, 2] - target["Head"][2], 0.0)
+    rise = np.clip((moved[:, 1] + CHIN_DROP * ahead - (target["Head"][1] + HEAD_ALONE[0])) / (HEAD_ALONE[1] - HEAD_ALONE[0]), 0.0, 1.0)
+    near = np.linalg.norm(moved[:, [0, 2]] - target["Head"][[0, 2]], axis=1) < 0.25
+    share = np.where(near, rise * rise * (3.0 - 2.0 * rise), 0.0)
+    weights = weights * (1.0 - share[:, None])
+    weights[:, at[PREFIX + "Head"]] += share
+    lines.append(f"head alone: {int((share > 0.999).sum())} vertices, {int(((share > 0) & (share <= 0.999)).sum())} eased in below them")
 
     order = np.argsort(-weights, axis=1)[:, :4]
     top = np.take_along_axis(weights, order, axis=1)
