@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
-"""Puts clips of the Quaternius Universal Animation Library on the Exile's skeleton (SEED-795).
+"""Puts clips of the two Quaternius Universal Animation Libraries on the Exile's skeleton (SEED-795).
 
-    retarget_exile_clips.py --source UAL1_Standard_RM.glb [--exile art/exile/SK_Exile.glb] [--out FILE] [--report]
+    retarget_exile_clips.py --source UAL1_Standard_RM.glb UAL2_Standard_RM.glb [--exile art/exile/SK_Exile.glb] [--out FILE] [--report]
 
-The Exile's own clips were broken at the source and of unrecorded origin. The library is CC0 1.0 and stands on an
+The Exile's own clips were broken at the source and of unrecorded origin. Both libraries are CC0 1.0 and stand on one
 ordinary humanoid rig (pelvis, three spine bones, neck, head, clavicle, upper arm, forearm, hand, thigh, calf, foot,
-ball) that lines up bone for bone with the Exile's. The Exile's mesh, skin and skeleton are kept byte for byte; only
-the animations are replaced.
+ball) that lines up bone for bone with the Exile's. The Exile's mesh, skin, skeleton and textures keep their bytes;
+only the animations are replaced.
 
 How a clip is carried over. The two rigs rest in different poses, so a joint's rotation cannot be copied as it is: that
-is the mistake the old clips were made with. Each rig is first brought to one canonical pose in thought: spine straight
-up, arms level to the sides, legs straight down, feet pointing ahead. For every joint that gives the world rotation it
-has in that pose (its rest rotation, turned by the smallest turn that lines its bone up with the canonical direction).
-A source joint's world rotation in a clip, taken against its canonical one, is a turn in the world; mirrored into the
-Exile's axes and put in front of the Exile joint's canonical rotation, it is that joint's world rotation in the clip.
-The hips' travel is scaled by the ratio of the two rigs' hip heights. The root joint takes the horizontal travel and
+is the mistake the old clips were made with. Each rig is first brought to one canonical pose in thought: arms level to
+the sides, legs straight down, feet pointing ahead. For every joint that gives the world rotation it has in that pose
+(its rest rotation, turned by the smallest turn that lines its bone up with the canonical direction). A source joint's
+world rotation in a clip, taken against its canonical one, is a turn in the world; mirrored into the Exile's axes and
+put in front of the Exile joint's canonical rotation, it is that joint's world rotation in the clip. The hips, spine,
+neck, head and collarbones are not straightened first: their turns are taken from each rig's own rest, so the Exile
+keeps its own posture. The hips' travel is scaled by the ratio of the two rigs' hip heights. The root joint takes the horizontal travel and
 the hips keep the rest, as the engine expects (docs/exile-import.md).
 
-Block has no clip in the library's free tier: it is Sword_Idle with the shield arm held up in front of the chest.
-Thrust is Punch_Cross, which was not made for a spear.
+Thrust is Punch_Jab, which was not made for a spear, played left for right so the spear hand drives. The swing and the
+block come from the second library. The idle is stood as the bind pose with the arms hanging, and the run is stretched
+in time to the game's speed with the arms brought in.
 
 Needs numpy. Same inputs give the same output.
 """
 import argparse
 import json
+import math
 import struct
 import sys
 from pathlib import Path
@@ -33,24 +36,38 @@ import numpy as np
 import provenance
 
 FPS = 30
+# Metres per second the game moves the Exile at: the clip is stretched in time until its travel matches.
+SPEED = {"run": 5.2}
+# Degrees each arm is brought in toward the body and ahead: the library's jog carries its elbows wide and behind.
+TUCK = {"run": {"Left": (20.0, 10.0), "Right": (20.0, 10.0)}}
 PREFIX = "mixamorig:"
-# Exile clip -> library clip.
-CLIPS = {"idle": "Idle_Loop", "walk": "Walk_Loop", "run": "Jog_Fwd_Loop", "swing": "Sword_Attack", "thrust": "Punch_Cross",
-         "block": "Sword_Idle", "dodge": "Roll", "hit": "Hit_Chest", "death": "Death01"}
+# Clips played left for right: the library's jab is thrown with the left hand and the Exile's spear is in the right.
+MIRRORED = ("thrust",)
+FLIP = np.diag([-1.0, 1.0, 1.0])
+# Exile clip -> library clip, or clips played one after the other, joined by "+". The swing is the second library's
+# strike followed by its recovery: the first library's only sword attack rolls the chest until a shoulder is at the ear.
+CLIPS = {"idle": "Idle_Loop", "walk": "Walk_Loop", "run": "Jog_Fwd_Loop", "swing": "Sword_Regular_A+Sword_Regular_A_Rec",
+         "thrust": "Punch_Jab", "block": "Idle_Shield_Loop", "dodge": "Roll", "hit": "Hit_Chest", "death": "Death01"}
+# Exile clips whose library clips are in the second library.
+SECOND = ("swing", "block")
 LOOPS = ("idle", "walk", "run", "block")
 # Exile joint -> (library joint, the child whose joint gives the bone's direction on the Exile, on the library rig, canonical direction).
 # Directions are in (left, up, ahead). "yaw" keeps the bone's own slope and only turns it to point ahead; None takes the parent's turn.
 BONES = {
+    # The trunk, the head and the clavicles are carried as turns from each rig's own rest: both rigs rest in a neutral
+    # standing posture there, and the Exile's mesh is built around its own (spine 7 degrees back, clavicles 20 degrees
+    # down). Lining these bones up with the library's would lean the Exile 7 degrees further forward than the clip
+    # means and lift its shoulders out of the shape the idle has.
     "Hips": ("pelvis", None, None, "rest"),
-    "Spine": ("spine_01", "Spine1", "spine_02", (0, 1, 0)),
-    "Spine1": ("spine_02", "Spine2", "spine_03", (0, 1, 0)),
-    "Spine2": ("spine_03", "Neck", "neck_01", (0, 1, 0)),
-    "Neck": ("neck_01", "Head", "Head", (0, 1, 0)),
-    "Head": ("Head", None, None, "Neck"),
+    "Spine": ("spine_01", None, None, "rest"),
+    "Spine1": ("spine_02", None, None, "rest"),
+    "Spine2": ("spine_03", None, None, "rest"),
+    "Neck": ("neck_01", None, None, "rest"),
+    "Head": ("Head", None, None, "rest"),
 }
 for _side, _s, _sign in (("Left", "l", 1), ("Right", "r", -1)):
     BONES.update({
-        f"{_side}Shoulder": (f"clavicle_{_s}", f"{_side}Arm", f"upperarm_{_s}", (_sign, 0, 0)),
+        f"{_side}Shoulder": (f"clavicle_{_s}", None, None, "rest"),
         f"{_side}Arm": (f"upperarm_{_s}", f"{_side}ForeArm", f"lowerarm_{_s}", (_sign, 0, 0)),
         f"{_side}ForeArm": (f"lowerarm_{_s}", f"{_side}Hand", f"hand_{_s}", (_sign, 0, 0)),
         f"{_side}Hand": (f"hand_{_s}", None, None, f"{_side}ForeArm"),
@@ -59,9 +76,6 @@ for _side, _s, _sign in (("Left", "l", 1), ("Right", "r", -1)):
         f"{_side}Foot": (f"foot_{_s}", f"{_side}ToeBase", f"ball_{_s}", "yaw"),
         f"{_side}ToeBase": (f"ball_{_s}", None, None, f"{_side}Foot"),
     })
-# The shield arm of the block stand-in: upper arm and forearm directions in (left, up, ahead).
-GUARD = {"LeftArm": (0.35, -0.75, 0.55), "LeftForeArm": (-0.55, 0.35, 0.75)}
-
 COMPONENT = {5120: "i1", 5121: "u1", 5122: "<i2", 5123: "<u2", 5125: "<u4", 5126: "<f4"}
 WIDTH = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
 
@@ -244,14 +258,108 @@ class Rig:
             self.canonical[name] = self.aim[name] @ rest[glb.index[names[name]]][1]
 
 
-def retarget(source, exile, name):
-    """Times and, per frame, {exile node: (translation or None, quaternion)} for one Exile clip."""
+def quat_mul(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return np.array([aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+                     aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz])
+
+
+def quat_inverse(q):
+    return np.array([-q[0], -q[1], -q[2], q[3]])
+
+
+# The idle's hanging arm: how much of the arm's length the hang uses, how far out from and ahead of the shoulder the
+# hand hangs (m), and how far out the elbow points for each unit it points back.
+HANG, HANG_OUT, HANG_AHEAD, ELBOW_OUT = 0.97, 0.04, 0.08, 0.3
+
+
+def square_idle(exile, rig, frames):
+    """Stands the idle as the bind pose does, with the arms hanging, and keeps the library clip's motion about it.
+
+    The library's idle stands turned with the weight on one leg. The Exile's idle faces the way it will walk: every
+    joint takes its bind rotation times its key's turn from the clip's mean, and the hips' translation its bind value
+    plus the key's offset from the mean. The upper arm and forearm then hang the hand beside the thigh, straight down
+    from the shoulder with the elbow pointing back, and the wrist keeps its bind rotation.
+    """
+    root = exile.index["root"]
+    hips = exile.index[PREFIX + "Hips"]
+    for node in frames[0]:
+        if node == root:
+            continue
+        keys = np.array([f[node][1] for f in frames])
+        keys[np.sum(keys * keys[0], axis=1) < 0] *= -1.0
+        mean = unit(keys.sum(axis=0))
+        rest = exile.local(node)[1]
+        previous = rest
+        for f, q in zip(frames, keys):
+            new = unit(quat_mul(rest, quat_mul(quat_inverse(mean), q)))
+            if np.dot(new, previous) < 0:
+                new = -new
+            previous = new
+            f[node] = (f[node][0], new)
+    travel = np.array([f[hips][0] for f in frames])
+    for f, t in zip(frames, travel):
+        f[hips] = (exile.local(hips)[0] + (t - travel.mean(axis=0)), f[hips][1])
+    rest = rig.rest
+    for side, sign in (("Left", 1.0), ("Right", -1.0)):
+        arm, fore, hand = (exile.index[PREFIX + side + part] for part in ("Arm", "ForeArm", "Hand"))
+        shoulder = rest[arm][0]
+        upper, lower = np.linalg.norm(rest[fore][0] - shoulder), np.linalg.norm(rest[hand][0] - rest[fore][0])
+        wrist = shoulder + rig.left * sign * HANG_OUT + rig.ahead * HANG_AHEAD - rig.up * HANG * (upper + lower)
+        reach = np.linalg.norm(wrist - shoulder)
+        line = (wrist - shoulder) / reach
+        pole = rig.left * sign * ELBOW_OUT - rig.ahead
+        pole = unit(pole - line * np.dot(pole, line))
+        along = (upper * upper - lower * lower + reach * reach) / (2.0 * reach)
+        elbow = shoulder + line * along + pole * np.sqrt(max(0.0, upper * upper - along * along))
+        arm_world = turn(unit(rest[fore][0] - shoulder), unit(elbow - shoulder)) @ rest[arm][1]
+        fore_world = turn(unit(rest[hand][0] - rest[fore][0]), unit(wrist - elbow)) @ rest[fore][1]
+        parent = rest[exile.parent[arm]][1]
+        hung = {arm: matrix_quat(parent.T @ arm_world), fore: matrix_quat(arm_world.T @ fore_world), hand: exile.local(hand)[1]}
+        for f in frames:
+            for node, q in hung.items():
+                f[node] = (f[node][0], q)
+
+
+def tucked(rig, chest, bone, inward, forward):
+    """The world turn that brings one arm `inward` degrees toward the body and `forward` degrees ahead, in the chest's frame."""
+    side = 1.0 if bone.startswith("Left") else -1.0
+    a, f = math.radians(inward), math.radians(forward)
+    down = np.array([0.0, -1.0, 0.0])
+    tuck = turn(down, unit(np.array([-side * math.sin(a), -math.cos(a), 0.0])))
+    swing = turn(down, unit(np.array([0.0, -math.cos(f), math.sin(f)])))
+    frame = chest @ rig.rest[rig.glb.index[PREFIX + "Spine2"]][1].T @ rig.axes
+    return frame @ swing @ tuck @ frame.T
+
+
+def joined(sources, exile, name):
+    """One Exile clip from its library clips in turn, each from the file that has it, the root's travel carried on."""
+    root = exile.index["root"]
+    times, frames = np.zeros(0), []
+    for clip in CLIPS[name].split("+"):
+        source = next((s for s in sources if any(a.get("name") == clip for a in s.doc.get("animations", []))), None)
+        if source is None:
+            raise SystemExit(f"{clip} is in none of the source files")
+        part_times, part = retarget(source, exile, name, clip)
+        if frames:
+            carried = frames[-1][root][0] - part[0][root][0]
+            for keys in part:
+                keys[root] = (keys[root][0] + carried, keys[root][1])
+            part_times = part_times + times[-1] + 1.0 / FPS
+        times = np.concatenate([times, part_times])
+        frames += part
+    return times, frames
+
+
+def retarget(source, exile, name, clip):
+    """Times and, per frame, {exile node: (translation or None, quaternion)} for one library clip as the Exile clip `name`."""
     source_names = {n: b[0] for n, b in BONES.items()}
     exile_names = {n: PREFIX + n for n in BONES}
     src = Rig(source, source_names, {n: b[2] for n, b in BONES.items()})
     dst = Rig(exile, exile_names, {n: PREFIX + b[1] for n, b in BONES.items() if b[1]})
     mirror = dst.axes @ src.axes.T
-    times, frames = sample(source, CLIPS[name])
+    times, frames = sample(source, clip)
     joints = exile.doc["skins"][0]["joints"]
     order = [i for i in exile.order() if i in joints]
     by_node = {exile.index[PREFIX + n]: n for n in BONES}
@@ -269,19 +377,26 @@ def retarget(source, exile, name):
         keys = {}
         travel = mirror @ (world[s_root][0] - src.rest[s_root][0]) * scale
         travel[1] = 0.0
+        hips_moved = mirror @ (world[s_hips][0] - src.rest[s_hips][0]) * scale
+        if name in MIRRORED:
+            travel, hips_moved = FLIP @ travel, FLIP @ hips_moved
         root_at = root_rest[0] + travel
-        hips_at = dst.rest[hips][0] + mirror @ (world[s_hips][0] - src.rest[s_hips][0]) * scale
+        hips_at = dst.rest[hips][0] + hips_moved
         for node in order:
             parent = exile.parent.get(node)
             parent_rotation = rotation.get(parent, dst.rest[parent][1] if parent is not None else np.eye(3))
             if node in by_node:
                 bone = by_node[node]
-                turned = mirror @ (world[source.index[source_names[bone]]][1] @ src.canonical[bone].T) @ mirror.T
+                taken = bone
+                if name in MIRRORED:
+                    taken = "Right" + bone[4:] if bone.startswith("Left") else "Left" + bone[5:] if bone.startswith("Right") else bone
+                turned = mirror @ (world[source.index[source_names[taken]]][1] @ src.canonical[taken].T) @ mirror.T
+                if name in MIRRORED:
+                    turned = FLIP @ turned @ FLIP
                 rotation[node] = turned @ dst.canonical[bone]
-                if name == "block" and bone in GUARD:
-                    rotation[node] = turn(dst.axes @ np.array([1.0, 0.0, 0.0]), unit(dst.axes @ np.array(GUARD[bone]))) @ dst.canonical[bone]
-                if name == "block" and bone == "LeftHand":
-                    rotation[node] = rotation[exile.index[PREFIX + "LeftForeArm"]] @ dst.canonical["LeftForeArm"].T @ dst.canonical[bone]
+                side = bone[:4] if bone[:4] == "Left" else bone[:5]
+                if side in TUCK.get(name, {}) and ("Arm" in bone or "Hand" in bone):
+                    rotation[node] = tucked(dst, rotation[exile.index[PREFIX + "Spine2"]], bone, *TUCK[name][side]) @ rotation[node]
             else:
                 rotation[node] = parent_rotation @ quat_matrix(exile.local(node)[1])
             q = matrix_quat(parent_rotation.T @ rotation[node])
@@ -295,12 +410,17 @@ def retarget(source, exile, name):
                 translation = rotation[root].T @ (hips_at - root_at)
             keys[node] = (translation, q)
         out.append(keys)
+    if name == "idle":
+        square_idle(exile, dst, out)
     if name in LOOPS:
         # A loop's last key is its first, with the root's travel kept.
         last, first = out[-1], out[0]
         for node in last:
             translation = last[node][0] if node == root else first[node][0]
             last[node] = (translation, first[node][1])
+    if name in SPEED:
+        travelled = float(np.linalg.norm(out[-1][root][0] - out[0][root][0]))
+        times = times * (travelled / times[-1] / SPEED[name])
     return times, out
 
 
@@ -392,33 +512,36 @@ def describe(exile, name, times, frames):
         for side, sign in (("Left", 1.0), ("Right", -1.0)):
             out[side].append(sign * float(np.dot(world[exile.index[PREFIX + side + "Hand"]][0] - world[hips][0], left)))
     travel = np.linalg.norm(frames[-1][root][0] - frames[0][root][0])
-    return (f"{name:7s} from {CLIPS[name]:13s} {times[-1]:.2f} s, {len(frames)} keys, travels {travel:.2f} m, "
+    return (f"{name:7s} from {CLIPS[name]:35s} {times[-1]:.2f} s, {len(frames)} keys, travels {travel:.2f} m, "
             f"hands out from the midline: left {np.mean(out['Left']):+.2f} m, right {np.mean(out['Right']):+.2f} m")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--source", required=True, help="UAL1_Standard_RM.glb from the library's Standard zip")
+    parser.add_argument("--source", required=True, nargs="+",
+                        help="UAL1_Standard_RM.glb and UAL2_Standard_RM.glb from the two libraries' Standard zips")
     parser.add_argument("--exile", default=str(Path(__file__).resolve().parents[1] / "art" / "exile" / "SK_Exile.glb"))
     parser.add_argument("--out")
     parser.add_argument("--report", action="store_true")
     args = parser.parse_args()
-    source, exile = Glb(args.source), Glb(args.exile)
+    sources, exile = [Glb(path) for path in args.source], Glb(args.exile)
     clips = {}
     for name in CLIPS:
-        times, frames = retarget(source, exile, name)
+        times, frames = joined(sources, exile, name)
         clips[name] = (times, frames)
         print(describe(exile, name, times, frames))
     if not args.report:
         out = Path(args.out or args.exile)
         out.write_bytes(build(exile, clips))
         print(f"wrote {out}")
-        origins = {name: {"source": f"Quaternius Universal Animation Library, Standard: {clip}"
-                          + (", shield arm posed by tools/retarget_exile_clips.py" if name == "block" else ""), "licence": "CC0-1.0"}
+        origins = {name: {"source": f"Quaternius Universal Animation Library{' 2' if name in SECOND else ''}, Standard: {clip.replace('+', ' then ')}"
+                          + (", played left for right" if name in MIRRORED else ""), "licence": "CC0-1.0"}
                    for name, clip in CLIPS.items()}
         sidecar = provenance.write_sidecar(out, source="Mesh, skin and skeleton: first-party, generated locally by the owner. Clips: Quaternius Universal "
-                                           "Animation Library (https://quaternius.com/packs/universalanimationlibrary.html), retargeted by "
-                                           "tools/retarget_exile_clips.py.", licence="own-work", source_file=args.source, clip_origins=origins)
+                                           "Animation Library (https://quaternius.com/packs/universalanimationlibrary.html) and, for the swing and the block, "
+                                           "Universal Animation Library 2 (https://quaternius.com/packs/universalanimationlibrary2.html), "
+                                           "retargeted by tools/retarget_exile_clips.py. The hashed source file is the first library's.",
+                                           licence="own-work", source_file=args.source[0], clip_origins=origins)
         print(f"wrote {sidecar}")
     return 0
 

@@ -186,14 +186,14 @@ TEST_CASE("walk travels about 1.05 m/s and run about 5.2 m/s along the way the b
     };
     float walkSeconds = 0.0f;
     const glm::vec3 walk = travel("walk", walkSeconds);
-    REQUIRE(walkSeconds == Catch::Approx(2.7f).margin(0.15f));
+    REQUIRE(walkSeconds == Catch::Approx(1.33f).margin(0.1f));
     REQUIRE(glm::dot(glm::vec2(walk.x, walk.z), forward) / walkSeconds == Catch::Approx(1.05f).margin(0.1f));
     REQUIRE(std::abs(walk.y) < 0.05f);
 
     float runSeconds = 0.0f;
     const glm::vec3 run = travel("run", runSeconds);
-    // The run is turned about 10 degrees so its legs sweep along the travel, so the speed is the length of the
-    // travel and the direction is only checked to be roughly the way the body faces.
+    // The run travels straight ahead, but the body's forward is read off the left foot and idle stands with the toes
+    // about 18 degrees out, so the speed is the length of the travel and the direction is only checked roughly.
     const glm::vec2 runTravel(run.x, run.z);
     REQUIRE(glm::length(runTravel) / runSeconds == Catch::Approx(5.2f).margin(0.5f));
     REQUIRE(glm::dot(glm::normalize(runTravel), forward) > 0.8f);
@@ -202,8 +202,8 @@ TEST_CASE("walk travels about 1.05 m/s and run about 5.2 m/s along the way the b
 
 TEST_CASE("the feet plant while the body travels: the root travel matches the legs")
 {
-    // If the root travelled against the legs the planted ankle would slide at about twice walking speed (1.8 m/s
-    // against 0.07 here). Run has too few planted frames at 60 Hz to say anything.
+    // If the root travelled against the legs the planted ankle would slide at about twice walking speed (2.2 m/s
+    // against 0.3 here). Run has too few planted frames at 60 Hz to say anything.
     const float walk = plantedFootSpeed("walk");
     INFO("planted ankle speed in walk: " << walk << " m/s");
     REQUIRE(walk < 1.0f);
@@ -216,11 +216,13 @@ TEST_CASE("no clip drags the hips off the ground or through it")
     std::vector<glm::mat4> pose;
     for (const char* name : kExileClipNames) {
         const std::uint32_t clip = set.findClip(name);
-        REQUIRE(set.clipDuration(clip) > 1.0f);
+        REQUIRE(set.clipDuration(clip) > 0.3f);
+        // Dodge rolls over the ground and death ends lying on it, the hips joint 5 to 7 cm above it.
+        const bool onTheGround = std::string_view(name) == "dodge" || std::string_view(name) == "death";
         for (int i = 0; i <= 20; ++i) {
             REQUIRE(set.samplePose(clip, set.clipDuration(clip) * static_cast<float>(i) / 20.0f, pose));
             INFO(name);
-            REQUIRE(pose[1][3].y > 0.2f);
+            REQUIRE(pose[1][3].y > (onTheGround ? 0.03f : 0.2f));
             REQUIRE(pose[1][3].y < 1.8f);
         }
     }
@@ -382,10 +384,10 @@ TEST_CASE("every Exile clip hinges the elbows between 0 and 150 degrees and keep
     }
 }
 
-// The solve keeps the source's shoulders, and its hands in every clip but idle, walk and run: against the same file
-// cooked without it a hand stays within a centimetre and a half. Those three hang the hands beside the thighs (over
-// 12 cm out from the hips' midline, at the hips' height or below, a running hand up to 30 cm above).
-TEST_CASE("the Exile's arm solve keeps the combat hands where the source put them and hangs the idle, walk and run hands by the thighs")
+// The solve keeps the source's shoulders, and its hands in every clip but idle: against the same file cooked without
+// it a hand stays within a centimetre and a half. Idle hangs the hands beside the thighs (over 12 cm out from the
+// hips' midline, at the hips' height or below).
+TEST_CASE("the Exile's arm solve keeps the hands where the source put them and hangs the idle hands by the thighs")
 {
     SceneBundle plain;
     CookStats stats;
@@ -422,9 +424,9 @@ TEST_CASE("the Exile's arm solve keeps the combat hands where the source put the
         }
         INFO("hand moved up to " << handMove << " m, shoulder " << shoulderMove << " m, hands " << nearest << " m from the midline at the nearest, " << lowest << " m above the hips at the highest");
         CHECK(shoulderMove < 1e-4f);
-        if (std::string_view(name) == "idle" || std::string_view(name) == "walk" || std::string_view(name) == "run") {
+        if (std::string_view(name) == "idle") {
             CHECK(nearest > 0.12f);
-            CHECK(lowest < (std::string_view(name) == "run" ? 0.3f : 0.05f));
+            CHECK(lowest < 0.05f);
             continue;
         }
         CHECK(handMove < 0.015f);
