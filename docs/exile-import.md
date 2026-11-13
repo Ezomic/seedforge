@@ -19,7 +19,7 @@ the spear and the shield.
 
 ## Root motion
 
-Clips are authored so the root travels the way the legs plant their feet, along the way the body faces (+Z in the file, -Z after the turn). Walk is a loop of 2.7 s at about 1.05 m/s (2.86 m per loop) and Run a loop of 1.75 s at about 5.2 m/s (9.1 m per loop). The planted ankle moves at about 0.07 m/s in Walk.
+Clips are authored so the root travels the way the legs plant their feet, along the way the body faces (+Z in the file, -Z after the turn). Walk is a loop of 1.33 s at about 1.08 m/s (1.45 m per loop) and Run a loop of 1.07 s at 5.2 m/s (5.56 m per loop). The planted ankle moves at about 0.3 m/s in Walk.
 
 ## Loops
 
@@ -51,7 +51,7 @@ The source clips straighten the elbows past straight (Idle, Block, Hit, by up to
 (`CookOptions::clipPass`, run on the 60 Hz samples before compression) that solves each arm again per sample as a
 two-bone chain, from the posed skeleton only:
 
-- The shoulder stays where the source puts it, and so does the hand, except in Idle, Walk and Run (below). A hand moves
+- The shoulder stays where the source puts it, and so does the hand, except in Idle (below). A hand moves
   otherwise only where the reach asks for a bend under 14 degrees or over 150.
 - The elbow goes to the side of the shoulder-hand line that a pole points to: outward, a little back and down, in the
   frame of the shoulders and the neck. The elbow never locks straight: flex is at least 14 degrees, which stands the
@@ -59,11 +59,11 @@ two-bone chain, from the posed skeleton only:
 - The elbow is a pure hinge, about the axis the bind pose bends about, carried by the upper arm. The plane it bends in
   is 70% the source's own (its upper arm's hinge) and 30% the pole's, so the shoulder keeps most of its source roll and
   the cuirass is not twisted across the chest.
-- Idle, Walk and Run put the hands across the chest or flared out. Their hands hang beside the thigh instead, palm to the
-  thigh, thumb forward, fingers along the forearm: the hand's path is the source's own, offset from the clip's mean (in
-  the hips' frame), so the arm swing of Walk and Run survives. Hang is 0.93 of the arm's length (Idle, Walk), 0.8 (Run).
-  The props follow: the sockets come from the cooked Idle's hand.
-- In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
+- Idle's hands hang beside the thigh, palm to the thigh, thumb forward, fingers along the forearm: the hand's path is
+  the source's own, offset from the clip's mean (in the hips' frame), at a hang of 0.93 of the arm's length. Walk and
+  Run keep the arm swing their source clips give them, like every other clip (SEED-795). The props follow: the sockets
+  come from the cooked Idle's hand.
+- In every clip but Idle the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
   saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.
 
 ## Sockets
