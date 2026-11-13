@@ -1179,6 +1179,30 @@
       "sha256": {
         "art/texture_budget.json": "db07048f5ee55f0bc21755ce5d44da9bc15fad862f3be687f4183594ecf1789d"
       }
+    },
+    {
+      "id": "exile_body",
+      "path": "art/exile/SK_ExileBody.glb",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Bare Exile body: generated locally by the owner with Z-Image Turbo, TRELLIS.2 and UniRig, fitted to the Exile skeleton with tools/fit_exile_body.py. First-party, all rights reserved.",
+      "date_added": "2026-11-11",
+      "sha256": {
+        "art/exile/SK_ExileBody.glb": "7628797cfeae743405aba4990e2a0b757dd71b0dbdb5975747ad1f2b24392a2d"
+      }
+    },
+    {
+      "id": "exile_body_concept",
+      "path": "art/concept/characters/T_ExileBody*.png",
+      "source_url": "https://github.com/Ezomic/seedforge",
+      "author": "Ezomic",
+      "license": "LicenseRef-Proprietary",
+      "attribution": "Bare Exile body concept art: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.",
+      "date_added": "2026-11-11",
+      "sha256": {
+        "art/concept/characters/T_ExileBodyFront.png": "18455e56ceb964cc86aadc29ce716655ef3c3c0615a31898ce8a69e475a8b0b8"
+      }
     }
   ]
 }

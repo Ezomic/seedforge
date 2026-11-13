@@ -54,6 +54,9 @@ ART_RULES = {
 }
 
 
+SIDECAR = ".provenance.json"
+
+
 def stem_and_ext(name):
     stem, dot, ext = name.rpartition(".")
     return (stem, "." + ext) if dot and stem else (name, "")
@@ -66,6 +69,9 @@ def check_file(parts):
     stem, ext = stem_and_ext(name)
     if parts == ["art", "LICENSES.json"]:
         return []
+    # A provenance sidecar (tools/provenance.py) is named after the asset it sits beside, so it follows that asset's rule.
+    if top == "art" and name.endswith(SIDECAR):
+        return check_file(parts[:-1] + [name[: -len(SIDECAR)]])
     if top == "data":
         if len(parts) == 2 and name == "README.md":
             return []
@@ -211,6 +217,7 @@ def self_test():
         ("texture without prefix", "art-file", add("art/hoplite/Bronze.png")),
         ("texture in snake_case", "art-file", add("art/hoplite/t_bronze.png")),
         ("mesh with the texture prefix", "art-file", add("art/hoplite/T_Aspis.fbx")),
+        ("provenance sidecar of a badly named mesh", "art-file", add("art/hoplite/aspis.glb.provenance.json")),
         ("glb mesh without prefix", "art-file", add("art/hoplite/Aspis.glb")),
         ("glb mesh with the texture prefix", "art-file", add("art/hoplite/T_Aspis.glb")),
         ("glb mesh in snake_case", "art-file", add("art/hoplite/sm_aspis.glb")),
