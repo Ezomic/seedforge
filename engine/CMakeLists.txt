@@ -12,9 +12,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(ENGINE_SANITIZERS AND MSVC)
     message(FATAL_ERROR "ENGINE_SANITIZERS is for clang and gcc; use the linux-headless-asan preset")
 endif()
+# UBSan checks recover by default: they print "runtime error" and the process still exits 0, so ctest
+# would pass. -fno-sanitize-recover makes every finding end the process with a failure (SEED-797).
 if(ENGINE_SANITIZERS)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
-    add_link_options(-fsanitize=address,undefined)
+    add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
 endif()
 
 # The simulation must round the same way everywhere. MSVC does not contract
