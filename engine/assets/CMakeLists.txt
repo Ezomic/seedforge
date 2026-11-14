@@ -17,6 +17,11 @@ target_compile_definitions(ichor_bc7enc PUBLIC RGBCX_USE_SMALLER_TABLES=1)
 
 file(GLOB ichor_assets_sources CONFIGURE_DEPENDS src/*.cpp)
 add_library(ichor_assets ${ichor_assets_sources})
+# image.cpp compiles stb_image, whose stbi__getn does memcpy(NULL, p, 0) on a zero-length PNG chunk. That is UB
+# by the letter but harmless, and it is third-party code, so only that one UBSan check is off for this file.
+if(ENGINE_SANITIZERS)
+    set_source_files_properties(src/image.cpp PROPERTIES COMPILE_OPTIONS -fno-sanitize=nonnull-attribute)
+endif()
 target_include_directories(ichor_assets PUBLIC include)
 target_include_directories(ichor_assets PRIVATE ${Stb_INCLUDE_DIR} ${CGLTF_INCLUDE_DIR})
 target_link_libraries(ichor_assets

@@ -42,7 +42,7 @@ MapOverlaySources everywhere()
 {
     static const TemenosSanctuary sanctuary{50.0f, 50.0f, 1000.0f, 1.0f};
     MapOverlaySources s;
-    s.regionAt = [](std::int32_t x, std::int32_t y) { return static_cast<std::uint32_t>((x / 4) + 100 * (y / 4)); };
+    s.regionAt = [](std::int32_t x, std::int32_t y) { return static_cast<std::uint32_t>((x / 4) + 100 * static_cast<std::int64_t>(y / 4)); };
     s.ownerAt = [](std::int32_t x, std::int32_t) { return static_cast<std::uint32_t>(x < 0 ? 0 : 1); };
     s.factionCount = 2;
     s.sanctuaries = std::span<const TemenosSanctuary>(&sanctuary, 1);
