@@ -594,6 +594,22 @@ Generated from `art/LICENSES.json` by `tools/check_assets_licensed.py --write-cr
 - Files: `engine/assets/vendor/bc7enc/*`
 - Attribution: bc7enc, rgbcx and bc7decomp by Richard Geldreich, Jr. (https://github.com/richgel999/bc7enc), Copyright 2020, MIT License (also offered as public domain). Used by ichor_cook to block-compress textures.
 
+## exile_body
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/exile/SK_ExileBody.glb`
+- Attribution: Bare Exile body: generated locally by the owner with Z-Image Turbo, TRELLIS.2 and UniRig, fitted to the Exile skeleton with tools/fit_exile_body.py. First-party, all rights reserved.
+
+## exile_body_concept
+
+- Author: Ezomic
+- Licence: Proprietary, all rights reserved (first-party)
+- Source: https://github.com/Ezomic/seedforge
+- Files: `art/concept/characters/T_ExileBody*.png`
+- Attribution: Bare Exile body concept art: generated locally by the owner with Z-Image Turbo. First-party, all rights reserved.
+
 ## font_alegreya_sans
 
 - Author: The Alegreya Sans Project Authors
