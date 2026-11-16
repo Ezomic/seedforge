@@ -499,7 +499,7 @@ TEST_CASE("the Exile's shield faces forward at the start of idle and through blo
     std::vector<glm::mat4> skin;
     REQUIRE(set.samplePose(set.findClip("idle"), 0.0f, pose));
     REQUIRE(set.skinningMatrices(set.findClip("idle"), 0.0f, skin));
-    CHECK(glm::degrees(std::acos(glm::dot(shieldFace(skin), hipsForward(pose)))) < 35.0f);
+    CHECK(glm::degrees(std::acos(std::clamp(glm::dot(shieldFace(skin), hipsForward(pose)), -1.0f, 1.0f))) < 35.0f);
 
     const std::uint32_t block = set.findClip("block");
     const std::uint32_t hand = jointIndex("mixamorig:LeftHand");

@@ -63,6 +63,22 @@ two-bone chain, from the posed skeleton only:
   thigh, thumb forward, fingers along the forearm: the hand's path is the source's own, offset from the clip's mean (in
   the hips' frame), so the arm swing of Walk and Run survives. Hang is 0.93 of the arm's length (Idle, Walk), 0.8 (Run).
   The props follow: the sockets come from the cooked Idle's hand.
+  Idle's arms are also relaxed in `SK_Exile.glb` itself (SEED-792), so a tool that reads the file no longer shows the
+  source's flared hands: `tools/relax_exile_idle.py` solves the same two-bone chain on the clip's own keys and rewrites
+  the upper arm, forearm and hand rotations. It hangs each hand straight down from its own posed shoulder, keeps the
+  bind wrist and takes the elbow plane from the pole alone, where the cook measures the hang from the hips and keeps most
+  of the source's upper arm roll, so the file's arms and the cooked ones are close, not
+  equal. The same tool stands the idle square: the source turned the hips 14 degrees one way and the shoulders 10 the
+  other and set the right foot 24 cm back, and every joint but the arms and hands now takes its bind rotation times its
+  key's turn from the clip's mean, so the clip's own motion stays. This changes the stance in the game too. The tool also
+  corrects the arms of the other eight clips in the file. Their hands crossed the body's midline because the clips were
+  made for a rig that rests with its arms higher than this one's: each upper arm key is turned back out by 46 degrees
+  (of the 63 from the bind arm to level; the figure that leaves the walk's arms about 8 degrees out from the body), and
+  the cook's elbow and wrist solve is then applied as it stands. Walk's arms also bend as they swing forward. The clavicles get the same treatment one joint up:
+  the source walk holds them 50 and 56 degrees below level against the bind's 20, so each clavicle key is turned back by
+  the turn from the walk's mean clavicle to the bind one (32 and 40 degrees), which lifts the shoulders about 8 cm. The hand positions of those
+  clips therefore change in the game too. `tools/restore_exile_roll.py` writes the source idle back, so run
+  `relax_exile_idle.py` after it.
 - In the other clips the hand keeps its world rotation. Its turn about the forearm bone against the bind is unwrapped along the clip and
   saturated by `45 * tanh(t / 45)` degrees: smooth, no wrap, under 45.
 
