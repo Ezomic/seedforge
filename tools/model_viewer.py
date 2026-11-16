@@ -70,7 +70,7 @@ PAGE_BODY = """
 <label>Clip <select id="clip"></select></label>
 <label><input type="checkbox" id="play" checked> Play</label>
 <label><input type="checkbox" id="spin"> Turntable</label></header>
-<model-viewer id="mv" camera-controls touch-action="pan-y" shadow-intensity="0.6" interaction-prompt="none" hidden></model-viewer>
+<model-viewer id="mv" camera-controls max-camera-orbit="auto auto 600%" touch-action="pan-y" shadow-intensity="0.6" interaction-prompt="none" hidden></model-viewer>
 <div id="note">Choose a model on the left.</div>
 </main>
 <aside><h2>Measured</h2><table id="stats"></table><h2>References</h2><div id="refs"></div></aside>
