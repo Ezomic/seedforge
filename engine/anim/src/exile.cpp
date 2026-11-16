@@ -52,14 +52,14 @@ constexpr float kPoleBack = 0.4f;
 constexpr float kPoleDown = 0.25f;
 // How much of the source's own elbow plane (its upper arm roll) the plane keeps, the rest being the pole's.
 constexpr float kRollKept = 0.7f;
-// Idle, Walk and Run put the hands across the chest or flared out. Their hands are moved to hang beside the thigh with
-// the palm to it, keeping the source's own motion: the hand's path is offset from the clip's mean, not replaced.
-// `hang` is the reach used of the arm's length, `out` how far outward of the shoulder line the hand hangs.
+// Idle's hands are moved to hang beside the thigh with the palm to it, keeping the source's own motion: the hand's
+// path is offset from the clip's mean, not replaced. Walk and Run keep the arm swing their source gives them.
+// `hang` is the reach used of the arm's length, kRelaxedOut how far outward of the shoulder line the hand hangs.
 struct Relaxed {
     const char* clip;
     float hang;
 };
-constexpr Relaxed kRelaxed[] = {{"idle", 0.93f}, {"walk", 0.93f}, {"run", 0.8f}};
+constexpr Relaxed kRelaxed[] = {{"idle", 0.93f}};
 constexpr float kRelaxedOut = 0.05f;
 
 struct ArmChain {

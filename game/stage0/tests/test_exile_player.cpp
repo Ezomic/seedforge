@@ -459,7 +459,13 @@ TEST_CASE("the run sits the body up but leaves the arms, and so the spear and sh
         for (const std::uint32_t j : {probe.rig.leftArmJoints.back(), probe.rig.rightArmJoints.back()}) {
             for (int c = 0; c < 3; ++c) CHECK(glm::distance(glm::vec3(skin[j][c]), glm::vec3(raw[j][c])) < 1e-3f);
         }
-        CHECK(glm::distance(probe.at(skin, probe.rig.chest), probe.at(raw, probe.rig.chest)) > 0.05f);
+        // The spine turns back about the hips by however far the clip leans past kExileRunLean, so the chest moves
+        // by that turn's chord and stays put on a frame that leans less. The player's pose has the root's travel
+        // taken out and the raw sample has not.
+        const float over = std::max(leanOf(probe, raw) - kExileRunLean, 0.0f);
+        const glm::vec3 spine = probe.at(raw, probe.rig.chest) - probe.at(raw, probe.rig.hips);
+        const glm::vec3 chest = probe.at(skin, probe.rig.chest) + glm::vec3(root.x, 0.0f, root.z);
+        CHECK(glm::distance(chest, probe.at(raw, probe.rig.chest)) == Catch::Approx(2.0f * std::hypot(spine.y, spine.z) * std::sin(0.5f * over)).margin(1e-3f));
     }
 }
 
